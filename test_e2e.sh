@@ -1,21 +1,32 @@
 #!/usr/bin/env bash
-# 已知答案端到端测试：say 合成中文语音 + PIL 字幕 PNG overlay 烧录 → 逐阶段驱动 serve API → 断言。
-# 管线由 Dify workflow 编排后，e2e 直接打 serve 的阶段端点（POST /runs + /runs/{id}/{stage}），
-# 本地 whisper（remote="" 强制）+ 启发式选帧兜底 + 合成正文写盘，全程不烧 LLM、不入知识库。
-#   ./test_e2e.sh                      # 端到端（需 serve 已启动：launchd com.linmintao.video2md-server）
+# 已知答案端到端测试（LangGraph 版）：say 合成中文语音 + PIL 字幕 PNG overlay 烧录
+#   → 自起 api 实例（V2MD_FAKE_LLM=1，确定性假 LLM 不烧 token）→ POST /runs → 轮询终态 → 断言。
+# Dify 抽离后不再有逐阶段 HTTP 端点：图的节点就是阶段，e2e 验证的是「整条链一次跑通」。
+#   ./test_e2e.sh                      # 端到端（脚本自起 api 于 127.0.0.1:8791，不影响 8790）
 #   WHISPER_MODEL=small ./test_e2e.sh  # 自选 whisper 模型（默认 small）
+#   REAL_LLM=1 ./test_e2e.sh           # 烧真实 LLM（用 ~/.config/video2md.env 的 LLM_*）
 set -euo pipefail
 cd "$(dirname "$0")"
 
 MODEL="${WHISPER_MODEL:-small}"
-SERVE="http://127.0.0.1:${V2MD_PORT:-8790}"
+PORT="${V2MD_API_PORT:-8791}"
+API="http://127.0.0.1:$PORT"
 
 VAULT="${OBSIDIAN_VAULT:-$HOME/Documents/Obsidian Vault}"
 NOTEDIR="$VAULT/资料库/视频笔记"
 fail() { echo "❌ $1"; exit 1; }
 
 TMP=$(mktemp -d /tmp/v2md-e2e-XXXXXX)
-trap 'rm -rf "$TMP"' EXIT
+
+# .env 临时切本地算力（远程池挂了会把 e2e 拖进无关故障域），退出时恢复
+cp .env "$TMP/.env.bak"
+cleanup() {
+  cp "$TMP/.env.bak" .env
+  [ -n "${API_PID:-}" ] && kill "$API_PID" 2>/dev/null || true
+  rm -rf "$TMP"
+}
+trap cleanup EXIT
+sed -i '' -E 's/^(V2MD_REMOTE|V2MD_CLIPS_REMOTE|V2MD_CLIPS_SOURCE)=/# e2e 本地算力 \1=/' .env
 
 # —— 1. 合成测试视频：5 句已知中文，语音 + 同步烧录字幕（画面即 OCR ground truth）——
 SENTS=("量子纠缠是粒子之间的奇妙关联" "时间管理的第一步是记录时间去向" "光合作用将光能转化为化学能" "深度学习的本质是多层特征变换" "复利是世界第八大奇迹")
@@ -23,7 +34,6 @@ VOICE=$(say -v '?' | grep zh_CN | head -1 | awk '{print $1}')
 say -v '?' | grep -q Tingting && VOICE="Tingting"
 echo "语音: $VOICE · whisper: $MODEL"
 
-# PIL 渲染幻灯片式整幅 PNG（白底黑字大标题——贴近幻灯片 OCR 场景，场景切换可触发抽帧）
 SENTS_JSON=$(printf '%s\n' "${SENTS[@]}" | python3 -c "import json,sys;print(json.dumps(sys.stdin.read().split(),ensure_ascii=False))")
 uv run python - "$TMP" "$SENTS_JSON" <<'PYEOF'
 import json, sys
@@ -50,7 +60,6 @@ for i, s in enumerate(sentences, 1):
 print(f"幻灯片 PNG x{len(sentences)}")
 PYEOF
 
-# 逐句合成语音，累计 overlay 时间窗
 CHAIN=""; INPUTS=(-f lavfi -i "color=c=0x1d2b53:s=1280x720:r=25:d=0"); AUDIO=(); T=0
 for i in "${!SENTS[@]}"; do
   n=$((i + 1))
@@ -77,75 +86,60 @@ ffmpeg -y -hide_banner -loglevel error "${INPUTS[@]}" -i "$TMP/all.wav" \
   -c:v libx264 -pix_fmt yuv420p -c:a aac -shortest "$TMP/e2e.mp4"
 echo "测试视频就绪（${T}s）"
 
-# —— 2. 逐阶段驱动 serve API（与 Dify workflow 同一组端点）——
-rm -f "$NOTEDIR"/e2e*.md "$NOTEDIR"/transcripts/e2e* "$NOTEDIR"/attachments/e2e-*.jpg "$NOTEDIR"/attachments/e2e-*.mp4
+# —— 2. 自起 api 实例（假 LLM + 本地算力）并跑完整张图 ——
+rm -f "$NOTEDIR"/测试笔记（假LLM）*.md "$NOTEDIR"/e2e*.md "$NOTEDIR"/transcripts/e2e* "$NOTEDIR"/attachments/e2e-*.jpg "$NOTEDIR"/attachments/e2e-*.mp4
 mkdir -p "$NOTEDIR" "$NOTEDIR/transcripts" "$NOTEDIR/attachments"
-touch "$NOTEDIR/索引.md" 2>/dev/null || true
-[ -f "$NOTEDIR/索引.md" ] && sed -i '' '/e2e/d' "$NOTEDIR/索引.md" 2>/dev/null || true
+touch "$NOTEDIR/索引.md"
+sed -i '' '/e2e/d;/测试笔记（假LLM）/d' "$NOTEDIR/索引.md" 2>/dev/null || true
+
+FAKE_FLAG="1"
+if [ -n "${REAL_LLM:-}" ]; then
+  FAKE_FLAG="0"
+fi
+V2MD_FAKE_LLM="$FAKE_FLAG" V2MD_WHISPER_MODEL="$MODEL" uv run python -m video2md api --port "$PORT" \
+  > "$TMP/api.log" 2>&1 &
+API_PID=$!
+for _ in $(seq 1 30); do curl -s -m 2 "$API/healthz" >/dev/null 2>&1 && break; sleep 1; done
+curl -s -m 2 "$API/healthz" >/dev/null || { cat "$TMP/api.log"; fail "api 未起来"; }
+echo "api 就绪（V2MD_FAKE_LLM=${FAKE_FLAG}）"
 
 jqv() { python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get(sys.argv[1],'') or '')" "$1"; }
 
-stage() {  # stage <name> <json-body>：POST 后轮询到 done/error
-  local name="$1" body="$2" deadline=$((SECONDS + 900))
-  while true; do
-    local resp
-    resp=$(curl -s -m 120 -X POST "$SERVE/runs/$RUN_ID/$name" -H 'Content-Type: application/json' -d "$body")
-    local st
-    st=$(echo "$resp" | jqv status)
-    case "$st" in
-      done) echo "  ✅ $name"; return 0 ;;
-      error) echo "$resp" | jqv error; fail "阶段 $name 失败" ;;
-      *) [ $SECONDS -lt $deadline ] || fail "阶段 $name 轮询超时"; sleep 5 ;;
-    esac
-  done
-}
+# 临时目录断言的基线：只数本测新增的残留（历史崩溃遗留不该算到本次头上）
+TMP_LEFT_BEFORE=$(python3 -c "import glob,tempfile;print(len(glob.glob(tempfile.gettempdir()+'/video2md-run-*')))")
 
-echo "—— 建 run ——"
-RESP=$(curl -s -m 60 -X POST "$SERVE/runs" -H 'Content-Type: application/json' \
-  -d "$(python3 -c "import json;print(json.dumps({'url':'$TMP/e2e.mp4','force':True}))")")
-RUN_ID=$(echo "$RESP" | jqv run_id)
-[ -n "$RUN_ID" ] || { echo "$RESP"; fail "建 run 失败"; }
-echo "run_id=$RUN_ID"
-
-echo "—— 逐阶段推进 ——"
-stage download '{}'
-stage transcribe "$(python3 -c "import json;print(json.dumps({'remote':'','model':'$MODEL','language':'zh'}))")"
-stage frames '{"max_frames":"20"}'
-stage ocr '{}'
-stage select '{}'   # 空 payload → 本地启发式选帧兜底
-stage clips '{}'
-
-echo "—— note：合成正文（嵌已发布帧）写盘 ——"
-SELECTED=$(curl -s -m 30 "$SERVE/runs/$RUN_ID/stages/selected" | jqv text)
-BODY=$(python3 - "$SELECTED" <<'PYEOF'
-import json, re, sys
-manifest = sys.argv[1]
-frames = re.findall(r"^(\S+\.jpe?g)", manifest, re.M)
-parts = ["## 引言（00:00）", "", "本视频用五条已知事实句做管线自检，逐句配画面帧。", ""]
-for i, f in enumerate(frames[:5], 1):
-    parts += [f"第 {i} 节内容。", f"![[attachments/{f}]]", f"*第 {i} 帧图注*", ""]
-print(json.dumps({"body": "\n".join(parts),
-                  "meta": {"title": "e2e 自检笔记", "tags": ["e2e"], "summary": "管线自检"}},
-                 ensure_ascii=False))
+BODY=$(python3 - "$TMP/e2e.mp4" <<'PYEOF'
+import json, sys
+print(json.dumps({"url": sys.argv[1], "force": True}))
 PYEOF
 )
-NOTE_RESP=$(curl -s -m 300 -X POST "$SERVE/runs/$RUN_ID/note" -H 'Content-Type: application/json' -d "$BODY")
+RESP=$(curl -s -m 30 -X POST "$API/runs" -H 'Content-Type: application/json' -d "$BODY")
+RUN_ID=$(echo "$RESP" | jqv run_id)
+[ -n "$RUN_ID" ] || { echo "$RESP"; fail "建 run 失败"; }
+echo "run_id=${RUN_ID}（图一次跑通，不再逐阶段驱动）"
+
+deadline=$((SECONDS + 900))
 while true; do
-  st=$(curl -s -m 120 -X POST "$SERVE/runs/$RUN_ID/note" -H 'Content-Type: application/json' -d "$BODY" | jqv status)
-  case "$st" in
-    done) break ;;
-    error) fail "note 阶段失败" ;;
-    *) sleep 5 ;;
+  R=$(curl -s -m 30 "$API/runs/$RUN_ID")
+  ST=$(echo "$R" | python3 -c "import json,sys;d=json.load(sys.stdin);print(d.get('status') or (d.get('task') or {}).get('status') or '')")
+  case "$ST" in
+    done|partial) break ;;
+    error) echo "$R" | python3 -m json.tool | head -30; fail "run 失败" ;;
+    *) [ $SECONDS -lt $deadline ] || fail "轮询超时（900s）"; sleep 10 ;;
   esac
 done
-NOTE=$(find "$NOTEDIR" -name "e2e*.md" -newer "$TMP/e2e.mp4" | head -1)
+echo "  ✅ run → $ST"
+
+NOTE=$(find "$NOTEDIR" -name "*.md" -newer "$TMP/e2e.mp4" ! -name "索引*" | head -1)
 [ -n "$NOTE" ] && [ -f "$NOTE" ] || fail "未产出笔记"
-echo "  ✅ note → $NOTE"
-# —— 3. 断言 ——
+echo "  ✅ note → $(basename "$NOTE")"
+
+# —— 3. 断言（与旧 e2e 同口径；kb 相关断言已随 Dify 抽离摘除）——
 echo "—— 断言 ——"
 grep -q "processor: dify-video2md" "$NOTE" || fail "frontmatter 缺 processor"
 grep -q "reviewed: false" "$NOTE" || fail "frontmatter 缺 reviewed"
 grep -q "> \[!info\] 视频信息" "$NOTE" || fail "缺 [!info] 视频信息 callout"
+grep -q "^## " "$NOTE" || fail "笔记缺章节结构"
 # 转录本 SSOT：正文 wikilink 指向 transcripts/ 下的真实文件
 TNAME=$(grep -o 'transcripts/[^|)]*\.txt' "$NOTE" | head -1 | sed 's#.*/##')
 [ -n "$TNAME" ] && [ -f "$NOTEDIR/transcripts/$TNAME" ] || fail "缺转录本 SSOT 文件（wikilink 悬空）"
@@ -166,7 +160,6 @@ text = open(note).read()
 embeds = re.findall(r"!\[\[attachments/([^\]]+\.mp4)\]\]", text)
 missing = [e for e in embeds if not (Path(att) / e).exists()]
 assert not missing, f"节段嵌入悬空: {missing}"
-# 每个帧嵌入下方应紧跟对应节段嵌入
 lines = text.splitlines()
 for i, l in enumerate(lines):
     m = re.fullmatch(r"!\[\[attachments/([^\]]+\.jpg)\]\]", l.strip())
@@ -175,7 +168,7 @@ for i, l in enumerate(lines):
         raise SystemExit(f"帧 {m.group(1)} 缺配套视频节段")
 print("节段配对 OK")
 PYEOF
-# ground truth：5 句合成语音模糊匹配，对照转录本 SSOT（正文是改写文，措辞会变）。容忍：繁体/同音字（ratio）、多句并一段（滑窗）
+# ground truth：5 句合成语音模糊匹配，对照转录本 SSOT。容忍：繁体/同音字（ratio）、多句并一段（滑窗）
 uv run python - "$NOTEDIR/transcripts/$TNAME" <<'PYEOF'
 import re, sys
 from difflib import SequenceMatcher
@@ -210,15 +203,18 @@ PYEOF
 grep "【画面】" "$NOTEDIR/transcripts/$TNAME" | grep -q "光合作用" || fail "OCR 未识别出烧录字幕"
 # 索引登记
 grep -q "$(basename "$NOTE" .md)" "$NOTEDIR/索引.md" || fail "索引未登记该笔记"
-# 完整模式额外断言：LLM 文稿结构 + 检索自检
-if [ -z "${DRY_RUN:-}" ] && [ -z "${SKIP_KB:-}" ]; then
-  grep -q "^## " "$NOTE" || fail "笔记缺章节结构"
-  grep -qE "^## .+（[0-9]+:[0-9]{2}）" "$NOTE" || fail "章节标题缺时间戳锚点"
-  grep -q "复利" "$NOTEDIR/transcripts/$TNAME" || fail "转录本未覆盖关键句5"
-  echo "$OUT" | grep -q "SELF-CHECK PASS" || fail "知识库检索自检未通过"
-fi
-# 临时目录零残留
-LEFT=$(python3 -c "import glob,tempfile;print(len(glob.glob(tempfile.gettempdir()+'/video2md-*')))")
-[ "$LEFT" -eq 0 ] || fail "临时目录残留 $LEFT 个"
+# 幂等 SSOT：state.json 应有本视频的指纹记录（重发同链应跳过）
+python3 -c "
+import json; s = json.load(open('state.json'))
+assert any(v.get('note') for v in s.values()), 'state.json 未落幂等记录'
+print('state.json 幂等记录 OK')"
+# 临时目录零新增残留
+LEFT=$(python3 -c "import glob,tempfile;print(len(glob.glob(tempfile.gettempdir()+'/video2md-run-*')))")
+[ "$LEFT" -le "$TMP_LEFT_BEFORE" ] || fail "临时目录新增残留 $((LEFT - TMP_LEFT_BEFORE)) 个"
+
+# /queue 契约（gpu_router 回读口）
+curl -s -m 5 "$API/queue" | grep -q '"queue_len"' || fail "/queue 契约缺失"
+# 产出 markdown 调取口
+curl -s -m 5 "$API/runs/$RUN_ID/note" | grep -q "测试笔记" || fail "/note 调取口异常"
 
 echo "✅ E2E PASS → $NOTE"

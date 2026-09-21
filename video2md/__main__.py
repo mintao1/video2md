@@ -12,6 +12,14 @@ from .serve import cmd_serve
 
 
 def main() -> None:
+    if len(sys.argv) > 1 and sys.argv[1] == "api":
+        # LangGraph 内嵌服务（FastAPI）——Dify 抽离后的生产入口
+        from .api import cmd_api
+        ap = argparse.ArgumentParser(prog="video2md api")
+        ap.add_argument("--port", type=int, default=int(ENV.get("V2MD_PORT", "8790")))
+        a = ap.parse_args(sys.argv[2:])
+        cmd_api(a.port)
+        return
     if len(sys.argv) > 1 and sys.argv[1] == "serve":
         ap = argparse.ArgumentParser(prog="video2md serve")
         ap.add_argument("--port", type=int, default=int(ENV.get("V2MD_PORT", "8790")))
@@ -62,7 +70,8 @@ def main() -> None:
                 print(f"{rid}  {r.get('created', '')}  {r.get('status', '')}  "
                       f"条目 {r.get('total', 0)}  url={r.get('url', '')[:60]}")
         return
-    sys.exit("用法：video2md serve [--port 8790] | graph-run <url> [--force] [--review] | runs [run_id]")
+    sys.exit("用法：video2md api [--port 8790] | graph-run <url> [--force] [--review] | runs [run_id]"
+             " | serve（legacy：Dify 时代的阶段服务，迁移完成后归档）")
 
 
 

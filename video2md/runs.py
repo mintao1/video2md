@@ -334,7 +334,7 @@ def _stage_transcribe(run, entry, art, tmp, args):
     if not art.get("video"):
         # 工作流在 download 失败后仍会放行下游（loop 对 error 不拦），这里要给出人话而不是 KeyError 'video'
         raise SystemExit("无视频产物（download 未成功），跳过转写")
-    segs, conf, dropped = transcribe(Path(art["video"]), args.get("model") or "turbo",
+    segs, conf, dropped = transcribe(Path(art["video"]), args.get("model") or ENV.get("V2MD_WHISPER_MODEL") or "turbo",
                                      args.get("language") or "zh", tmp,
                                      args.get("remote") or ENV.get("V2MD_REMOTE", ""))
     if not segs:

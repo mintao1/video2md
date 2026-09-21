@@ -46,6 +46,25 @@ _TRANSPORT = None  # 测试注入 httpx.MockTransport；None = 真实网络
 _sleep = time.sleep  # 测试替换掉，免得重试间隔真等
 
 
+# 假 LLM 模式（V2MD_FAKE_LLM=1）：e2e / Docker 冒烟不烧真实 token 的确定性出口。
+# 只替代「文本生成」，解析/过滤/门禁全走真代码——测的正是后者。
+_FAKE_LLM = (ENV.get("V2MD_FAKE_LLM") or "").lower() in ("1", "true", "on")
+
+_FAKE_META = '{"title": "测试笔记（假LLM）", "tags": ["e2e", "测试"], "summary": "离线冒烟摘要"}'
+
+
+def _fake_organize(entry_frames: str) -> str:
+    """确定性正文：嵌入选中帧（entry_frames = select 产物的可用帧清单），贴近真实改写格式。"""
+    frames = re.findall(r"(\S+\.jpe?g)", entry_frames or "")[:5]
+    parts = ["## 引言（00:00）", "",
+             "这是基于转录本整理的**测试正文**（假 LLM 占位，e2e/冒烟专用）。" + "展开。" * 20]
+    for i, f in enumerate(frames, 1):
+        parts += [f"## 第 {i} 节（00:{i:02d}）", "", f"第 {i} 节内容。" + "补充细节。" * 10,
+                  f"![[attachments/{f}]]", f"*第 {i} 帧图注*", ""]
+    parts.append("## 小结（00:15）\n\n" + "收尾。" * 40)
+    return "\n".join(parts)
+
+
 
 def render(template: str, **vars) -> str:
     """{{var}} 占位符替换；未知占位符保留原样（宁漏不炸——prompt 里可能有别的双花括号文本）。"""
@@ -93,6 +112,9 @@ def chat(system: str, user: str, *, task: str, temperature: float, max_tokens: i
 
 def llm_task(task: str, **vars) -> str:
     """按任务名取模板渲染并调用。vars 即 user 模板的 {{var}} 占位符实参。"""
+    if _FAKE_LLM:
+        return _fake_organize(vars.get("entry_frames", "")) if task in ("organize", "review") \
+            else _FAKE_META
     p = _TASK_PARAMS[task]
     log = current_log()
     if log:
@@ -192,6 +214,15 @@ def filter_select(blocks: list[dict], mode: str, allowed: dict[int, list[str]],
 
 def select_frames(transcript: str, candidates: str, total: int) -> tuple[dict, int, str]:
     """内容选帧一步到位：LLM 调用 + 解析 + 合法名过滤 → select 阶段 payload。"""
+    if _FAKE_LLM:
+        # 假模式确定性选帧：每条目取清单前 2 个合法帧名
+        allowed = allowed_frames_of(candidates)
+        if total > 1:
+            sels = [{"entry": k, "frames": [{"name": n, "caption": "e2e"} for n in v[:2]]}
+                    for k, v in sorted(allowed.items())]
+            return {"selections": sels}, sum(len(s["frames"]) for s in sels), ""
+        frames = [{"name": n, "caption": "e2e"} for n in allowed.get(1, [])[:2]]
+        return {"frames": frames}, len(frames), ""
     out = llm_task("select_frames", transcript=transcript, candidates=candidates)
     blocks, mode = parse_select_output(out)
     return filter_select(blocks, mode, allowed_frames_of(candidates), total)
