@@ -1,0 +1,12 @@
+.env
+.env.bak-*
+state.json
+state.json.bak-*
+jobs.json
+runs.json
+runs.lock
+logs/
+__pycache__/
+.venv/
+.DS_Store
+tmp/
