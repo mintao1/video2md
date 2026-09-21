@@ -84,6 +84,7 @@ assert n[0] == 1, f"4xx 不该重试，实际调了 {n[0]} 次"
 
 # ---- SSE 流式收集（524 规避的主路径）-----------------------------------------
 def sse_handler(_r):
+    calls.append(_r)
     body = ('data: {"choices":[{"delta":{"content":"第一段"}}]}\n\n'
             'data: {"choices":[{"delta":{}}]}\n\n'          # 空 delta 心跳
             'data: {"choices":[{"delta":{"content":"第二段"}}]}\n\n'
