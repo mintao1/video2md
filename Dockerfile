@@ -3,7 +3,10 @@
 # 在目标架构上构建（服务器 x86：直接在 lcode-4c 上 docker build，避免 Mac arm64 交叉构建）。
 FROM python:3.12-slim
 
-RUN apt-get update \
+# Debian 源换清华镜像（国内服务器从 deb.debian.org 拉 ffmpeg 依赖龟速实测 ~60KB/s；
+# Mac/海外构建也无害——tuna 全球可达）
+RUN sed -i 's|deb.debian.org|mirrors.tuna.tsinghua.edu.cn|g' /etc/apt/sources.list.d/debian.sources \
+ && apt-get update \
  && apt-get install -y --no-install-recommends ffmpeg \
  && rm -rf /var/lib/apt/lists/*
 
