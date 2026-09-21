@@ -64,12 +64,33 @@ def _persist(run: dict) -> None:
 # ---------------------------------------------------------------- 节点
 
 def node_resolve(state: RunState) -> dict:
-    """剥分享文本 → 建 run（resolve 展开条目 + state 幂等标记）+ 同链去重复用。"""
+    """剥分享文本 → 建 run（resolve 展开条目 + state 幂等标记）+ 同链去重复用。
+
+    state 已带 run（api.py 同步解析过）→ 直接用，不重复建——POST /runs 的同步语义
+    保留给调用方（建 run 即知 total/all_skipped），图内只做兜底。
+    """
+    if state.get("run"):
+        return {}
     url = extract_url(state.get("url", ""))
     part_items = (state.get("part_items") or "").strip()
     force = bool(state.get("force"))
     if not url:
         return {"status": "error", "errors": [*state.get("errors", []), "缺 url"]}
+    run, err, _dup = resolve_run(url, part_items, force, run_id=state["run_id"])
+    if err:
+        return {"status": "error", "errors": [*state.get("errors", []), err]}
+    return {"run": run}
+
+
+
+def resolve_run(url: str, part_items: str = "", force: bool = False,
+                run_id: str = "") -> tuple[dict, str]:
+    """建 run 的同步入口（api.py POST /runs 与 node_resolve 共用）。
+
+    返回 (run, err, is_dup)：err 非空即失败；is_dup=True 时 run 是进行中旧 run
+    （调用方须自己判活：旧 run 的驱动已死就得重新入队驱动它）。
+    """
+    part_items = (part_items or "").strip()
     # 同链接同分区的进行中 run 复用（对齐 serve._post_runs 的 dedup；
     # part_items 必须参与比对——同合集的分区补跑共享 URL，只按 URL 去重会把新分区并进旧 run）
     dup = next((r for r in _load_runs().values()
@@ -77,17 +98,18 @@ def node_resolve(state: RunState) -> dict:
                 and r.get("status") in ("created", "running")), None)
     if dup:
         print(f"♻️ 复用进行中的 run {dup['run_id']}（{dup['total']} 条目），继续推进")
-        return {"run": dup, "run_id": dup["run_id"]}
+        return dup, "", True
     try:
         run = create_run(url, part_items, force=force)
     except RuntimeError as exc:
-        return {"status": "error", "errors": [*state.get("errors", []), str(exc)[:300]]}
-    run["run_id"] = state["run_id"]  # thread_id 即 run_id
-    run["status"] = "running"
+        return {}, str(exc)[:300], False
+    if run_id:
+        run["run_id"] = run_id  # thread_id 即 run_id
+    run["status"] = "created"   # created=已建未驱动；_drive 开跑时转 running（启动恢复只认 running）
     _persist(run)
     skipped = sum(1 for a in run["artifacts"].values() if a.get("skipped"))
     print(f"✅ run {run['run_id']}：{run['total']} 条" + (f"（{skipped} 条幂等跳过）" if skipped else ""))
-    return {"run": run}
+    return run, "", False
 
 
 
@@ -314,7 +336,11 @@ def run_graph(url: str, *, part_items: str = "", force: bool = False, review: bo
                          "force": force, "review": review, "max_frames": max_frames,
                          "entry_idx": 1, "errors": [], "status": "running"}
     graph = build_graph(checkpointer)
-    config = {"configurable": {"thread_id": run_id}} if checkpointer else None
+    # note 回环每条目 1 个 superstep（8 + total + 2），LangGraph 默认 recursion_limit=25
+    # 会杀掉 >15 条目的合集——放宽到 1000（superstep 是真干活，不是空转，不存在烧轮次）
+    config = {"recursion_limit": 1000}
+    if checkpointer:
+        config["configurable"] = {"thread_id": run_id}
     final = graph.invoke(initial, config=config)
     if checkpointer and final.get("status") in ("done", "partial"):
         # checkpoint 裁剪：完成的 run 不需要步进历史（重跑靠 state.json 幂等，不靠 checkpoint）

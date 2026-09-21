@@ -7,7 +7,13 @@ RUN apt-get update \
  && apt-get install -y --no-install-recommends ffmpeg \
  && rm -rf /var/lib/apt/lists/*
 
-COPY --from=ghcr.io/astral-sh/uv:0.9 /uv /usr/local/bin/uv
+# uv 以 pip 包安装（ghcr.io 在国内服务器拉不动；PyPI 走镜像站即可）。
+# 构建参数 PIP_INDEX_URL：服务器上传清华镜像（https://pypi.tuna.tsinghua.edu.cn/simple），
+# uv 装包走同一镜像（UV_INDEX_URL 跟随）。
+ARG PIP_INDEX_URL=""
+ENV PIP_INDEX_URL="${PIP_INDEX_URL}" \
+    UV_INDEX_URL="${PIP_INDEX_URL}"
+RUN pip install --no-cache-dir uv
 
 WORKDIR /app
 # 依赖层先行：源码变动不击穿缓存。package=false 项目，uv sync 只装依赖

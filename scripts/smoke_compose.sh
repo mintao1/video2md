@@ -6,6 +6,10 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+# gpu_router 仓库位置：Mac 上不同级，显式指；服务器上默认同级 ../gpu_router
+export GPU_ROUTER_DIR="${GPU_ROUTER_DIR:-$HOME/Desktop/开发项目/gpu_router}"
+[ -d "$GPU_ROUTER_DIR" ] || { echo "❌ gpu_router 仓库不在: $GPU_ROUTER_DIR"; exit 1; }
+
 SMOKE_PORT="${SMOKE_PORT:-8791}"
 API="http://127.0.0.1:$SMOKE_PORT"
 fail() { echo "❌ $1"; docker compose -f docker-compose.smoke.yml logs --tail 40 2>/dev/null || true; exit 1; }

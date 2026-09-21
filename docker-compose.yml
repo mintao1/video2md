@@ -1,5 +1,6 @@
 # video2md + gpu_router 生产编排（lcode-4c）。
-# 目录约定：~/stack/dify-video2md + ~/stack/gpu_router 同级（gpu_router build 上下文用相对路径）。
+# 目录约定：两仓库同级（默认 ../gpu_router；可用 GPU_ROUTER_DIR 环境变量覆盖，
+# 如 Mac 上 GPU_ROUTER_DIR=~/Desktop/开发项目/gpu_router）。
 # 凭证：secrets/ 目录（gitignore，部署时手工放）：
 #   secrets/video2md.env      → LLM_BASE_URL/LLM_API_KEY/LLM_MODEL（挂进容器由 V2MD_SECRETS_FILE 读）
 #   secrets/gpu_router.env    → 代理 env（HTTP_PROXY/HTTPS_PROXY/ALL_PROXY/NO_PROXY，可选但强烈建议）
@@ -16,11 +17,11 @@ volumes:
 
 services:
   gpu_router:
-    build: ../gpu_router
+    build: ${GPU_ROUTER_DIR:-../gpu_router}
     image: video2md-gpu-router
     restart: unless-stopped
     volumes:
-      - ../gpu_router/gpu_router.docker.json:/app/gpu_router.json:ro
+      - ${GPU_ROUTER_DIR:-../gpu_router}/gpu_router.docker.json:/app/gpu_router.json:ro
       - gpu-router-logs:/app/logs
       - ./secrets/colab-cli:/root/.config/colab-cli:ro
       - ./secrets/kaggle:/root/.kaggle:ro

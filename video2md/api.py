@@ -69,6 +69,11 @@ async def _drive(run_id: str, url: str, part_items: str, force: bool,
     """排队等信号量 → 线程里跑同步 graph（stage 函数全是同步阻塞，不能堵事件循环）。"""
     async with _SEMA:
         _TASKS[run_id].update(status="running", started=_now())
+        run = _load_runs().get(run_id)  # created → running（启动恢复只认 running）
+        if run and run.get("status") == "created":
+            run["status"] = "running"
+            with _runs_file_lock():
+                _runs_merge(run)
         try:
             final = await asyncio.to_thread(run_graph, url, part_items=part_items,
                                             force=force, review=review,
@@ -109,7 +114,7 @@ async def _lifespan(app: FastAPI):
     # 标记 error 收场，不占用执行信号量。
     resumed = 0
     for r in _load_runs().values():
-        if r.get("status") not in ("created", "running") or not r.get("url"):
+        if r.get("status") != "running" or not r.get("url"):
             continue
         if r.get("tmp") and not Path(r["tmp"]).exists() and not r.get("tmp_cleaned"):
             r["status"] = "error"
@@ -131,24 +136,43 @@ app = FastAPI(title="video2md", lifespan=_lifespan, docs_url=None, redoc_url=Non
 
 @app.post("/runs")
 async def post_runs(request: Request) -> dict:
+    """同步解析建 run（旧 serve 语义：响应即知 total/all_skipped，批量驱动靠它分窗），
+    随后异步驱动整张图。解析慢点（抖音分享页抓取 70s+）所以在线程里跑，不堵事件循环。"""
+    from .graph import resolve_run
+    from .resolve import extract_url
+
     data = await request.json()
-    url = str(data.get("url", "")).strip()
+    url = extract_url(str(data.get("url", "")).strip())
     part_items = str(data.get("part_items", "")).strip()
+    force = bool(data.get("force"))
     if not url:
         _req_log("POST", "/runs", 400, error="缺 url")
         raise HTTPException(400, "缺 url")
-    # API 层去重（便宜预检；graph resolve 节点还有一道 runs.json 真去重）
-    dup = next((k for k, v in _TASKS.items()
-                if v.get("url") == url and v.get("part_items", "") == part_items
-                and v.get("status") in ("queued", "running")), None)
-    if dup:
-        _req_log("POST", "/runs", 200, run_id=dup, dedup=True)
-        return {"run_id": dup, "status": _TASKS[dup]["status"], "dedup": True}
-    out = _enqueue(url, part_items, bool(data.get("force")), bool(data.get("review")),
-                   int(data.get("max_frames") or 60))
-    _TASKS[out["run_id"]]["part_items"] = part_items
-    _req_log("POST", "/runs", 200, run_id=out["run_id"], url=url[:80])
-    return out
+    run_id = uuid.uuid4().hex[:8]
+    run, err, is_dup = await asyncio.to_thread(resolve_run, url, part_items, force, run_id)
+    if err:
+        _req_log("POST", "/runs", 400, url=url[:80], error=err[:120])
+        raise HTTPException(400, err)
+    skipped = [bool(a.get("skipped")) for a in run["artifacts"].values()]
+    resp = {"run_id": run["run_id"], "total": run["total"],
+            "entries": [{"index": i, "url": e["url"], "skipped": s}
+                        for i, (e, s) in enumerate(zip(run["entries"], skipped), 1)],
+            "all_skipped": bool(skipped) and all(skipped)}
+    if data.get("resolve_only"):
+        # 只解析不驱动（批量脚本分窗预飞）；后续同 URL+part_items 的正式 POST
+        # 会 dedup 命中这条记录并入队驱动——探测残档不会被启动恢复捡走（只认 running）
+        _req_log("POST", "/runs", 200, run_id=run["run_id"], resolve_only=True)
+        return {**resp, "status": "created"}
+    if is_dup and _TASKS.get(run["run_id"], {}).get("status") in ("queued", "running"):
+        _req_log("POST", "/runs", 200, run_id=run["run_id"], dedup=True)
+        return {**resp, "status": _TASKS[run["run_id"]]["status"], "dedup": True}
+    # 新 run 或「旧 run 驱动已死」的 dedup 残档——都入队驱动（图内幂等重入）
+    _TASKS[run["run_id"]] = {"status": "queued", "url": url, "part_items": part_items,
+                             "created": _now()}
+    asyncio.create_task(_drive(run["run_id"], url, part_items, force,
+                               bool(data.get("review")), int(data.get("max_frames") or 60)))
+    _req_log("POST", "/runs", 200, run_id=run["run_id"], total=run["total"], dedup=is_dup)
+    return {**resp, "status": "queued", "dedup": is_dup}
 
 
 
