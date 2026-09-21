@@ -1,0 +1,42 @@
+# compose 冒烟栈（独立 project，不与生产栈冲突）：video2md + mockpool（假算力池）。
+# 用法：scripts/smoke_compose.sh（先 docker compose build 生产栈镜像，再跑本栈）。
+# 全程零 GPU 零 token：转写/OCR/剪辑走 mockpool 契约假实现，LLM 走 V2MD_FAKE_LLM。
+name: video2md-smoke
+
+networks:
+  internal: {}
+
+volumes:
+  v2md-smoke-data: {}
+
+services:
+  mockpool:
+    image: video2md-gpu-router   # 复用路由镜像的 fastapi/uvicorn，脚本挂载即跑
+    command: ["uvicorn", "mock_pool:app", "--host", "0.0.0.0", "--port", "9700"]
+    volumes:
+      - ./deploy/mock_pool.py:/mock/mock_pool.py:ro
+    working_dir: /mock
+    networks: [internal]
+
+  video2md:
+    image: video2md
+    depends_on:
+      mockpool:
+        condition: service_started
+    ports:
+      - "127.0.0.1:8791:8790"
+    environment:
+      TZ: Asia/Shanghai
+      V2MD_FAKE_LLM: "1"
+      V2MD_REMOTE: http://mockpool:9700
+      V2MD_OCR_REMOTE: http://mockpool:9700
+      V2MD_CLIPS_REMOTE: http://mockpool:9700
+      V2MD_CLIPS_SOURCE: remote
+      OBSIDIAN_VAULT: /vault
+      LANGFUSE_PK: ""
+      LANGFUSE_SK: ""
+    volumes:
+      - v2md-smoke-data:/app/data
+      - ./deploy/smoke-vault:/vault
+      - ./deploy/fixtures:/fixtures:ro
+    networks: [internal]

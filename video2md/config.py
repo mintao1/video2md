@@ -9,12 +9,6 @@ from pathlib import Path
 PROJ = Path(__file__).resolve().parent.parent  # 包目录的上一级 = 项目根（state.json/runs.json/.env 都在根上）
 
 
-STATE_FILE = PROJ / "state.json"
-
-
-LOG_DIR = PROJ / "logs"
-
-
 MAX_TRANSCRIPT_CHARS = 60000  # 约等于 3 小时密集语音
 
 
@@ -72,6 +66,13 @@ def load_env() -> dict[str, str]:
 
 
 ENV = load_env()
+
+
+# 持久化文件位置：容器里由 compose 指到 data 卷（/app/data/…），本机默认项目根
+STATE_FILE = Path(ENV.get("V2MD_STATE_FILE", str(PROJ / "state.json")))
+
+
+LOG_DIR = Path(ENV.get("V2MD_LOG_DIR", str(PROJ / "logs")))
 
 
 # 代理键透传给子进程/httpx（YouTube 等境外源下载；国内站代码层强制直连）。

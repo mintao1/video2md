@@ -38,13 +38,13 @@ from .note import MIN_NOTE_TRANSCRIPT_CHARS, append_index, extract_toc, looks_li
 # 本地管线拆成阶段：download → transcribe → frames → ocr → select → clips → note → kb。
 # 工作流（Dify 画布）逐阶段 POST 触发、轮询完成；LLM 在中间做「内容选帧」与「改写」决策。
 # CLI 直跑路径（_cmd_process_one）复用同一套函数，本地启发式选帧兜底。
-RUNS_FILE = PROJ / "runs.json"
+RUNS_FILE = Path(ENV.get("V2MD_RUNS_FILE", str(PROJ / "runs.json")))
 
 
 _RUNS_LOCK = threading.Lock()
 
 
-_RUNS_LOCKFILE = PROJ / "runs.lock"
+_RUNS_LOCKFILE = RUNS_FILE.with_suffix(".lock")
 
 
 STAGES = ("download", "transcribe", "frames", "ocr", "select", "clips", "note")

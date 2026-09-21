@@ -1,0 +1,55 @@
+# video2md + gpu_router 生产编排（lcode-4c）。
+# 目录约定：~/stack/dify-video2md + ~/stack/gpu_router 同级（gpu_router build 上下文用相对路径）。
+# 凭证：secrets/ 目录（gitignore，部署时手工放）：
+#   secrets/video2md.env      → LLM_BASE_URL/LLM_API_KEY/LLM_MODEL（挂进容器由 V2MD_SECRETS_FILE 读）
+#   secrets/gpu_router.env    → 代理 env（HTTP_PROXY/HTTPS_PROXY/ALL_PROXY/NO_PROXY，可选但强烈建议）
+#   secrets/colab-cli/token.json、secrets/kaggle/kaggle.json（可选，缺了对应 provider 自动冷却）
+name: video2md
+
+networks:
+  internal: {}
+
+volumes:
+  v2md-data: {}        # state.json / runs.json / checkpoints.sqlite / logs
+  vault: {}            # 笔记产物（Syncthing 同步回本地 Obsidian 的就是这个卷）
+  gpu-router-logs: {}  # provider 冷却/用量记账
+
+services:
+  gpu_router:
+    build: ../gpu_router
+    image: video2md-gpu-router
+    restart: unless-stopped
+    volumes:
+      - ../gpu_router/gpu_router.docker.json:/app/gpu_router.json:ro
+      - gpu-router-logs:/app/logs
+      - ./secrets/colab-cli:/root/.config/colab-cli:ro
+      - ./secrets/kaggle:/root/.kaggle:ro
+    env_file:
+      - path: ./secrets/gpu_router.env
+        required: false
+    networks: [internal]
+    # 不发布端口：无认证服务，仅内网对 video2md 可达
+
+  video2md:
+    build: .
+    image: video2md
+    restart: unless-stopped
+    depends_on:
+      gpu_router:
+        condition: service_started
+    ports:
+      - "127.0.0.1:8790:8790"   # 无认证服务：默认只绑回环，外用 SSH 隧道/nginx 反代（README 有做法）
+    environment:
+      TZ: Asia/Shanghai
+      V2MD_SECRETS_FILE: /run/video2md.env
+      V2MD_REMOTE: http://gpu_router:9700
+      V2MD_OCR_REMOTE: http://gpu_router:9700
+      V2MD_CLIPS_REMOTE: http://gpu_router:9700
+      V2MD_CLIPS_SOURCE: remote
+      OBSIDIAN_VAULT: /vault
+      NO_PROXY: "gpu_router,127.0.0.1,localhost"  # 代理 env 存在时内网服务必须直连
+    volumes:
+      - v2md-data:/app/data
+      - vault:/vault
+      - ./secrets/video2md.env:/run/video2md.env:ro
+    networks: [internal]
