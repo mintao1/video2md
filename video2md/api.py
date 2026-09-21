@@ -22,19 +22,142 @@ from __future__ import annotations
 
 import asyncio
 import os
+import shutil
+import tempfile
+import time
 import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime
 from pathlib import Path
 
+import httpx
 import uvicorn
 from fastapi import FastAPI, HTTPException, Request
 
-from .config import ENV, LOG_DIR, PROJ
+from .config import ENV, LOG_DIR, OUT_DIR, PROJ
 from .graph import make_checkpointer, run_graph
 from .runs import _load_runs, _runs_file_lock, _runs_merge
-from .serve import _checkpoint, _cleanup_stale_runs, _preflight, _prune_orphan_tmps
+
 from .util import redact
+
+# ---------------------------------------------------------------- 运维函数（原 serve.py）
+
+def _preflight() -> dict:
+    """开跑前的环境体检：把「全局必炸」在阶段入队前暴露，免得 27 条各自白烧才发现同一死法。"""
+    checks: list[dict] = []
+
+    def add(name: str, ok: bool, detail: str = "") -> None:
+        checks.append({"name": name, "ok": bool(ok), "detail": detail})
+
+    add("ffmpeg", bool(shutil.which("ffmpeg")), shutil.which("ffmpeg") or "未安装")
+    try:
+        free_gb = shutil.disk_usage(tempfile.gettempdir()).free / 1e9
+        add("disk", free_gb >= 2, f"临时卷剩余 {free_gb:.1f}GB")
+    except Exception as exc:
+        add("disk", False, str(exc)[:80])
+    try:
+        OUT_DIR.mkdir(parents=True, exist_ok=True)  # 新鲜 vault（云上空卷）先建目录再测写
+        add("vault", os.access(OUT_DIR, os.W_OK), str(OUT_DIR))
+    except Exception as exc:
+        add("vault", False, f"{OUT_DIR}: {str(exc)[:80]}")
+    remote = (ENV.get("V2MD_REMOTE") or "").strip()
+    if remote.lower() in ("colab", "colab-cli"):
+        add("gpu_pool", False, "V2MD_REMOTE=colab 已抽离：起 ~/Desktop/开发项目/gpu_router "
+                               "后改 V2MD_REMOTE=http://127.0.0.1:9700")
+    elif remote.startswith(("http://", "https://")):
+        # GPU 算力池/远程转录服务：/status（池子）或 /ping（裸参考服务端）二选一认
+        base = remote.rstrip("/")
+        ok, detail = False, ""
+        try:
+            d = httpx.get(f"{base}/status", timeout=4).json()
+            ok = bool(d.get("ok"))
+            usable = [p["name"] for p in d.get("providers", [])
+                      if p.get("enabled") and p.get("healthy")
+                      and not p.get("cooldown_remaining_s")]
+            detail = f"算力池可用 provider: {', '.join(usable) or '无'}"
+        except Exception:
+            try:
+                d = httpx.get(f"{base}/ping", timeout=4).json()
+                ok, detail = bool(d.get("ok")), "裸转录服务 /ping 通过"
+            except Exception as exc:
+                detail = f"够不到 {base}: {str(exc)[:100]}"
+        add("gpu_pool", ok, detail)
+    return {"ok": all(c["ok"] for c in checks), "checks": checks,
+            "ts": datetime.now().isoformat(timespec="seconds")}
+
+
+
+def _checkpoint() -> dict:
+    """对账快照：任务表计数 + 算力池可达性 + 临时目录残留。"""
+    counts: dict[str, int] = {}
+    for t in _TASKS.values():
+        counts[t.get("status", "?")] = counts.get(t.get("status", "?"), 0) + 1
+    snap = {"ts": _now(), "counts": counts,
+            "queue_len": sum(1 for v in _TASKS.values() if v.get("status") == "queued"),
+            "running": sum(1 for v in _TASKS.values() if v.get("status") == "running"),
+            "tmp_leftovers": len(list(Path(tempfile.gettempdir()).glob("video2md-*")))}
+    remote = (ENV.get("V2MD_REMOTE") or "").strip()
+    if remote.startswith(("http://", "https://")):
+        try:
+            snap["gpu_pool"] = httpx.get(f"{remote.rstrip('/')}/status", timeout=2).json()
+        except Exception as exc:
+            snap["gpu_pool"] = {"ok": False, "error": str(exc)[:100]}
+    return snap
+
+
+def _cleanup_stale_runs(max_age_days: int = 30, idle_hours: float = 24.0) -> None:
+    """清陈旧/失活 run 的临时目录：run 生命周期随 kb 阶段结束清，这里兜底异常中断。
+
+    两类会清：
+    - 超龄（>30 天）——历史保险丝
+    - 闲置 >24h——阶段失败后 tmp 无人清理（一个合集能占几百 MB）；「闲置」按最近阶段
+      落盘时间算，正常批次阶段间隔以分钟计，撞不上
+    """
+    with _runs_file_lock():
+        runs = _load_runs()
+        now = time.time()
+        changed = False
+        for rid, r in list(runs.items()):
+            if r.get("tmp_cleaned"):
+                continue
+            try:
+                age = now - datetime.fromisoformat(r.get("created", "2000-01-01")).timestamp()
+                last = max((datetime.fromisoformat(s["ts"]).timestamp()
+                            for s in r.get("stages", {}).values() if s.get("ts")), default=0.0)
+                idle = now - last if last else age
+            except (ValueError, TypeError):
+                age, idle = 1e9, 1e9
+            if age > max_age_days * 86400 or idle > idle_hours * 3600:
+                shutil.rmtree(r.get("tmp", ""), ignore_errors=True)
+                r["tmp_cleaned"] = True
+                changed = True
+        if changed:
+            _save_runs(runs)
+
+
+
+def _prune_orphan_tmps(min_age_h: float = 6.0) -> None:
+    """清没人认领的 run 临时目录：runs.json 记录丢失或进程被 SIGKILL 时，tmp 目录永久残留，
+    30 天兜底等于不清。只动 `video2md-run-*`（CLI 的 `video2md-*` 由 finally 自清）。
+
+    6 小时内动过的目录视为可能在跑（目录 mtime 随文件增删刷新），不清。
+    """
+    tdir = Path(tempfile.gettempdir())
+    claimed = {r.get("tmp") for r in _load_runs().values()}
+    n = 0
+    for d in tdir.glob("video2md-run-*"):
+        if str(d) in claimed:
+            continue
+        try:
+            if time.time() - d.stat().st_mtime < min_age_h * 3600:
+                continue
+        except OSError:
+            continue
+        shutil.rmtree(d, ignore_errors=True)
+        n += 1
+    if n:
+        print(f"🧹 清理孤儿临时目录 {n} 个（无 run 记录认领，>{int(min_age_h)}h 未动）")
+
 
 # ---------------------------------------------------------------- 任务表
 _TASKS: dict[str, dict] = {}          # run_id → {status, url, created, started, finished, errors}

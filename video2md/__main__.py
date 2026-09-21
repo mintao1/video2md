@@ -1,4 +1,4 @@
-"""入口：serve / graph-run / __stage / runs 四命令。"""
+"""入口：api / graph-run / __stage / runs 四命令（serve 已随 Dify 抽离归档 legacy/）。"""
 from __future__ import annotations
 
 import argparse
@@ -7,7 +7,6 @@ import sys
 
 from .config import ENV
 from .runs import _load_runs, cmd_stage
-from .serve import cmd_serve
 
 
 
@@ -19,12 +18,6 @@ def main() -> None:
         ap.add_argument("--port", type=int, default=int(ENV.get("V2MD_PORT", "8790")))
         a = ap.parse_args(sys.argv[2:])
         cmd_api(a.port)
-        return
-    if len(sys.argv) > 1 and sys.argv[1] == "serve":
-        ap = argparse.ArgumentParser(prog="video2md serve")
-        ap.add_argument("--port", type=int, default=int(ENV.get("V2MD_PORT", "8790")))
-        a = ap.parse_args(sys.argv[2:])
-        cmd_serve(a.port)
         return
     if len(sys.argv) > 1 and sys.argv[1] == "graph-run":
         # LangGraph 单次直跑（调试/对拍用；生产入口是 api 服务的 POST /runs）
@@ -71,7 +64,7 @@ def main() -> None:
                       f"条目 {r.get('total', 0)}  url={r.get('url', '')[:60]}")
         return
     sys.exit("用法：video2md api [--port 8790] | graph-run <url> [--force] [--review] | runs [run_id]"
-             " | serve（legacy：Dify 时代的阶段服务，迁移完成后归档）")
+             "（__stage 为单阶段手动排障入口；Dify 时代的 serve 已归档 legacy/serve.py）")
 
 
 
