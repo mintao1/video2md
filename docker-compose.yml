@@ -7,9 +7,6 @@
 #   secrets/colab-cli/token.json、secrets/kaggle/kaggle.json（可选，缺了对应 provider 自动冷却）
 name: video2md
 
-networks:
-  internal: {}
-
 volumes:
   v2md-data: {}        # state.json / runs.json / checkpoints.sqlite / logs
   vault: {}            # 笔记产物（Syncthing 同步回本地 Obsidian 的就是这个卷）
@@ -45,22 +42,22 @@ services:
     depends_on:
       gpu_router:
         condition: service_started
-    extra_hosts:
-      - "host.docker.internal:host-gateway"   # gpu_router 在 host 网络上，经宿主网关可达
-    ports:
-      - "127.0.0.1:8790:8790"   # 无认证服务：默认只绑回环，外用 SSH 隧道/nginx 反代（README 有做法）
+    # host 网络：① 算力池/队列都在宿主回环（127.0.0.1:9700 / :8790）；② yt-dlp 子进程
+    # 走 V2MD_PROXY=127.0.0.1:17897（SSH 隧道出口）绕国内站对机房 IP 的风控。
+    # api 绑定 V2MD_HOST=127.0.0.1（无认证服务，只露回环；外用 SSH 隧道/nginx，见 README）
+    network_mode: host
     environment:
       TZ: Asia/Shanghai
+      V2MD_HOST: 127.0.0.1
       V2MD_SECRETS_FILE: /run/video2md.env
-      V2MD_REMOTE: http://host.docker.internal:9700
-      V2MD_OCR_REMOTE: http://host.docker.internal:9700
-      V2MD_CLIPS_REMOTE: http://host.docker.internal:9700
+      V2MD_REMOTE: http://127.0.0.1:9700
+      V2MD_OCR_REMOTE: http://127.0.0.1:9700
+      V2MD_CLIPS_REMOTE: http://127.0.0.1:9700
       V2MD_CLIPS_SOURCE: remote
+      V2MD_PROXY: http://127.0.0.1:17897
+      V2MD_PROXY_DOMESTIC: "1"
       OBSIDIAN_VAULT: /vault
-      # 国内平台直连；YouTube 等境外源在服务器上需另行配代理（README 有说明）
-      NO_PROXY: "host.docker.internal,127.0.0.1,localhost"
     volumes:
       - v2md-data:/app/data
       - vault:/vault
       - ./secrets/video2md.env:/run/video2md.env:ro
-    networks: [internal]
