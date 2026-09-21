@@ -1,4 +1,4 @@
-"""run 状态（runs.json）+ 阶段注册表 + 8 个 _stage_* + 阶段子进程入口。"""
+"""run 状态（runs.json）+ 阶段注册表 + 7 个 _stage_* + 阶段子进程入口（kb 已随 Dify 抽离摘除）。"""
 from __future__ import annotations
 
 import contextlib
@@ -13,7 +13,7 @@ import tempfile
 import threading
 import uuid
 from pathlib import Path
-from datetime import date, datetime, timedelta
+from datetime import datetime
 
 from .config import ENV, MAX_TRANSCRIPT_CHARS, PROJ
 from .util import RunLog, _STAGE_LOGS, fmt_hms, load_state, probe, redact, sanitize_filename, save_state, video_fingerprint
@@ -23,7 +23,6 @@ from .transcribe import transcribe
 from .frames import _NORM, extract_frame_candidates, frame_pool_size, manifest_of, merge_timeline, name_candidates, ocr_candidates, publish_named, select_content_frames
 from .clips import cut_clip_files, insert_clip_embeds, remote_cut_clips
 from .note import MIN_NOTE_TRANSCRIPT_CHARS, append_index, extract_toc, looks_like_refusal, render_note, sanitize_embeds, write_note, write_transcript
-from .kb import kb_selfcheck, kb_upload
 
 
 
@@ -48,7 +47,7 @@ _RUNS_LOCK = threading.Lock()
 _RUNS_LOCKFILE = PROJ / "runs.lock"
 
 
-STAGES = ("download", "transcribe", "frames", "ocr", "select", "clips", "note", "kb")
+STAGES = ("download", "transcribe", "frames", "ocr", "select", "clips", "note")
 
 
 
@@ -248,10 +247,6 @@ def _run_stage_inner(run: dict, stage: str, args: dict, log: "RunLog") -> None:
         run["stages"][stage]["failed_entries"] = failed
         run.setdefault("partial_failures", {})[stage] = failed
         print(f"PARTIAL-FAIL {stage} 条目 {'、'.join(failed)}")
-    if stage == "kb" and not all_failed:
-        run["status"] = "done"
-        shutil.rmtree(tmp, ignore_errors=True)  # kb 是末阶段：临时产物可清
-        run["tmp_cleaned"] = True
     if breaker:
         run["stages"][stage]["breaker"] = breaker
     with _runs_file_lock():
@@ -593,34 +588,6 @@ def _stage_note(run, entry, art, tmp, args):
     art.update(note=str(note), title=title, md=md, transcript_path=str(tpath))
     print(f"    📝 {note}")
 
-
-
-@_stage
-def _stage_kb(run, entry, art, tmp, args):
-    if art.get("doc_id") and not args.get("force_kb"):
-        print("    ⏭ 已入库，跳过")
-        return
-    if not art.get("md"):
-        raise SystemExit("无笔记产物（note 未成功），跳过入库")
-    if args.get("dry_run") or args.get("no_upload"):
-        print("    ⏭ 跳过知识库上传")
-        doc_id = ""
-    else:
-        # 共享 _run_stage 的 RunLog（同 run_id 同 trace；历史上这里 new 新 uuid 导致 id 断裂）
-        rlog = _STAGE_LOGS.get(run["run_id"]) or RunLog(f"stage:kb", run_id=run["run_id"],
-                                                        trace_name=run.get("url", ""))
-        doc_id = kb_upload(art["title"], art["md"], rlog)
-        kb_selfcheck(doc_id, art.get("meta") or {}, rlog)
-    art["doc_id"] = doc_id
-    state = load_state()
-    state[art["fp"]] = {"note": art.get("note", ""), "transcript": art.get("transcript_path", ""),
-                        "doc_id": doc_id, "title": art.get("title", ""), "url": entry.get("url", ""),
-                        "date": date.today().isoformat(), "run_id": run["run_id"],
-                        "status": "completed", "dry_run": bool(args.get("dry_run")),
-                        # 真实 span 摘要（曾硬编码 [] 把阶段模式观测数据丢弃）
-                        "spans": [{k: v for k, v in sp.items() if k != "spanId"}
-                                  for sp in run.get("span_log", [])][-80:]}
-    save_state(state)
 
 
 

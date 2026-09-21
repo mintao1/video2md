@@ -1,4 +1,4 @@
-"""入口：serve / __stage / runs 三命令。"""
+"""入口：serve / graph-run / __stage / runs 四命令。"""
 from __future__ import annotations
 
 import argparse
@@ -18,6 +18,25 @@ def main() -> None:
         a = ap.parse_args(sys.argv[2:])
         cmd_serve(a.port)
         return
+    if len(sys.argv) > 1 and sys.argv[1] == "graph-run":
+        # LangGraph 单次直跑（调试/对拍用；生产入口是 api 服务的 POST /runs）
+        from .graph import make_checkpointer, run_graph
+        ap = argparse.ArgumentParser(prog="video2md graph-run")
+        ap.add_argument("url")
+        ap.add_argument("--part-items", default="")
+        ap.add_argument("--force", action="store_true")
+        ap.add_argument("--review", action="store_true")
+        ap.add_argument("--max-frames", type=int, default=60)
+        a = ap.parse_args(sys.argv[2:])
+        saver = make_checkpointer()
+        final = run_graph(a.url, part_items=a.part_items, force=a.force,
+                          review=a.review, max_frames=a.max_frames, checkpointer=saver)
+        run = final.get("run") or {}
+        notes = [a2.get("note") for a2 in (run.get("artifacts") or {}).values() if a2.get("note")]
+        print(json.dumps({"run_id": final.get("run_id"), "status": final.get("status"),
+                          "notes": notes, "errors": (final.get("errors") or [])[-5:]},
+                         ensure_ascii=False, indent=1))
+        sys.exit(0 if final.get("status") in ("done", "partial") else 1)
     if len(sys.argv) > 1 and sys.argv[1] == "__stage":
         # 内部入口：serve 的阶段 job 子进程（worker 以 `__stage <run> <stage> <args-json>` 拉起）
         ap = argparse.ArgumentParser(prog="video2md __stage")
@@ -43,8 +62,7 @@ def main() -> None:
                 print(f"{rid}  {r.get('created', '')}  {r.get('status', '')}  "
                       f"条目 {r.get('total', 0)}  url={r.get('url', '')[:60]}")
         return
-    sys.exit("用法：video2md serve [--port 8790] | runs [run_id]"
-             "（管线由 Dify workflow「视频转文档」驱动，已删除本地 CLI 直跑路径）")
+    sys.exit("用法：video2md serve [--port 8790] | graph-run <url> [--force] [--review] | runs [run_id]")
 
 
 

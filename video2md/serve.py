@@ -367,17 +367,6 @@ def _stage_dep_block(run_id: str, stage: str) -> str:
     """返回阻止入队的原因；可入队返回空串。"""
     with _JOBS_LOCK:
         jobs = [j for j in _JOBS.values() if j.get("run_id") == run_id]
-        if stage == "kb":
-            if not any(_raw_stage(j) == "note" for j in jobs):
-                # 全跳过 run（state 幂等全命中）：note 循环对 skipped 条目快进、永不 POST /note，
-                # 不存在 note job 是正常态而非编排错误——放行（kb 阶段对 skipped 条目同样秒过）
-                run = _load_runs().get(run_id) or {}
-                arts = run.get("artifacts") or {}
-                if run.get("entries") and all((arts.get(e["url"]) or {}).get("skipped")
-                                              for e in run["entries"]):
-                    return ""
-                return "前置阶段 note 尚未入队；等 note 循环发起再入队，或显式 {\"force\": true} 绕过"
-            return ""
         for dep in _STAGE_DEPS.get(stage, ()):
             dep_jobs = [j for j in jobs if _raw_stage(j) == dep]
             if not any(j.get("status") == "done" for j in dep_jobs):
@@ -407,7 +396,7 @@ class _JobHandler(BaseHTTPRequestHandler):
         if self.path == "/runs":
             self._post_runs()
             return
-        m = re.fullmatch(r"/runs/([^/]+)/(download|transcribe|frames|ocr|select|clips|note|kb)", self.path)
+        m = re.fullmatch(r"/runs/([^/]+)/(download|transcribe|frames|ocr|select|clips|note)", self.path)
         if m:
             self._post_run_stage(m.group(1), m.group(2))
             return

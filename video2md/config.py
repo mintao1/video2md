@@ -1,8 +1,7 @@
-"""配置与基座：项目 .env（非机密）+ dify_kit SSOT 注入 + 路径常量。"""
+"""配置与基座：项目 .env（非机密）+ 凭证文件（机密）+ 路径常量。"""
 from __future__ import annotations
 
 import os
-import sys
 from pathlib import Path
 
 
@@ -39,24 +38,34 @@ CLIP_SPAN = 10        # 视频节段：帧时间戳 ±10s 剪 20s 可播片段�
 
 
 # ---------------------------------------------------------------- env / paths
-def load_env() -> dict[str, str]:
-    """读项目 .env（只放本机非机密配置），真实环境变量优先。
-
-    key/凭证 SSOT 是 ~/.config/dify-zcode.env，由 dify_kit 基座 load_env 注入 os.environ
-    （见下方 kit_config.load_env()）；历史上 daoxe/.env 作 GEMINI_API_KEY 兜底，
-    该文件已无此键，兜底链已摘除。"""
-    env: dict[str, str] = {}
-    for p in (PROJ / ".env",):
-        if not p.exists():
+def _read_env_file(p: Path) -> dict[str, str]:
+    """读 KEY=VALUE 行（忽略注释/空行；值可带引号）。"""
+    out: dict[str, str] = {}
+    if not p.exists():
+        return out
+    for line in p.read_text().splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
             continue
-        for line in p.read_text().splitlines():
-            line = line.strip()
-            if not line or line.startswith("#") or "=" not in line:
-                continue
-            k, _, v = line.partition("=")
-            k, v = k.strip(), v.strip().strip('"').strip("'")
-            if k and k not in env:
-                env[k] = v
+        k, _, v = line.partition("=")
+        k, v = k.strip(), v.strip().strip('"').strip("'")
+        if k:
+            out[k] = v
+    return out
+
+
+
+# 机密凭证 SSOT：~/.config/video2md.env（0600；LLM_API_KEY 等）。
+# Dify 抽离（2026-09-21）后不再经 dify_kit 注入 dify-zcode.env。
+SECRETS_FILE = Path(ENV_SECRETS_OVERRIDE) if (ENV_SECRETS_OVERRIDE := os.environ.get("V2MD_SECRETS_FILE")) \
+    else Path.home() / ".config" / "video2md.env"
+
+
+
+def load_env() -> dict[str, str]:
+    """合并优先级：项目 .env（非机密兜底）< 凭证文件 < 真实环境变量。"""
+    env = _read_env_file(PROJ / ".env")
+    env.update(_read_env_file(SECRETS_FILE))
     env.update({k: v for k, v in os.environ.items() if v})  # 真实环境变量优先
     return env
 
@@ -90,57 +99,6 @@ TRANSCRIPT_DIR = OUT_DIR / "transcripts"  # 转录本 SSOT（info callout wikili
 
 
 
-# ---------------------------------------------------------------- dify_kit 基座
-def _load_dify_kit():
-    kit_home = Path(ENV.get("DIFY_KIT_HOME",
-                            str(Path.home() / "Desktop/开发项目/dify_kit"))).expanduser()
-    if not kit_home.exists():
-        sys.exit(f"❌ dify_kit 基座不存在: {kit_home}（设 DIFY_KIT_HOME 指向基座目录）")
-    sys.path.insert(0, str(kit_home))
-    from dify_kit.client import AppClient, DatasetAPI, DifyClient  # noqa: F401
-    from dify_kit import config as kit_config
-    return kit_config
-
-
-
-kit_config = _load_dify_kit()
-
-
-kit_config.load_env()  # 基座文件 → os.environ（setdefault，不覆盖真实环境变量）
-
-
-if not os.environ.get("DIFY_APP_API_KEY") and ENV.get("DIFY_API_KEY") \
-        and not ENV["DIFY_API_KEY"].startswith("app-xxxx"):
-    os.environ.setdefault("DIFY_APP_API_KEY", ENV["DIFY_API_KEY"])
-
-
-if not os.environ.get("DIFY_DATASET_API_KEY") and ENV.get("DIFY_DATASET_API_KEY") \
-        and not ENV["DIFY_DATASET_API_KEY"].startswith("dataset-xxxx"):
-    os.environ.setdefault("DIFY_DATASET_API_KEY", ENV["DIFY_DATASET_API_KEY"])
-
-
-if not os.environ.get("DIFY_DATASET_ID") and ENV.get("DIFY_DATASET_ID"):
-    os.environ.setdefault("DIFY_DATASET_ID", ENV["DIFY_DATASET_ID"])
-
-
-_APP_CFG = kit_config.load_app_config()          # base_url + app_key（缺则 SystemExit）
-
-
-DIFY_BASE = _APP_CFG["base_url"].rstrip("/")
-
-
-_dataset_api = None
-
-
-
-
-
-def dataset_api():
-    global _dataset_api
-    if _dataset_api is None:
-        from dify_kit.client import DatasetAPI, DifyClient
-        ds_key = os.environ.get("DIFY_DATASET_API_KEY", "")
-        if not ds_key:
-            sys.exit("DIFY_DATASET_API_KEY 未配置：写入 ~/.config/dify-zcode.env 或环境变量")
-        _dataset_api = DatasetAPI(DifyClient(DIFY_BASE, ds_key, timeout=120))
-    return _dataset_api
+# ---------------------------------------------------------------- fin
+# dify_kit / DIFY_* / dataset_api 已随 Dify 抽离（2026-09-21）摘除：
+# 知识库入库（kb 阶段）取消；LLM 凭证由 SECRETS_FILE 提供（LLM_BASE_URL/LLM_API_KEY/LLM_MODEL）。

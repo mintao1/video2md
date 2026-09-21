@@ -1,15 +1,24 @@
 [project]
 name = "dify-video2md"
-version = "0.1.0"
-description = "视频 → Obsidian 笔记 + Dify RAG（本地转写/抽帧 OCR + Dify Cloud LLM 整理）"
+version = "0.2.0"
+description = "视频 → Obsidian 笔记（LangGraph 编排：本地转写/抽帧 OCR + LLM 整理；Dify 已抽离）"
 requires-python = ">=3.12"
 dependencies = [
     "httpx>=0.27",
     "pillow>=10.4",
-    "pyobjc-framework-Vision>=10.3",
-    "pyobjc-framework-Cocoa>=10.3",
     "pyyaml>=6.0.3",
     "websocket-client>=1.8",
+    "langgraph>=0.2",
+    "langgraph-checkpoint-sqlite>=2.0",
+    "fastapi>=0.115",
+    "uvicorn>=0.30",
+]
+
+[project.optional-dependencies]
+# macOS 本地开发：Vision 框架 OCR（Linux/云服务器不装，OCR 走 V2MD_OCR_REMOTE 远程池）
+mac = [
+    "pyobjc-framework-Vision>=10.3",
+    "pyobjc-framework-Cocoa>=10.3",
 ]
 
 [tool.uv]

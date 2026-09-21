@@ -24,6 +24,21 @@ _BARE_HOST_RE = re.compile(r"^(?:www\.)?[\w-]+(?:\.[\w-]+)*\.(?:com|cn|net|org|t
                            r"(?:[/?#]|$)", re.I)
 
 
+_SHARE_URL_RE = re.compile(r"https?://[^\s一-鿿\"'「」『』<>，。；]+")
+
+
+def extract_url(text: str) -> str:
+    """剥分享文本取 URL（「复制打开抖音【…】 https://v.douyin.com/xx 其余文案」→ 纯链接）。
+
+    移植自 Dify code 节点 CODE_CLEAN_URL——Dify 抽离后这一步收回 resolve 链入口。
+    抖音弹窗链接（modal_id）归一化在 normalize_douyin_url，此处只管提取。
+    """
+    t = (text or "").strip()
+    m = _SHARE_URL_RE.search(t)
+    return m.group(0) if m else t
+
+
+
 
 def ensure_scheme(u: str) -> str:
     """补 URL scheme：从地址栏复制的 `www.bilibili.com/video/BV…` 没有 `https://`。
