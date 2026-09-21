@@ -82,31 +82,60 @@ def _load(task: str, role: str) -> str:
 
 def chat(system: str, user: str, *, task: str, temperature: float, max_tokens: int) -> str:
     """openai-compatible chat completion；网络错误/429/5xx 重试 2 次（对齐 Dify 节点），
-    4xx 立即失败（鉴权/参数错重试无意义）。失败即 RuntimeError，不静默降级。"""
+    4xx 立即失败（鉴权/参数错重试无意义）。失败即 RuntimeError，不静默降级。
+
+    强制流式（stream=True）：长生成（organize 16000 tokens）在中转边缘（Cloudflare）
+    空闲 100s 就 524——流式逐 token 回传不存在空闲窗，Dify 插件当年就是这么活下来的。
+    """
     if not LLM_BASE or not LLM_KEY:
         raise SystemExit("LLM_BASE_URL / LLM_API_KEY 未配置：写入 .env 或环境变量")
     payload = {"model": LLM_MODEL, "temperature": temperature, "max_tokens": max_tokens,
+               "stream": True,
                "messages": [{"role": "system", "content": system},
                             {"role": "user", "content": user}]}
     last_err = ""
     for attempt in range(3):
         try:
             with httpx.Client(transport=_TRANSPORT) as client:
-                r = client.post(f"{LLM_BASE}/chat/completions", json=payload,
-                                headers={"Authorization": f"Bearer {LLM_KEY}"},
-                                timeout=httpx.Timeout(30.0, read=600.0))
-            if r.status_code == 200:
-                return r.json()["choices"][0]["message"]["content"]
-            # 429/5xx 可重试；其余 4xx（401/403/参数错）重试无意义，响亮失败
-            if r.status_code != 429 and r.status_code < 500:
-                raise RuntimeError(f"LLM 请求失败 HTTP {r.status_code}: {r.text[:300]}")
-            last_err = f"HTTP {r.status_code}: {r.text[:200]}"
+                with client.stream("POST", f"{LLM_BASE}/chat/completions", json=payload,
+                                   headers={"Authorization": f"Bearer {LLM_KEY}"},
+                                   timeout=httpx.Timeout(30.0, read=600.0)) as r:
+                    if r.status_code != 200:
+                        r.read()
+                        # 429/5xx 可重试；其余 4xx（401/403/参数错）重试无意义，响亮失败
+                        if r.status_code != 429 and r.status_code < 500:
+                            raise RuntimeError(f"LLM 请求失败 HTTP {r.status_code}: {r.text[:300]}")
+                        last_err = f"HTTP {r.status_code}: {r.text[:200]}"
+                    else:
+                        return _collect_stream(r)
         except httpx.HTTPError as exc:
             last_err = redact(str(exc))[:300]
         if attempt < 2:
             print(f"  ⚠ LLM {task} 第 {attempt + 1} 次调用失败（{last_err[:80]}），30s 后重试")
             _sleep(30)
     raise RuntimeError(f"LLM {task} 连续 3 次失败：{last_err}")
+
+
+
+def _collect_stream(r: httpx.Response) -> str:
+    """SSE 流收集为完整文本；个别中转不支持 stream 会回普通 JSON，兼容解析。"""
+    ctype = r.headers.get("content-type", "")
+    if "text/event-stream" not in ctype:
+        return r.json()["choices"][0]["message"]["content"]  # 非流式回包兼容
+    parts: list[str] = []
+    for line in r.iter_lines():
+        if not line.startswith("data:"):
+            continue
+        data = line[5:].strip()
+        if data == "[DONE]":
+            break
+        try:
+            delta = json.loads(data)["choices"][0].get("delta", {})
+        except Exception:
+            continue  # 心跳/坏行不炸主流
+        if delta.get("content"):
+            parts.append(delta["content"])
+    return "".join(parts)
 
 
 

@@ -82,6 +82,25 @@ except RuntimeError as e:
 assert n[0] == 1, f"4xx 不该重试，实际调了 {n[0]} 次"
 
 
+# ---- SSE 流式收集（524 规避的主路径）-----------------------------------------
+def sse_handler(_r):
+    body = ('data: {"choices":[{"delta":{"content":"第一段"}}]}\n\n'
+            'data: {"choices":[{"delta":{}}]}\n\n'          # 空 delta 心跳
+            'data: {"choices":[{"delta":{"content":"第二段"}}]}\n\n'
+            'data: [DONE]\n\n')
+    return httpx.Response(200, headers={"content-type": "text/event-stream"}, text=body)
+
+calls.clear()
+out = run_chat(sse_handler)
+assert out == "第一段第二段", out
+assert json.loads(calls[0].content)["stream"] is True  # 必须强制流式（长生成防中转 524）
+
+# 中转不支持 stream 时回普通 JSON → 兼容解析
+def json_handler(_r):
+    return httpx.Response(200, json={"choices": [{"message": {"content": "非流式"}}]})
+assert run_chat(json_handler) == "非流式"
+
+
 # ---- 选帧解析（移植自 DSL code 节点）-----------------------------------------
 manifest = ("===== 条目 1/2：https://a =====\nf1.jpg [00:01] OCR: 标题\nf2.jpg [00:02] OCR: —\n\n"
             "===== 条目 2/2：https://b =====\ng1.jpg [00:03] OCR: 图\n")
