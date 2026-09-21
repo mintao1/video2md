@@ -29,7 +29,7 @@ services:
     volumes:
       - ${GPU_ROUTER_DIR:-../gpu_router}/gpu_router.docker.json:/app/gpu_router.json:ro
       - gpu-router-logs:/app/logs
-      - ./secrets/colab-cli:/root/.config/colab-cli:ro
+      - ./secrets/colab-cli:/root/.config/colab-cli   # rw：OAuth token 刷新要回写 token.json
       - ./secrets/kaggle:/root/.kaggle:ro
     env_file:
       - path: ./secrets/gpu_router.env   # HTTP_PROXY=http://127.0.0.1:17897 等

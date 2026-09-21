@@ -291,7 +291,11 @@ def _preflight() -> dict:
         add("disk", free_gb >= 2, f"临时卷剩余 {free_gb:.1f}GB")
     except Exception as exc:
         add("disk", False, str(exc)[:80])
-    add("vault", os.access(OUT_DIR, os.W_OK), str(OUT_DIR))
+    try:
+        OUT_DIR.mkdir(parents=True, exist_ok=True)  # 新鲜 vault（云上空卷）先建目录再测写
+        add("vault", os.access(OUT_DIR, os.W_OK), str(OUT_DIR))
+    except Exception as exc:
+        add("vault", False, f"{OUT_DIR}: {str(exc)[:80]}")
     remote = (ENV.get("V2MD_REMOTE") or "").strip()
     if remote.lower() in ("colab", "colab-cli"):
         add("gpu_pool", False, "V2MD_REMOTE=colab 已抽离：起 ~/Desktop/开发项目/gpu_router "
