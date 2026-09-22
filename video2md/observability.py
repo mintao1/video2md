@@ -27,7 +27,6 @@ import hashlib
 import os
 import threading
 
-from opentelemetry import trace as otel_trace
 from opentelemetry.metrics import Observation
 from opentelemetry.sdk.metrics import MeterProvider
 from opentelemetry.sdk.metrics.view import ExplicitBucketHistogramAggregation, View

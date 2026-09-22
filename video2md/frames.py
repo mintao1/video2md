@@ -6,7 +6,7 @@ import re
 import shutil
 import subprocess
 from pathlib import Path
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor
 
 from .config import ATTACH_DIR, BLUR_SHARP_MIN, ENV, FRAME_DEDUP_EPS, FRAME_MAE_MAX, LOW_CONF
 from .util import fmt_ts

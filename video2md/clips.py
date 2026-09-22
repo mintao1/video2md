@@ -122,13 +122,13 @@ def remote_cut_clips(published: list, video: Path, dur: float,
 
 
 
-def cut_clip_files(published: list, video: Path, dur: float, rlog: RunLog | None = None,
+def cut_clip_files(published: list, video: Path, dur: float,
                    segs: list[dict] | None = None) -> dict[str, str | None]:
     """对每个已发布帧，从原视频剪节段（含音频）入 attachments；返回 {帧名: 节段名}（失败为 None）。
 
     节段窗口 = 帧 ±CLIP_SPAN ∪ 所在 whisper 语音段（单边 clamp ±CLIP_SPAN×2；
     语音段太短/落在空白时回退 ±CLIP_SPAN）——音频恰好完整讲完该画面内容
-    （「节段按文字内容」；本地/工作流路径共用）。
+    （「节段按文字内容」；本地剪辑与远端剪辑共用此窗口语义）。
 
     剪辑失败只丢节段不丢帧；节段幂等（已存在直接引用）。
     """

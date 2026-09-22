@@ -11,8 +11,8 @@ GET /runs/{id} 看终态。串行纪律不变：asyncio 信号量=1，对齐旧�
   GET  /runs/{id}/note  产出 markdown（标题/路径/正文），供云上调取
   GET  /queue         {queue_len, running}——gpu_router 的 colab 看门狗回读这里
   GET  /healthz       存活探针（Docker healthcheck）
-  GET  /preflight     开跑前体检（复用 serve._preflight：ffmpeg/磁盘/vault/算力池）
-  GET  /checkpoint    对账快照（复用 serve._checkpoint 的算力池部分）
+  GET  /preflight     开跑前体检（ffmpeg/磁盘/vault/算力池）
+  GET  /checkpoint    对账快照（任务表计数 + 算力池可达性 + 临时目录残留）
 
 恢复语义：进程重启时把 runs.json 里 created/running 的 run 重新入队（同 run_id），
 graph 的 resolve 节点幂等复用该 run，阶段节点按产物字段跳过已完成条目——
@@ -34,9 +34,9 @@ import httpx
 import uvicorn
 from fastapi import FastAPI, HTTPException, Request
 
-from .config import ENV, LOG_DIR, OUT_DIR, PROJ
+from .config import ENV, LOG_DIR, OUT_DIR
 from .graph import make_checkpointer, run_graph
-from .runs import _load_runs, _runs_file_lock, _runs_merge
+from .runs import _load_runs, _runs_file_lock, _runs_merge, _save_runs
 from . import observability
 
 from .util import redact
@@ -107,7 +107,7 @@ def _checkpoint() -> dict:
 
 
 def _cleanup_stale_runs(max_age_days: int = 30, idle_hours: float = 24.0) -> None:
-    """清陈旧/失活 run 的临时目录：run 生命周期随 kb 阶段结束清，这里兜底异常中断。
+    """清陈旧/失活 run 的临时目录：run 生命周期随 finalize 节点结束清，这里兜底异常中断。
 
     两类会清：
     - 超龄（>30 天）——历史保险丝

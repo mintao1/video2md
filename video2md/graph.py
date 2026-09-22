@@ -28,7 +28,7 @@ import os
 import shutil
 import sqlite3
 import uuid
-from datetime import date, datetime
+from datetime import date
 from pathlib import Path
 
 from langgraph.graph import END, START, StateGraph
@@ -86,7 +86,7 @@ def node_resolve(state: RunState) -> dict:
 
 
 def resolve_run(url: str, part_items: str = "", force: bool = False,
-                run_id: str = "") -> tuple[dict, str]:
+                run_id: str = "") -> tuple[dict, str, bool]:
     """建 run 的同步入口（api.py POST /runs 与 node_resolve 共用）。
 
     返回 (run, err, is_dup)：err 非空即失败；is_dup=True 时 run 是进行中旧 run
@@ -142,8 +142,8 @@ def node_select_frames(state: RunState) -> dict:
     （对齐 DSL code_parse_select 的 note 语义；比 Dify 时代「LLM 挂=整 run 挂」多一层韧性）。
     """
     run = _reload(state["run_id"], state.get("run") or {})
-    transcript = _run_outputs(run, "transcript")["text"]
-    candidates = _run_outputs(run, "candidates")["text"]
+    transcript = _run_outputs(run, "transcript")
+    candidates = _run_outputs(run, "candidates")
     total = int(run.get("total") or 1)
     if not transcript.strip() or not candidates.strip():
         # 全跳过 run（state 幂等全命中）没有产物——正常路径，不是错误

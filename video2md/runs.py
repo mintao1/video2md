@@ -7,7 +7,6 @@ import hashlib
 import json
 import os
 import re
-import shutil
 import sys
 import tempfile
 import threading
@@ -17,7 +16,7 @@ from pathlib import Path
 from datetime import datetime
 
 from .config import ENV, MAX_TRANSCRIPT_CHARS, PROJ
-from .util import RunLog, _STAGE_LOGS, current_log, fmt_hms, load_state, probe, redact, sanitize_filename, save_state, video_fingerprint
+from .util import RunLog, _STAGE_LOGS, current_log, fmt_hms, load_state, probe, redact, sanitize_filename, video_fingerprint
 from . import observability
 from .resolve import _part_selected, ensure_scheme, normalize_url, resolve_url
 from .download import download_entry, download_images
@@ -36,10 +35,10 @@ from .note import MIN_NOTE_TRANSCRIPT_CHARS, append_index, extract_toc, looks_li
 
 
 
-# ---------------------------------------------------------------- run 会话（serve/工作流阶段编排）
-# 本地管线拆成阶段：download → transcribe → frames → ocr → select → clips → note → kb。
-# 工作流（Dify 画布）逐阶段 POST 触发、轮询完成；LLM 在中间做「内容选帧」与「改写」决策。
-# CLI 直跑路径（_cmd_process_one）复用同一套函数，本地启发式选帧兜底。
+# ---------------------------------------------------------------- run 会话（LangGraph 阶段编排）
+# 本地管线拆成阶段：download → transcribe → frames → ocr → select → clips → note。
+# graph 的阶段节点直调 _run_stage（进程内）；LLM 在中间做「内容选帧」与「改写」决策。
+# `__stage` 子命令保留手动排障入口（单阶段子进程重放）；CLI 直跑路径复用同一套函数。
 RUNS_FILE = Path(ENV.get("V2MD_RUNS_FILE", str(PROJ / "runs.json")))
 
 
@@ -67,10 +66,10 @@ def _load_runs() -> dict:
 def _runs_file_lock():
     """跨进程互斥 + 读写整段原子。
 
-    runs.json 的写方不止一个进程：serve 主进程（POST /runs 建 run）与 worker 拉起的
-    `__stage` 子进程（阶段结束落盘）。线程锁只管得住同进程；固定 `.json.tmp` 路径下
-    两个进程会互相截断——先 rename 的那个把对方写了一半的空文件发布出去，
-    读方拿到 {} 后下一次 merge 就只写自己那一个 key，其余的 run 全丢。
+    现役写方是 api 单进程（POST /runs 建 run、阶段结束落盘）；但 `__stage` 手动排障
+    与 graph-run CLI 可能与 api 并发跑，跨进程语义保留。线程锁只管得住同进程；固定
+    `.json.tmp` 路径下两个进程会互相截断——先 rename 的那个把对方写了一半的空文件
+    发布出去，读方拿到 {} 后下一次 merge 就只写自己那一个 key，其余的 run 全丢。
     """
     with _RUNS_LOCK:
         with _RUNS_LOCKFILE.open("a+") as fh:
@@ -98,8 +97,7 @@ def _runs_merge(run: dict) -> dict:
 
 
 
-def create_run(url: str, part_items: str = "", force: bool = False,
-               dify_run_id: str = "") -> dict:
+def create_run(url: str, part_items: str = "", force: bool = False) -> dict:
     """建 run：resolve 展开条目 + 临时目录；已按 url 幂等处理的条目标 skipped（force=True 强制全量）。
 
     返回 run（未落盘前）；落盘由调用方 _runs_merge。
@@ -138,8 +136,6 @@ def create_run(url: str, part_items: str = "", force: bool = False,
         "stages": {},
         "status": "created",
     }
-    if dify_run_id:
-        run["dify_run_id"] = dify_run_id  # Langfuse 里 Dify trace ↔ serve trace 互跳
     if force:
         run["force"] = True
     return run
@@ -175,11 +171,10 @@ def _run_stage(run: dict, stage: str, args: dict) -> None:
     全局型错误（认证/网络类，_CB_GLOBAL_PAT）2 连即熔，其余 V2MD_CB_THRESHOLD（默认 3）连熔——
     不把 27 条各自白烧 5 分钟才发现是同一个死法。
 
-    观测：run 级 RunLog（run_id 复用 serve 的，trace 跨子进程拼合）——阶段 1 个 span、
-    每条目 1 个子 span；jsonl 双写 + Langfuse sink（配了 LANGFUSE_SK 才启用）。"""
+    观测：run 级 RunLog（run_id 复用，trace 跨子进程拼合）——阶段 1 个 span、
+    每条目 1 个子子 span；jsonl 双写 + OTel sink（配了 OTEL 端点/LANGFUSE 才启用）。"""
     log = RunLog(f"stage:{stage}", run_id=run["run_id"], trace_name=run.get("url", ""),
-                 trace_meta={"dify_run_id": run.get("dify_run_id", ""),
-                             "stage": stage, "total": str(run.get("total", ""))})
+                 trace_meta={"stage": stage, "total": str(run.get("total", ""))})
     _STAGE_LOGS[run["run_id"]] = log
     t0 = time.monotonic()
     status = "completed"
@@ -288,7 +283,7 @@ def _run_stage_inner(run: dict, stage: str, args: dict, log: "RunLog") -> None:
 
 
 def cmd_stage(run_id: str, stage: str, args_json: str) -> None:
-    """阶段 job 子进程入口（serve 的 worker 以 `python -m video2md __stage` 拉起）。"""
+    """单阶段手动排障入口：`python -m video2md __stage <run_id> <stage> '<args JSON>'`。"""
     if stage not in STAGES:
         print(f"❌ 未知阶段 {stage}（可选 {','.join(STAGES)}）")
         sys.exit(1)
@@ -305,7 +300,7 @@ def cmd_stage(run_id: str, stage: str, args_json: str) -> None:
 
 
 
-# ---- 阶段函数（工作流/CLI 共用；args 为 dict 便于子进程 JSON 传参）----
+# ---- 阶段函数（图节点/CLI/__stage 手动排障共用；args 为 dict 便于子进程 JSON 传参）----
 _STAGE_FNS: dict[str, callable] = {}
 
 
@@ -370,7 +365,8 @@ def _stage_transcribe(run, entry, art, tmp, args):
         print("    ⏭ 图文帖无音频，跳过转写（转录本将由 OCR 合成）")
         return
     if not art.get("video"):
-        # 工作流在 download 失败后仍会放行下游（loop 对 error 不拦），这里要给出人话而不是 KeyError 'video'
+        # 正常路径 download 失败即 fail 节点终止（到不了这里）；保留防御：幂等重入/
+        # __stage 手动乱序执行时给出人话而不是 KeyError 'video'
         raise SystemExit("无视频产物（download 未成功），跳过转写")
     segs, conf, dropped = transcribe(Path(art["video"]), args.get("model") or ENV.get("V2MD_WHISPER_MODEL") or "turbo",
                                      args.get("language") or "zh", tmp,
@@ -378,8 +374,8 @@ def _stage_transcribe(run, entry, art, tmp, args):
     if not segs:
         raise SystemExit("转写结果为空（未识别到语音段）")
     art.update(segs=segs, conf=conf, dropped=dropped)
-    # 语音通道转录本立刻物化：工作流 transcribe 一结束就 GET stages/transcript，
-    # 不能等 ocr 阶段的 merge_timeline 双通道版（那是后期覆盖，早期 GET 会拿到空）
+    # 语音通道转录本立刻物化：调用方在 ocr 阶段结束前就能读到（ocr 的
+    # merge_timeline 双通道版是后期覆盖，不物化则早期读者拿到空）
     art["transcript"], _ = merge_timeline(segs, [])
     _art_info(stage="transcribe", segs=len(segs), conf=round(conf, 3),
               transcript_chars=len(art["transcript"]))
@@ -435,7 +431,7 @@ def _stage_ocr(run, entry, art, tmp, args):
     if not art.get("candidates") or not art.get("segs"):
         raise SystemExit("缺候选帧或语音段（frames/transcribe 未成功），跳过 OCR")
     cands = [(t, _cand_path(rel, tmp)) for t, rel in art["candidates"]]
-    # 注意用 `or` 而不是 .get(k, 默认)：工作流未填时传的是空串，空串不走默认值，
+    # 注意用 `or` 而不是 .get(k, 默认)：调用方未填时传的是空串，空串不走默认值，
     # 会把 ocr 静默切到 gemini（实测：整批 OCR 命中 0，因为空串 != "vision"）
     # remote：V2MD_OCR_REMOTE 指向 GPU 路由（或任意参考服务端）时默认外移
     ocr_engine = args.get("ocr") or ("remote" if ENV.get("V2MD_OCR_REMOTE") else "vision")
@@ -468,7 +464,7 @@ def _stage_ocr(run, entry, art, tmp, args):
 
 @_stage
 def _stage_select(run, entry, art, tmp, args):
-    """发布选中帧：优先工作流 LLM 选帧结果（args.frames/selections），空则本地启发式兜底。"""
+    """发布选中帧：优先 LLM 选帧结果（args.frames/selections），空则本地启发式兜底。"""
     if not art.get("candidates") or not art.get("segs"):
         raise SystemExit("缺候选帧或语音段（frames/transcribe 未成功），跳过选帧")
     cands = [(t, _cand_path(rel, tmp)) for t, rel in art["candidates"]]
@@ -480,7 +476,7 @@ def _stage_select(run, entry, art, tmp, args):
     name_of = {p: n for _t, p, n in named_list}
     chosen = args.get("frames")
     if not chosen and args.get("selections"):
-        idx = str(run["entries"].index(entry) + 1)  # 清单头「条目 N/M」的序号，工作流 LLM 按序号回选
+        idx = str(run["entries"].index(entry) + 1)  # 清单头「条目 N/M」的序号，LLM 按序号回选
         for s in args["selections"]:
             key = str(s.get("entry", "")).strip()
             if key in (idx, entry["url"], str(entry.get("playlist_index", ""))):
@@ -549,10 +545,11 @@ def _stage_clips(run, entry, art, tmp, args):
 
 @_stage
 def _stage_note(run, entry, art, tmp, args):
-    """接收工作流整理正文 + 元数据 → 校图链/插节段/写盘/索引/转录本。
+    """接收 LLM 整理正文 + 元数据 → 校图链/插节段/写盘/索引/转录本。
 
-    逐条目循环时 args["entry"] 指定目标条目（序号/URL/分P 均可），其余条目直接跳过
-    （不是失败、不写盘）——这正是把合集「一次调用写 N 篇」拆成逐条目写的关键。
+    图内路径由 graph 逐条目传 body/meta；`args["entry"]`/`args["notes"]` 是
+    `__stage` 手动排障时的分发形态（指定目标条目/一次多正文），其余条目直接跳过
+    （不是失败、不写盘）。
     """
     want = str(args.get("entry", "")).strip()
     if want:
@@ -564,11 +561,11 @@ def _stage_note(run, entry, art, tmp, args):
         return
     body, meta = args.get("body"), args.get("meta")
     if not art.get("segs"):
-        # 工作流在 transcribe 失败后会继续跑下游（loop 对 error 也放行），
-        # 这里硬门禁：无转录本绝不写盘，杜绝「空转录本」类废稿再次入库
+        # 硬门禁：无转录本绝不写盘，杜绝「空转录本」类废稿再次入库
+        # （正常路径 transcribe 失败即 fail 终止；防御幂等重入/手动乱序执行）
         raise SystemExit("无转录本（transcribe 未成功），拒绝写盘")
     if not body and args.get("notes"):
-        idx = str(run["entries"].index(entry) + 1)  # 工作流按条目序号分发正文（多条目合集各写一篇）
+        idx = str(run["entries"].index(entry) + 1)  # __stage 手动路径按条目序号分发正文（多条目合集各写一篇）
         for n in args["notes"]:
             key = str(n.get("entry", "")).strip()
             if key in (idx, entry["url"], str(entry.get("playlist_index", ""))):
@@ -577,8 +574,8 @@ def _stage_note(run, entry, art, tmp, args):
         if not body and len(args["notes"]) == 1 and run["total"] == 1:
             body, meta = args["notes"][0].get("body"), args["notes"][0].get("meta")
     if not body:
-        raise SystemExit("note 阶段缺 body（工作流整理正文未产出？）")
-    # 质量门禁：拒答/空壳绝不写盘（否则 vault 与知识库都会被污染）
+        raise SystemExit("note 阶段缺 body（LLM 整理正文未产出？）")
+    # 质量门禁：拒答/空壳绝不写盘（否则 vault 会被污染）
     if looks_like_refusal(body):
         raise SystemExit(f"正文疑似 LLM 拒答/空壳（{len(body.strip())} 字），拒绝写盘：{body.strip()[:60]}")
     tr_len = len((art.get("transcript") or "").strip())
@@ -636,31 +633,10 @@ def _stage_note(run, entry, art, tmp, args):
 
 
 
-def _run_outputs(run: dict, which: str, entry: str | None = None) -> dict:
-    """工作流取数的聚合文本：transcript / candidates / selected。
-
-    不带 entry：多条目用「===== 条目 N/M：url =====」分节（LLM 靠它分篇，需 ===NOTE N=== 纪律）。
-    带 entry=N：只返回该条目自己的文本、**不带分节头**——逐条目循环用，单条目改写不需要分篇纪律。
-    """
-    key = {"transcript": "transcript", "candidates": "cand_manifest", "selected": "manifest"}[which]
-    blocks: list[str] = []
-    entries: list[dict] = []
-    for idx, e in enumerate(run["entries"], 1):
-        art = run["artifacts"].get(e["url"], {})
-        entries.append({"index": idx, "url": e["url"], "skipped": bool(art.get("skipped"))})
-        txt = art.get(key)
-        if entry is not None:
-            hit = (str(idx) == str(entry) or e["url"] == entry
-                   or str(e.get("playlist_index", "")) == str(entry))
-            if hit:
-                return {"text": txt or "", "entry": idx, "url": e["url"],
-                        "skipped": bool(art.get("skipped")),
-                        # 工作流逐条目循环据此跳过已写盘条目的 LLM 改写（幂等省 token）
-                        "note_done": bool(art.get("note")),
-                        "entries": entries}
-            continue
-        if txt:
-            blocks.append(f"===== 条目 {idx}/{run['total']}：{e['url']} =====\n{txt}")
-    if entry is not None:
-        return {"text": "", "entry": None, "entries": entries}
-    return {"text": "\n\n".join(blocks), "entries": entries}
+def _run_outputs(run: dict, which: str) -> str:
+    """LLM 节点取数的聚合文本：transcript / candidates（多条目用「===== 条目 N/M：url =====」分节，LLM 靠它分篇）。"""
+    key = {"transcript": "transcript", "candidates": "cand_manifest"}[which]
+    blocks = [f"===== 条目 {idx}/{run['total']}：{e['url']} =====\n{txt}"
+              for idx, e in enumerate(run["entries"], 1)
+              if (txt := run["artifacts"].get(e["url"], {}).get(key))]
+    return "\n\n".join(blocks)

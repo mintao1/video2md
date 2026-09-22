@@ -6,7 +6,6 @@ __pycache__
 .env.bak-*
 state.json
 state.json.bak-*
-jobs.json
 runs.json
 runs.lock
 logs/
@@ -15,11 +14,9 @@ tmp/
 legacy/
 docs/
 scripts/
-tests
 test_*.py
 test_e2e.sh
 .zcode/
 .DS_Store
-dify/
 docker-compose*.yml
 deploy/

@@ -9,7 +9,8 @@ import subprocess
 import threading
 import time
 import uuid
-from datetime import date, datetime, timedelta
+from datetime import date, datetime
+from pathlib import Path
 
 from .config import LOG_DIR, STATE_FILE
 
@@ -80,7 +81,7 @@ _STAGE_LOGS: dict[str, "RunLog"] = {}
 
 
 def current_log() -> "RunLog | None":
-    """当前活跃的阶段 RunLog（serve worker 串行跑阶段，任意时刻最多一个）。"""
+    """当前活跃的阶段 RunLog（api 串行驱动阶段，任意时刻最多一个）。"""
     return next(iter(_STAGE_LOGS.values()), None)
 
 
@@ -93,8 +94,8 @@ class RunLog:
 
     def __init__(self, label: str, run_id: str = "", trace_name: str = "",
                  trace_meta: dict | None = None):
-        # run_id 可由调用方指定（stage 子进程复用 serve 的 run_id，跨进程拼出同一条 trace）；
-        # trace_name/trace_meta 供 Langfuse 侧建 trace（name=url，metadata 带 dify_run_id 互跳）
+        # run_id 可由调用方指定（__stage 子进程复用同一 run_id，跨进程拼出同一条 trace）；
+        # trace_name/trace_meta 供 Langfuse 侧建 trace（name=url，metadata 带 stage/total）
         self.run_id = run_id or uuid.uuid4().hex[:8]
         self.label = label
         self.trace_name = trace_name
@@ -113,7 +114,7 @@ class RunLog:
             with self.path.open("a") as f:
                 f.write(json.dumps(out, ensure_ascii=False) + "\n")
         try:
-            from . import observability  # 惰性导入：未配 LANGFUSE_SK 时零开销
+            from . import observability  # 惰性导入：未配 OTel 端点/Langfuse 时零开销
             observability.record(out, run_id=self.run_id, label=self.label,
                                  trace_name=self.trace_name, trace_metadata=self.trace_meta)
         except Exception:

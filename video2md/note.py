@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
-from datetime import date, datetime, timedelta
+from datetime import date
 
 from .config import ENV, INDEX_FILE, OUT_DIR, TRANSCRIPT_DIR
 from .util import sanitize_filename
@@ -85,7 +85,7 @@ def write_transcript(title: str, transcript: str) -> Path:
 
 
 
-# ---------------------------------------------------------------- ⑤ vault
+# ---------------------------------------------------------------- vault 笔记组装
 def render_note(body: str, meta: dict, ctx: dict, toc: list[tuple[str, str]]) -> str:
     """组装 3B1B 式笔记：富 frontmatter + [!info] 视频信息 + 折叠章节导航 + 文稿正文。"""
     tags = list(dict.fromkeys(["视频笔记"] + meta["tags"]))
@@ -107,10 +107,6 @@ def render_note(body: str, meta: dict, ctx: dict, toc: list[tuple[str, str]]) ->
         fm["duration"] = ctx["dur_str"]
         fm["transcribe_model"] = ctx["model"]
         fm["transcribe_conf"] = round(ctx["conf"], 2)
-    if meta.get("tokens"):  # LLM token 用量（成本可见）
-        fm["llm_tokens"] = meta["tokens"]
-    if meta.get("price"):
-        fm["llm_cost"] = meta["price"]
     if ctx.get("playlist_title"):  # 合集/播放列表来源（分P 时能追溯第几集）
         fm["playlist"] = ctx["playlist_title"]
     if ctx.get("playlist_index"):
