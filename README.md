@@ -62,7 +62,7 @@ POST /runs（FastAPI 内嵌图，串行信号量=1）
 
 ## 部署 lcode-4c
 
-前提：服务器 Docker + Compose；两仓库同级放 `~/stack/{dify-video2md,gpu_router}`
+前提：服务器 Docker + Compose；两仓库同级放 `~/stack/{video2md,gpu_router}`
 （别处则设 `GPU_ROUTER_DIR`）。全部命令在 Mac 上执行：
 
 ```bash
@@ -70,7 +70,7 @@ POST /runs（FastAPI 内嵌图，串行信号量=1）
 rsync -az --delete --exclude '.venv' --exclude 'logs' --exclude '__pycache__' \
   --exclude '.env' --exclude 'secrets' --exclude 'state.json*' --exclude 'runs.json*' \
   --exclude 'data' --exclude '.DS_Store' \
-  ./ lcode-4c:~/stack/dify-video2md/
+  ./ lcode-4c:~/stack/video2md/
 rsync -az --delete --exclude '.venv' --exclude 'logs' --exclude '__pycache__' \
   --exclude 'gpu_router.json' --exclude '.DS_Store' \
   ~/Desktop/开发项目/gpu_router/ lcode-4c:~/stack/gpu_router/
@@ -81,10 +81,10 @@ rsync -az --delete --exclude '.venv' --exclude 'logs' --exclude '__pycache__' \
 #    secrets/gpu_router.env ← HTTP_PROXY=http://127.0.0.1:17897 等（出墙代理，SSH 隧道转发）
 #    secrets/obs.env        ← LANGFUSE_BASIC / HTTPS_PROXY / GF_SECURITY_ADMIN_PASSWORD（观测栈，可选）
 #    secrets/colab-cli/token.json（可选；缺了 colab provider 自动冷却）
-scp ~/.config/video2md.env lcode-4c:~/stack/dify-video2md/secrets/video2md.env
+scp ~/.config/video2md.env lcode-4c:~/stack/video2md/secrets/video2md.env
 
 # 3. 构建（x86 原生构建；PIP_INDEX_URL 走清华镜像，ghcr/debian 源已换国内镜像）
-ssh lcode-4c 'cd ~/stack/dify-video2md && \
+ssh lcode-4c 'cd ~/stack/video2md && \
   PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple \
   docker compose -f docker-compose.yml -f docker-compose.obs.yml build'
 #    ⚠ 实测 2026-09-22：依赖变更触发的全量 `uv sync` 在该机可能 0 CPU/0 socket 挂死
@@ -94,7 +94,7 @@ ssh lcode-4c 'cd ~/stack/dify-video2md && \
 #      docker build -t video2md:latest -f /tmp/patch.Dockerfile . && docker compose ... up -d
 
 # 4. 起栈（含观测栈：collector/prometheus/grafana）+ 体检
-ssh lcode-4c 'cd ~/stack/dify-video2md && \
+ssh lcode-4c 'cd ~/stack/video2md && \
   docker compose -f docker-compose.yml -f docker-compose.obs.yml up -d && \
   curl -s localhost:8790/healthz && curl -s localhost:8790/preflight && \
   curl -s "localhost:9700/status?refresh=true" && \
