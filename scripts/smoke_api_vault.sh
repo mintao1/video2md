@@ -118,7 +118,8 @@ NOTE=$(find "$NOTEDIR" -name "*.md" -newer "$STAMP" ! -name "索引*" | head -1)
 [ -n "$NOTE" ] || fail "vault 未出现新笔记（${NOTEDIR}）"
 grep -q "processor: video2md" "$NOTE" || fail "frontmatter 缺 processor"
 # ground truth 句查转录本（whisper 真输出，fake/真 LLM 两档都在），不查正文（fake 档正文无语义）
-TR_FILE=$(ls "$NOTEDIR/transcripts/"*.txt 2>/dev/null | while read -r f; do [ "$f" -nt "$STAMP" ] && echo "$f"; done | head -1)
+# （ls 无匹配/while 末轮测试失败都会以非零收尾——pipefail 下会静默杀掉赋值语句，双兜底）
+TR_FILE=$( (ls "$NOTEDIR/transcripts/"*.txt 2>/dev/null || true) | while read -r f; do if [ "$f" -nt "$STAMP" ]; then echo "$f"; fi; done | head -1)
 [ -n "$TR_FILE" ] && grep -q "光合作用" "$TR_FILE" || fail "转录本不含 ground truth 句（转写失败？）"
 API_MD=$(curl -s -m 10 "$API/runs/$RUN_ID/note" | python3 -c "
 import json,sys; ns=json.load(sys.stdin).get('notes') or []; print(ns[0]['md'] if ns else '')")

@@ -194,7 +194,8 @@ def node_note_entry(state: RunState) -> dict:
     dur_str = fmt_hms(art.get("duration") or 0.0)
     # RunLog 注册进 _STAGE_LOGS：llm_task 的 span 才能挂进 run 的 trace（对齐 _run_stage 的待遇）
     log = RunLog("stage:note", run_id=run["run_id"], trace_name=run.get("url", ""),
-                 trace_meta={"stage": "note", "entry": str(idx)})
+                 trace_meta={"stage": "note", "entry": str(idx)},
+                 user_id=run.get("owner", ""))
     _STAGE_LOGS[run["run_id"]] = log
     try:
         organize = llm_task("organize", idx=idx, total=run["total"],
@@ -484,7 +485,7 @@ def run_graph(url: str, *, part_items: str = "", force: bool = False, review: bo
     # 图编排层自动插桩：节点/state 增量/路由决策 → RunLog 事件流（graph:* 前缀），
     # api 后台驱动与 graph-run CLI 两条入口自动覆盖
     config = {"recursion_limit": 1000,
-              "callbacks": [GraphObsHandler(run_id, trace_name=url)]}
+              "callbacks": [GraphObsHandler(run_id, trace_name=url, user_id=owner)]}
     if checkpointer:
         config["configurable"] = {"thread_id": run_id}
     deadman.ping("start", run_id=run_id, trace_name=url)

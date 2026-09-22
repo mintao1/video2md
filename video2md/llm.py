@@ -169,6 +169,13 @@ def _llm_observed(task: str, status: str, t0: float, attempts: int, meta: dict,
             span_rec["ttftMs"] = meta["ttft_ms"]
         if usage:
             span_rec["usage"] = usage
+        # generation 全文只走 _otel 旁路 → Langfuse input/output（Render 成对话视图）；
+        # RunLog._write 会把它从 jsonl/SSE 剥掉，span_log 摘要也不留副本
+        span_rec["_otel"] = {
+            "input": json.dumps([{"role": "system", "content": system},
+                                 {"role": "user", "content": user}], ensure_ascii=False),
+            "output": text,
+        }
     from . import observability
     observability.metric_llm(task, status, secs, in_tok, out_tok)
 

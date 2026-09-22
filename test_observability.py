@@ -63,14 +63,17 @@ spans = InMemorySpanExporter()
 reader = InMemoryMetricReader()
 assert observability.init(span_exporter=spans, metric_reader=reader) is True
 
-log = RunLog("t", run_id="r1", trace_name="http://video", trace_meta={"stage": "download"})
+log = RunLog("t", run_id="r1", trace_name="http://video", trace_meta={"stage": "download"},
+             user_id="uid_alice")
 with log.span("stage:download"):
-    with log.span("entry 1/2 download abc"):
+    with log.span("entry 1/2 download"):
         log.info("artifacts", stage="download", duration_s=42)
     with log.span("llm:organize") as sp:
         sp["model"] = "Kimi-K3"
         sp["usage"] = {"prompt_tokens": 11, "completion_tokens": 7}
         sp["ttftMs"] = 120
+        sp["_otel"] = {"input": '[{"role":"user","content":"转录全文"}]', "output": "正文"}
+log.info("graph:end", status="done")  # trace 出口：root observation output
 try:
     with log.span("stage:frames"):
         raise RuntimeError("ffmpeg 炸了")
@@ -79,9 +82,20 @@ except RuntimeError:
 observability.close_run("r1")
 
 tree = {s.name: s for s in spans.get_finished_spans()}
-root, stage, entry = tree["http://video"], tree["stage:download"], tree["entry 1/2 download abc"]
-assert root.attributes["langfuse.trace.name"] == "http://video"
-assert root.attributes["run_id"] == "r1" and root.attributes["stage"] == "download"
+root, stage, entry = tree["video2md-run"], tree["stage:download"], tree["entry 1/2 download"]
+# trace 名常量化（低基数原则：名字是 API，URL 是数据进 input）
+assert root.attributes["langfuse.trace.name"] == "video2md-run"
+assert root.attributes["run_id"] == "r1"
+# Langfuse OTel 映射：metadata 带 langfuse.trace.metadata.* 前缀才可过滤
+assert root.attributes["langfuse.trace.metadata.stage"] == "download"
+# userId 映射 + 全 span 传播（官方：过滤/聚合的前提）；tags 给 dashboard 分维度
+assert root.attributes["langfuse.user.id"] == "uid_alice"
+assert stage.attributes["langfuse.user.id"] == "uid_alice"
+assert "video2md" in root.attributes["langfuse.trace.tags"]
+assert any(t.startswith("mode:") for t in root.attributes["langfuse.trace.tags"])
+# trace 输入/输出（root 观察体语义等价物：v4 废弃 trace 级 input/output）
+assert root.attributes["langfuse.observation.input"] == "http://video"
+assert root.attributes["langfuse.observation.output"] == "done"
 assert stage.parent.span_id == root.context.span_id
 assert entry.parent.span_id == stage.context.span_id
 info = tree["artifacts"]
@@ -96,6 +110,10 @@ assert gen.attributes["gen_ai.usage.input_tokens"] == 11
 assert gen.attributes["gen_ai.usage.output_tokens"] == 7
 assert gen.attributes["ttftMs"] == 120
 assert gen.attributes["durationMs"] >= 0
+# generation 全文：_otel 旁路 → langfuse.observation.input/output
+assert "转录全文" in gen.attributes["langfuse.observation.input"]
+assert gen.attributes["langfuse.observation.output"] == "正文"
+assert "_otel" not in log.spans[-2], "span_log 摘要不得养 prompt 全文副本"
 
 from opentelemetry.trace import StatusCode
 assert tree["stage:frames"].status.status_code == StatusCode.ERROR

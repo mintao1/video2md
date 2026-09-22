@@ -326,9 +326,16 @@ evals 旁路：scripts/eval_notes.py → Langfuse scores（SDK 直挂，黑洞�
 - **trace/LLM 成本（Langfuse Cloud）**：每 run 一条 trace，traceId =
   `sha256("video2md-"+run_id)`（确定性，evals 分数据此回挂；2026-09-22 前为
   `serve-` 前缀，Langfuse 里 233 条历史回放 trace 仍用旧前缀）；LLM 调用渲染为 generation
-  （gen_ai semconv：model/input/output tokens/TTFT/重试次数；模型定价在 Langfuse
-  项目侧配）。熔断与部分失败是 trace 上的即时事件（circuit_breaker/partial_failure），
+  （gen_ai semconv：model/usage/TTFT + **prompt/completion 全文**经 `_otel` 旁路上云，
+  不落 jsonl/SSE；模型定价在 Langfuse 项目侧配）。trace 名常量 `video2md-run`
+  （URL 进 root input——名字当 API 保低基数，按官方 best-practices）；`userId`=
+  run 归属 uid（全 span 传播，可按用户过滤/归因成本）；tags=`video2md`/`mode:vault|deliver`；
+  environment 取 `V2MD_ENV`（缺省 development，生产 compose 侧应设 production）。
+  熔断与部分失败是 trace 上的即时事件（circuit_breaker/partial_failure），
   阶段产物计数（帧数/转录字数/OCR 命中/节段数/note 字节）挂在各条目 span 下。
+  **开发/生产分项目**：Langfuse 里给开发机单开 project，密钥只进 `~/.config/video2md.env`，
+  两边数据天然分家；新组织（2026-09-16 后建）legacy traces API 已禁用，程序查询走
+  `GET /api/public/v2/observations?fromStartTime=…&fields=core,basic,io,model,usage,trace_context`。
   设计依据存档：`docs/research/2026-09-22-otel-critique-review.md`——traceId 为何用
   sha256 约定 + OTel SpanContext 锚（合法 SDK 机制，四组件免 Langfuse SDK 对齐）
   而非 `create_trace_id`；`/fail` 是 healthchecks.io 标准告警路径；RAGAS 保留决策。

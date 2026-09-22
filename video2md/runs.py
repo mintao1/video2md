@@ -201,7 +201,8 @@ def _run_stage(run: dict, stage: str, args: dict) -> None:
     观测：run 级 RunLog（run_id 复用，trace 跨子进程拼合）——阶段 1 个 span、
     每条目 1 个子子 span；jsonl 双写 + OTel sink（配了 OTEL 端点/LANGFUSE 才启用）。"""
     log = RunLog(f"stage:{stage}", run_id=run["run_id"], trace_name=run.get("url", ""),
-                 trace_meta={"stage": stage, "total": str(run.get("total", ""))})
+                 trace_meta={"stage": stage, "total": str(run.get("total", ""))},
+                 user_id=run.get("owner", ""))
     _STAGE_LOGS[run["run_id"]] = log
     t0 = time.monotonic()
     status = "completed"
@@ -257,7 +258,9 @@ def _run_stage_inner(run: dict, stage: str, args: dict, log: "RunLog") -> None:
         etmp.mkdir(parents=True, exist_ok=True)
         err_msg = ""
         eid = entry.get("id") or entry.get("url", "")[-24:]
-        with log.span(f"entry {idx}/{len(run['entries'])} {stage} {eid}") as sp:
+        # span 名保持低基数（动态值进 attribute 不进名字——Langfuse 按名过滤/建 evaluator）
+        with log.span(f"entry {idx}/{len(run['entries'])} {stage}") as sp:
+            sp["entry_id"] = eid
             try:
                 _STAGE_FNS[stage](run, entry, art, etmp, args)
             except SystemExit as exc:

@@ -44,7 +44,8 @@ _HISTOGRAM_BOUNDS_S = [1, 5, 15, 60, 300, 900, 1800, 3600, 7200]
 
 # rec 里的控制字段（不进 attributes）；usage/model 由 LLM 映射单独处理
 _CONTROL_KEYS = {"ts", "run_id", "event", "spanId", "parentSpanId", "status",
-                 "durationMs", "error", "force_status", "ts_mono", "usage", "model"}
+                 "durationMs", "error", "force_status", "ts_mono", "usage", "model",
+                 "user_id"}
 
 _STARTED = False
 _TRACER_PROVIDER: TracerProvider | None = None
@@ -64,6 +65,12 @@ def _env(key: str, default: str = "") -> str:
     if key in os.environ:
         return os.environ[key]
     return ENV.get(key, default)
+
+
+def _artifact_mode() -> str:
+    """产物模式 tag（dashboard 按 mode 分维度）。动态读 config 属性：测试可 monkeypatch。"""
+    from . import config as _c  # 惰性：避免模块级循环；ARTIFACT_MODE 是 import 后常量
+    return getattr(_c, "ARTIFACT_MODE", "vault")
 
 
 def _endpoint() -> tuple[str, dict, bool] | None:
@@ -100,7 +107,8 @@ def init(*, endpoint: str = "", headers: dict | None = None,
                 return False
             base, hdrs, is_collector = cfg
         resource = Resource.create({"service.name": "video2md-serve",
-                                    "service.namespace": "video2md"})
+                                    "service.namespace": "video2md",
+                                    "deployment.environment.name": _env("V2MD_ENV", "development")})
         tp = TracerProvider(resource=resource)
         if span_exporter is not None:
             tp.add_span_processor(SimpleSpanProcessor(span_exporter))
@@ -174,18 +182,31 @@ class _RunTrace:
     靠同一约定拼回这条 trace。
     """
 
-    def __init__(self, run_id: str, label: str, trace_name: str, trace_meta: dict):
+    def __init__(self, run_id: str, label: str, trace_name: str, trace_meta: dict,
+                 user_id: str = ""):
         tid = int(hashlib.sha256(f"video2md-{run_id}".encode()).hexdigest()[:32], 16)
         sid = int(hashlib.sha256(f"root-{run_id}".encode()).hexdigest()[:16], 16)
         anchor = SpanContext(trace_id=tid, span_id=sid, is_remote=True,
                              trace_flags=TraceFlags(TraceFlags.SAMPLED))
         parent_ctx = set_span_in_context(NonRecordingSpan(anchor))
-        attrs = {"langfuse.trace.name": trace_name or label, "run_id": run_id}
-        attrs.update({k: str(v) for k, v in (trace_meta or {}).items() if v})
+        # Langfuse OTel 映射（官方 ingestion 文档）：trace 名/用户/metadata 走 langfuse.*
+        # 前缀才落进 trace 的可过滤字段，裸 key 只会进 metadata.attributes 杂物袋
+        attrs = {"langfuse.trace.name": "video2md-run", "run_id": run_id,
+                 "langfuse.environment": _env("V2MD_ENV", "development")}
+        if user_id:
+            attrs["langfuse.user.id"] = user_id
+        attrs["langfuse.trace.tags"] = ["video2md", f"mode:{_artifact_mode()}"]
+        # root 观察体的 input = 入口 URL（trace 级 input 在 v4 已废弃，用语义等价物；
+        # 名/身份分离：名字当 API 保持常量，URL 是数据进 input）
+        if trace_name:
+            attrs["langfuse.observation.input"] = trace_name
+        attrs.update({f"langfuse.trace.metadata.{k}": str(v)
+                      for k, v in (trace_meta or {}).items() if v})
         # root 立即开立：长阶段跑到哪一步在 Langfuse 实时可见，不用等收尾
-        self.root = _TRACER.start_span(trace_name or label, attributes=attrs,
+        self.root = _TRACER.start_span("video2md-run", attributes=attrs,
                                        context=parent_ctx)
         self.open: dict[str, object] = {}
+        self.user_id = user_id
 
 
 def _scalar_attrs(rec: dict) -> dict:
@@ -220,26 +241,39 @@ def _scalar_attrs(rec: dict) -> dict:
 
 
 def record(rec: dict, *, run_id: str, label: str, trace_name: str = "",
-           trace_metadata: dict | None = None) -> None:
-    """RunLog._write 的双写钩子。rec 是已脱敏的事件记录（含 event/spanId/status/durationMs…）。"""
+           trace_metadata: dict | None = None,
+           otel_attrs: dict | None = None) -> None:
+    """RunLog._write 的双写钩子。rec 是已脱敏的事件记录（含 event/spanId/status/durationMs…）。
+
+    otel_attrs：只喂 OTel 的大字段（LLM prompt/completion 全文），按 Langfuse 映射
+    落到 generation 的 input/output——不经 jsonl/SSE（体积与「日志不养正文」口径）。"""
     if not _ensure_started():
         return
     with _LOCK:
+        uid = str(rec.get("user_id") or "")
         rt = _RUNS.get(run_id)
         if rt is None:
-            rt = _RunTrace(run_id, label, trace_name, trace_metadata or {})
+            rt = _RunTrace(run_id, label, trace_name, trace_metadata or {}, user_id=uid)
             _RUNS[run_id] = rt
+        elif uid and not rt.user_id:  # 首条记录没带 owner（graph 层先于 stage）→ 补登
+            rt.user_id = uid
+            rt.root.set_attribute("langfuse.user.id", uid)
         status, span_id, event = rec.get("status"), rec.get("spanId"), str(rec.get("event"))
+        # Langfuse 要求 userId 落到 trace 内所有 span 才可过滤聚合（桥内集中补，免 Baggage）
+        uid_attr = {"langfuse.user.id": rt.user_id} if rt.user_id else {}
         if not span_id:
             # info 点事件 → 零时长 span，挂在当前最深开口 span（无则 root）下，树形不摊平
             parent = list(rt.open.values())[-1] if rt.open else rt.root
             _TRACER.start_span(event, context=set_span_in_context(parent),
-                               attributes=_scalar_attrs(rec)).end()
+                               attributes={**_scalar_attrs(rec), **uid_attr}).end()
+            if event == "graph:end":  # trace 出口：root 观察体 output = 终态
+                rt.root.set_attribute("langfuse.observation.output",
+                                      str(rec.get("status") or ""))
             return
         if status == "started":
             parent = rt.open.get(rec.get("parentSpanId") or "") or rt.root
             rt.open[span_id] = _TRACER.start_span(event, context=set_span_in_context(parent),
-                                                  attributes=_scalar_attrs(rec))
+                                                  attributes={**_scalar_attrs(rec), **uid_attr})
             return
         # completed/failed/exited → 闭合 span；悬空闭合（进程重启丢 started）补零时长 span 留痕
         s = rt.open.pop(span_id, None)
@@ -247,6 +281,11 @@ def record(rec: dict, *, run_id: str, label: str, trace_name: str = "",
             s = _TRACER.start_span(event, context=set_span_in_context(rt.root))
         for k, v in _scalar_attrs(rec).items():
             s.set_attribute(k, v)
+        for k in ("input", "output"):  # generation 全文（_otel 旁路；目前只有 llm:* 会带）
+            if otel_attrs and otel_attrs.get(k):
+                s.set_attribute(f"langfuse.observation.{k}", str(otel_attrs[k]))
+        if rt.user_id:
+            s.set_attribute("langfuse.user.id", rt.user_id)
         if status in ("failed", "exited"):
             s.set_status(Status(StatusCode.ERROR, str(rec.get("error") or "")[:300]))
         else:

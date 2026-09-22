@@ -41,8 +41,8 @@ class GraphObsHandler:
     ignore_chain = False  # langchain_core.handle_event 需要的类属性（鸭子类型零 import）
     raise_error = False
 
-    def __init__(self, run_id: str, trace_name: str = ""):
-        self.log = RunLog("graph", run_id=run_id, trace_name=trace_name)
+    def __init__(self, run_id: str, trace_name: str = "", user_id: str = ""):
+        self.log = RunLog("graph", run_id=run_id, trace_name=trace_name, user_id=user_id)
         self._graph_rid = ""  # 顶层图级事件的 run_id（graph:end 配对用）
         self._t0: dict[str, tuple[str, int, float]] = {}  # 事件 run_id → (节点, step, t0)
         self._router: dict[str, tuple[str, str]] = {}     # 事件 run_id → (路由函数名, 源节点)

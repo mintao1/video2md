@@ -94,13 +94,15 @@ class RunLog:
     """
 
     def __init__(self, label: str, run_id: str = "", trace_name: str = "",
-                 trace_meta: dict | None = None):
+                 trace_meta: dict | None = None, user_id: str = ""):
         # run_id 可由调用方指定（__stage 子进程复用同一 run_id，跨进程拼出同一条 trace）；
-        # trace_name/trace_meta 供 Langfuse 侧建 trace（name=url，metadata 带 stage/total）
+        # trace_name/trace_meta 供 Langfuse 侧建 trace（name=url，metadata 带 stage/total）；
+        # user_id = run 归属内部 uid → Langfuse userId（按用户过滤/成本归因的前提）
         self.run_id = run_id or uuid.uuid4().hex[:8]
         self.label = label
         self.trace_name = trace_name
         self.trace_meta = trace_meta or {}
+        self.user_id = user_id
         self.spans: list[dict] = []
         self._stack: list[str] = []  # span 嵌套栈：Langfuse 父子关系（entry 挂 stage）
         self._lock = threading.Lock()  # 并行阶段多线程写 jsonl 串行化
@@ -110,7 +112,9 @@ class RunLog:
     def _write(self, rec: dict) -> None:
         out = {"ts": datetime.now().isoformat(timespec="seconds"),
                "run_id": self.run_id}
-        out.update({k: v for k, v in rec.items() if k != "ts_mono"})
+        if self.user_id:
+            out["user_id"] = self.user_id
+        out.update({k: v for k, v in rec.items() if k not in ("ts_mono", "_otel")})
         with self._lock:  # 并行阶段（剪节段/OCR）多线程写同一 jsonl
             with self.path.open("a") as f:
                 f.write(json.dumps(out, ensure_ascii=False) + "\n")
@@ -120,8 +124,11 @@ class RunLog:
             pass  # 下游 sink 任何异常都不许影响主管线
         try:
             from . import observability  # 惰性导入：未配 OTel 端点/Langfuse 时零开销
+            # rec["_otel"]（如 LLM prompt/completion 全文）只喂 OTel sink：
+            # 不进 jsonl/SSE——SSE 撑不起百 KB 级负载，jsonl 也不该养正文副本
             observability.record(out, run_id=self.run_id, label=self.label,
-                                 trace_name=self.trace_name, trace_metadata=self.trace_meta)
+                                 trace_name=self.trace_name, trace_metadata=self.trace_meta,
+                                 otel_attrs=rec.get("_otel"))
         except Exception:
             pass  # sink 任何异常都不许影响主管线
 
@@ -152,8 +159,9 @@ class RunLog:
         finally:
             self._stack.pop()
             rec.pop("ts_mono", None)
-            self.spans.append(rec)
             self._write(rec)
+            rec.pop("_otel", None)  # 全文只给 OTel sink；span_log/state.json 不养副本
+            self.spans.append(rec)
 
     def info(self, event: str, **fields) -> None:
         # 字符串过脱敏；数值/布尔原样保留（OTel attribute 类型不丢，jsonl 也可序列化）
