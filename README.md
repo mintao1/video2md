@@ -40,8 +40,9 @@ POST /runs（FastAPI 内嵌图，串行信号量=1）
 `![[attachments/…mp4]]` 配斜体图注、`[^n]` 脚注、callout。
 嵌入文件名经本地校验（清单外引用自动剥离），防 LLM 幻觉图链。
 
-**不缓存策略**：中间产物全在系统临时目录，跑完必删；唯一持久落盘 = vault 笔记 +
-`state.json`（幂等记录）+ `runs.json`（run 记录）+ `data/checkpoints.sqlite`（图 checkpoint）。
+**不缓存策略**：中间产物全在系统临时目录，跑完必删；持久落盘 = vault 笔记 +
+`state.json`（幂等记录）+ `runs.json`（run 记录）+ `data/checkpoints.sqlite`（图 checkpoint）+
+`logs/`（run 级 jsonl 遥测真相）。
 
 ## 运行拓扑
 
@@ -68,7 +69,7 @@ POST /runs（FastAPI 内嵌图，串行信号量=1）
 # 1. 同步代码（secrets 被排除，单独放）
 rsync -az --delete --exclude '.venv' --exclude 'logs' --exclude '__pycache__' \
   --exclude '.env' --exclude 'secrets' --exclude 'state.json*' --exclude 'runs.json*' \
-  --exclude 'jobs.json' --exclude 'data' --exclude '.DS_Store' \
+  --exclude 'data' --exclude '.DS_Store' \
   ./ lcode-4c:~/stack/dify-video2md/
 rsync -az --delete --exclude '.venv' --exclude 'logs' --exclude '__pycache__' \
   --exclude 'gpu_router.json' --exclude '.DS_Store' \
@@ -203,6 +204,9 @@ evals 旁路：scripts/eval_notes.py → Langfuse scores（SDK 直挂，黑洞�
   （gen_ai semconv：model/input/output tokens/TTFT/重试次数；模型定价在 Langfuse
   项目侧配）。熔断与部分失败是 trace 上的即时事件（circuit_breaker/partial_failure），
   阶段产物计数（帧数/转录字数/OCR 命中/节段数/note 字节）挂在各条目 span 下。
+  设计依据存档：`docs/research/2026-09-22-otel-critique-review.md`——traceId 为何用
+  sha256 约定 + OTel SpanContext 锚（合法 SDK 机制，四组件免 Langfuse SDK 对齐）
+  而非 `create_trace_id`；`/fail` 是 healthchecks.io 标准告警路径；RAGAS 保留决策。
 - **指标（Grafana）**：起观测栈后 `ssh -L 3000:127.0.0.1:3000 lcode-4c` →
   http://127.0.0.1:3000 看预置看板：run 终态速率、阶段耗时、LLM token/调用量、
   熔断计数、队列深度。指标进程内存态，重启清零（运行态非账本）。
