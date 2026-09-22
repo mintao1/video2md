@@ -13,6 +13,9 @@ dependencies = [
     "fastapi>=0.115",
     "yt-dlp>=2025.9.0",
     "uvicorn>=0.30",
+    # 遥测出口（OTel SDK：traces+metrics → 本机 collector；未配端点时零开销纯 jsonl）
+    "opentelemetry-sdk>=1.27",
+    "opentelemetry-exporter-otlp-proto-http>=1.27",
 ]
 
 [project.optional-dependencies]
@@ -20,6 +23,16 @@ dependencies = [
 mac = [
     "pyobjc-framework-Vision>=10.3",
     "pyobjc-framework-Cocoa>=10.3",
+]
+# 评测旁路（scripts/eval_notes.py；judge 走自有 LLM 端点；ragas 带入 langchain-core，
+# 仅此路径 import，graph 运行时不染）
+evals = [
+    "deepeval>=3.0",
+    "ragas>=0.3",
+    "langfuse>=3.0",
+    # ragas 0.4.3 仍 import langchain_community.chat_models.vertexai——该模块在
+    # langchain-community 0.4 被删（包已 sunset），钉 0.3 系否则 ragas 整体 import 失败
+    "langchain-community>=0.3.27,<0.4",
 ]
 
 [tool.uv]

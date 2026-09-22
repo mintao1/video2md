@@ -150,7 +150,9 @@ class RunLog:
             self._write(rec)
 
     def info(self, event: str, **fields) -> None:
-        self._write({"event": event, **{k: redact(v) for k, v in fields.items()}})
+        # 字符串过脱敏；数值/布尔原样保留（OTel attribute 类型不丢，jsonl 也可序列化）
+        self._write({"event": event,
+                     **{k: redact(v) if isinstance(v, str) else v for k, v in fields.items()}})
 
 
 

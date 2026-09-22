@@ -35,6 +35,7 @@ services:
       OBSIDIAN_VAULT: /vault
       LANGFUSE_PK: ""
       LANGFUSE_SK: ""
+      OTEL_EXPORTER_OTLP_ENDPOINT: ""   # 显式关闭遥测出口（显式空串优先于文件配置）
     volumes:
       - v2md-smoke-data:/app/data
       - ./deploy/smoke-vault:/vault

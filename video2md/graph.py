@@ -5,6 +5,7 @@
     resolve → download → transcribe → frames → ocr
       → select_frames_llm（LLM 内容选帧；失败/空选 → 空 payload，select 阶段启发式兜底）
       → select → clips → note_entry（逐条目回环：整理→校对?→元数据→写盘）
+        → [V2MD_EVAL=1 时插入 eval_entry：刚写盘条目在线评测 → Langfuse scores，失败不致命]
       → finalize（状态落盘/清 tmp）→ END
     每个阶段节点失败 → fail（显式终止，对齐 DSL「失败即终止」闸门）
 
@@ -23,6 +24,7 @@
 """
 from __future__ import annotations
 
+import os
 import shutil
 import sqlite3
 import uuid
@@ -31,7 +33,7 @@ from pathlib import Path
 
 from langgraph.graph import END, START, StateGraph
 
-from .config import PROJ
+from .config import ENV, PROJ
 from .llm import assemble_entry_note, llm_task, select_frames
 from .resolve import extract_url
 from .runs import (_STAGE_FNS, _load_runs, _run_outputs, _run_stage,
@@ -234,6 +236,47 @@ def node_note_entry(state: RunState) -> dict:
 
 
 
+def node_eval_entry(state: RunState) -> dict:
+    """在线逐条目评测（仅 V2MD_EVAL=1 时接线）：刚写盘的 note+transcript → evals 打分
+    → Langfuse scores + 分数写回 artifacts[url].eval。
+
+    旁路纪律：任何失败只记 errors 继续（评测是旁路不是门禁，不继承 note 的 3-strikes
+    语义）；只评「本 run 新写盘」的条目——state.json 幂等记录的 run_id 比对，
+    幂等跳过/门禁拒答/无转录本的条目不评（也没东西可评）。
+    """
+    run = _reload(state["run_id"], state.get("run") or {})
+    if state.get("status") == "error":
+        return {"run": run}  # 上一步 LLM 全局故障：交给路由去 fail，不评
+    idx = int(state.get("entry_idx") or 2) - 1  # note_entry 已推进游标，评刚处理完的那条
+    try:
+        entry = run["entries"][idx - 1]
+        art = (run.get("artifacts") or {}).get(entry.get("url"), {})
+        if not (art.get("note") and art.get("transcript_path")):
+            return {"run": run}  # 幂等跳过/门禁拒答：本 pass 没写盘
+        rec = load_state().get(art.get("fp") or "", {})
+        if rec.get("run_id") != run["run_id"]:
+            return {"run": run}  # note 是旧 run 写的（幂等复用），不重复评
+        note_p, tr_p = Path(art["note"]), Path(art["transcript_path"])
+        if not (note_p.exists() and tr_p.exists()):
+            return {"run": run}
+        from . import evals  # 延迟 import：deepeval/ragas 是 extras，graph 运行时不染
+        scores = evals.score_note(note_p.read_text(encoding="utf-8"),
+                                  tr_p.read_text(encoding="utf-8"))
+        if scores:
+            art["eval"] = scores
+            _persist(run)
+            via = evals.report_scores(run["run_id"], scores,
+                                      comment=f"在线 eval 条目 {idx}/{run.get('total')}")
+            print(f"  📊 条目 {idx}/{run.get('total')} 评测（{via}）：" +
+                  "  ".join(f"{k}={v:.3f}" for k, v in scores.items()))
+    except Exception as exc:
+        msg = redact(str(exc))[:200]
+        print(f"  ⚠ 条目 {idx} 在线评测失败（不影响 run）：{msg}")
+        return {"run": run, "errors": [*state.get("errors", []), f"eval 条目 {idx}: {msg}"]}
+    return {"run": run}
+
+
+
 def node_finalize(state: RunState) -> dict:
     """收尾：run 状态落盘 + 清临时目录（原 _stage_kb 的非 Dify 部分）。"""
     run = _reload(state["run_id"], state.get("run") or {})
@@ -277,6 +320,13 @@ def _route_note(state: RunState) -> str:
 
 # ---------------------------------------------------------------- 建图
 
+def _eval_enabled() -> bool:
+    """在线逐条评测开关（V2MD_EVAL=1）。建图时读取——是否插 eval_entry 是拓扑级决策。"""
+    v = os.environ["V2MD_EVAL"] if "V2MD_EVAL" in os.environ else ENV.get("V2MD_EVAL", "")
+    return (v or "").strip().lower() in ("1", "true", "on")
+
+
+
 def build_graph(checkpointer=None):
     """编译 StateGraph。checkpointer=None → 纯内存（单测）；生产传 SqliteSaver。"""
     g = StateGraph(RunState)
@@ -304,8 +354,16 @@ def build_graph(checkpointer=None):
     g.add_conditional_edges("select", _route_ok, {"ok": "clips", "fail": "fail"})
     g.add_conditional_edges("clips", _route_ok, {"ok": "note_entry", "fail": "fail"})
     # note 逐条目回环：entry_idx 从 1 起，> total 出环
-    g.add_conditional_edges("note_entry", _route_note,
-                            {"loop": "note_entry", "done": "finalize", "fail": "fail"})
+    if _eval_enabled():
+        # 在线评测旁路：note_entry 后插 eval_entry（仿 select_frames_llm 的无条件边——
+        # eval 失败只记 errors，路由口径与 note 回环相同，评测永不影响 run 成败）
+        g.add_node("eval_entry", node_eval_entry)
+        g.add_edge("note_entry", "eval_entry")
+        g.add_conditional_edges("eval_entry", _route_note,
+                                {"loop": "note_entry", "done": "finalize", "fail": "fail"})
+    else:
+        g.add_conditional_edges("note_entry", _route_note,
+                                {"loop": "note_entry", "done": "finalize", "fail": "fail"})
     g.add_edge("finalize", END)
     g.add_edge("fail", END)
     return g.compile(checkpointer=checkpointer)
@@ -331,21 +389,32 @@ def make_checkpointer(path: Path = CHECKPOINT_DB):
 def run_graph(url: str, *, part_items: str = "", force: bool = False, review: bool = False,
               max_frames: int = 60, run_id: str = "", checkpointer=None) -> dict:
     """一次 run 的入口（api.py 后台任务与 graph-run CLI 共用）。返回终态 state。"""
+    from . import deadman
+
     run_id = run_id or uuid.uuid4().hex[:8]
     initial: RunState = {"run_id": run_id, "url": url, "part_items": part_items,
                          "force": force, "review": review, "max_frames": max_frames,
                          "entry_idx": 1, "errors": [], "status": "running"}
     graph = build_graph(checkpointer)
-    # note 回环每条目 1 个 superstep（8 + total + 2），LangGraph 默认 recursion_limit=25
-    # 会杀掉 >15 条目的合集——放宽到 1000（superstep 是真干活，不是空转，不存在烧轮次）
+    # note 回环每条目 1 个 superstep（8 + total + 2；V2MD_EVAL 接线时每条目 2 个），
+    # LangGraph 默认 recursion_limit=25 会杀掉 >15 条目的合集——放宽到 1000
+    # （superstep 是真干活，不是空转，不存在烧轮次）
     config = {"recursion_limit": 1000}
     if checkpointer:
         config["configurable"] = {"thread_id": run_id}
-    final = graph.invoke(initial, config=config)
+    deadman.ping("start", run_id=run_id, trace_name=url)
+    try:
+        final = graph.invoke(initial, config=config)
+    except Exception:
+        deadman.ping("fail", run_id=run_id, trace_name=url)
+        raise
     if checkpointer and final.get("status") in ("done", "partial"):
         # checkpoint 裁剪：完成的 run 不需要步进历史（重跑靠 state.json 幂等，不靠 checkpoint）
         try:
             checkpointer.delete_thread(run_id)
         except Exception as exc:
             print(f"  ⚠ checkpoint 裁剪失败（不影响产物）：{redact(str(exc))[:120]}")
+    # partial 也 ping 成功：部分失败在 trace/metrics 已留痕，死人开关只回答「跑没跑完」
+    deadman.ping("fail" if final.get("status") == "error" else "ok",
+                 run_id=run_id, trace_name=url)
     return final

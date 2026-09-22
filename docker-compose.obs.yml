@@ -1,0 +1,68 @@
+# 观测栈 override：otel-collector + prometheus + grafana（2026-09-22 定稿架构）。
+# 用法：docker compose -f docker-compose.yml -f docker-compose.obs.yml up -d
+#
+# 拓扑：video2md ─OTLP→ collector:4318 ─┬─ traces → Langfuse Cloud（HTTPS_PROXY 出墙）
+#                                       └─ metrics → :8889 → prometheus → grafana
+# 与主栈同 host 网络：出口代理在宿主回环（127.0.0.1:17897 SSH 隧道），桥接网络够不到。
+# 全部只绑 127.0.0.1，公网零暴露。Mac 开发机查看：
+#   ssh -L 3000:127.0.0.1:3000 lcode-4c   → http://127.0.0.1:3000（Grafana，admin 密码见 secrets/obs.env）
+#   Langfuse 直接开 https://cloud.langfuse.com
+# 凭证：secrets/obs.env（gitignore，部署时手工放）：
+#   LANGFUSE_HOST=https://cloud.langfuse.com
+#   LANGFUSE_BASIC=base64("PK:SK")     # printf '%s:%s' "$PK" "$SK" | base64
+#   HTTPS_PROXY=http://127.0.0.1:17897
+#   GF_SECURITY_ADMIN_PASSWORD=<grafana admin 密码>
+
+volumes:
+  obs-prometheus: {}
+  obs-grafana: {}
+
+services:
+  video2md:
+    environment:
+      # 遥测出口切到本机 collector（未起本栈时删此行即回退 LANGFUSE 直连/纯本地）
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://127.0.0.1:4318
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.132.0
+    restart: unless-stopped
+    network_mode: host   # 出墙代理在宿主回环；4318/8889 的 127.0.0.1 绑定见 deploy/otel-collector.yml
+    command: ["--config=/etc/otelcol/config.yml"]
+    volumes:
+      - ./deploy/otel-collector.yml:/etc/otelcol/config.yml:ro
+    env_file:
+      - path: ./secrets/obs.env
+        required: false
+    mem_limit: 512m
+
+  prometheus:
+    image: prom/prometheus:v3.5.0
+    restart: unless-stopped
+    network_mode: host   # 抓 127.0.0.1:8889（collector）；自身只绑回环
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --web.listen-address=127.0.0.1:9090
+      - --storage.tsdb.retention.time=90d
+    volumes:
+      - ./deploy/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - obs-prometheus:/prometheus
+    mem_limit: 768m
+
+  grafana:
+    image: grafana/grafana:12.1.0
+    restart: unless-stopped
+    network_mode: host   # GF_SERVER_HTTP_ADDR=127.0.0.1：只露回环，Mac 走 SSH 隧道
+    environment:
+      GF_SERVER_HTTP_ADDR: 127.0.0.1
+      GF_SERVER_HTTP_PORT: "3000"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_ANALYTICS_CHECK_FOR_PLUGIN_UPDATES: "false"
+    env_file:
+      - path: ./secrets/obs.env   # GF_SECURITY_ADMIN_PASSWORD
+        required: false
+    volumes:
+      - ./deploy/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./deploy/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - obs-grafana:/var/lib/grafana
+    mem_limit: 512m

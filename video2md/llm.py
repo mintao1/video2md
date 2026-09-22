@@ -80,21 +80,37 @@ def _load(task: str, role: str) -> str:
 
 
 
-def chat(system: str, user: str, *, task: str, temperature: float, max_tokens: int) -> str:
-    """openai-compatible chat completion；网络错误/429/5xx 重试 2 次（对齐 Dify 节点），
-    4xx 立即失败（鉴权/参数错重试无意义）。失败即 RuntimeError，不静默降级。
+def chat(system: str, user: str, *, task: str, temperature: float, max_tokens: int,
+         span_rec: dict | None = None, model: str | None = None,
+         attempts: int = 3) -> str:
+    """openai-compatible chat completion；网络错误/429/5xx/空回包重试（默认 3 次，
+    对齐 Dify 节点 retry_config），4xx 立即失败（鉴权/参数错重试无意义）。
+    失败即 RuntimeError，不静默降级。
+
+    model=None 用 LLM_MODEL；judge 之类想单独换模型的调用方显式传（evals 走
+    V2MD_JUDGE_MODEL——中转对某模型回包不规范/慢时不用动主管线）。
+    attempts：judge 评测链（多子调用串行，单次失败概率被放大）可放宽到 5。
 
     强制流式（stream=True）：长生成（organize 16000 tokens）在中转边缘（Cloudflare）
     空闲 100s 就 524——流式逐 token 回传不存在空闲窗，Dify 插件当年就是这么活下来的。
+    注意 524 仍可能发生在「首字节前」（上游排队超 100s），故 524 也走统一重试。
+
+    观测：span_rec（llm_task 的 RunLog span）回填 usage/attempts/TTFT/字符数 →
+    Langfuse generation；指标（请求/耗时/token）走 observability.metric_llm。
+    include_usage 讨要 usage 尾 chunk；个别中转 400 拒识该字段时摘掉重试。
     """
     if not LLM_BASE or not LLM_KEY:
         raise SystemExit("LLM_BASE_URL / LLM_API_KEY 未配置：写入 .env 或环境变量")
-    payload = {"model": LLM_MODEL, "temperature": temperature, "max_tokens": max_tokens,
-               "stream": True,
+    use_model = model or LLM_MODEL
+    payload = {"model": use_model, "temperature": temperature, "max_tokens": max_tokens,
+               "stream": True, "stream_options": {"include_usage": True},
                "messages": [{"role": "system", "content": system},
                             {"role": "user", "content": user}]}
+    meta: dict = {}
     last_err = ""
-    for attempt in range(3):
+    t0 = time.monotonic()
+    for attempt in range(attempts):
+        meta = {}
         try:
             with httpx.Client(transport=_TRANSPORT) as client:
                 with client.stream("POST", f"{LLM_BASE}/chat/completions", json=payload,
@@ -102,27 +118,73 @@ def chat(system: str, user: str, *, task: str, temperature: float, max_tokens: i
                                    timeout=httpx.Timeout(30.0, read=600.0)) as r:
                     if r.status_code != 200:
                         r.read()
+                        # 中转不认识 stream_options（400 且点名）→ 摘掉重建 payload 重试
+                        if r.status_code == 400 and "stream_options" in r.text \
+                                and "stream_options" in payload:
+                            payload.pop("stream_options")
+                            last_err = "HTTP 400: 中转拒识 stream_options，已摘掉重试"
+                            continue
                         # 429/5xx 可重试；其余 4xx（401/403/参数错）重试无意义，响亮失败
                         if r.status_code != 429 and r.status_code < 500:
                             raise RuntimeError(f"LLM 请求失败 HTTP {r.status_code}: {r.text[:300]}")
                         last_err = f"HTTP {r.status_code}: {r.text[:200]}"
                     else:
-                        return _collect_stream(r)
+                        text, parse_err = "", ""
+                        try:
+                            text = _collect_stream(r, meta)
+                        except Exception as exc:
+                            # 非流式兼容路径的畸形 JSON 等：当中转故障处理，进统一重试
+                            parse_err = f"回包解析失败：{redact(str(exc))[:150]}"
+                        if text.strip():
+                            _llm_observed(task, "ok", t0, attempt + 1, meta, span_rec,
+                                          system, user, text, use_model)
+                            return text
+                        # 空回包/畸形回包：中转把上游异常包成 HTTP 200（实测 2026-09-22：
+                        # 524 后重试拿到 200 空流）。视同可重试错误，不静默返回空串
+                        last_err = parse_err or "空回包（HTTP 200 但零内容）"
         except httpx.HTTPError as exc:
             last_err = redact(str(exc))[:300]
-        if attempt < 2:
+        if attempt < attempts - 1:
             print(f"  ⚠ LLM {task} 第 {attempt + 1} 次调用失败（{last_err[:80]}），30s 后重试")
             _sleep(30)
-    raise RuntimeError(f"LLM {task} 连续 3 次失败：{last_err}")
+    _llm_observed(task, "failed", t0, attempts, meta, span_rec, system, user, "", use_model)
+    raise RuntimeError(f"LLM {task} 连续 {attempts} 次失败：{last_err}")
 
 
 
-def _collect_stream(r: httpx.Response) -> str:
-    """SSE 流收集为完整文本；个别中转不支持 stream 会回普通 JSON，兼容解析。"""
+def _llm_observed(task: str, status: str, t0: float, attempts: int, meta: dict,
+                  span_rec: dict | None, system: str, user: str, text: str,
+                  model: str = "") -> None:
+    """LLM 调用的观测收口：span rec 富化（generation 属性来源）+ 指标。"""
+    secs = time.monotonic() - t0
+    usage = meta.get("usage") or {}
+    in_tok = int(usage.get("prompt_tokens") or 0)
+    out_tok = int(usage.get("completion_tokens") or 0)
+    if span_rec is not None:
+        span_rec["model"] = model or LLM_MODEL
+        span_rec["attempts"] = attempts
+        span_rec["prompt_chars"] = len(system) + len(user)
+        span_rec["completion_chars"] = len(text)
+        if meta.get("ttft_ms") is not None:
+            span_rec["ttftMs"] = meta["ttft_ms"]
+        if usage:
+            span_rec["usage"] = usage
+    from . import observability
+    observability.metric_llm(task, status, secs, in_tok, out_tok)
+
+
+
+def _collect_stream(r: httpx.Response, meta: dict | None = None) -> str:
+    """SSE 流收集为完整文本；个别中转不支持 stream 会回普通 JSON，兼容解析。
+    meta 出参：usage（尾 chunk 或回包 JSON）、ttft_ms（首内容 token 耗时）。"""
     ctype = r.headers.get("content-type", "")
     if "text/event-stream" not in ctype:
-        return r.json()["choices"][0]["message"]["content"]  # 非流式回包兼容
+        body = r.json()
+        if meta is not None and body.get("usage"):
+            meta["usage"] = body["usage"]
+        return body["choices"][0]["message"]["content"]  # 非流式回包兼容
     parts: list[str] = []
+    t0 = time.monotonic()
     for line in r.iter_lines():
         if not line.startswith("data:"):
             continue
@@ -130,10 +192,18 @@ def _collect_stream(r: httpx.Response) -> str:
         if data == "[DONE]":
             break
         try:
-            delta = json.loads(data)["choices"][0].get("delta", {})
+            obj = json.loads(data)
         except Exception:
             continue  # 心跳/坏行不炸主流
+        if meta is not None and obj.get("usage"):
+            meta["usage"] = obj["usage"]  # include_usage 尾 chunk（choices 为空）
+        choices = obj.get("choices") or []
+        if not choices:
+            continue
+        delta = choices[0].get("delta", {})
         if delta.get("content"):
+            if meta is not None and "ttft_ms" not in meta:
+                meta["ttft_ms"] = round((time.monotonic() - t0) * 1000)
             parts.append(delta["content"])
     return "".join(parts)
 
@@ -147,9 +217,9 @@ def llm_task(task: str, **vars) -> str:
     p = _TASK_PARAMS[task]
     log = current_log()
     if log:
-        with log.span(f"llm:{task}"):
+        with log.span(f"llm:{task}") as sp:
             return chat(render(_load(task, "system"), **vars),
-                        render(_load(task, "user"), **vars), task=task, **p)
+                        render(_load(task, "user"), **vars), task=task, span_rec=sp, **p)
     return chat(render(_load(task, "system"), **vars),
                 render(_load(task, "user"), **vars), task=task, **p)
 

@@ -11,12 +11,14 @@ import shutil
 import sys
 import tempfile
 import threading
+import time
 import uuid
 from pathlib import Path
 from datetime import datetime
 
 from .config import ENV, MAX_TRANSCRIPT_CHARS, PROJ
-from .util import RunLog, _STAGE_LOGS, fmt_hms, load_state, probe, redact, sanitize_filename, save_state, video_fingerprint
+from .util import RunLog, _STAGE_LOGS, current_log, fmt_hms, load_state, probe, redact, sanitize_filename, save_state, video_fingerprint
+from . import observability
 from .resolve import _part_selected, ensure_scheme, normalize_url, resolve_url
 from .download import download_entry, download_images
 from .transcribe import transcribe
@@ -179,15 +181,38 @@ def _run_stage(run: dict, stage: str, args: dict) -> None:
                  trace_meta={"dify_run_id": run.get("dify_run_id", ""),
                              "stage": stage, "total": str(run.get("total", ""))})
     _STAGE_LOGS[run["run_id"]] = log
+    t0 = time.monotonic()
+    status = "completed"
     try:
-        with log.span(f"stage:{stage}"):  # run → stage → entry 三层 span 树
-            return _run_stage_inner(run, stage, args, log)
+        with log.span(f"stage:{stage}") as sp:  # run → stage → entry 三层 span 树
+            try:
+                return _run_stage_inner(run, stage, args, log)
+            finally:
+                # 阶段 span 收尾富化：失败留痕/熔断摘要/条目计数随 span 进 trace
+                st = run.get("stages", {}).get(stage, {})
+                failed_n = len(st.get("failed_entries", []))
+                skipped_n = sum(1 for e in run["entries"]
+                                if run["artifacts"].get(e["url"], {}).get("skipped"))
+                sp["failed_entries"], sp["skipped"] = failed_n, skipped_n
+                sp["processed"] = int(run.get("total", 0)) - failed_n - skipped_n
+                if st.get("breaker"):
+                    sp["breaker"] = str(st["breaker"])[:200]
+    except (SystemExit, Exception):
+        status = "failed"
+        raise
     finally:
+        st = run.get("stages", {}).get(stage, {})
+        failed_n = len(st.get("failed_entries", []))
+        skipped_n = sum(1 for e in run["entries"]
+                        if run["artifacts"].get(e["url"], {}).get("skipped"))
+        observability.metric_stage(stage, status, time.monotonic() - t0,
+                                   ok=int(run.get("total", 0)) - failed_n - skipped_n,
+                                   failed=failed_n, skipped=skipped_n)
         run.setdefault("span_log", []).extend(log.spans)  # state.json 的 spans 摘要来源
         with _runs_file_lock():
             _runs_merge(run)
         _STAGE_LOGS.pop(run["run_id"], None)
-        from . import observability
+        observability.close_run(run["run_id"])
         observability.flush()  # __stage 子进程短命，退出前排空 sink 队列
 
 
@@ -231,6 +256,8 @@ def _run_stage_inner(run: dict, stage: str, args: dict, log: "RunLog") -> None:
         if streak >= limit:
             breaker = f"连续 {streak} 条同一错误，判定全局故障：{err_msg[:120]}"
             print(f"    🔌 熔断：{breaker}（剩余 {len(run['entries']) - idx} 条不再白跑）")
+            log.info("circuit_breaker", stage=stage, sig=sig, streak=streak)
+            observability.metric_cb(stage)
             failed += [str(i) for i in range(idx + 1, len(run["entries"]) + 1)
                        if not run["artifacts"].get(run["entries"][i - 1]["url"], {}).get("skipped")]
             break
@@ -246,6 +273,7 @@ def _run_stage_inner(run: dict, stage: str, args: dict, log: "RunLog") -> None:
         # 部分失败必须留痕：job 只回 status=done 会把「少几篇」吞掉（14P 合集丢 2 集，无人知）
         run["stages"][stage]["failed_entries"] = failed
         run.setdefault("partial_failures", {})[stage] = failed
+        log.info("partial_failure", stage=stage, entries=",".join(failed))
         print(f"PARTIAL-FAIL {stage} 条目 {'、'.join(failed)}")
     if breaker:
         run["stages"][stage]["breaker"] = breaker
@@ -282,6 +310,15 @@ _STAGE_FNS: dict[str, callable] = {}
 
 
 
+
+def _art_info(**fields) -> None:
+    """阶段产物计数 → trace info 点（挂当前条目 span 下；无活跃 RunLog 时静默）。"""
+    log = current_log()
+    if log:
+        log.info("artifacts", **fields)
+
+
+
 def _stage(fn):
     _STAGE_FNS[fn.__name__.removeprefix("_stage_")] = fn
     return fn
@@ -314,6 +351,7 @@ def _stage_download(run, entry, art, tmp, args):
     info = probe(video)
     art.update(video=str(video), duration=info["duration"], width=info["width"],
                height=info["height"], fp=video_fingerprint(video))
+    _art_info(stage="download", duration_s=int(info["duration"]))
     print(f"    ▶ {video.name} · {fmt_hms(info['duration'])} · {info['width']}x{info['height']}")
 
 
@@ -343,6 +381,8 @@ def _stage_transcribe(run, entry, art, tmp, args):
     # 语音通道转录本立刻物化：工作流 transcribe 一结束就 GET stages/transcript，
     # 不能等 ocr 阶段的 merge_timeline 双通道版（那是后期覆盖，早期 GET 会拿到空）
     art["transcript"], _ = merge_timeline(segs, [])
+    _art_info(stage="transcribe", segs=len(segs), conf=round(conf, 3),
+              transcript_chars=len(art["transcript"]))
     print(f"    🎙 {len(segs)} 段（幻觉过滤剔除 {dropped}）· 置信度 {conf:.2f}")
 
 
@@ -367,6 +407,7 @@ def _stage_frames(run, entry, art, tmp, args):
     cands = extract_frame_candidates(video, pool, art["duration"], tmp)
     art["candidates"] = [[t, str(f.relative_to(tmp))] for t, f in cands]  # 相对路径：JSON 可序列化
     art["ocr_engine"] = args.get("ocr") or ("remote" if ENV.get("V2MD_OCR_REMOTE") else "vision")
+    _art_info(stage="frames", candidates=len(cands))
     print(f"    🎞 候选帧 {len(cands)} 张（池 {pool}）")
 
 
@@ -420,6 +461,7 @@ def _stage_ocr(run, entry, art, tmp, args):
     if len(transcript) > MAX_TRANSCRIPT_CHARS:
         raise SystemExit(f"转录本 {len(transcript)} 字符超上限 {MAX_TRANSCRIPT_CHARS}")
     art["transcript"] = transcript
+    _art_info(stage="ocr", ocr_hits=len(ocr_items), transcript_chars=len(transcript))
     print(f"    🔍 OCR 命中 {len(ocr_items)}/{len(cands)} · 时间线 {len(transcript)} 字符")
 
 
@@ -465,6 +507,7 @@ def _stage_select(run, entry, art, tmp, args):
     manifest, published = publish_named(picked, [tuple(x) for x in art.get("ocr_items", [])])
     art.update(selected=[{"name": n, "t": t} for t, _p, n in picked],
                manifest=manifest, published=[list(x) for x in published])
+    _art_info(stage="select", selected=len(picked))
     print(f"    🖼 选中 {len(picked)} 帧入库 attachments/")
 
 
@@ -499,6 +542,7 @@ def _stage_clips(run, entry, art, tmp, args):
     art["clips"] = clips
     art["clips_done"] = True
     ok = sum(1 for c in clips.values() if c)
+    _art_info(stage="clips", ok=ok, total=len(clips))
     print(f"    🎬 {ok}/{len(clips)} 段节段入库 attachments/")
 
 
@@ -586,6 +630,7 @@ def _stage_note(run, entry, art, tmp, args):
     note = write_note(md, title, entry.get("playlist_title", ""))
     append_index(title, dur_str, (meta.get("summary") or "")[:120], entry.get("playlist_title", ""))
     art.update(note=str(note), title=title, md=md, transcript_path=str(tpath))
+    _art_info(stage="note", note_bytes=len(md), title=title[:60])
     print(f"    📝 {note}")
 
 

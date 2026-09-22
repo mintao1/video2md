@@ -37,6 +37,7 @@ from fastapi import FastAPI, HTTPException, Request
 from .config import ENV, LOG_DIR, OUT_DIR, PROJ
 from .graph import make_checkpointer, run_graph
 from .runs import _load_runs, _runs_file_lock, _runs_merge
+from . import observability
 
 from .util import redact
 
@@ -207,6 +208,10 @@ async def _drive(run_id: str, url: str, part_items: str, force: bool,
         except Exception as exc:  # graph 节点已全捕获，走到这是框架级异常
             _TASKS[run_id].update(status="error", finished=_now(),
                                   errors=[redact(str(exc))[:300]])
+        finally:
+            observability.metric_run(_TASKS[run_id].get("status", "error"))
+            observability.close_run(run_id)  # 兜底闭合 run 级 root span（各 stage 已各自闭合）
+            observability.flush()
 
 
 
@@ -230,6 +235,11 @@ def _enqueue(url: str, part_items: str, force: bool, review: bool,
 async def _lifespan(app: FastAPI):
     global _CHECKPOINTER
     _CHECKPOINTER = make_checkpointer()
+    # 遥测出口：OTEL_EXPORTER_OTLP_ENDPOINT（collector）> LANGFUSE 直连 > 纯本地 jsonl
+    observability.init()
+    observability.register_runtime_gauges(lambda: {
+        "queued": sum(1 for v in _TASKS.values() if v.get("status") == "queued"),
+        "active": sum(1 for v in _TASKS.values() if v.get("status") == "running")})
     _cleanup_stale_runs()
     _prune_orphan_tmps()
     # 恢复中断的 run（对齐旧 _load_jobs 的语义；error 的不自动重跑，避免双份产物）。

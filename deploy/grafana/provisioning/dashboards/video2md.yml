@@ -1,0 +1,11 @@
+# Grafana 看板预置：自动加载 deploy/grafana/dashboards/ 下的 JSON。
+apiVersion: 1
+providers:
+  - name: video2md
+    folder: video2md
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    options:
+      path: /var/lib/grafana/dashboards
+      foldersFromFilesStructure: false

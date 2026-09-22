@@ -173,4 +173,49 @@ left = list(saver.list({"configurable": {"thread_id": final["run_id"]}}))
 assert left == [], f"done 后 checkpoint 应被裁剪，剩 {len(left)} 条"
 print("✅ 7. SqliteSaver 落库 + done 后 delete_thread 裁剪")
 
+
+# ---- 8. V2MD_EVAL=1：eval_entry 接线——本 run 写盘条目评测 / 失败不致命 / 缺省不接线
+from video2md import evals as _ev
+
+os.environ["V2MD_EVAL"] = "1"
+_note_md = _TMP / "笔记1.md"; _note_md.write_text("# 笔记\n正文" * 50, encoding="utf-8")
+_tr_md = _TMP / "t.md"; _tr_md.write_text("转录本" * 200, encoding="utf-8")
+_orig_note_fn = runs._STAGE_FNS["note"]
+
+
+def _note_real_files(run, entry, art, tmp, args):
+    _orig_note_fn(run, entry, art, tmp, args)
+    art.update(note=str(_note_md), transcript_path=str(_tr_md))  # eval 节点要读真实文件
+
+
+_ev_calls = []
+_ev_score_orig, _ev_rep_orig = _ev.score_note, _ev.report_scores
+
+_fresh()
+runs._STAGE_FNS["note"] = _note_real_files
+_ev.score_note = lambda note, tr, **kw: _ev_calls.append(1) or {"note_quality": 0.9}
+_ev.report_scores = lambda *a, **kw: "off"
+final = graph.run_graph("/tmp/fake.mp4", checkpointer=None)
+assert final["status"] == "done", final.get("errors")
+assert len(_ev_calls) == 1  # 本 run 写盘的唯一条目被评
+run = json.loads((_TMP / "runs.json").read_text())[final["run_id"]]
+assert next(iter(run["artifacts"].values())).get("eval") == {"note_quality": 0.9}
+
+# eval 全灭 → run 仍 done，错误留痕（旁路不炸批）
+_fresh()
+runs._STAGE_FNS["note"] = _note_real_files
+_ev.score_note = lambda *a, **kw: (_ for _ in ()).throw(RuntimeError("judge 全灭"))
+final = graph.run_graph("/tmp/fake.mp4", checkpointer=None)
+assert final["status"] == "done", final.get("errors")
+assert any("eval 条目" in e for e in final["errors"]), final["errors"]
+
+# 缺省（开关关）→ 不接线，拓扑零变化
+_ev.score_note = _ev_score_orig
+os.environ.pop("V2MD_EVAL")
+_fresh()
+final = graph.run_graph("/tmp/fake.mp4", checkpointer=None)
+assert final["status"] == "done" and len(_ev_calls) == 1  # 没新增评测调用
+_ev.report_scores = _ev_rep_orig
+print("✅ 8. V2MD_EVAL 在线评测节点：接线评测写回 artifacts / 失败不致命 / 缺省不接线")
+
 print("\n✅ test_graph.py 全部通过")

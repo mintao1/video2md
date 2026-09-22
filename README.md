@@ -70,18 +70,30 @@ rsync -az --delete --exclude '.venv' --exclude 'logs' --exclude '__pycache__' \
 
 # 2. 凭证（0600；只放服务器，不进 git）
 #    secrets/video2md.env   ← LLM_BASE_URL / LLM_API_KEY / LLM_MODEL（本机 SSOT 是 ~/.config/video2md.env）
+#                            + V2MD_DEADMAN_PING_URL（可选，死人开关）
 #    secrets/gpu_router.env ← HTTP_PROXY=http://127.0.0.1:17897 等（出墙代理，SSH 隧道转发）
+#    secrets/obs.env        ← LANGFUSE_BASIC / HTTPS_PROXY / GF_SECURITY_ADMIN_PASSWORD（观测栈，可选）
 #    secrets/colab-cli/token.json（可选；缺了 colab provider 自动冷却）
 scp ~/.config/video2md.env lcode-4c:~/stack/dify-video2md/secrets/video2md.env
 
 # 3. 构建（x86 原生构建；PIP_INDEX_URL 走清华镜像，ghcr/debian 源已换国内镜像）
 ssh lcode-4c 'cd ~/stack/dify-video2md && \
-  PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple docker compose build'
+  PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple \
+  docker compose -f docker-compose.yml -f docker-compose.obs.yml build'
+#    ⚠ 实测 2026-09-22：依赖变更触发的全量 `uv sync` 在该机可能 0 CPU/0 socket 挂死
+#    （两次复现；小范围 uv pip install 正常）。挂死就杀掉重试 `--progress=plain`；
+#    纯代码改动可用补丁层秒级绕过：
+#      printf 'FROM video2md:latest\nCOPY video2md/ /app/video2md/\n' > /tmp/patch.Dockerfile
+#      docker build -t video2md:latest -f /tmp/patch.Dockerfile . && docker compose ... up -d
 
-# 4. 起栈 + 体检
-ssh lcode-4c 'cd ~/stack/dify-video2md && docker compose up -d && \
+# 4. 起栈（含观测栈：collector/prometheus/grafana）+ 体检
+ssh lcode-4c 'cd ~/stack/dify-video2md && \
+  docker compose -f docker-compose.yml -f docker-compose.obs.yml up -d && \
   curl -s localhost:8790/healthz && curl -s localhost:8790/preflight && \
-  curl -s "localhost:9700/status?refresh=true"'
+  curl -s "localhost:9700/status?refresh=true" && \
+  docker logs video2md-otel-collector-1 2>&1 | tail -3'
+#    观测栈验证：curl -s 127.0.0.1:9090/-/healthy（prometheus）· curl -s 127.0.0.1:3000/api/health（grafana）
+#    真跑一条后：Langfuse Cloud 看 trace/generation；Grafana 走 ssh -L 3000:127.0.0.1:3000 lcode-4c
 ```
 
 - **网络拓扑**：双服务均 `network_mode: host`——gpu_router 要直连宿主回环上的隧道代理
@@ -155,19 +167,57 @@ python3 scripts/rerun_failed.py [url...]
 
 ## 可观测性
 
-- `logs/run-YYYY-MM-DD.jsonl`：span started/completed 事件对（悬空的 started 即崩溃点），
-  日志层自动脱敏 key；`run → stage → entry → llm:*` 逐级 span 树
-- Langfuse（可选）：配 `LANGFUSE_PK/SK/HOST` 即 OTLP 上报（零 SDK 手写 sink），
-  traceId = `sha256("serve-"+run_id)`；未配置静默丢弃不反压
+三层，各司其职（2026-09-22 定稿）：
+
+```
+video2md（OTel SDK：traces + metrics）
+     │ OTLP HTTP :4318
+     ▼
+otel-collector（memory_limiter → batch）
+     ├─ traces 管道 → otlphttp（HTTPS_PROXY 出墙）→ Langfuse Cloud
+     └─ metrics 管道 → prometheus exporter :8889 → prometheus → grafana
+evals 旁路：scripts/eval_notes.py → Langfuse scores（SDK 直挂，黑洞自动降级 OTLP）
+死人开关：run 终态 → V2MD_DEADMAN_PING_URL（healthchecks.io 兼容）
+```
+
+- **本地真相**：`logs/run-YYYY-MM-DD.jsonl`——span started/completed 事件对（悬空的
+  started 即崩溃点），日志层自动脱敏；`run → stage → entry → llm:*` 逐级 span 树。
+  观测栈全挂也不影响主管线（jsonl 先落盘，export 异常静默）。
+- **trace/LLM 成本（Langfuse Cloud）**：每 run 一条 trace，traceId =
+  `sha256("serve-"+run_id)`（确定性，evals 分数据此回挂）；LLM 调用渲染为 generation
+  （gen_ai semconv：model/input/output tokens/TTFT/重试次数；模型定价在 Langfuse
+  项目侧配）。熔断与部分失败是 trace 上的即时事件（circuit_breaker/partial_failure），
+  阶段产物计数（帧数/转录字数/OCR 命中/节段数/note 字节）挂在各条目 span 下。
+- **指标（Grafana）**：起观测栈后 `ssh -L 3000:127.0.0.1:3000 lcode-4c` →
+  http://127.0.0.1:3000 看预置看板：run 终态速率、阶段耗时、LLM token/调用量、
+  熔断计数、队列深度。指标进程内存态，重启清零（运行态非账本）。
+- **死人开关**：配 `V2MD_DEADMAN_PING_URL` 后 run 开始 ping `/start`、done/partial
+  ping 原 URL、error ping `/fail`——「任务压根没跑/挂死」只有外部监控看得见。
+- **evals 旁路**：`scripts/eval_notes.py` 对 state.json 已完成条目批量打分
+  （DeepEval G-Eval/Faithfulness/Summarization + RAGAS faithfulness；judge 走自有
+  LLM 端点，可用 `V2MD_JUDGE_MODEL` 单独换模型），分数回写 Langfuse 同 trace，
+  本地落 `docs/evals/baseline-<date>.json` 回归基线（`--compare` 对比旧基线，
+  均值跌 >0.05 退出码 2）。judge 输出走括号配平强解析 + 一次「只输出 JSON」重问
+  （中转回包不规范不再拖掉 Faithfulness）；四指标线程级并发 + scores 整批一次核验
+  （单篇约 3 分钟，不再 9 分钟+）。需 embedding 的 RAGAS 指标默认跳过（端点无
+  embeddings 时）。**在线模式**：secrets 里开 `V2MD_EVAL=1`，graph 在 note_entry 后
+  插 eval_entry 节点，逐条目写盘即评（失败只留痕不影响 run；缺省不接线）。
+  服务器容器内跑（baseline 落到持久卷）：`docker exec video2md-video2md-1 \
+  python -m video2md.evals --limit 5 --baseline /app/data/evals/baseline-$(date +%F).json`
+- **起停观测栈**：`docker compose -f docker-compose.yml -f docker-compose.obs.yml up -d`
+  （凭证 secrets/obs.env，见 docker-compose.obs.yml 头注释；未起栈时 app 回退
+  LANGFUSE 直连，再退纯本地 jsonl）。
 - 图调试：`langgraph dev`（本地开发，Studio UI 看 checkpoint/单步）
 
 ## 测试
 
 ```bash
-python3 test_llm.py             # LLM 客户端：模板渲染/重试纪律/选帧解析/写盘组装（MockTransport 离线）
+python3 test_llm.py             # LLM 客户端：模板渲染/重试纪律/流式收集/usage 捕获/选帧解析（MockTransport 离线）
 python3 test_graph.py           # 图编排：节点序/失败路由/幂等短路/兜底/熔断/partial/checkpoint 裁剪（全打桩离线）
 python3 test_resolve.py         # URL 解析/条目展开/幂等键（离线）
 python3 test_remote_clients.py  # 算力池薄客户端 HTTP 契约（MockTransport 离线）
+python3 test_observability.py   # OTel 桥：span 树/gen_ai 属性/traceId 确定性/指标仪表/deadman（InMemory 离线）
+python3 test_evals.py           # evals 旁路：指标编排/scores 三运输路径/回归对比（假 deepeval/ragas/langfuse）
 ./test_e2e.sh                   # 端到端：合成视频 → 自起 api（假 LLM）→ 全断言（本地 whisper，不烧 token）
 scripts/smoke_compose.sh        # compose 全链路冒烟：mockpool 假算力 + 假 LLM（零 GPU 零 token）
 REAL_LLM=1 ./test_e2e.sh        # 烧真实 LLM 的端到端（用 ~/.config/video2md.env）
