@@ -10,6 +10,7 @@ __pycache__/
 .DS_Store
 tmp/
 data/
+secrets/
 .zcode/
 deploy/fixtures/smoke.mp4
 deploy/smoke-vault/
