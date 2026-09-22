@@ -14,7 +14,8 @@ import tarfile
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 
-from .config import ATTACH_DIR, CLIP_SPAN, ENV
+from . import artsink
+from .config import CLIP_SPAN, ENV
 
 
 
@@ -43,7 +44,7 @@ def _clip_tasks(published: list, dur: float, segs: list[dict] | None) -> dict[st
     tasks: dict[str, tuple[str, Path, float, float] | str] = {}
     for fname, t in ts_by_name.items():
         clip = fname.replace("-f", "-c").replace(".jpg", ".mp4")
-        dest = ATTACH_DIR / clip
+        dest = artsink.attach_dir() / clip
         if dest.exists():
             tasks[fname] = clip
             continue
@@ -112,7 +113,7 @@ def remote_cut_clips(published: list, video: Path, dur: float,
     for fname, spec in todo:
         src = in_dir / spec[0]
         if src.exists() and src.stat().st_size > 0:
-            shutil.move(str(src), str(ATTACH_DIR / spec[0]))
+            shutil.move(str(src), str(artsink.attach_dir() / spec[0]))
             result[fname] = spec[0]
             ok_n += 1
         else:
@@ -144,7 +145,7 @@ def cut_clip_files(published: list, video: Path, dur: float,
     tasks = {}
     for fname, t in ts_by_name.items():
         clip = fname.replace("-f", "-c").replace(".jpg", ".mp4")
-        dest = ATTACH_DIR / clip
+        dest = artsink.attach_dir() / clip
         if dest.exists():
             tasks[fname] = clip
             continue

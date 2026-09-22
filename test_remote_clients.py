@@ -47,8 +47,10 @@ def _tar_bytes() -> bytes:
 
 
 # ---- clips 客户端
-clips_mod.ATTACH_DIR = _TMP / "attachments"  # 重定向：别碰真 vault
-clips_mod.ATTACH_DIR.mkdir(exist_ok=True)
+# Phase 2 后 attach 落点走 artsink.attach_dir()（动态读 config），重定向打在 config 缝上
+from video2md import config as _cfg
+_cfg.ATTACH_DIR = _TMP / "attachments"  # 重定向：别碰真 vault
+_cfg.ATTACH_DIR.mkdir(exist_ok=True)
 clips_mod.ENV = {**clips_mod.ENV, "V2MD_CLIPS_SOURCE": ""}  # 钉死上传路径（与 .env 无关）
 (_TMP / "fake.mp4").touch()
 
@@ -65,7 +67,7 @@ res = clips_mod.remote_cut_clips(published, _TMP / "fake.mp4", 120.0, [], _TMP,
                                  "http://r", direct_url="https://cdn/x.mp4", client=mc)
 check("remote_cut_clips：spec 映射 + mp4 落 attachments",
       res.get("a-f01-0000.jpg") == "a-c01-0000.mp4"
-      and (clips_mod.ATTACH_DIR / "a-c01-0000.mp4").exists())
+      and (_cfg.ATTACH_DIR / "a-c01-0000.mp4").exists())
 
 err_client = httpx.Client(transport=httpx.MockTransport(
     lambda req: httpx.Response(502, text="全灭")), base_url="http://r")

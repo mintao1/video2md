@@ -117,7 +117,9 @@ echo "  ✅ SSE 旁观 $N_EVT 事件、graph:end 关流（解耦进度面）"
 NOTE=$(find "$NOTEDIR" -name "*.md" -newer "$STAMP" ! -name "索引*" | head -1)
 [ -n "$NOTE" ] || fail "vault 未出现新笔记（${NOTEDIR}）"
 grep -q "processor: video2md" "$NOTE" || fail "frontmatter 缺 processor"
-grep -q "光合作用" "$NOTE" || fail "正文不含 ground truth 句（转写失败？）"
+# ground truth 句查转录本（whisper 真输出，fake/真 LLM 两档都在），不查正文（fake 档正文无语义）
+TR_FILE=$(ls "$NOTEDIR/transcripts/"*.txt 2>/dev/null | while read -r f; do [ "$f" -nt "$STAMP" ] && echo "$f"; done | head -1)
+[ -n "$TR_FILE" ] && grep -q "光合作用" "$TR_FILE" || fail "转录本不含 ground truth 句（转写失败？）"
 API_MD=$(curl -s -m 10 "$API/runs/$RUN_ID/note" | python3 -c "
 import json,sys; ns=json.load(sys.stdin).get('notes') or []; print(ns[0]['md'] if ns else '')")
 [ "${#API_MD}" -ge 200 ] || fail "/note 取回正文过短（${#API_MD} 字符）"

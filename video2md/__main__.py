@@ -21,7 +21,7 @@ def main() -> None:
         return
     if len(sys.argv) > 1 and sys.argv[1] == "graph-run":
         # LangGraph 单次直跑（调试/对拍用；生产入口是 api 服务的 POST /runs）
-        from .graph import make_checkpointer, run_graph
+        from .graph import make_checkpointer_from_env, run_graph
         ap = argparse.ArgumentParser(prog="video2md graph-run")
         ap.add_argument("url")
         ap.add_argument("--part-items", default="")
@@ -29,9 +29,12 @@ def main() -> None:
         ap.add_argument("--review", action="store_true")
         ap.add_argument("--max-frames", type=int, default=60)
         a = ap.parse_args(sys.argv[2:])
-        saver = make_checkpointer()
-        final = run_graph(a.url, part_items=a.part_items, force=a.force,
-                          review=a.review, max_frames=a.max_frames, checkpointer=saver)
+        saver, closer = make_checkpointer_from_env()  # 默认 sqlite；V2MD_CHECKPOINTER=postgres 切库
+        try:
+            final = run_graph(a.url, part_items=a.part_items, force=a.force,
+                              review=a.review, max_frames=a.max_frames, checkpointer=saver)
+        finally:
+            closer()
         run = final.get("run") or {}
         notes = [a2.get("note") for a2 in (run.get("artifacts") or {}).values() if a2.get("note")]
         print(json.dumps({"run_id": final.get("run_id"), "status": final.get("status"),

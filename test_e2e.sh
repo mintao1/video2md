@@ -5,15 +5,19 @@
 #   ./test_e2e.sh                      # 端到端（脚本自起 api 于 127.0.0.1:8791，不影响 8790）
 #   WHISPER_MODEL=small ./test_e2e.sh  # 自选 whisper 模型（默认 small）
 #   REAL_LLM=1 ./test_e2e.sh           # 烧真实 LLM（用 ~/.config/video2md.env 的 LLM_*）
+#   MODE=deliver ./test_e2e.sh         # deliver 形态（云端不储存）：产物进 outbox →
+#                                      # bundle 拉取解包后跑同一套内容断言 + ACK 即焚链
 set -euo pipefail
 cd "$(dirname "$0")"
 
 MODEL="${WHISPER_MODEL:-small}"
 PORT="${V2MD_API_PORT:-8791}"
 API="http://127.0.0.1:$PORT"
+MODE="${MODE:-vault}"          # vault=现状（写本机 vault）| deliver=在架+TTL+ACK 即焚
 
 VAULT="${OBSIDIAN_VAULT:-$HOME/Documents/Obsidian Vault}"
 NOTEDIR="$VAULT/资料库/视频笔记"
+SHELF_TMP=""                   # deliver 模式的在架根（api 子进程 env 注入）
 fail() { echo "❌ $1"; exit 1; }
 
 # Vision OCR 依赖 pyobjc（mac extra）：venv 被剥 extra 时 OCR 全灭而 run 照样 partial
@@ -92,17 +96,26 @@ ffmpeg -y -hide_banner -loglevel error "${INPUTS[@]}" -i "$TMP/all.wav" \
 echo "测试视频就绪（${T}s）"
 
 # —— 2. 自起 api 实例（假 LLM + 本地算力）并跑完整张图 ——
-rm -f "$NOTEDIR"/测试笔记（假LLM）*.md "$NOTEDIR"/e2e*.md "$NOTEDIR"/transcripts/e2e* "$NOTEDIR"/attachments/e2e-*.jpg "$NOTEDIR"/attachments/e2e-*.mp4
-mkdir -p "$NOTEDIR" "$NOTEDIR/transcripts" "$NOTEDIR/attachments"
-touch "$NOTEDIR/索引.md"
-sed -i '' '/e2e/d;/测试笔记（假LLM）/d' "$NOTEDIR/索引.md" 2>/dev/null || true
+if [ "$MODE" = deliver ]; then
+  # deliver：产物只活在 outbox 在架窗口，真 vault 必须零写入——marker 前后对比兜住这条线
+  touch "$TMP/marker"
+  SHELF_TMP="$TMP/outbox-shelf"
+else
+  rm -f "$NOTEDIR"/测试笔记（假LLM）*.md "$NOTEDIR"/e2e*.md "$NOTEDIR"/transcripts/e2e* "$NOTEDIR"/attachments/e2e-*.jpg "$NOTEDIR"/attachments/e2e-*.mp4
+  mkdir -p "$NOTEDIR" "$NOTEDIR/transcripts" "$NOTEDIR/attachments"
+  touch "$NOTEDIR/索引.md"
+  sed -i '' '/e2e/d;/测试笔记（假LLM）/d' "$NOTEDIR/索引.md" 2>/dev/null || true
+fi
 
 FAKE_FLAG="1"
 if [ -n "${REAL_LLM:-}" ]; then
   FAKE_FLAG="0"
 fi
-V2MD_FAKE_LLM="$FAKE_FLAG" V2MD_WHISPER_MODEL="$MODEL" uv run python -m video2md api --port "$PORT" \
-  > "$TMP/api.log" 2>&1 &
+MODE_ENV=(V2MD_ARTIFACT_MODE="$MODE")
+[ "$MODE" = deliver ] && MODE_ENV+=(V2MD_OUTBOX_DIR="$SHELF_TMP")  # vault 模式不给空值脏配置
+# （展开产物不能做命令前缀赋值——走 env 吸收）
+V2MD_FAKE_LLM="$FAKE_FLAG" V2MD_WHISPER_MODEL="$MODEL" \
+env "${MODE_ENV[@]}" uv run python -m video2md api --port "$PORT" > "$TMP/api.log" 2>&1 &
 API_PID=$!
 for _ in $(seq 1 30); do curl -s -m 2 "$API/healthz" >/dev/null 2>&1 && break; sleep 1; done
 curl -s -m 2 "$API/healthz" >/dev/null || { cat "$TMP/api.log"; fail "api 未起来"; }
@@ -135,6 +148,22 @@ while true; do
 done
 echo "  ✅ run → $ST"
 
+if [ "$MODE" = deliver ]; then
+  # —— 投递面：轮询带在架窗口 → bundle 拉取解包 → 解包目录成为后续内容断言的根 ——
+  python3 - "$R" <<'PYEOF' || fail "/runs 未附在架状态"
+import json, sys
+a = json.loads(sys.argv[1]).get("artifacts") or {}
+assert a.get("mode") == "deliver" and a.get("present") and a.get("expires"), a
+PYEOF
+  HTTP=$(curl -s -o "$TMP/bundle.zip" -w '%{http_code}' -m 60 "$API/runs/$RUN_ID/bundle")
+  [ "$HTTP" = 200 ] || fail "bundle 拉取失败（HTTP ${HTTP}）"
+  unzip -q -o "$TMP/bundle.zip" -d "$TMP/unpacked"
+  NOTEDIR="$TMP/unpacked"
+  ls "$NOTEDIR/索引-append.md" >/dev/null 2>&1 || fail "bundle 缺索引-append.md"
+  [ -d "$SHELF_TMP/$RUN_ID" ] || fail "在架目录不在 $SHELF_TMP/$RUN_ID"
+  echo "  ✅ bundle 解包 → $NOTEDIR"
+fi
+# （zip 保留原 mtime，均为 run 期间写出 → -newer 基线两模式通用）
 NOTE=$(find "$NOTEDIR" -name "*.md" -newer "$TMP/e2e.mp4" ! -name "索引*" | head -1)
 [ -n "$NOTE" ] && [ -f "$NOTE" ] || fail "未产出笔记"
 echo "  ✅ note → $(basename "$NOTE")"
@@ -206,8 +235,9 @@ print("转写 ground truth OK")
 PYEOF
 # OCR ground truth：烧录字幕文字必须出现在【画面】行
 grep "【画面】" "$NOTEDIR/transcripts/$TNAME" | grep -q "光合作用" || fail "OCR 未识别出烧录字幕"
-# 索引登记
-grep -q "$(basename "$NOTE" .md)" "$NOTEDIR/索引.md" || fail "索引未登记该笔记"
+# 索引登记（vault=共享索引.md；deliver=随包并库的 索引-append.md）
+IDX="$NOTEDIR/索引.md"; [ "$MODE" = deliver ] && IDX="$NOTEDIR/索引-append.md"
+grep -q "$(basename "$NOTE" .md)" "$IDX" || fail "索引未登记该笔记"
 # 幂等 SSOT：state.json 应有本视频的指纹记录（重发同链应跳过）
 python3 -c "
 import json; s = json.load(open('state.json'))
@@ -222,4 +252,23 @@ curl -s -m 5 "$API/queue" | grep -q '"queue_len"' || fail "/queue 契约缺失"
 # 产出 markdown 调取口
 curl -s -m 5 "$API/runs/$RUN_ID/note" | grep -q "测试笔记" || fail "/note 调取口异常"
 
-echo "✅ E2E PASS → $NOTE"
+if [ "$MODE" = deliver ]; then
+  # —— deliver 收尾断言：云端不储存的两条硬线 ——
+  # 1) 真 vault 零写入（deliver 全链路不得碰用户共享库）
+  if [ -d "$VAULT/资料库/视频笔记" ]; then
+    DIRTY=$(find "$VAULT/资料库/视频笔记" -type f -newer "$TMP/marker" 2>/dev/null | head -3)
+    [ -z "$DIRTY" ] || fail "deliver 模式写了真 vault：$DIRTY"
+  fi
+  # 2) ACK 即焚：确认收完 → 在架目录物理消失 → bundle/note 全 410（重发才有的新 run）
+  ACK=$(curl -s -m 10 -X DELETE "$API/runs/$RUN_ID/artifacts")
+  echo "$ACK" | grep -q '"burned"' || fail "ACK 即焚失败：$ACK"
+  [ ! -d "$SHELF_TMP/$RUN_ID" ] || fail "ACK 后在架目录仍在（未物理删除）"
+  H1=$(curl -s -o /dev/null -w '%{http_code}' "$API/runs/$RUN_ID/bundle")
+  H2=$(curl -s -o /dev/null -w '%{http_code}' "$API/runs/$RUN_ID/note")
+  [ "$H1" = 410 ] && [ "$H2" = 410 ] || fail "焚后再取应 410，实得 bundle=$H1 note=$H2"
+  grep -q '"artifacts_burned": true' data/runs.json 2>/dev/null \
+    || grep -q "burned" "$TMP/api.log" || true  # runs.json 位置随 V2MD_RUNS_FILE，形态断言以 410 为准
+  echo "  ✅ ACK 即焚：bundle/note → 410，在架目录已物理销毁"
+fi
+
+echo "✅ E2E PASS（mode=${MODE}） → $NOTE"

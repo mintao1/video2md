@@ -111,6 +111,25 @@ ssh lcode-4c 'cd ~/stack/video2md && \
 - **网络拓扑**：双服务均 `network_mode: host`——gpu_router 要直连宿主回环上的隧道代理
   （`127.0.0.1:17897`），video2md 与池子互访也走回环。api 绑 `127.0.0.1:8790`（无认证，
   公网经安全组拦截；外部调用走 SSH 隧道 `ssh -L 8790:127.0.0.1:8790 lcode-4c` 或加 nginx 反代）
+- **Postgres checkpointer（按需，缺省 sqlite 零变化）**：`V2MD_CHECKPOINTER=postgres` +
+  `V2MD_PG_DSN`（两行进 `secrets/video2md.env`）。compose 的 postgres:17-alpine 挂
+  `profiles:["pg"]` 默认**不起**（外部托管 PG 只给 DSN 同入口）：
+  ```bash
+  echo 'V2MD_CHECKPOINTER=postgres' >> secrets/video2md.env
+  echo 'V2MD_PG_DSN=postgresql://v2md:***@127.0.0.1:5432/v2md' >> secrets/video2md.env
+  docker compose --profile pg up -d postgres   # PG 未就绪时 api fail-fast + restart 自拉起
+  ```
+  依赖变更走上面的 patch 层实操（uv sync 挂死教训）：
+  ```dockerfile
+  COPY pyproject.toml uv.lock /app/
+  RUN PIP_INDEX_URL=… uv pip install --python /app/.venv/bin/python \
+      langgraph-checkpoint-postgres==3.1.2 "psycopg[binary,pool]==3.3.6"
+  ```
+  checkpoint 是易失数据（done 即 `delete_thread` 裁剪），**无存量迁移**。
+- **deliver 形态激活（按需，缺省 vault 零变化）**：`V2MD_ARTIFACT_MODE=deliver` +
+  可选 `V2MD_OUTBOX_DIR`（容器指 data 卷）/`V2MD_OUTBOX_TTL_H`（默认 24）。
+  产物不落 vault、runs.json 不养正文，bundle 拉取 + ACK/TTL 双路即焚（契约见
+  [HTTP 后端契约](#http-后端契约多用户产品--phase-12)节）
 - **国内站风控**：机房 IP 直连 B站 秒 412，故 `V2MD_PROXY + V2MD_PROXY_DOMESTIC=1`
   让 yt-dlp 子进程走隧道出口（住宅 IP）；进程内 httpx（LLM 等）不受影响仍直连
 - **YouTube**：同一隧道出口即可（`V2MD_PROXY` 对非国内站同样生效）；隧道断则境外源不可用
@@ -160,7 +179,7 @@ python3 scripts/rerun_failed.py [url...]
 | `max_frames` | 候选帧池上限（默认 60） |
 | `resolve_only` | 只解析建 run 不驱动（批量脚本分窗预飞用；后续正式 POST 会 dedup 命中并驱动） |
 
-## HTTP 后端契约（多用户产品 · Phase 1）
+## HTTP 后端契约（多用户产品 · Phase 1/2）
 
 GUI 前端把本服务当正式后端：契约硬化在 `video2md/models.py`（Pydantic request/response），
 交互式文档 **`/docs` + `/openapi.json` 已开**（生产要关由网关负责）。图核 `run_graph` 不感知鉴权。
@@ -171,12 +190,17 @@ GUI 前端把本服务当正式后端：契约硬化在 `video2md/models.py`（P
 - `V2MD_AUTH=google`：前端 Google 登录拿 `id_token` → 头 `Authorization: Bearer <id_token>`
   → 后端 `google-auth` 验签（JWKS/iss/exp，`audience=GOOGLE_CLIENT_ID`）取 `sub`。
   **后端不持 client secret**，只需 OAuth「Web」客户端的 client_id。
-- `V2MD_AUTH_PROVIDERS` 逗号列表按序尝试；**微信（code→openid）是 Phase 2 预留 provider**，
-  加实现即插，`current_identity` 与 run 隔离层零改。
+- `V2MD_AUTH_PROVIDERS` 逗号列表按序尝试（`NoCredentials` 换下一家、`AuthError` 直抛）；
+  **微信开放平台扫码登录是 Phase 2 落地的第二家 provider**：前端拿临时 `code`（单次有效
+  5 分钟）→ 头 `Authorization: Wechat <code>` → 后端服务端换 `openid`/`unionid`
+  （`WECHAT_APP_ID`/`WECHAT_APP_SECRET` 进凭证文件）。两家 scheme 各认各头，互不干扰；
+  `current_identity` 与 run 隔离层零改。
 - 身份表 `users.json`（`V2MD_USERS_FILE`，容器指 data 卷）：`(provider, external_id) → uid`
   首登自动开户；**run 按内部 uid 归属**（`run["owner"]`），他人 run 的
   `/runs/{id}`、`/note`、`/events` 一律 403，不存在才 404；dedup 也按 owner 隔离
-  （不同用户同链接各建各的 run）。将来 Google+微信账号联动 = 归并到同一 uid。
+  （不同用户同链接各建各的 run）。**Google+微信账号联动已落地**：微信 `external_id`
+  取 unionid 优先（openid 兜底），`put_identity("wechat", <unionid>, <同一 uid>)` 把微信
+  身份归并到已存在的 Google uid，两家登录进同一个账号（见 `test_acctkit` 双 provider 归并测）。
 - CORS：`V2MD_CORS_ORIGINS` 逗号列表放行 GUI origin（空=不挂中间件）。
   生产绑公网务必 `V2MD_AUTH=google` + 反代 TLS（Google 回调需 https）。
 - `/healthz` `/queue` `/preflight` **保持不鉴权**（docker healthcheck / gpu_router 看门狗在打）。
@@ -190,6 +214,24 @@ Redis pub/sub 留 Phase 2。
 
 **错误契约**：非 2xx 统一 `{"error": {"code", "message", "details"}}`
 （`AUTH_REQUIRED`/`FORBIDDEN`/`NOT_FOUND`/`VALIDATION`…；422 带定位信息）。
+
+**产物形态双模式（`V2MD_ARTIFACT_MODE`，缺省 vault=现状零变化）**：
+
+| | `vault`（开发机默认） | `deliver`（多用户「云端不储存」） |
+|---|---|---|
+| 落点 | 直写 Obsidian vault（Syncthing 回本地） | per-run outbox → finalize 搬到在架位 `V2MD_OUTBOX_DIR/<run_id>/` |
+| runs.json | 养 `md` 全文（`/note` 的原语义） | **剥正文**——`/note` 从在架文件现读 |
+| 生命周期 | 永久（vault 归用户） | TTL（`V2MD_OUTBOX_TTL_H`，默认 24h）到期惰性焚 + 周期 sweep + 启动兜底；**ACK 即焚不等 TTL** |
+| 幂等跳过 | 同 URL 处理过即跳（旧语义） | 仅当**同 owner 且源产物还在架**才跳（否则老实重烧——产物在别人手里，跳过=给个拿不到东西的空条目）；命中时响应条目带 `from_run` 指旧 run |
+
+deliver 新增端点（都过 owner 闸：越权 403 / 无 run 404 / 非 deliver 模式 409）：
+- `GET /runs/{id}/bundle` — 在架产物整包 zip（笔记+转录+帧+节段+`索引-append.md`，
+  wikilink 相对结构原样，客户端解进本机 vault 即成品）；现打包发送、发完即删，云端不留副本。
+  已焚/过期 → **410 Gone**（提示重发 URL 生成新 run）。
+- `DELETE /runs/{id}/artifacts` — ACK 即焚：客户端确认收完，目录**物理销毁**（rmtree），
+  返回 `{"run_id","status":"burned"}`；再删 → 410。
+- `GET /runs/{id}` deliver 下附 `"artifacts": {"mode","present","expires"}` 拉取窗口；
+  `/preflight` 体检项 vault→outbox 自动切换。
 
 ## acctkit：可复用账号登录模块（顶层包）
 
@@ -209,7 +251,7 @@ identity = await engine.authenticate(request.headers)   # Mapping[str,str] → I
 
 | 缝 | 已落地适配器 | 挂法 |
 |---|---|---|
-| `AuthProvider` | `GoogleProvider(client_id)`（ID-Token 验签，不持 secret）/ `DevProvider` / `FakeProvider` | 微信（code→openid）等新登录方式实现 `authenticate(headers)` 后 `register_provider("wechat", 工厂)` 即挂，引擎/存储/隔离零改 |
+| `AuthProvider` | `GoogleProvider(client_id)`（ID-Token 验签，不持 secret）/ `WeChatProvider(app_id, app_secret)`（扫码 code→服务端换 openid/unionid，stdlib urllib + 强制直连国内站，无新依赖）/ `DevProvider` / `FakeProvider` | 新登录方式实现 `authenticate(headers)` 后 `register_provider(name, 工厂)` 即挂，引擎/存储/隔离零改 |
 | `IdentityStore` | `JsonFileStore(path)`（fcntl 跨进程锁 + tmp rename 原子替换）/ `MemoryStore`（测试） | 换 Postgres 用户表 = 同协议再写一个适配器 |
 
 宿主接线（本项目 = `video2md/auth/`，仅二十来行）：
@@ -222,7 +264,8 @@ async def current_identity(request: Request) -> Identity:               # 唯一
 ```
 
 `build_from_env(env, prefix)` 认 `{prefix}AUTH` / `{prefix}AUTH_PROVIDERS` /
-`{prefix}USERS_FILE` / `GOOGLE_CLIENT_ID` 四个键，别的项目换前缀即复用同一套配置语义。
+`{prefix}USERS_FILE` / `GOOGLE_CLIENT_ID` 四个键（工厂注册表另有 `WECHAT_APP_ID` /
+`WECHAT_APP_SECRET`），别的项目换前缀即复用同一套配置语义。
 `AuthError.status` 只是建议码——HTTP 响应形状（错误包络、401/403 转译）永远是宿主的。
 
 ## 阶段与质量门禁
@@ -314,16 +357,20 @@ evals 旁路：scripts/eval_notes.py → Langfuse scores（SDK 直挂，黑洞�
 
 ```bash
 python3 test_llm.py             # LLM 客户端：模板渲染/重试纪律/流式收集/usage 捕获/选帧解析（MockTransport 离线）
-python3 test_graph.py           # 图编排：节点序/失败路由/幂等短路/兜底/熔断/partial/checkpoint 裁剪（全打桩离线）
+python3 test_graph.py           # 图编排：节点序/失败路由/幂等短路/兜底/熔断/partial/checkpoint 裁剪
+                                # + checkpointer env 分派 + deliver artsink 缝/搬家剥正文（全打桩离线）
 python3 test_resolve.py         # URL 解析/条目展开/幂等键（离线）
 python3 test_remote_clients.py  # 算力池薄客户端 HTTP 契约（MockTransport 离线）
-python3 -m pytest test_api_contract.py  # HTTP 后端契约：鉴权/owner 403/422 错误形状/SSE 关流/OpenAPI（TestClient 离线）
-python3 -m pytest test_acctkit.py       # acctkit 模块自身接口：provider 次序/Google 打桩/JsonFileStore 开户回填/前缀工厂（零宿主零网络）
+python3 -m pytest test_api_contract.py  # HTTP 后端契约：鉴权/owner 403/422 错误形状/SSE 关流/OpenAPI
+                                        # + deliver 面（bundle zip/ACK 410/TTL 惰性焚/sweep/owner 收紧幂等）（TestClient 离线）
+python3 -m pytest test_acctkit.py       # acctkit 模块自身接口：provider 次序/Google+微信打桩/开户回填归并/前缀工厂（零宿主零网络）
 python3 test_observability.py   # OTel 桥：span 树/gen_ai 属性/traceId 确定性/指标仪表/deadman（InMemory 离线）
 python3 test_otel_replay.py     # 历史回放：jsonl→span 树重建/悬空闭合/时间戳还原（InMemory 离线）
 python3 test_evals.py           # evals 旁路：指标编排/scores 三运输路径/回归对比（假 deepeval/ragas/langfuse）
 ./test_e2e.sh                   # 端到端：合成视频 → 自起 api（假 LLM）→ 全断言（本地 whisper，不烧 token）
+MODE=deliver ./test_e2e.sh      #   deliver 形态分支：bundle 拉取解包跑同套断言 + vault 零写入 + ACK 即焚 410 链
 ./scripts/smoke_api_vault.sh    # 解耦 API 路子冒烟（开发机）：POST+SSE+轮询+/note 纯 HTTP，产物进本机 vault（真 LLM 少量 token）
+./scripts/smoke_api_deliver.sh  # deliver 形态真 LLM 冒烟：在架→bundle 投递→/note 一致性→ACK 即焚 410，产物不进开发机 vault
 scripts/smoke_compose.sh        # compose 全链路冒烟：mockpool 假算力 + 假 LLM（零 GPU 零 token）
 REAL_LLM=1 ./test_e2e.sh        # 烧真实 LLM 的端到端（用 ~/.config/video2md.env）
 # gpu_router 本体测试在 ../gpu_router/tests/

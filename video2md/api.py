@@ -14,9 +14,12 @@ SSE 实时进度（GET /runs/{id}/events）与轮询并存。核心 run_graph �
   GET  /runs/{id}       run 记录 + 任务状态 + 逐条目产物进度（沿用 serve 的形状）
   GET  /runs/{id}/note  产出 markdown（标题/路径/正文），供云上调取
   GET  /runs/{id}/events SSE 实时进度（graph:*/stage 事件流；轮询 GET /runs/{id} 仍在）
+  GET  /runs/{id}/bundle   deliver 模式产物整包 zip（笔记/帧/转录/节段/索引-append）——云端不
+                           储存，只在此窗口发送到用户端；已焚/过期 410
+  DELETE /runs/{id}/artifacts deliver 模式 ACK 即焚：客户端确认收完，云端立刻销毁产物
   GET  /queue           {queue_len, running}——gpu_router 的 colab 看门狗回读这里（运维探针，不鉴权）
   GET  /healthz         存活探针（Docker healthcheck，不鉴权）
-  GET  /preflight       开跑前体检（ffmpeg/磁盘/vault/算力池，不鉴权）
+  GET  /preflight       开跑前体检（ffmpeg/磁盘/vault 或 outbox/算力池，不鉴权）
 
 恢复语义：进程重启时把 runs.json 里 running 的 run 重新入队（同 run_id、同 owner），
 graph 的 resolve 节点幂等复用该 run，阶段节点按产物字段跳过已完成条目。
@@ -30,7 +33,8 @@ import shutil
 import tempfile
 import time
 import uuid
-from contextlib import asynccontextmanager
+import zipfile
+from contextlib import asynccontextmanager, suppress
 from datetime import datetime
 from pathlib import Path
 
@@ -39,15 +43,16 @@ import uvicorn
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
+from starlette.background import BackgroundTask
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from .config import CORS_ORIGINS, ENV, LOG_DIR, OUT_DIR
-from . import events
+from . import artsink, events
 from .auth import AuthError, Identity, current_identity
-from .graph import make_checkpointer, run_graph
-from .models import (PreflightOut, QueueOut, RunCreate, RunCreatedOut, RunNotesOut,
-                     RunStatusOut, HealthOut)
+from .graph import make_checkpointer_from_env, run_graph
+from .models import (ArtifactsAckOut, HealthOut, PreflightOut, QueueOut, RunCreate,
+                     RunCreatedOut, RunNotesOut, RunStatusOut)
 from .runs import _load_runs, _runs_file_lock, _runs_merge, _save_runs
 from . import observability
 
@@ -69,10 +74,17 @@ def _preflight() -> dict:
     except Exception as exc:
         add("disk", False, str(exc)[:80])
     try:
-        OUT_DIR.mkdir(parents=True, exist_ok=True)  # 新鲜 vault（云上空卷）先建目录再测写
-        add("vault", os.access(OUT_DIR, os.W_OK), str(OUT_DIR))
+        if artsink.current_mode() == "deliver":
+            ob = artsink.outbox_dir()
+            ob.mkdir(parents=True, exist_ok=True)  # 产物不落 vault，体检对象换成在架根
+            add("outbox", os.access(ob, os.W_OK),
+                f"{ob}（deliver 模式，TTL {artsink.outbox_ttl_h():.0f}h 即焚）")
+        else:
+            OUT_DIR.mkdir(parents=True, exist_ok=True)  # 新鲜 vault（云上空卷）先建目录再测写
+            add("vault", os.access(OUT_DIR, os.W_OK), str(OUT_DIR))
     except Exception as exc:
-        add("vault", False, f"{OUT_DIR}: {str(exc)[:80]}")
+        add("outbox" if artsink.current_mode() == "deliver" else "vault",
+            False, str(exc)[:120])
     remote = (ENV.get("V2MD_REMOTE") or "").strip()
     if remote.lower() in ("colab", "colab-cli"):
         add("gpu_pool", False, "V2MD_REMOTE=colab 已抽离：起 ~/Desktop/开发项目/gpu_router "
@@ -154,10 +166,43 @@ def _prune_orphan_tmps(min_age_h: float = 6.0) -> None:
         print(f"🧹 清理孤儿临时目录 {n} 个（无 run 记录认领，>{int(min_age_h)}h 未动）")
 
 
+def _sweep_outbox() -> int:
+    """deliver TTL 清扫：过期/盘上已丢的 outbox 物理删掉并记 burned（启动跑一遍 + 周期兜底）。
+
+    过期的权威判定在 _outbox_live（请求时惰性焚，410 不掺假）；本函数负责让**文件真的没了**
+    ——「云端不储存」是物理口径不是视图口径。
+    """
+    n = 0
+    now = datetime.now()
+    with _runs_file_lock():
+        runs = _load_runs()
+        changed = False
+        for r in runs.values():
+            ob = r.get("outbox")
+            if not ob or r.get("artifacts_burned"):
+                continue
+            try:
+                expired = datetime.fromisoformat(r.get("artifacts_expire", "2000-01-01")) <= now
+            except (ValueError, TypeError):
+                expired = True  # 到期时间缺失/非法（脏数据）：宁可烧也不永久 shelving
+            if expired or not Path(ob).is_dir():
+                shutil.rmtree(ob, ignore_errors=True)
+                r["artifacts_burned"] = True
+                r["burned_reason"] = "ttl" if expired else "missing"
+                changed = True
+                n += 1
+        if changed:
+            _save_runs(runs)
+    if n:
+        print(f"🔥 outbox 清扫：焚毁 {n} 个 run 的产物（TTL {artsink.outbox_ttl_h():.0f}h 到期/盘上已丢）")
+    return n
+
+
 # ---------------------------------------------------------------- 任务表
 _TASKS: dict[str, dict] = {}          # run_id → {status, url, owner, created, started, finished, errors}
 _SEMA = asyncio.Semaphore(1)          # 串行执行：单 worker 语义
-_CHECKPOINTER = None                  # lifespan 注入的 SqliteSaver
+_CHECKPOINTER = None                  # lifespan 注入（sqlite/postgres 由 V2MD_CHECKPOINTER 定）
+_CK_CLOSER = lambda: None             # checkpointer 资源释放钩子（PG 分支关连接池）
 
 _TASKS_KEEP = 200                     # 内存任务表上限（超出裁最老，runs.json 才是真相）
 
@@ -166,6 +211,12 @@ _TERMINAL_STATUSES = ("done", "partial", "error")
 
 def _now() -> str:
     return datetime.now().isoformat(timespec="seconds")
+
+
+def _unlink_quiet(path: str) -> None:
+    """BackgroundTask 收尾：zip 发完即删（deliver 的「不留副本」到临时打包文件这一层）。"""
+    with suppress(OSError):
+        os.unlink(path)
 
 
 def _req_log(method: str, path: str, code: int, **fields) -> None:
@@ -194,6 +245,70 @@ def _require_run_access(run_id: str, ident: Identity) -> dict | None:
     if owner != ident.uid:
         raise HTTPException(403, f"无权访问 run {run_id}")
     return run
+
+
+# ---------------------------------------------------------------- deliver 产物在架态（TTL/ACK 即焚）
+
+def _burn_run(run_id: str, run: dict, reason: str) -> None:
+    """即时销毁在架产物并留痕（run 内存副本同步更新，响应口径一致）。"""
+    if run.get("outbox"):
+        shutil.rmtree(run["outbox"], ignore_errors=True)
+    with _runs_file_lock():
+        fresh = _load_runs().get(run_id)
+        if fresh:
+            fresh["artifacts_burned"] = True
+            fresh["burned_reason"] = reason
+            _runs_merge(fresh)
+    run["artifacts_burned"] = True
+    run["burned_reason"] = reason
+
+
+def _outbox_live(run: dict) -> tuple[Path | None, str | None]:
+    """(在架目录, 到期时刻)；None=不在架。过期在读取时惰性焚——410 不是视图口径。"""
+    exp = run.get("artifacts_expire") or ""
+    rid = run.get("run_id", "")
+    if run.get("artifacts_burned") or not run.get("outbox"):
+        return None, exp or None
+    try:
+        expired = datetime.fromisoformat(exp) <= datetime.now() if exp else False
+    except (ValueError, TypeError):
+        expired = True
+    if expired:
+        _burn_run(rid, run, "ttl")
+        return None, exp or None
+    p = Path(run["outbox"])
+    if not p.is_dir():  # 目录被外部挪走：盘上一致性优先，视同已焚
+        _burn_run(rid, run, "missing")
+        return None, exp or None
+    return p, exp or None
+
+
+def _deliver_outbox(run_id: str, ident: Identity) -> Path:
+    """/bundle 与 DELETE /artifacts 的共同访问闸：409(模式) / 404(无 run 或无产物) /
+    403(越权，_require_run_access 里) / 410(已焚)。"""
+    if artsink.current_mode() != "deliver":
+        raise HTTPException(409, f"当前产物模式为 {artsink.current_mode()}："
+                                 "bundle/artifacts 端点仅 deliver 模式提供")
+    run = _require_run_access(run_id, ident)
+    if not run:
+        raise HTTPException(404, f"run {run_id} 无落盘记录（产物无从取架）")
+    path, _exp = _outbox_live(run)
+    if path is None:
+        if run.get("artifacts_burned"):
+            raise HTTPException(410, f"产物已焚（{run.get('burned_reason', 'ttl')}），"
+                                     "云端不保留——需要请重发 URL 生成新 run")
+        raise HTTPException(404, "产物尚未生成（run 进行中或没有写出笔记）")
+    return path
+
+
+async def _outbox_sweeper(period_s: float = 600.0) -> None:
+    """deliver 周期 TTL 清扫：启动扫一遍管冷启动，长驻进程还得把窗口里陆续到期的烧掉。"""
+    while True:
+        await asyncio.sleep(period_s)
+        try:
+            await asyncio.to_thread(_sweep_outbox)
+        except Exception as exc:
+            print(f"⚠ outbox 清扫异常（下轮重试）：{redact(str(exc))[:160]}")
 
 
 # ---------------------------------------------------------------- 后台执行
@@ -242,9 +357,9 @@ def _enqueue(url: str, part_items: str, force: bool, review: bool,
 
 @asynccontextmanager
 async def _lifespan(app: FastAPI):
-    global _CHECKPOINTER
+    global _CHECKPOINTER, _CK_CLOSER
     events.bind_loop(asyncio.get_running_loop())  # SSE 总线钉住主循环（工作线程据此投递）
-    _CHECKPOINTER = make_checkpointer()
+    _CHECKPOINTER, _CK_CLOSER = make_checkpointer_from_env(ENV)
     # 遥测出口：OTEL_EXPORTER_OTLP_ENDPOINT（collector）> LANGFUSE 直连 > 纯本地 jsonl
     observability.init()
     observability.register_runtime_gauges(lambda: {
@@ -252,6 +367,8 @@ async def _lifespan(app: FastAPI):
         "active": sum(1 for v in _TASKS.values() if v.get("status") == "running")})
     _cleanup_stale_runs()
     _prune_orphan_tmps()
+    if artsink.current_mode() == "deliver":
+        _sweep_outbox()  # 停机期间到期的产物，起来先物理焚掉（冷启动口径）
     # 恢复中断的 run（对齐旧 _load_jobs 的语义；error 的不自动重跑，避免双份产物）。
     # tmp 已没了的 run 不可恢复（产物文件随目录一起没了，续跑只会拿空产物硬跑）：
     # 标记 error 收场，不占用执行信号量。
@@ -270,7 +387,15 @@ async def _lifespan(app: FastAPI):
         resumed += 1
     if resumed:
         print(f"♻️ 恢复 {resumed} 个中断 run（上次服务退出前未跑完）")
+    sweeper = (asyncio.create_task(_outbox_sweeper())
+               if artsink.current_mode() == "deliver" else None)
     yield
+    if sweeper:
+        sweeper.cancel()
+    try:  # 释放 checkpointer 资源（PG 分支关池；sqlite 是 no-op）
+        _CK_CLOSER()
+    except Exception as exc:
+        print(f"⚠ checkpointer 关闭异常（退出流程不拦）：{exc}")
 
 
 app = FastAPI(title="video2md", version="0.2.0", lifespan=_lifespan,
@@ -340,7 +465,9 @@ async def post_runs(body: RunCreate, ident: Identity = Depends(current_identity)
         raise HTTPException(400, err)
     skipped = [bool(a.get("skipped")) for a in run["artifacts"].values()]
     resp = {"run_id": run["run_id"], "total": run["total"],
-            "entries": [{"index": i, "url": e["url"], "skipped": s}
+            "entries": [{"index": i, "url": e["url"], "skipped": s,
+                         "from_run": ((run["artifacts"].get(e["url"]) or {})
+                                      .get("skipped_from") or {}).get("run_id") or None}
                         for i, (e, s) in enumerate(zip(run["entries"], skipped), 1)],
             "all_skipped": bool(skipped) and all(skipped)}
     if body.resolve_only:
@@ -377,6 +504,7 @@ def get_run(run_id: str, ident: Identity = Depends(current_identity)) -> dict:
             entries.append({
                 "index": e.get("playlist_index"), "url": e["url"],
                 "skipped": bool(art.get("skipped")),
+                "from_run": (art.get("skipped_from") or {}).get("run_id") or None,
                 "note": Path(art["note"]).name if art.get("note") else None,
                 "done": {s: bool(art.get({"transcribe": "segs", "frames": "candidates",
                                           "ocr": "ocr_raw", "select": "published",
@@ -388,19 +516,77 @@ def get_run(run_id: str, ident: Identity = Depends(current_identity)) -> dict:
         out.update(url=run.get("url"), status=run.get("status"), total=run.get("total"),
                    stages=run.get("stages"), partial_failures=run.get("partial_failures"),
                    entries=entries)
+    if run and artsink.current_mode() == "deliver":
+        path, exp = _outbox_live(run)  # 客户端凭它知道拉取窗口（present=false 即已焚）
+        out["artifacts"] = {"mode": "deliver", "present": path is not None, "expires": exp}
     return out
 
 
 
 @app.get("/runs/{run_id}/note", response_model=RunNotesOut,
-         summary="产出的 markdown（标题 + vault 路径 + 正文）")
+         summary="产出的 markdown（标题 + 产物路径 + 正文），供云上调取")
 def get_run_notes(run_id: str, ident: Identity = Depends(current_identity)) -> dict:
+    """vault 模式：正文常驻 runs.json 记录（原语义）。deliver 模式：finalize 已把全文
+    剥出 runs.json，这里从在架 outbox 的文件读——已焚即 410，「云端不储存」不掺假。"""
     run = _require_run_access(run_id, ident)
     if not run:
         return {"run_id": run_id, "status": None, "notes": []}
-    notes = [{"title": a.get("title", ""), "path": a.get("note", ""), "md": a.get("md", "")}
-             for a in (run.get("artifacts") or {}).values() if a.get("note")]
+    deliver = artsink.current_mode() == "deliver"
+    shelf, _exp = _outbox_live(run) if deliver else (None, None)
+    notes = []
+    for a in (run.get("artifacts") or {}).values():
+        if not a.get("note"):
+            continue
+        md = a.get("md")
+        if not md and deliver:
+            p = Path(a["note"])
+            if shelf is None or not p.is_file():
+                raise HTTPException(410, "产物已焚（ACK/TTL 即焚），云端不留正文——"
+                                         "需要请重发 URL 生成新 run")
+            md = p.read_text(encoding="utf-8")
+        notes.append({"title": a.get("title", ""), "path": a.get("note", ""), "md": md or ""})
     return {"run_id": run_id, "status": run.get("status"), "notes": notes}
+
+
+def _zip_dir(src: Path) -> tuple[str, int]:
+    """目录现打包 zip（temp 文件，发送方负责删）→ (路径, 字节数)。结构原样保留。"""
+    fd, zpath = tempfile.mkstemp(prefix=f"v2md-bundle-{src.name}-", suffix=".zip")
+    os.close(fd)
+    try:
+        with zipfile.ZipFile(zpath, "w", zipfile.ZIP_DEFLATED) as zf:
+            for f in sorted(src.rglob("*")):
+                if f.is_file():
+                    zf.write(f, arcname=str(f.relative_to(src)))
+        return zpath, os.path.getsize(zpath)
+    except OSError:
+        with suppress(OSError):
+            os.unlink(zpath)
+        raise
+
+
+@app.get("/runs/{run_id}/bundle", summary="deliver 产物整包 zip（笔记+帧图+转录+节段+索引-append）",
+         response_class=FileResponse)
+def get_run_bundle(run_id: str, ident: Identity = Depends(current_identity)) -> FileResponse:
+    """「发送到用户端」的投递主体：在架 outbox 整包（wikilink 相对结构原样，客户端
+    解进本机 vault 即成品）。zip 现打包、发完即删（BackgroundTask），云端不留副本。
+
+    410=已焚/过期（重发 URL 生成新 run）；404=run 不存在、越权 403、非 deliver 模式 409。
+    """
+    src = _deliver_outbox(run_id, ident)
+    zpath, size = _zip_dir(src)
+    _req_log("GET", f"/runs/{run_id}/bundle", 200, user=ident.uid, zip_bytes=size)
+    return FileResponse(zpath, media_type="application/zip",
+                        filename=f"video2md-{run_id}.zip",
+                        background=BackgroundTask(_unlink_quiet, zpath))
+
+
+@app.delete("/runs/{run_id}/artifacts", response_model=ArtifactsAckOut,
+            summary="ACK 即焚：客户端确认收完，云端立刻销毁产物（不等 TTL）")
+def delete_run_artifacts(run_id: str, ident: Identity = Depends(current_identity)) -> dict:
+    path = _deliver_outbox(run_id, ident)
+    run = _load_runs().get(run_id) or {"run_id": run_id, "outbox": str(path)}
+    _burn_run(run_id, run, "ack")
+    return {"run_id": run_id, "status": "burned"}
 
 
 

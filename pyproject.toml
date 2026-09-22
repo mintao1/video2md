@@ -17,6 +17,8 @@ dependencies = [
     "opentelemetry-sdk>=1.27",
     "opentelemetry-exporter-otlp-proto-http>=1.27",
     "google-auth>=2.58.0",
+    "langgraph-checkpoint-postgres>=3.1.2",
+    "psycopg[binary,pool]>=3.3.6",
 ]
 
 [project.optional-dependencies]

@@ -8,7 +8,8 @@ import subprocess
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 
-from .config import ATTACH_DIR, BLUR_SHARP_MIN, ENV, FRAME_DEDUP_EPS, FRAME_MAE_MAX, LOW_CONF
+from . import artsink
+from .config import BLUR_SHARP_MIN, ENV, FRAME_DEDUP_EPS, FRAME_MAE_MAX, LOW_CONF
 from .util import fmt_ts
 
 
@@ -260,10 +261,11 @@ def publish_named(named: list[tuple[float, Path, str]], ocr_items: list) -> tupl
 
     已存在则跳过（幂等）；返回 (manifest 文本, [(文件名, mm:ss)])。
     """
-    ATTACH_DIR.mkdir(parents=True, exist_ok=True)
+    dest_dir = artsink.attach_dir()  # vault=ATTACH_DIR 常量；deliver=本 run outbox/attachments
+    dest_dir.mkdir(parents=True, exist_ok=True)
     published = []
     for t, fpath, name in named:
-        dest = ATTACH_DIR / name
+        dest = dest_dir / name
         if not dest.exists():
             shutil.copyfile(fpath, dest)
         published.append((name, fmt_ts(t)))

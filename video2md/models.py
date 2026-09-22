@@ -25,6 +25,8 @@ class EntryBrief(BaseModel):
     index: int
     url: str
     skipped: bool
+    from_run: str | None = Field(
+        None, description="deliver 模式幂等跳过的来源 run_id（产物还在架上，直接拉旧 bundle）")
 
 
 class RunCreatedOut(BaseModel):
@@ -53,6 +55,14 @@ class EntryStatus(BaseModel):
     skipped: bool = False
     note: str | None = None
     done: dict[str, bool] = Field(default_factory=dict)
+    from_run: str | None = None
+
+
+class ArtifactsInfo(BaseModel):
+    """deliver 模式产物在架状态（vault 模式此块为 None——契约零扰动）。"""
+    mode: str = "deliver"
+    present: bool = Field(description="outbox 在架（未 ACK、未过期被清）")
+    expires: str | None = Field(None, description="在架到期时刻（iso）；到点即焚")
 
 
 class RunStatusOut(BaseModel):
@@ -64,6 +74,12 @@ class RunStatusOut(BaseModel):
     stages: dict[str, Any] | None = None
     partial_failures: dict[str, Any] | None = None
     entries: list[EntryStatus] | None = None
+    artifacts: ArtifactsInfo | None = None
+
+
+class ArtifactsAckOut(BaseModel):
+    run_id: str
+    status: str = Field(description="burned=已即时销毁（ACK 即焚）")
 
 
 # ---------------------------------------------------------------- note / queue / health / preflight

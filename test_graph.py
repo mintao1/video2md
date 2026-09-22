@@ -174,6 +174,20 @@ assert left == [], f"done 后 checkpoint 应被裁剪，剩 {len(left)} 条"
 print("✅ 7. SqliteSaver 落库 + done 后 delete_thread 裁剪")
 
 
+# ---- 7b. make_checkpointer_from_env：sqlite 默认 / postgres 参数守卫 ----------------
+saver2, closer2 = graph.make_checkpointer_from_env({})  # 缺省 → sqlite 分支（closer no-op）
+assert type(saver2).__name__ == "SqliteSaver" and callable(closer2)
+closer2()
+for bad, why in [({"V2MD_CHECKPOINTER": "mysql"}, "未知类型"),
+                 ({"V2MD_CHECKPOINTER": "postgres"}, "没配 DSN")]:
+    try:
+        graph.make_checkpointer_from_env(bad)
+        raise AssertionError(f"应报错（{why}）却没报")
+    except RuntimeError as e:
+        assert str(e)
+print("✅ 7b. checkpointer env 分派（sqlite 默认；postgres 守卫在 import 前，不联网）")
+
+
 # ---- 8. V2MD_EVAL=1：eval_entry 接线——本 run 写盘条目评测 / 失败不致命 / 缺省不接线
 from video2md import evals as _ev
 
@@ -217,5 +231,93 @@ final = graph.run_graph("/tmp/fake.mp4", checkpointer=None)
 assert final["status"] == "done" and len(_ev_calls) == 1  # 没新增评测调用
 _ev.report_scores = _ev_rep_orig
 print("✅ 8. V2MD_EVAL 在线评测节点：接线评测写回 artifacts / 失败不致命 / 缺省不接线")
+
+
+# ---- 9. deliver 模式：artsink 激活缝 + finalize 搬家剥正文 ----------------------
+from datetime import datetime as _dt
+
+from video2md import artsink
+from video2md import config as v2config
+from video2md import note as note_mod
+
+_orig_mode, _orig_ob, _orig_outdir = (v2config.ARTIFACT_MODE,
+                                      v2config.OUTBOX_DIR, v2config.OUT_DIR)
+
+# 9a. 激活守卫：deliver 模式下 sink_for 之外的写盘必须炸（宁可炸也不静默漏进 vault）
+v2config.ARTIFACT_MODE = "deliver"
+_violated = False
+try:
+    artsink.note_root()
+except RuntimeError:
+    _violated = True
+assert _violated, "deliver 模式漏激活点没炸——「云端不储存」口径有兜底漏网"
+# vault 模式：no-op 直通，访问器 = config 常量（现状逐字节不变）
+v2config.ARTIFACT_MODE = "vault"
+assert artsink.note_root() is _orig_outdir
+with artsink.sink_for({"run_id": "x", "tmp": "/ignored"}):
+    pass  # vault 下 sink_for 不建目录不激活
+# deliver 下 sink_for 建齐三目录并线程内激活，退出即复位
+v2config.ARTIFACT_MODE = "deliver"
+_stub_run = {"run_id": "r_sink", "tmp": str(_TMP / "sinkrun")}
+with artsink.sink_for(_stub_run):
+    assert artsink.note_root() == Path(_stub_run["tmp"]) / "outbox"
+    assert artsink.attach_dir().is_dir() and artsink.transcript_dir().is_dir()
+assert artsink._SINK.get() is None
+print("✅ 9a. artsink 激活缝（漏激活炸 / vault 直通 / sink 建目录+复位）")
+
+# 9b. _relocate_outbox 单元级：剥 md、搬家、只改写 outbox 下的路径、在架位重入不炸
+v2config.ARTIFACT_MODE, v2config.OUTBOX_DIR = "deliver", _TMP / "shelf-u"
+_u = _TMP / "urun"
+(_u / "outbox" / "transcripts").mkdir(parents=True)
+(_u / "outbox" / "n.md").write_text("# 正文", encoding="utf-8")
+(_u / "outbox" / "transcripts" / "t.txt").write_text("转录", encoding="utf-8")
+run_u = {"run_id": "r_u", "tmp": str(_u), "artifacts": {
+    "u1": {"md": "全文", "note": str(_u / "outbox" / "n.md"),
+           "transcript_path": str(_u / "outbox" / "transcripts" / "t.txt"),
+           "published": [["f1.jpg", 0.5]]},  # published 只存文件名：搬家不改写
+    "u2": {"md": "全文", "note": "/vault/旧笔记.md"}}}  # 非 outbox 历史路径：原样保留
+graph._relocate_outbox(run_u)
+_shelf_u = _TMP / "shelf-u" / "r_u"
+assert all("md" not in a for a in run_u["artifacts"].values()), "runs.json 养正文=口径破裂"
+assert run_u["outbox"] == str(_shelf_u) and (_shelf_u / "n.md").is_file()
+assert run_u["artifacts"]["u1"]["note"] == str(_shelf_u / "n.md")
+assert run_u["artifacts"]["u1"]["transcript_path"] == str(_shelf_u / "transcripts" / "t.txt")
+assert run_u["artifacts"]["u2"]["note"] == "/vault/旧笔记.md"
+assert _dt.fromisoformat(run_u["artifacts_expire"]) > _dt.now()
+assert not (_u / "outbox").exists()
+graph._relocate_outbox(run_u)  # 崩溃恢复重入：src 已没了 → 只剩剥正文，幂等不炸
+assert run_u["outbox"] == str(_shelf_u)
+print("✅ 9b. _relocate_outbox：剥正文/搬家/路径改写/历史路径保留/重入幂等")
+
+# 9c. 全链路（假 LLM 假阶段）：note 阶段经 artsink 真写文件 → finalize 搬家进在架位
+_fresh()
+v2config.OUTBOX_DIR = _TMP / "shelf-e2e"
+v2config.OUT_DIR = _TMP / "vault-must-stay-empty"
+
+
+def _deliver_note(run, entry, art, tmp, args):
+    tp = note_mod.write_transcript("投递条目", art.get("transcript", "x"))
+    p = note_mod.write_note("# 投递正文\n见转录", "投递条目")
+    note_mod.append_index("投递条目", "2:00", "摘")
+    art.update(note=str(p), title="投递条目", transcript_path=str(tp),
+               fp="fp-deliver", md="# 投递正文\n见转录")
+
+
+runs._STAGE_FNS["note"] = _deliver_note
+final = graph.run_graph("/tmp/fake.mp4", checkpointer=None)
+assert final["status"] == "done", final.get("errors")
+rec = json.loads((_TMP / "runs.json").read_text())[final["run_id"]]
+art = next(iter(rec["artifacts"].values()))
+assert "md" not in art, "finalize 后 runs.json 不得残留正文"
+shelf = _TMP / "shelf-e2e" / final["run_id"]
+assert rec["outbox"] == str(shelf) and shelf.is_dir()
+assert art["note"] == str(shelf / "投递条目.md") and Path(art["note"]).is_file()
+assert (shelf / "transcripts").is_dir() and (shelf / "索引-append.md").is_file()
+assert _dt.fromisoformat(rec["artifacts_expire"]) > _dt.now()
+assert not (_TMP / "vault-must-stay-empty").exists(), "deliver 写入漏进了 vault！"
+print("✅ 9c. deliver 全链路：note 经 sink 写 outbox → finalize 搬家，vault 零写入")
+
+v2config.ARTIFACT_MODE, v2config.OUTBOX_DIR, v2config.OUT_DIR = (
+    _orig_mode, _orig_ob, _orig_outdir)
 
 print("\n✅ test_graph.py 全部通过")

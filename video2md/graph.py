@@ -28,11 +28,12 @@ import os
 import shutil
 import sqlite3
 import uuid
-from datetime import date
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 from langgraph.graph import END, START, StateGraph
 
+from . import artsink
 from .config import ENV, PROJ
 from .graph_obs import GraphObsHandler
 from .llm import assemble_entry_note, llm_task, select_frames
@@ -219,7 +220,8 @@ def node_note_entry(state: RunState) -> dict:
     etmp = tmp if run["total"] == 1 else tmp / f"e{idx:02d}"
     etmp.mkdir(parents=True, exist_ok=True)
     try:
-        _STAGE_FNS["note"](run, entry, art, etmp, args)
+        with artsink.sink_for(run):  # note 直调不经 _run_stage，产物落点须单独激活
+            _STAGE_FNS["note"](run, entry, art, etmp, args)
     except SystemExit as exc:
         # 质量门禁（拒答/空壳/转录本过短）：记 partial 继续下一条，不炸整 run
         msg = f"note 条目 {idx}: {redact(str(exc))[:200]}"
@@ -229,9 +231,12 @@ def node_note_entry(state: RunState) -> dict:
         return {**nxt, "errors": [*state.get("errors", []), msg]}
     # state.json 幂等 SSOT 逐条落盘（移植自 _stage_kb 末段：重发同 URL 跳过本条目）
     state_db = load_state()
+    # owner：deliver 模式的幂等跳过判「谁的产物、还在不在架」（见 runs.create_run）；
+    # vault 模式此字段闲置（旧全局去重语义不变）
     state_db[art["fp"]] = {"note": art.get("note", ""), "transcript": art.get("transcript_path", ""),
                            "title": art.get("title", ""), "url": entry.get("url", ""),
                            "date": date.today().isoformat(), "run_id": run["run_id"],
+                           "owner": run.get("owner", ""),
                            "status": "completed",
                            "spans": [{k: v for k, v in sp.items() if k != "spanId"}
                                      for sp in run.get("span_log", [])][-80:]}
@@ -282,16 +287,51 @@ def node_eval_entry(state: RunState) -> dict:
 
 
 
+def _relocate_outbox(run: dict) -> None:
+    """deliver 收尾：tmp/outbox 整体搬到在架位 OUTBOX_DIR/<run_id>，并把正文从 runs.json 剥掉。
+
+    「云端不储存」的诚实口径：正文只活在在架窗口（TTL/ACK 即焚，见 api.py），runs.json
+    连 md 全文副本都不留；note/transcript_path 改写到在架位，端点按它取文件。
+    崩溃恢复后重入 finalize 看到旧在架：整份替换（本 run 才是产物的权威版本）。
+    """
+    for art in (run.get("artifacts") or {}).values():
+        art.pop("md", None)
+    src = Path(run.get("tmp") or "") / "outbox"
+    if not src.is_dir():
+        return
+    dst = artsink.outbox_dir() / run["run_id"]
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    if dst.exists():
+        shutil.rmtree(dst, ignore_errors=True)
+    shutil.move(str(src), str(dst))
+    run["outbox"] = str(dst)
+    run["artifacts_expire"] = (datetime.now() + timedelta(
+        hours=artsink.outbox_ttl_h())).isoformat(timespec="seconds")
+    run.pop("artifacts_burned", None)
+    for art in (run.get("artifacts") or {}).values():
+        for key in ("note", "transcript_path"):
+            p = art.get(key)
+            if p:
+                try:
+                    art[key] = str(dst / Path(p).relative_to(src))
+                except ValueError:
+                    pass  # 非 outbox 下的历史路径（vault 旧数据重跑）：不改写，随 tmp 一起没了就没了
+    # 帧/节段发布记录（published）与选中清单只存文件名，wikilink 按名解析，搬家不用改写
+
+
 def node_finalize(state: RunState) -> dict:
-    """收尾：run 状态落盘 + 清临时目录（原 _stage_kb 的非 Dify 部分）。"""
+    """收尾：run 状态落盘 + 清临时目录（deliver 模式先把 outbox 搬家到在架位）。"""
     run = _reload(state["run_id"], state.get("run") or {})
     errors = state.get("errors") or []
     run["status"] = "partial" if run.get("partial_failures") else "done"
+    if artsink.current_mode() == "deliver":
+        _relocate_outbox(run)
     if run.get("tmp") and not run.get("tmp_cleaned"):
         shutil.rmtree(run["tmp"], ignore_errors=True)  # 末阶段：临时产物可清
         run["tmp_cleaned"] = True
     _persist(run)
     print(f"🏁 run {run['run_id']} → {run['status']}"
+          + (f" · 产物在架至 {run.get('artifacts_expire', '?')}" if run.get("outbox") else "")
           + (f"（{len(errors)} 条留痕）" if errors else ""))
     return {"run": run, "status": run["status"]}
 
@@ -376,7 +416,7 @@ def build_graph(checkpointer=None):
 
 
 def make_checkpointer(path: Path = CHECKPOINT_DB):
-    """生产 checkpointer。调用方持有返回的 saver 保活（连接随 saver 生命周期）。
+    """SQLite checkpointer（默认形态）。调用方持有返回的 saver 保活（连接随 saver 生命周期）。
 
     裁剪策略在 run_graph：run 完成（done/partial）即 delete_thread——完成的 run
     不需要步进历史（重跑靠 state.json 幂等，不靠 checkpoint）；失败 run 的
@@ -388,6 +428,37 @@ def make_checkpointer(path: Path = CHECKPOINT_DB):
     saver = SqliteSaver(sqlite3.connect(str(path), check_same_thread=False))
     saver.setup()  # 幂等建表
     return saver
+
+
+def make_checkpointer_from_env(env: dict | None = None) -> tuple:
+    """按 env 装配 checkpointer：``(saver, closer)``，closer 在进程/服务退出时调用。
+
+    V2MD_CHECKPOINTER=sqlite（默认，零外部服务，本地/e2e/契约测试都走它）| postgres。
+    postgres 分支：V2MD_PG_DSN 必填；图跑在 asyncio.to_thread 工作线程里、多家并发共享
+    连接，psycopg 单连接非线程安全 → 用连接池（autocommit + prepare_threshold=0 是
+    langgraph PostgresSaver 官方口径）。delete_thread 裁剪语义两家通用，run_graph 不改。
+    """
+    env = env if env is not None else ENV
+    kind = (env.get("V2MD_CHECKPOINTER") or "sqlite").strip().lower()
+    if kind in ("", "sqlite"):
+        return make_checkpointer(), lambda: None
+    if kind != "postgres":
+        raise RuntimeError(f"未知 V2MD_CHECKPOINTER：{kind}（支持 sqlite|postgres）")
+    dsn = (env.get("V2MD_PG_DSN") or "").strip()
+    if not dsn:
+        raise RuntimeError("V2MD_CHECKPOINTER=postgres 需要配 V2MD_PG_DSN")
+    from langgraph.checkpoint.postgres import PostgresSaver
+    from psycopg_pool import ConnectionPool
+
+    pool = ConnectionPool(conninfo=dsn, min_size=1, max_size=5, open=True,
+                          kwargs={"autocommit": True, "prepare_threshold": 0})
+    try:
+        saver = PostgresSaver(pool)
+        saver.setup()  # 幂等建表
+    except Exception:
+        pool.close()
+        raise
+    return saver, pool.close
 
 
 

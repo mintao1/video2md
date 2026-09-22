@@ -5,7 +5,8 @@ import re
 from pathlib import Path
 from datetime import date
 
-from .config import ENV, INDEX_FILE, OUT_DIR, TRANSCRIPT_DIR
+from . import artsink
+from .config import ENV
 from .util import sanitize_filename
 
 
@@ -68,9 +69,13 @@ def extract_toc(body: str) -> list[tuple[str, str]]:
 
 
 def write_transcript(title: str, transcript: str) -> Path:
-    """转录本 SSOT 落 transcripts/（覆盖同名：标题相同即同一篇笔记的重跑）。"""
-    TRANSCRIPT_DIR.mkdir(parents=True, exist_ok=True)
-    p = TRANSCRIPT_DIR / f"{sanitize_filename(title)}-transcript.txt"
+    """转录本 SSOT 落 transcripts/（覆盖同名：标题相同即同一篇笔记的重跑）。
+
+    目录经 artsink 取：vault 模式=config 常量；deliver 模式=本 run outbox/transcripts。
+    """
+    d = artsink.transcript_dir()
+    d.mkdir(parents=True, exist_ok=True)
+    p = d / f"{sanitize_filename(title)}-transcript.txt"
     p.write_text(transcript)
     return p
 
@@ -177,12 +182,12 @@ def collection_dir(playlist_title: str) -> Path | None:
     `[[transcripts/x]]` / `![[attachments/y.jpg]]` 按文件名解析，笔记进子目录不影响链接。
     """
     name = _collection_folder_name(playlist_title)
-    return (OUT_DIR / name) if name else None
+    return (artsink.note_root() / name) if name else None
 
 
 
 def write_note(md: str, title: str, playlist_title: str = "") -> Path:
-    folder = collection_dir(playlist_title) or OUT_DIR
+    folder = collection_dir(playlist_title) or artsink.note_root()
     folder.mkdir(parents=True, exist_ok=True)
     path = folder / f"{sanitize_filename(title)}.md"
     i = 2
@@ -195,14 +200,17 @@ def write_note(md: str, title: str, playlist_title: str = "") -> Path:
 
 
 def append_index(title: str, dur_str: str, summary: str, playlist_title: str = "") -> None:
-    OUT_DIR.mkdir(parents=True, exist_ok=True)
-    if not INDEX_FILE.exists():
-        INDEX_FILE.write_text(
+    """索引追加：vault 模式进共享 INDEX_FILE；deliver 模式进本 run outbox/索引-append.md
+    （行格式一致，客户端并库时自行拼接）。"""
+    artsink.note_root().mkdir(parents=True, exist_ok=True)
+    idx = artsink.index_file()
+    if not idx.exists():
+        idx.write_text(
             "---\ntags:\n  - 索引\n  - 视频笔记\n---\n\n# 视频笔记索引\n\n"
             "| 笔记 | 时长 | 摘要 | 日期 |\n| --- | --- | --- | --- |\n")
     parts = ([_collection_folder_name(playlist_title), sanitize_filename(title)]
              if playlist_title else [sanitize_filename(title)])
     link = "/".join(p for p in parts if p)  # 合集笔记带目录前缀，Obsidian 按路径解析
     row = f"| [[{link}]] | {dur_str} | {(summary or '—')[:60]} | {date.today().isoformat()} |\n"
-    with INDEX_FILE.open("a") as f:
+    with idx.open("a") as f:
         f.write(row)

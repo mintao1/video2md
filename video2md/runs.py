@@ -15,6 +15,7 @@ import uuid
 from pathlib import Path
 from datetime import datetime
 
+from . import artsink
 from .config import ENV, MAX_TRANSCRIPT_CHARS, PROJ
 from .util import RunLog, _STAGE_LOGS, current_log, fmt_hms, load_state, probe, redact, sanitize_filename, video_fingerprint
 from . import observability
@@ -119,13 +120,36 @@ def create_run(url: str, part_items: str = "", force: bool = False,
     state = load_state()
     # 幂等比对按 rstrip('/') 口径：历史 state 里躺着无尾斜杠的旧记录（归一化加 / 之前落盘的），
     # 严格相等会让已完成的视频整链重跑（实测 44min 视频重复下载+转录）
-    done_keys = {str(v.get("url", "")).rstrip("/")
-                 for v in state.values() if not v.get("dry_run") and v.get("url")}
+    done_by_url: dict[str, dict] = {str(v.get("url", "")).rstrip("/"): v
+                                    for v in state.values()
+                                    if not v.get("dry_run") and v.get("url")}
+    # deliver 模式在架判定需要 runs 库比对来源 run 的 outbox 是否存在
+    runs_db = _load_runs() if artsink.current_mode() == "deliver" else {}
+
+    def _deliver_reusable(v: dict) -> bool:
+        """同 owner 的旧产物还在架上（未 ACK 未过期被清）才算可跳过——产物在别人手里
+        或已被烧掉时跳过 = 给了个拿不到东西的空条目，不如重烧。"""
+        src = runs_db.get(v.get("run_id", "")) or {}
+        ob = src.get("outbox")
+        if (src.get("owner", "") or "") != (owner or "") or not ob or src.get("artifacts_burned"):
+            return False
+        try:
+            exp = datetime.fromisoformat(src.get("artifacts_expire", "2000-01-01"))
+        except (ValueError, TypeError):
+            return False
+        return exp > datetime.now() and Path(ob).exists()
+
     artifacts: dict[str, dict] = {}
     for e in entries:
         art = {}
-        if not force and e["url"].rstrip("/") in done_keys:
-            art["skipped"] = True  # 已处理过：阶段直接跳过，不重复烧 token 重写
+        v = done_by_url.get(e["url"].rstrip("/"))
+        if v is not None and not force:
+            if artsink.current_mode() != "deliver":
+                art["skipped"] = True  # vault 旧语义：已处理过即跳过，不重复烧 token 重写
+            elif _deliver_reusable(v):
+                art["skipped"] = True
+                art["skipped_from"] = {"run_id": v.get("run_id", ""),
+                                       "title": v.get("title", "")}  # 客户端凭它拉旧 bundle
         artifacts[e["url"]] = art
     run = {
         "run_id": uuid.uuid4().hex[:8],
@@ -184,7 +208,8 @@ def _run_stage(run: dict, stage: str, args: dict) -> None:
     try:
         with log.span(f"stage:{stage}") as sp:  # run → stage → entry 三层 span 树
             try:
-                return _run_stage_inner(run, stage, args, log)
+                with artsink.sink_for(run):  # deliver 模式整阶段写盘指向本 run outbox（vault 模式 no-op）
+                    return _run_stage_inner(run, stage, args, log)
             finally:
                 # 阶段 span 收尾富化：失败留痕/熔断摘要/条目计数随 span 进 trace
                 st = run.get("stages", {}).get(stage, {})

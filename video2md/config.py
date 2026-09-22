@@ -108,6 +108,19 @@ ATTACH_DIR = OUT_DIR / "attachments"      # 嵌入帧（![[attachments/...]] 按
 TRANSCRIPT_DIR = OUT_DIR / "transcripts"  # 转录本 SSOT（info callout wikilink）
 
 
+# 产物落点模式（缝在 artsink.py，写盘函数不感知）：
+#   vault（默认）= 直写 vault 卷 + Syncthing 同步（现状逐字节不变）
+#   deliver      = 多用户「云端不储存」：产物进 per-run outbox，终态后搬到 OUTBOX_DIR，
+#                  只经 bundle/ACK HTTP 端点发送到用户端，TTL 到期/确认收完即焚（api.py）
+ARTIFACT_MODE = (ENV.get("V2MD_ARTIFACT_MODE") or "vault").strip().lower()
+if ARTIFACT_MODE not in ("vault", "deliver"):
+    raise RuntimeError(f"未知 V2MD_ARTIFACT_MODE：{ARTIFACT_MODE}（支持 vault|deliver）")
+
+# deliver 在架根（容器指 data 卷）与保留窗口（小时，到期自动烧）
+OUTBOX_DIR = Path(ENV.get("V2MD_OUTBOX_DIR", str(PROJ / "data" / "outbox")))
+OUTBOX_TTL_H = float(ENV.get("V2MD_OUTBOX_TTL_H", "24") or 24)
+
+
 
 # ---------------------------------------------------------------- fin
 # dify_kit / DIFY_* / dataset_api 已随 Dify 抽离（2026-09-21）摘除：

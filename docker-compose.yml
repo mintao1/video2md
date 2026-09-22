@@ -11,6 +11,7 @@ volumes:
   v2md-data: {}        # state.json / runs.json / checkpoints.sqlite / logs
   vault: {}            # 笔记产物（Syncthing 同步回本地 Obsidian 的就是这个卷）
   gpu-router-logs: {}  # provider 冷却/用量记账
+  v2md-pg: {}          # Postgres checkpointer 数据（仅 --profile pg 时用到）
 
 services:
   gpu_router:
@@ -61,3 +62,29 @@ services:
       - v2md-data:/app/data
       - vault:/vault
       - ./secrets/video2md.env:/run/video2md.env:ro
+
+  # Postgres checkpointer（可选，profile "pg"）：默认 sqlite 零外部服务；
+  # 切库 = 起这条 + 在 secrets/video2md.env 里配两行（load_env 读 secrets 文件，
+  # api 无需 compose env 透传）：
+  #   V2MD_CHECKPOINTER=postgres
+  #   V2MD_PG_DSN=postgresql://v2md:<密码>@127.0.0.1:5432/v2md
+  # 起法：docker compose --profile pg up -d（外部/托管 PG 则不起这条，DSN 直接指过去）
+  # ⚠ 刻意不用 depends_on：compose 的 depends_on 会无视 profile 强制拉起被依赖服务；
+  #   PG 未就绪时 api fail-fast，靠 restart: unless-stopped 秒级自重启等库。
+  postgres:
+    image: postgres:17-alpine
+    profiles: ["pg"]
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5432:5432"   # 只绑回环：host 网络的 api 走回环访问，公网不可达
+    environment:
+      POSTGRES_USER: v2md
+      POSTGRES_DB: v2md
+      POSTGRES_PASSWORD: ${V2MD_PG_PASSWORD:-v2md-loopback-only}  # 生产用环境变量/宿主 .env 覆盖，与 DSN 同值
+    volumes:
+      - v2md-pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U v2md -d v2md"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
