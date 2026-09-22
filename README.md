@@ -88,10 +88,15 @@ ssh lcode-4c 'cd ~/stack/video2md && \
   PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple \
   docker compose -f docker-compose.yml -f docker-compose.obs.yml build'
 #    ⚠ 实测 2026-09-22：依赖变更触发的全量 `uv sync` 在该机可能 0 CPU/0 socket 挂死
-#    （两次复现；小范围 uv pip install 正常）。挂死就杀掉重试 `--progress=plain`；
+#    （三次复现；小范围 uv pip install 正常）。挂死就杀掉重试 `--progress=plain`；
 #    纯代码改动可用补丁层秒级绕过：
 #      printf 'FROM video2md:latest\nCOPY video2md/ /app/video2md/\n' > /tmp/patch.Dockerfile
 #      docker build -t video2md:latest -f /tmp/patch.Dockerfile . && docker compose ... up -d
+#    依赖小版本升级同样绕得动（2026-09-22 langgraph 1.2.12 实操）：补丁层里加
+#      COPY pyproject.toml uv.lock /app/ 和
+#      RUN PIP_INDEX_URL=… UV_INDEX_URL=… uv pip install --python /app/.venv/bin/python \
+#          langgraph==<版本> langchain-core==<版本>
+#    （uv pip 不走挂死的 sync 代码路径；版本与 uv.lock 保持一致）
 
 # 4. 起栈（含观测栈：collector/prometheus/grafana）+ 体检
 ssh lcode-4c 'cd ~/stack/video2md && \
