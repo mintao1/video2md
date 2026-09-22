@@ -19,7 +19,8 @@ _Judge.generate(prompt, schema) 接管 deepeval 的 schema 解析——括号配
 （单篇耗时 ≈ 最慢的 Faithfulness，不再是全链总和）。judge 模型可用
 V2MD_JUDGE_MODEL 单独换（缺省 LLM_MODEL）。
 
-scores 上报：Langfuse SDK（trace_id = sha256("serve-"+run_id)[:32] 确定性回挂原 trace）。
+scores 上报：Langfuse SDK（trace_id = sha256("video2md-"+run_id)[:32] 确定性回挂原 trace；
+2026-09-22 前为 serve- 前缀，历史 trace 在 Langfuse 仍用旧前缀）。
 新 Cloud 组织（≥2026-09-16）legacy 读写 API 大面积 410：POST /api/public/scores 实测可用，
 验证只能走 GET /api/public/v3/scores?traceId=（实测 2026-09-22）。SDK 发完首条 score
 用该端点验证落库，不落库则进程内降级为 OTLP eval-span 属性（经 collector，trace 上仍可见）。
@@ -50,7 +51,7 @@ _SCORE_TRANSPORT = ""  # "" 未判定 | "sdk" | "otlp" | "off"
 
 def trace_id_of(run_id: str) -> str:
     """与 observability._RunTrace 同一约定：Langfuse trace id = sha256 前 32 hex。"""
-    return hashlib.sha256(f"serve-{run_id}".encode()).hexdigest()[:32]
+    return hashlib.sha256(f"video2md-{run_id}".encode()).hexdigest()[:32]
 
 
 def _env(key: str) -> str:

@@ -141,7 +141,7 @@ echo "  ✅ note → $(basename "$NOTE")"
 
 # —— 3. 断言（与旧 e2e 同口径；kb 相关断言已随 Dify 抽离摘除）——
 echo "—— 断言 ——"
-grep -q "processor: dify-video2md" "$NOTE" || fail "frontmatter 缺 processor"
+grep -q "processor: video2md" "$NOTE" || fail "frontmatter 缺 processor"
 grep -q "reviewed: false" "$NOTE" || fail "frontmatter 缺 reviewed"
 grep -q "> \[!info\] 视频信息" "$NOTE" || fail "缺 [!info] 视频信息 callout"
 grep -q "^## " "$NOTE" || fail "笔记缺章节结构"

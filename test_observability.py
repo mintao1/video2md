@@ -102,7 +102,7 @@ assert tree["stage:frames"].status.status_code == StatusCode.ERROR
 assert "ffmpeg" in tree["stage:frames"].attributes["error"]
 
 # traceId 确定性：全树同 trace；与 evals.trace_id_of 同约定（evals 旁路回挂的依据）
-want_tid = int(hashlib.sha256(b"serve-r1").hexdigest()[:32], 16)
+want_tid = int(hashlib.sha256(b"video2md-r1").hexdigest()[:32], 16)
 assert all(s.context.trace_id == want_tid for s in tree.values())
 # 同 run_id 换进程（新 RunLog/新 _RunTrace）仍同 trace；不同 run_id 不同 trace
 log2 = RunLog("t", run_id="r1", trace_name="http://video")

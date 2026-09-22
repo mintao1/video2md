@@ -95,7 +95,7 @@ evals._judge_ragas = lambda: object()
 
 
 # ---- traceId 确定性（与 observability 同约定，跨进程回挂的根基）----------------
-assert evals.trace_id_of("r1") == hashlib.sha256(b"serve-r1").hexdigest()[:32]
+assert evals.trace_id_of("r1") == hashlib.sha256(b"video2md-r1").hexdigest()[:32]
 assert evals.trace_id_of("r1") != evals.trace_id_of("r2")
 
 

@@ -8,9 +8,10 @@
            > 都未配置：纯本地 jsonl（logs/run-*.jsonl 仍是唯一真相），零开销。
 
 RunLog API 不动（span/info/current_log），本模块只是 _write 的下游 sink：
-- 每 run 一条 trace：trace_id = sha256("serve-"+run_id)[:32]（确定性——evals 旁路
-  scripts/eval_notes.py 据此把分数回挂到原 trace）；root span 随首个事件开立，
-  stage → entry → llm:* 逐级父子；__stage 子进程与 serve 主进程靠同一 trace_id 拼合。
+- 每 run 一条 trace：trace_id = sha256("video2md-"+run_id)[:32]（确定性——evals 旁路
+  scripts/eval_notes.py 据此把分数回挂到原 trace；2026-09-22 前为 serve- 前缀，
+  Langfuse 里的历史回放 trace 仍用旧前缀）；root span 随首个事件开立，
+  stage → entry → llm:* 逐级父子；__stage 子进程与 api 主进程靠同一 trace_id 拼合。
 - LLM span（llm:<task>）按 Langfuse OTel 映射打 gen_ai.* 属性 → 渲染为 generation 计成本
   （模型定价在 Langfuse 项目侧配；provider 不回 usage 时只记字符数，不编造）。
 - 指标经 MeterProvider 周期导出，进程重启清零（运行态指标，非账本）。
@@ -167,13 +168,14 @@ def _ensure_started() -> bool:
 class _RunTrace:
     """每 run 一条 trace 的进程内状态：root span + 开口 span 表（RunLog spanId → SDK span）。
 
-    trace_id 钉死为 sha256("serve-"+run_id)：SDK 不从父 context 继承就会随机生成，
-    所以伪造一个远端 SpanContext 作 root 的父锚点（锚点自身永不上报）。
-    evals 旁路（scripts/eval_notes.py）与 __stage 子进程靠同一约定拼回这条 trace。
+    trace_id 钉死为 sha256("video2md-"+run_id)（2026-09-22 前为 serve-）：SDK 不从父
+    context 继承就会随机生成，所以伪造一个远端 SpanContext 作 root 的父锚点
+    （锚点自身永不上报）。evals 旁路（scripts/eval_notes.py）与 __stage 子进程
+    靠同一约定拼回这条 trace。
     """
 
     def __init__(self, run_id: str, label: str, trace_name: str, trace_meta: dict):
-        tid = int(hashlib.sha256(f"serve-{run_id}".encode()).hexdigest()[:32], 16)
+        tid = int(hashlib.sha256(f"video2md-{run_id}".encode()).hexdigest()[:32], 16)
         sid = int(hashlib.sha256(f"root-{run_id}".encode()).hexdigest()[:16], 16)
         anchor = SpanContext(trace_id=tid, span_id=sid, is_remote=True,
                              trace_flags=TraceFlags(TraceFlags.SAMPLED))

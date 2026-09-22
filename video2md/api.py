@@ -154,13 +154,13 @@ def _now() -> str:
 
 
 def _req_log(method: str, path: str, code: int, **fields) -> None:
-    """请求审计（沿用 serve 的 jsonl 口径：证明调用方是否真的打到服务）。"""
+    """请求审计 jsonl（证明调用方是否真的打到服务；2026-09-22 前叫 serve-requests.jsonl）。"""
     import json
     rec = {"ts": _now(), "method": method, "path": path, "code": code, **fields}
     print(f"[req] {method} {path} → {code} " + " ".join(f"{k}={str(v)[:60]}" for k, v in fields.items()))
     try:
         LOG_DIR.mkdir(exist_ok=True)
-        with (LOG_DIR / "serve-requests.jsonl").open("a") as f:
+        with (LOG_DIR / "api-requests.jsonl").open("a") as f:
             f.write(json.dumps(rec, ensure_ascii=False) + "\n")
     except OSError:
         pass

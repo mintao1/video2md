@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """test_otel_replay.py — 历史回放离线单测（InMemory 导出器，无网络）。
 
-覆盖：span 树父子链 / traceId 确定性（sha256("serve-"+run_id) 约定）/
+覆盖：span 树父子链 / traceId 确定性（sha256("video2md-"+run_id) 约定）/
 gen_ai 属性映射（复用 _scalar_attrs）/ info 点挂最深开口 span /
 悬空 started = 崩溃点（ERROR 强制闭合）/ 悬空 completed 补零时长 /
 时间戳 ns 还原 / 乱序输入稳定排序 / runs.json 联表 root 名 / 多 run 分 trace。
@@ -67,7 +67,7 @@ root, stage, entry, gen = tree["http://video"], tree["stage:download"], \
     tree["entry 1/2 download e1"], tree["llm:organize"]
 
 # traceId 确定性（与在线/evals 同约定）
-want_tid = int(hashlib.sha256(b"serve-r1").hexdigest()[:32], 16)
+want_tid = int(hashlib.sha256(b"video2md-r1").hexdigest()[:32], 16)
 assert all(s.context.trace_id == want_tid for s in tree.values())
 assert stats["trace_id"] == f"{want_tid:032x}"
 

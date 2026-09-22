@@ -6,7 +6,9 @@ Langfuse 网页里就能翻看历史 run 的完整 trace（root→stage→entry�
 含 evals/deadman 写进同一 jsonl 的事件（按 run_id 分组自动归位同一条 trace）。
 
 约定与 video2md/observability.py 逐字对齐（在线/回放同一棵树）：
-- trace_id = sha256("serve-"+run_id)[:32]（确定性；evals 分数回挂同一约定）
+- trace_id = sha256(trace_prefix+run_id)[:32]（确定性；evals 分数回挂同一约定。
+  前缀 2026-09-22 起为 "video2md-"；更早的 run 用 --trace-prefix serve- 回放才能
+  落回 Langfuse 里的旧 trace）
 - root 锚点 span_id = sha256("root-"+run_id)[:16]（伪造远端 SpanContext，锚点永不上报）
 - 属性映射复用 observability._scalar_attrs（llm:* → gen_ai.* → Langfuse generation）
 - info 点事件 → 零时长 span 挂当前最深开口 span；悬空闭合（丢 started）补零时长 span
@@ -112,15 +114,16 @@ def group_by_run(recs: list[dict]) -> "OrderedDict[str, list[dict]]":
 
 
 def replay_run(tracer, run_id: str, recs: list[dict], meta: dict,
-               source: str = "") -> dict | None:
+               source: str = "", trace_prefix: str = "video2md-") -> dict | None:
     """一个 run 的 jsonl 记录 → 一条 trace 的完整 span 树（镜像 record() 的映射）。
 
     meta: {name, status}（runs.json 联表；缺省 name 回退 run_id）。
+    trace_prefix: 确定性 traceId 前缀（现行 video2md-；2026-09-22 前的 run 用 serve-）。
     返回 stats（含 trace_id 十六进制）；recs 为空返回 None。
     """
     if not recs:
         return None
-    tid = int(hashlib.sha256(f"serve-{run_id}".encode()).hexdigest()[:32], 16)
+    tid = int(hashlib.sha256(f"{trace_prefix}{run_id}".encode()).hexdigest()[:32], 16)
     sid = int(hashlib.sha256(f"root-{run_id}".encode()).hexdigest()[:16], 16)
     anchor = SpanContext(trace_id=tid, span_id=sid, is_remote=True,
                          trace_flags=TraceFlags(TraceFlags.SAMPLED))
@@ -191,6 +194,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--runs-json", type=Path, default=PROJ / "runs.json",
                     help="run_id→url 联表（root span 名；缺省项目根 runs.json）")
     ap.add_argument("--endpoint", help="OTLP base 覆盖（如 http://127.0.0.1:4318）；缺省走 LANGFUSE 直连")
+    ap.add_argument("--trace-prefix", default="video2md-",
+                    help="确定性 traceId 前缀（2026-09-22 前的历史 run 用 serve-）")
     ap.add_argument("--dry-run", action="store_true", help="InMemory 试跑，不出网络，只印统计")
     args = ap.parse_args(argv)
 
@@ -241,7 +246,8 @@ def main(argv: list[str] | None = None) -> int:
 
     total = {"spans": 0, "info": 0, "synth": 0, "dangling": 0}
     for run_id, rs in runs.items():
-        st = replay_run(tracer, run_id, rs, runs_meta.get(run_id), source=source)
+        st = replay_run(tracer, run_id, rs, runs_meta.get(run_id), source=source,
+                        trace_prefix=args.trace_prefix)
         if st is None:
             continue
         for k in total:

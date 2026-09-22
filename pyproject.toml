@@ -1,5 +1,5 @@
 [project]
-name = "dify-video2md"
+name = "video2md"
 version = "0.2.0"
 description = "视频 → Obsidian 笔记（LangGraph 编排：本地转写/抽帧 OCR + LLM 整理；Dify 已抽离）"
 requires-python = ">=3.12"

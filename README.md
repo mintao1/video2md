@@ -199,7 +199,8 @@ evals 旁路：scripts/eval_notes.py → Langfuse scores（SDK 直挂，黑洞�
   started 即崩溃点），日志层自动脱敏；`run → stage → entry → llm:*` 逐级 span 树。
   观测栈全挂也不影响主管线（jsonl 先落盘，export 异常静默）。
 - **trace/LLM 成本（Langfuse Cloud）**：每 run 一条 trace，traceId =
-  `sha256("serve-"+run_id)`（确定性，evals 分数据此回挂）；LLM 调用渲染为 generation
+  `sha256("video2md-"+run_id)`（确定性，evals 分数据此回挂；2026-09-22 前为
+  `serve-` 前缀，Langfuse 里 233 条历史回放 trace 仍用旧前缀）；LLM 调用渲染为 generation
   （gen_ai semconv：model/input/output tokens/TTFT/重试次数；模型定价在 Langfuse
   项目侧配）。熔断与部分失败是 trace 上的即时事件（circuit_breaker/partial_failure），
   阶段产物计数（帧数/转录字数/OCR 命中/节段数/note 字节）挂在各条目 span 下。

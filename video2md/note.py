@@ -97,7 +97,7 @@ def render_note(body: str, meta: dict, ctx: dict, toc: list[tuple[str, str]]) ->
         "ocr_engine": ctx["ocr_engine"],
         "frames_kept": ctx["n_frames"],
         "frames_ocr": ctx["n_ocr"],
-        "processor": "dify-video2md",
+        "processor": "video2md",
         "reviewed": "false",
     }
     if is_img:

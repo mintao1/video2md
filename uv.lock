@@ -441,66 +441,6 @@ wheels = [
 ]
 
 [[package]]
-name = "dify-video2md"
-version = "0.2.0"
-source = { virtual = "." }
-dependencies = [
-    { name = "fastapi" },
-    { name = "httpx" },
-    { name = "langgraph" },
-    { name = "langgraph-checkpoint-sqlite" },
-    { name = "opentelemetry-exporter-otlp-proto-http" },
-    { name = "opentelemetry-sdk" },
-    { name = "pillow" },
-    { name = "pyyaml" },
-    { name = "uvicorn" },
-    { name = "websocket-client" },
-    { name = "yt-dlp" },
-]
-
-[package.optional-dependencies]
-evals = [
-    { name = "deepeval" },
-    { name = "langchain-community" },
-    { name = "langfuse" },
-    { name = "ragas" },
-]
-mac = [
-    { name = "pyobjc-framework-cocoa" },
-    { name = "pyobjc-framework-vision" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "pytest" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "deepeval", marker = "extra == 'evals'", specifier = ">=3.0" },
-    { name = "fastapi", specifier = ">=0.115" },
-    { name = "httpx", specifier = ">=0.27" },
-    { name = "langchain-community", marker = "extra == 'evals'", specifier = ">=0.3.27,<0.4" },
-    { name = "langfuse", marker = "extra == 'evals'", specifier = ">=3.0" },
-    { name = "langgraph", specifier = ">=0.2" },
-    { name = "langgraph-checkpoint-sqlite", specifier = ">=2.0" },
-    { name = "opentelemetry-exporter-otlp-proto-http", specifier = ">=1.27" },
-    { name = "opentelemetry-sdk", specifier = ">=1.27" },
-    { name = "pillow", specifier = ">=10.4" },
-    { name = "pyobjc-framework-cocoa", marker = "extra == 'mac'", specifier = ">=10.3" },
-    { name = "pyobjc-framework-vision", marker = "extra == 'mac'", specifier = ">=10.3" },
-    { name = "pyyaml", specifier = ">=6.0.3" },
-    { name = "ragas", marker = "extra == 'evals'", specifier = ">=0.3" },
-    { name = "uvicorn", specifier = ">=0.30" },
-    { name = "websocket-client", specifier = ">=1.8" },
-    { name = "yt-dlp", specifier = ">=2025.9.0" },
-]
-provides-extras = ["mac", "evals"]
-
-[package.metadata.requires-dev]
-dev = [{ name = "pytest", specifier = ">=9.1.1" }]
-
-[[package]]
 name = "dill"
 version = "0.4.1"
 source = { registry = "https://pypi.org/simple" }
@@ -3129,6 +3069,66 @@ sdist = { url = "https://files.pythonhosted.org/packages/5d/ad/04bbb797c84fc1f26
 wheels = [
     { url = "https://files.pythonhosted.org/packages/76/18/0eea75741ee812e9f598b687619ce2454f6c3a1c5cd21ea990ec6bd26f45/uvicorn-0.53.0-py3-none-any.whl", hash = "sha256:e8dca71ec86dce5f04e333f0d56cdedf942446e6643b9cea1af0d6d3a02cb03e", size = 87081, upload-time = "2026-09-14T07:44:22.179Z" },
 ]
+
+[[package]]
+name = "video2md"
+version = "0.2.0"
+source = { virtual = "." }
+dependencies = [
+    { name = "fastapi" },
+    { name = "httpx" },
+    { name = "langgraph" },
+    { name = "langgraph-checkpoint-sqlite" },
+    { name = "opentelemetry-exporter-otlp-proto-http" },
+    { name = "opentelemetry-sdk" },
+    { name = "pillow" },
+    { name = "pyyaml" },
+    { name = "uvicorn" },
+    { name = "websocket-client" },
+    { name = "yt-dlp" },
+]
+
+[package.optional-dependencies]
+evals = [
+    { name = "deepeval" },
+    { name = "langchain-community" },
+    { name = "langfuse" },
+    { name = "ragas" },
+]
+mac = [
+    { name = "pyobjc-framework-cocoa" },
+    { name = "pyobjc-framework-vision" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "pytest" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "deepeval", marker = "extra == 'evals'", specifier = ">=3.0" },
+    { name = "fastapi", specifier = ">=0.115" },
+    { name = "httpx", specifier = ">=0.27" },
+    { name = "langchain-community", marker = "extra == 'evals'", specifier = ">=0.3.27,<0.4" },
+    { name = "langfuse", marker = "extra == 'evals'", specifier = ">=3.0" },
+    { name = "langgraph", specifier = ">=0.2" },
+    { name = "langgraph-checkpoint-sqlite", specifier = ">=2.0" },
+    { name = "opentelemetry-exporter-otlp-proto-http", specifier = ">=1.27" },
+    { name = "opentelemetry-sdk", specifier = ">=1.27" },
+    { name = "pillow", specifier = ">=10.4" },
+    { name = "pyobjc-framework-cocoa", marker = "extra == 'mac'", specifier = ">=10.3" },
+    { name = "pyobjc-framework-vision", marker = "extra == 'mac'", specifier = ">=10.3" },
+    { name = "pyyaml", specifier = ">=6.0.3" },
+    { name = "ragas", marker = "extra == 'evals'", specifier = ">=0.3" },
+    { name = "uvicorn", specifier = ">=0.30" },
+    { name = "websocket-client", specifier = ">=1.8" },
+    { name = "yt-dlp", specifier = ">=2025.9.0" },
+]
+provides-extras = ["mac", "evals"]
+
+[package.metadata.requires-dev]
+dev = [{ name = "pytest", specifier = ">=9.1.1" }]
 
 [[package]]
 name = "wcwidth"
