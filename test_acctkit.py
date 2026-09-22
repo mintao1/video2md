@@ -1,8 +1,10 @@
 """acctkit 模块测试：在唯一对外接口上测（headers Mapping → Identity），不碰任何宿主。
 
 覆盖：off 语义（Fake/Dev 按序兜底）、provider 尝试次序与错误语义、GoogleProvider
-（打桩验签：缺头/缺 client_id/验签失败/成功四路）、JsonFileStore 自动开户+email 回填
-+跨实例持久化+put_identity 账号联动预留位、build_from_env 前缀复用。全部离线零依赖。
+（打桩验签：缺头/缺 client_id/验签失败/成功四路）、WeChatProvider（打桩换票：
+unionid 优先/openid 兜底/scheme 各认各家/errcode 500 与 401 分路/资料接口降级）、
+JsonFileStore 自动开户+email 回填+跨实例持久化+put_identity 账号联动预留位、
+build_from_env 前缀复用。全部离线零依赖。
 """
 from __future__ import annotations
 
@@ -13,7 +15,7 @@ import pytest
 
 from acctkit import (AuthEngine, AuthError, DevProvider, FakeProvider, GoogleProvider,
                      JsonFileStore, MemoryStore, NoCredentials, Principal,
-                     build_from_env)
+                     WeChatProvider, build_from_env)
 
 
 def _auth(engine: AuthEngine, headers: dict):
@@ -110,6 +112,88 @@ def test_google_failure_modes():
     assert ei.value.status == 500
 
 
+# ---------------------------------------------------------------- WeChatProvider
+
+class _StubWeChat(WeChatProvider):
+    """打桩 HTTP 层（_get_json）：真实 _exchange/_userinfo 的错误映射照跑，
+    只是不联网。resp/user 由测试摆好；user 给异常 = 模拟资料接口挂掉。"""
+    resp = {"access_token": "at-1", "expires_in": 7200, "scope": "snsapi_login",
+            "openid": "wx-open-1", "unionid": "uni-1"}
+    user = {"nickname": "小薇", "headimgurl": "h.png", "openid": "wx-open-1"}
+
+    def __init__(self, app_id: str = "wx-app-id", app_secret: str = "wx-app-secret"):
+        super().__init__(app_id, app_secret)
+
+    def _get_json(self, url: str) -> dict:
+        if "oauth2/access_token" in url:
+            assert "code=good-code" in url and "appid=wx-app-id" in url \
+                and "secret=wx-app-secret" in url and "grant_type=authorization_code" in url
+            return dict(self.resp)
+        if "sns/userinfo" in url:
+            if isinstance(self.user, Exception):
+                raise self.user
+            assert "access_token=at-1" in url
+            return dict(self.user)
+        raise AssertionError(f"未预期 URL：{url}")
+
+
+def test_wechat_happy_unionid_preferred():
+    eng = AuthEngine([_StubWeChat()], MemoryStore())
+    ident = _auth(eng, {"authorization": "Wechat good-code"})
+    assert ident.provider == "wechat" and ident.external_id == "uni-1"  # unionid 归并主键优先
+    assert ident.name == "小薇"
+    assert ident.is_new and eng.store.resolve(Principal("wechat", "uni-1")).uid == ident.uid
+
+
+def test_wechat_no_unionid_falls_to_openid():
+    w = _StubWeChat()
+    w.resp = {k: v for k, v in w.resp.items() if k != "unionid"}
+    p = asyncio.run(w.authenticate({"authorization": "Wechat good-code"}))
+    assert p.external_id == "wx-open-1" and "unionid" not in p.raw
+    assert p.raw["openid"] == "wx-open-1" and p.name == "小薇"
+
+
+def test_wechat_userinfo_failure_degrades():
+    w = _StubWeChat()
+    w.user = ConnectionError("资料接口挂了")  # 登录不能死于昵称头像
+    p = asyncio.run(w.authenticate({"authorization": "Wechat good-code"}))
+    assert p.external_id == "uni-1" and p.name is None and p.raw["openid"] == "wx-open-1"
+
+
+def test_wechat_error_mapping():
+    w = _StubWeChat()
+    with pytest.raises(NoCredentials):  # 不是我的 scheme → 弹给引擎换家
+        asyncio.run(w.authenticate({"authorization": "Bearer some-jwt"}))
+    eng = AuthEngine([_StubWeChat()], MemoryStore())
+    eng.providers[0].resp = {"errcode": 40029, "errmsg": "invalid code"}  # code 无效/已用
+    with pytest.raises(AuthError) as ei:
+        _auth(eng, {"authorization": "Wechat good-code"})
+    assert ei.value.status == 401
+    eng.providers[0].resp = {"errcode": 40013, "errmsg": "invalid appid"}  # 服务端配置错
+    with pytest.raises(AuthError) as ei:
+        _auth(eng, {"authorization": "Wechat good-code"})
+    assert ei.value.status == 500
+    bare = AuthEngine([WeChatProvider("", "")], MemoryStore())  # 没配凭据但带了 code
+    with pytest.raises(AuthError) as ei:
+        _auth(bare, {"authorization": "Wechat good-code"})
+    assert ei.value.status == 500
+
+
+def test_engine_google_wechat_scheme_split_and_linking(tmp_path: Path):
+    # [google, wechat] 各认各家 scheme，互不抢也不误伤
+    store = JsonFileStore(tmp_path / "users.json")
+    eng = AuthEngine([_StubGoogle("cid"), _StubWeChat()], store)
+    g = _auth(eng, {"authorization": "Bearer good-token"})
+    w = _auth(eng, {"authorization": "Wechat good-code"})
+    assert (g.provider, w.provider) == ("google", "wechat")
+    assert g.uid != w.uid  # 未归并前是两个 uid
+    # 账号联动实弹：把微信身份挂到 Google 的 uid 上 → 之后扫码登录拿到同一个人
+    store.put_identity("wechat", "uni-1", g.uid)
+    w2 = _auth(eng, {"authorization": "Wechat good-code"})
+    assert w2.uid == g.uid and not w2.is_new
+    assert len(store._load()[g.uid]["identities"]) == 2
+
+
 # ---------------------------------------------------------------- JsonFileStore
 
 def test_json_store_provision_backfill_persist(tmp_path: Path):
@@ -150,16 +234,19 @@ def test_build_from_env_off_and_prefix(tmp_path: Path):
     assert _auth(eng2, {"x-test-auth": "z"}).external_id == "z"
 
 
-def test_build_from_env_google_list_and_unknown():
-    env = {"V2MD_AUTH": "google", "V2MD_AUTH_PROVIDERS": "google",
-           "GOOGLE_CLIENT_ID": "cid-xyz", "V2MD_USERS_FILE": "unused"}
+def test_build_from_env_provider_list_and_unknown():
+    env = {"V2MD_AUTH": "google", "V2MD_AUTH_PROVIDERS": "google,wechat",
+           "GOOGLE_CLIENT_ID": "cid-xyz",
+           "WECHAT_APP_ID": "wx-id", "WECHAT_APP_SECRET": "wx-secret",
+           "V2MD_USERS_FILE": "unused"}
     eng = build_from_env(env, "V2MD_", store=MemoryStore())
-    assert isinstance(eng.providers[0], GoogleProvider)
-    assert eng.providers[0].client_id == "cid-xyz"  # env 的 client_id 注入构造
+    assert [type(p).__name__ for p in eng.providers] == ["GoogleProvider", "WeChatProvider"]
+    assert eng.providers[0].client_id == "cid-xyz"  # env 凭据注入构造（不带入引擎次序）
+    assert (eng.providers[1].app_id, eng.providers[1].app_secret) == ("wx-id", "wx-secret")
     with pytest.raises(AuthError) as ei:
-        build_from_env({"V2MD_AUTH": "google", "V2MD_AUTH_PROVIDERS": "wechat"},
+        build_from_env({"V2MD_AUTH": "google", "V2MD_AUTH_PROVIDERS": "sms"},
                        "V2MD_", store=MemoryStore())
-    assert ei.value.status == 500  # 未注册的 provider 名（微信 = register_provider 挂点）
+    assert ei.value.status == 500  # 未注册的 provider 名（自定义登录 = register_provider 挂点）
 
 
 def run_all() -> None:  # `python3 test_acctkit.py` 兜底（无 pytest 时）

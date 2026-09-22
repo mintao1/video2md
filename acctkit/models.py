@@ -1,7 +1,7 @@
 """acctkit 规范模型：Principal（provider 验出的外部身份）与 Identity（落库后的内部 uid）。
 
 分层纪律：provider 只管「从请求头验证出是谁」（Principal），不碰存储；
-uid 的分配/账号归并交给 IdentityStore。加新 provider（微信）或换存储都不动
+uid 的分配/账号归并交给 IdentityStore。加新 provider 或换存储都不动
 调用方的隔离逻辑（资源 owner 恒存 uid）。本模块零 Web 框架依赖——
 HTTP 状态码到响应体的映射是宿主的事，这里只带 AuthError.status 建议值。
 """

@@ -6,25 +6,37 @@
 
 ``headers`` 是 Mapping[str, str]（键按 HTTP 惯例小写；主流框架的 Headers 类型
 都是大小写不敏感 Mapping，直接传即可），刻意不依赖任何 Web 框架。凭据形态不同的登录方式
-（微信 = 扫码 code→服务端换 openid）将来实现一个 authenticate 注册进
-``register_provider`` 即可挂上，引擎与存储零改动。
+实现一个 authenticate 注册进 ``register_provider`` 即可挂上，引擎与存储零改动
+（微信开放平台扫码 = ``WeChatProvider``，已落地）。
 """
 from __future__ import annotations
 
 import abc
 import asyncio
+import json
+import urllib.request
 from collections.abc import Callable, Mapping
+from urllib.parse import urlencode
 
 from .models import AuthError, NoCredentials, Principal
 
 
-def bearer_token(headers: Mapping[str, str], provider: str) -> str:
-    """从 Authorization: Bearer <token> 取 token；缺头/格式不符 → NoCredentials。"""
+def credential_token(headers: Mapping[str, str], provider: str, scheme: str = "Bearer") -> str:
+    """从 ``Authorization: <scheme> <token>`` 取凭据；缺头/scheme 不符 → NoCredentials。
+
+    scheme 比较大小写不敏感（HTTP 惯例）；各 provider 用自己的 scheme 头互不抢
+    （Google=Bearer、微信=Wechat），错家的头会被 NoCredentials 弹给引擎换下家。
+    """
     raw = headers.get("authorization") or ""
     parts = raw.split(None, 1)
-    if len(parts) != 2 or parts[0].lower() != "bearer" or not parts[1].strip():
+    if len(parts) != 2 or parts[0].lower() != scheme.lower() or not parts[1].strip():
         raise NoCredentials(provider)
     return parts[1].strip()
+
+
+def bearer_token(headers: Mapping[str, str], provider: str) -> str:
+    """从 Authorization: Bearer <token> 取 token；缺头/格式不符 → NoCredentials。"""
+    return credential_token(headers, provider, "Bearer")
 
 
 class AuthProvider(abc.ABC):
@@ -71,6 +83,76 @@ class GoogleProvider(AuthProvider):
         return gid.verify_oauth2_token(token, grequests.Request(), audience=self.client_id)
 
 
+class WeChatProvider(AuthProvider):
+    """微信开放平台扫码登录（网站/移动应用）：``Authorization: Wechat <code>`` 带
+    OAuth 授权码，服务端用 appid+secret 换 openid/unionid。
+
+    前端引导扫码 → 微信回调带 code（5 分钟有效、**单次使用**）→ 客户端把 code 打到这里
+    换身份。code 无效/已被消费 = 凭据问题（401，客户端须重新引导扫码，不自动重试）；
+    appid/secret 配错（40013/41004）= 服务端配置问题（500）。scope 拿得到 unionid 时
+    external_id 用 unionid（跨应用账号归并主键，配 put_identity 联动），否则 openid。
+
+    零新依赖：urllib 直连且显式禁代理——api.weixin.qq.com 是国内站，进程环境里为
+    境外源准备的 HTTP_PROXY/V2MD_PROXY 隧道出口不该也不能参与微信换票。
+    access_token 只用于顺带拉昵称头像（best-effort，失败不挡登录），不外发不落盘。
+    """
+    name = "wechat"
+    _CONFIG_ERRCODES = {40013, 41004, 40002}  # invalid appid / appsecret missing / invalid secret
+
+    def __init__(self, app_id: str = "", app_secret: str = ""):
+        self.app_id = (app_id or "").strip()
+        self.app_secret = (app_secret or "").strip()
+
+    async def authenticate(self, headers: Mapping[str, str]) -> Principal:
+        code = credential_token(headers, self.name, "Wechat")
+        if not (self.app_id and self.app_secret):
+            raise AuthError("服务端未配置微信 appid/secret", status=500)
+        try:  # 同步阻塞 I/O → 丢线程（同 Google._verify 纪律）
+            tok = await asyncio.to_thread(self._exchange, code)
+        except AuthError:
+            raise
+        except Exception as exc:  # 网络/解析异常按凭据失败收口（细节不外泄）
+            raise AuthError(f"微信授权码换取失败：{type(exc).__name__}", status=401) from exc
+        openid = str(tok.get("openid") or "")
+        unionid = str(tok.get("unionid") or "")
+        if not openid:
+            raise AuthError("微信未返回 openid", status=401)
+        info: dict = {}
+        try:  # 资料接口 best-effort：挂了只是没昵称头像，登录照过
+            info = await asyncio.to_thread(self._userinfo,
+                                           str(tok.get("access_token") or ""), openid) or {}
+        except Exception:
+            pass
+        raw = {"openid": openid}
+        if unionid:
+            raw["unionid"] = unionid
+        for k in ("nickname", "headimgurl"):
+            if info.get(k):
+                raw[k] = info[k]
+        return Principal(provider=self.name, external_id=unionid or openid,
+                         name=str(info.get("nickname") or "") or None, raw=raw)
+
+    def _get_json(self, url: str) -> dict:
+        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+        req = urllib.request.Request(url, headers={"User-Agent": "acctkit"})
+        with opener.open(req, timeout=10) as resp:
+            return json.loads(resp.read().decode("utf-8"))
+
+    def _exchange(self, code: str) -> dict:
+        tok = self._get_json("https://api.weixin.qq.com/sns/oauth2/access_token?" + urlencode({
+            "appid": self.app_id, "secret": self.app_secret,
+            "code": code, "grant_type": "authorization_code"}))
+        errcode = tok.get("errcode")
+        if errcode:
+            status = 500 if int(errcode) in self._CONFIG_ERRCODES else 401
+            raise AuthError(f"微信授权码无效（errcode={errcode}）", status=status)
+        return tok
+
+    def _userinfo(self, access_token: str, openid: str) -> dict:
+        return self._get_json("https://api.weixin.qq.com/sns/userinfo?" + urlencode({
+            "access_token": access_token, "openid": openid, "lang": "zh_CN"}))
+
+
 class DevProvider(AuthProvider):
     """不校验模式：固定 dev 身份兜底（本机/隧道开发、e2e、契约测试，不打真上游）。"""
     name = "dev"
@@ -102,10 +184,12 @@ class FakeProvider(AuthProvider):
         return Principal(provider=self.provider_tag, external_id=ext, name=ext)
 
 
-# provider 名 → 工厂（env 进来，方便 google 这类需要配置的构造；微信将来 register 进来）
+# provider 名 → 工厂（env 进来，方便 google 这类需要配置的构造；自定义登录方式 register 进来）
 FactoriesT = dict[str, Callable[[Mapping[str, str]], AuthProvider]]
 _FACTORIES: FactoriesT = {
     GoogleProvider.name: lambda env: GoogleProvider(env.get("GOOGLE_CLIENT_ID", "")),
+    WeChatProvider.name: lambda env: WeChatProvider(env.get("WECHAT_APP_ID", ""),
+                                                     env.get("WECHAT_APP_SECRET", "")),
     DevProvider.name: lambda env: DevProvider(),
     FakeProvider.name: lambda env: FakeProvider(),
 }
