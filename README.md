@@ -53,6 +53,12 @@ POST /runs（FastAPI 内嵌图，串行信号量=1）
 | 代理 | Clash 等本地出口 | `V2MD_PROXY=http://127.0.0.1:17897`（Mac→服务器 SSH 隧道转发，`com.singtrain.proxytunnel`） |
 | 笔记落地 | 本地 Obsidian vault | `vault` docker 卷 → Syncthing 同步回 Mac |
 
+> **本机无常驻服务（2026-09-22 起）**：原 launchd 8790 实例已停，Mac 回归纯开发机——
+> 开发时手动 `uv run python -m video2md api`；恢复常驻 = plist 改回原名（现为
+> `~/Library/LaunchAgents/com.linmintao.video2md-server.plist.disabled`）+ `launchctl
+> bootstrap gui/$UID …/com.linmintao.video2md-server.plist`。本机运行时产物（logs/
+> runs.json/state.json 等）已归档 `~/Archive/dify-video2md-local-2026-09-22*.tar.gz`。
+
 ## 部署 lcode-4c
 
 前提：服务器 Docker + Compose；两仓库同级放 `~/stack/{dify-video2md,gpu_router}`
@@ -180,6 +186,15 @@ evals 旁路：scripts/eval_notes.py → Langfuse scores（SDK 直挂，黑洞�
 死人开关：run 终态 → V2MD_DEADMAN_PING_URL（healthchecks.io 兼容）
 ```
 
+- **追踪范围（2026-09-22 定）：Langfuse 只收生产**。生产遥测走服务器 collector；
+  本机开发不配 OTEL/LANGFUSE 端点（`~/.config/video2md.env` 只留 LLM 三键），保持
+  纯本地 jsonl——生产 trace/成本/评测不被开发流量稀释。本机时代的历史（233 个 run，
+  含 Dify 时代的真实业务 run）已一次性回放进 Langfuse，root 属性 `replayed=true` 可
+  过滤；按需再回放：`LANGFUSE_PK=… LANGFUSE_SK=… uv run python scripts/otel_replay.py
+  [--run-id …]`（一次性操作，重复跑产生重复 span；离线测试 `test_otel_replay.py`）。
+  ⚠️ 落库核验陷阱：2026-09-16 后新建的 Langfuse 组织 legacy 读 API（/api/public/traces）
+  404、v2 observations 读路径不可靠（数据短暂可见后查空）——核验以网页 UI 为准，
+  摄入本身正常（回放与生产 trace 均已在 UI 验证）。
 - **本地真相**：`logs/run-YYYY-MM-DD.jsonl`——span started/completed 事件对（悬空的
   started 即崩溃点），日志层自动脱敏；`run → stage → entry → llm:*` 逐级 span 树。
   观测栈全挂也不影响主管线（jsonl 先落盘，export 异常静默）。
@@ -217,6 +232,7 @@ python3 test_graph.py           # 图编排：节点序/失败路由/幂等短�
 python3 test_resolve.py         # URL 解析/条目展开/幂等键（离线）
 python3 test_remote_clients.py  # 算力池薄客户端 HTTP 契约（MockTransport 离线）
 python3 test_observability.py   # OTel 桥：span 树/gen_ai 属性/traceId 确定性/指标仪表/deadman（InMemory 离线）
+python3 test_otel_replay.py     # 历史回放：jsonl→span 树重建/悬空闭合/时间戳还原（InMemory 离线）
 python3 test_evals.py           # evals 旁路：指标编排/scores 三运输路径/回归对比（假 deepeval/ragas/langfuse）
 ./test_e2e.sh                   # 端到端：合成视频 → 自起 api（假 LLM）→ 全断言（本地 whisper，不烧 token）
 scripts/smoke_compose.sh        # compose 全链路冒烟：mockpool 假算力 + 假 LLM（零 GPU 零 token）
