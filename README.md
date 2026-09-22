@@ -198,6 +198,18 @@ evals 旁路：scripts/eval_notes.py → Langfuse scores（SDK 直挂，黑洞�
 - **本地真相**：`logs/run-YYYY-MM-DD.jsonl`——span started/completed 事件对（悬空的
   started 即崩溃点），日志层自动脱敏；`run → stage → entry → llm:*` 逐级 span 树。
   观测栈全挂也不影响主管线（jsonl 先落盘，export 异常静默）。
+- **图编排层插桩（2026-09-22）**：`graph_obs.GraphObsHandler` 挂在 `run_graph` 的
+  `config["callbacks"]` 上（LangGraph 官方可观测通道，节点/路由零逐点改码），
+  `graph:*` 事件进同一条确定性 trace——`graph:node`（节点+superstep）/`graph:state`
+  （state 增量键名+entry_idx 游标+status 标量，大 dict 不进事件）/`graph:route`
+  （条件路由决策串：ok/fail/loop/done，即「走哪条边」）/`graph:start|end`。
+  Langfuse 侧为零时长点事件（circuit_breaker 同款纪律）；handler 鸭子类型零 import
+  langchain_core（它是 langgraph 硬依赖，但运行时代码不直接引用）；langgraph 1.2.12
+  字段口径由 `test_graph_obs.py` 钉住，升级漂移先红。子图就绪：将来
+  `add_node(编译子图)` 自动覆盖（checkpoint_ns 以 `|` 分层）。附带修复：每节点开始把
+  graph RunLog 注册进 `_STAGE_LOGS`，select_frames_llm 等非阶段节点内的
+  `llm:select_frames` span 从此不缺。`langgraph dev`（Studio）走 LangGraph Server
+  事件流不经过 run_graph，与此互不干扰。
 - **trace/LLM 成本（Langfuse Cloud）**：每 run 一条 trace，traceId =
   `sha256("video2md-"+run_id)`（确定性，evals 分数据此回挂；2026-09-22 前为
   `serve-` 前缀，Langfuse 里 233 条历史回放 trace 仍用旧前缀）；LLM 调用渲染为 generation

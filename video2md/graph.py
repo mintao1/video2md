@@ -34,6 +34,7 @@ from pathlib import Path
 from langgraph.graph import END, START, StateGraph
 
 from .config import ENV, PROJ
+from .graph_obs import GraphObsHandler
 from .llm import assemble_entry_note, llm_task, select_frames
 from .resolve import extract_url
 from .runs import (_STAGE_FNS, _load_runs, _run_outputs, _run_stage,
@@ -399,7 +400,10 @@ def run_graph(url: str, *, part_items: str = "", force: bool = False, review: bo
     # note 回环每条目 1 个 superstep（8 + total + 2；V2MD_EVAL 接线时每条目 2 个），
     # LangGraph 默认 recursion_limit=25 会杀掉 >15 条目的合集——放宽到 1000
     # （superstep 是真干活，不是空转，不存在烧轮次）
-    config = {"recursion_limit": 1000}
+    # 图编排层自动插桩：节点/state 增量/路由决策 → RunLog 事件流（graph:* 前缀），
+    # api 后台驱动与 graph-run CLI 两条入口自动覆盖
+    config = {"recursion_limit": 1000,
+              "callbacks": [GraphObsHandler(run_id, trace_name=url)]}
     if checkpointer:
         config["configurable"] = {"thread_id": run_id}
     deadman.ping("start", run_id=run_id, trace_name=url)
