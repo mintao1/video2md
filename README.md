@@ -3,7 +3,7 @@
 视频 → Obsidian 文稿式笔记。**LangGraph 进程内编排**（2026-09-21 起 Dify 已抽离）：
 下载/转写/抽帧/OCR/选帧/剪节段/写盘各是图节点，LLM（选帧/改写/校对/元数据）由
 `video2md/llm.py` httpx 直连 openai-compatible 端点（默认 Kimi-K3）。
-GPU 重活（转写/OCR/剪辑）外包给 [gpu_router](../gpu_router) 算力池（Colab/Kaggle/Modal/ZeroGPU/国内云动态选举）。
+GPU 重活（转写/OCR/剪辑）外包给 [gpu_router](https://github.com/mintao1/gpu-router) 算力池（Colab/Kaggle/Modal/ZeroGPU/国内云动态选举）。
 
 ```
 POST /runs（FastAPI 内嵌图，串行信号量=1）
