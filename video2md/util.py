@@ -12,9 +12,8 @@ import uuid
 from datetime import date, datetime
 from pathlib import Path
 
-from .config import LOG_DIR, STATE_FILE
 from . import events  # 进程内 SSE 总线（_write 的第三下游；events 无本地依赖，不成环）
-
+from .config import LOG_DIR, STATE_FILE
 
 
 # ---------------------------------------------------------------- utils
@@ -178,5 +177,5 @@ def probe(video: Path) -> dict:
     dur = float(info.get("format", {}).get("duration") or
                 next((s.get("duration", 0) for s in info.get("streams", [])
                       if s.get("codec_type") == "video"), 0))
-    vs = next((s for s in info.get("streams", []) if s.get("codec_type") == "video"), {})
+    vs: dict = next((s for s in info.get("streams", []) if s.get("codec_type") == "video"), {})
     return {"duration": dur, "width": vs.get("width", 0), "height": vs.get("height", 0)}

@@ -49,8 +49,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
-from opentelemetry.trace import (NonRecordingSpan, SpanContext, Status, StatusCode,
-                                 TraceFlags, set_span_in_context)
+from opentelemetry.trace import (
+    NonRecordingSpan,
+    SpanContext,
+    Status,
+    StatusCode,
+    TraceFlags,
+    set_span_in_context,
+)
 
 from video2md.observability import _endpoint, _scalar_attrs
 

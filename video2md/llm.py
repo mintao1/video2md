@@ -32,7 +32,7 @@ LLM_MODEL = ENV.get("LLM_MODEL") or "Kimi-K3"
 
 # 与 Dify 画布节点参数一致（retry_config：2 次、间隔 30s——上游中转偶发挂起，
 # 节点级重试把「一次挂起=整 run 失败」降级为「多等半分钟」）
-_TASK_PARAMS = {
+_TASK_PARAMS: dict[str, dict] = {
     "select_frames": {"temperature": 0.2, "max_tokens": 4000},
     "organize": {"temperature": 0.4, "max_tokens": 16000},
     "review": {"temperature": 0.2, "max_tokens": 16000},
@@ -221,7 +221,7 @@ def llm_task(task: str, **vars) -> str:
     if _FAKE_LLM:
         return _fake_organize(vars.get("entry_frames", "")) if task in ("organize", "review") \
             else _FAKE_META
-    p = _TASK_PARAMS[task]
+    p: dict = _TASK_PARAMS[task]
     log = current_log()
     if log:
         with log.span(f"llm:{task}") as sp:
@@ -324,8 +324,8 @@ def select_frames(transcript: str, candidates: str, total: int) -> tuple[dict, i
         # 假模式确定性选帧：每条目取清单前 2 个合法帧名
         allowed = allowed_frames_of(candidates)
         if total > 1:
-            sels = [{"entry": k, "frames": [{"name": n, "caption": "e2e"} for n in v[:2]]}
-                    for k, v in sorted(allowed.items())]
+            sels: list[dict] = [{"entry": k, "frames": [{"name": n, "caption": "e2e"} for n in v[:2]]}
+                                for k, v in sorted(allowed.items())]
             return {"selections": sels}, sum(len(s["frames"]) for s in sels), ""
         frames = [{"name": n, "caption": "e2e"} for n in allowed.get(1, [])[:2]]
         return {"frames": frames}, len(frames), ""

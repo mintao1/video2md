@@ -47,15 +47,21 @@ from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from starlette.background import BackgroundTask
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from .config import CORS_ORIGINS, ENV, LOG_DIR, OUT_DIR
-from . import artsink, events
+from . import artsink, events, observability
 from .auth import AuthError, Identity, current_identity
+from .config import CORS_ORIGINS, ENV, LOG_DIR, OUT_DIR
 from .graph import make_checkpointer_from_env, run_graph
-from .models import (ArtifactsAckOut, HealthOut, PreflightOut, QueueOut, RunCreate,
-                     RunCreatedOut, RunNotesOut, RunStatusOut)
+from .models import (
+    ArtifactsAckOut,
+    HealthOut,
+    PreflightOut,
+    QueueOut,
+    RunCreate,
+    RunCreatedOut,
+    RunNotesOut,
+    RunStatusOut,
+)
 from .runs import _load_runs, _runs_file_lock, _runs_merge, _save_runs
-from . import observability
-
 from .util import redact
 
 # ---------------------------------------------------------------- 运维函数（原 serve.py）
@@ -202,7 +208,8 @@ def _sweep_outbox() -> int:
 _TASKS: dict[str, dict] = {}          # run_id → {status, url, owner, created, started, finished, errors}
 _SEMA = asyncio.Semaphore(1)          # 串行执行：单 worker 语义
 _CHECKPOINTER = None                  # lifespan 注入（sqlite/postgres 由 V2MD_CHECKPOINTER 定）
-_CK_CLOSER = lambda: None             # checkpointer 资源释放钩子（PG 分支关连接池）
+def _ck_closer() -> None:
+    pass  # checkpointer 资源释放钩子（PG 分支关连接池）
 
 _TASKS_KEEP = 200                     # 内存任务表上限（超出裁最老，runs.json 才是真相）
 
@@ -241,7 +248,7 @@ def _require_run_access(run_id: str, ident: Identity) -> dict | None:
     task = _TASKS.get(run_id)
     if not run and not task:
         raise HTTPException(404, f"run {run_id} 不存在")
-    owner = (run.get("owner", "") if run else task.get("owner", "")) or ""
+    owner = (run.get("owner", "") if run else (task or {}).get("owner", "")) or ""
     if owner != ident.uid:
         raise HTTPException(403, f"无权访问 run {run_id}")
     return run
@@ -357,9 +364,9 @@ def _enqueue(url: str, part_items: str, force: bool, review: bool,
 
 @asynccontextmanager
 async def _lifespan(app: FastAPI):
-    global _CHECKPOINTER, _CK_CLOSER
+    global _CHECKPOINTER, _ck_closer
     events.bind_loop(asyncio.get_running_loop())  # SSE 总线钉住主循环（工作线程据此投递）
-    _CHECKPOINTER, _CK_CLOSER = make_checkpointer_from_env(ENV)
+    _CHECKPOINTER, _ck_closer = make_checkpointer_from_env(ENV)
     # 遥测出口：OTEL_EXPORTER_OTLP_ENDPOINT（collector）> LANGFUSE 直连 > 纯本地 jsonl
     observability.init()
     observability.register_runtime_gauges(lambda: {
@@ -393,7 +400,7 @@ async def _lifespan(app: FastAPI):
     if sweeper:
         sweeper.cancel()
     try:  # 释放 checkpointer 资源（PG 分支关池；sqlite 是 no-op）
-        _CK_CLOSER()
+        _ck_closer()
     except Exception as exc:
         print(f"⚠ checkpointer 关闭异常（退出流程不拦）：{exc}")
 

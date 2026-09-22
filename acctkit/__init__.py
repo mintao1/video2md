@@ -10,9 +10,17 @@ from __future__ import annotations
 
 from .engine import AuthEngine, build_from_env
 from .models import AuthError, Identity, NoCredentials, Principal
-from .providers import (AuthProvider, DevProvider, FakeProvider, GoogleProvider,
-                        WeChatProvider, bearer_token, credential_token,
-                        make_provider, register_provider)
+from .providers import (
+                        AuthProvider,
+                        DevProvider,
+                        FakeProvider,
+                        GoogleProvider,
+                        WeChatProvider,
+                        bearer_token,
+                        credential_token,
+                        make_provider,
+                        register_provider,
+)
 from .store import IdentityStore, JsonFileStore, MemoryStore
 
 __all__ = [

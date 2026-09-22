@@ -4,8 +4,6 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-
-
 PROJ = Path(__file__).resolve().parent.parent  # 包目录的上一级 = 项目根（state.json/runs.json/.env 都在根上）
 
 

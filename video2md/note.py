@@ -2,14 +2,12 @@
 from __future__ import annotations
 
 import re
-from pathlib import Path
 from datetime import date
+from pathlib import Path
 
 from . import artsink
 from .config import ENV
 from .util import sanitize_filename
-
-
 
 # ---------------------------------------------------------------- 质量门禁
 # 实测事故：staged 路径没有 CLI 的「输出过短重试」门，Kimi 的一句拒答

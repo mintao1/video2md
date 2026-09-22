@@ -12,11 +12,10 @@ import json
 import math
 import shutil
 from pathlib import Path
+
 import httpx
 
 from .util import fmt_hms, redact, run
-
-
 
 _MIGRATION_HINT = (
     "V2MD_REMOTE=colab 已抽离（2026-09-21）：Colab 归 GPU 算力池统一接管。"

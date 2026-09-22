@@ -5,13 +5,12 @@ import math
 import re
 import shutil
 import subprocess
-from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 
 from . import artsink
 from .config import BLUR_SHARP_MIN, ENV, FRAME_DEDUP_EPS, FRAME_MAE_MAX, LOW_CONF
 from .util import fmt_ts
-
 
 
 # ---------------------------------------------------------------- ②b frames
@@ -70,15 +69,16 @@ def extract_frame_candidates(video: Path, pool_size: int, dur: float, tmp: Path)
     if scene_n >= 1:
         # format=yuvj420p：ffmpeg ≥7.1 的 mjpeg 编码器要求 full-range，否则直接拒启
         vf = "select='gt(scene,0.25)',format=yuvj420p,showinfo"
-        p = None
+        p2: subprocess.CompletedProcess[str] | None = None
         for vsync in (("-fps_mode", "vfr"), ("-vsync", "vfr")):  # 新旧 ffmpeg 语法回退
-            p = subprocess.run(
+            p2 = subprocess.run(
                 ["ffmpeg", "-hide_banner", "-i", str(video), "-vf", vf, *vsync,
                  "-frames:v", str(scene_n), "-q:v", "2", str(fdir / "s_%03d.jpg")],
                 capture_output=True, text=True)
-            if p.returncode == 0:
+            if p2.returncode == 0:
                 break
-        times = [float(m) for m in re.findall(r"pts_time:([\d.]+)", p.stderr if p else "")]
+        assert p2 is not None  # 回退循环至少执行一次
+        times = [float(m) for m in re.findall(r"pts_time:([\d.]+)", p2.stderr)]
         files = sorted(fdir.glob("s_*.jpg"))
         if times and files:
             scene = list(zip(times[:len(files)], files))
@@ -131,7 +131,8 @@ def ocr_vision(path: Path) -> tuple[str, float]:
 _NORM_RE = re.compile(r"[\s，。、；：？！“”‘’()（）\[\]【】《》.,;:?!\-—·]+")
 
 
-_NORM = lambda s: _NORM_RE.sub("", s)
+def _norm(s: str) -> str:
+    return _NORM_RE.sub("", s)
 
 
 
@@ -169,7 +170,7 @@ def select_content_frames(cands: list[tuple[float, Path]], ocr_raw: list,
         s = seg_of(t)
         align = 1.0 if (s and (s.get("text") or "").strip()) else (0.3 if s else 0.0)
         sharp = min(1.0, _sharpness(Image.open(path)) / 5.0)
-        score = (3.0 if has_text else 0.0) + min(1.0, len(_NORM(txt)) / 80.0) + align + 0.5 * sharp
+        score = (3.0 if has_text else 0.0) + min(1.0, len(_norm(txt)) / 80.0) + align + 0.5 * sharp
         scored.append({"t": t, "path": path, "txt": txt, "has_text": has_text,
                        "score": score, "seg": s})
 
@@ -222,7 +223,7 @@ def merge_timeline(segs: list[dict], ocr_items: list[tuple[float, str, float]]) 
     lines: list[str] = []
     for kind, t, txt, conf in events:
         if kind == "frame":
-            key = _NORM(txt)
+            key = _norm(txt)
             if not key or key in seen_ocr:
                 continue
             seen_ocr.add(key)

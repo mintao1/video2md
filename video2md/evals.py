@@ -249,7 +249,7 @@ def score_note(note_md: str, transcript: str, *, with_ragas: bool = True) -> dic
                                   retrieved_contexts=[ctx])
         res = evaluate(EvaluationDataset([sample]), metrics=[Faithfulness()],
                        llm=_judge_ragas(), show_progress=False)
-        val = res["faithfulness"]
+        val = res["faithfulness"]  # type: ignore[index]  # ragas 0.4 重载：单样本 Dataset 返回可下标结果
         if isinstance(val, (list, tuple)):
             val = val[0]  # ragas 0.4 evaluate() 按样本返回列表，单样本取首元素
         val = float(val)

@@ -10,11 +10,10 @@ import subprocess
 import time
 import urllib.parse
 from pathlib import Path
+
 import httpx
 
 from .util import redact
-
-
 
 # backwards-compatible single-entry wrapper
 
@@ -311,7 +310,6 @@ def douyin_user_resolve(url: str, *, max_pages: int = 40, budget_s: float = 240.
 
         send("Network.enable")
         send("Page.enable")
-        pending: dict[str, str] = {}   # requestId → 响应 url
         body_calls: dict[int, str] = {}  # 消息 id → requestId
         t0 = time.time()
         last_n, stale_scrolls = -1, 0
@@ -504,7 +502,7 @@ def resolve_url(url: str) -> list[dict]:
     except json.JSONDecodeError as exc:
         raise RuntimeError("yt-dlp 元数据响应不是合法 JSON") from exc
     if obj.get("_type") == "playlist":
-        entries = []
+        entries: list[dict] = []
         for e in obj.get("entries") or []:
             if not e:
                 continue

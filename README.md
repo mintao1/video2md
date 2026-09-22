@@ -360,7 +360,21 @@ evals 旁路：scripts/eval_notes.py → Langfuse scores（SDK 直挂，黑洞�
   LANGFUSE 直连，再退纯本地 jsonl）。
 - 图调试：`langgraph dev`（本地开发，Studio UI 看 checkpoint/单步）
 
-## 测试
+## 测试与 CI 门禁
+
+[![CI](https://github.com/mintao1/video2md/actions/workflows/ci.yml/badge.svg)](https://github.com/mintao1/video2md/actions/workflows/ci.yml)
+
+push/PR 自动跑三个 job（`.github/workflows/ci.yml`）：**test**（pytest 契约 + 8 个脚本式测试 + `scripts/smoke_ci.sh` 进程级 mockpool 全链冒烟，全离线零 token）、
+**lint**（ruff + mypy）、**docker-build**（生产镜像构建路径）。CI 跑什么，本地就能跑什么：
+
+```bash
+uv run ruff check video2md acctkit scripts   # lint（配置在 pyproject.toml [tool.ruff]）
+uv run mypy video2md acctkit                 # 类型检查（[tool.mypy]，check_untyped_defs）
+uv run pytest test_api_contract.py test_acctkit.py -q
+bash scripts/smoke_ci.sh                     # 进程级 mockpool 全链冒烟（跨平台，CI 同款）
+```
+
+离线测试清单（与 CI 同款）：
 
 ```bash
 python3 test_llm.py             # LLM 客户端：模板渲染/重试纪律/流式收集/usage 捕获/选帧解析（MockTransport 离线）

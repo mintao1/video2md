@@ -23,7 +23,9 @@ from pathlib import Path
 
 from .models import Identity, Principal
 
-_NOOP_SAVE: Callable[[dict], None] = lambda users: None
+
+def _noop_save(users: dict) -> None:
+    pass
 
 
 def _key(provider: str, external_id: str) -> str:
@@ -103,11 +105,11 @@ class MemoryStore(IdentityStore):
 
     def resolve(self, p: Principal) -> Identity:
         with self._lock:
-            return _provision(self._users, p, _NOOP_SAVE)
+            return _provision(self._users, p, _noop_save)
 
     def put_identity(self, provider: str, external_id: str, uid: str) -> None:
         with self._lock:
-            _add_identity(self._users, provider, external_id, uid, _NOOP_SAVE)
+            _add_identity(self._users, provider, external_id, uid, _noop_save)
 
 
 class JsonFileStore(IdentityStore):

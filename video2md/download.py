@@ -5,11 +5,11 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
+
 import httpx
 
-from .util import redact, sanitize_filename
 from .resolve import _DOUYIN_UA, _clean_ytdlp_err, _download_direct, _subprocess_env
-
+from .util import redact, sanitize_filename
 
 
 def download_entry(entry: dict, tmp: Path) -> tuple[Path, str]:
@@ -45,7 +45,7 @@ def download_entry(entry: dict, tmp: Path) -> tuple[Path, str]:
         if "No video formats" in err:
             sys.exit("❌ 小红书无可解析视频（可能是图文笔记或触发反爬；请提供 Chrome cookies）")
         sys.exit(f"❌ 视频下载失败: {redact(err[-300:])}")
-    meta = [l.split("|") for l in p.stdout.splitlines() if l.startswith("META|")]
+    meta = [ln.split("|") for ln in p.stdout.splitlines() if ln.startswith("META|")]
     uploader = (meta[-1][1].strip() if meta and len(meta[-1]) > 1 else "") or \
                (meta[-1][2].strip() if meta and len(meta[-1]) > 2 else "") or entry.get("uploader", "")
     files = sorted(tmp.glob(f"{prefix}.*"), key=lambda f: f.stat().st_size)

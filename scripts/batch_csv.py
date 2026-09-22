@@ -136,7 +136,8 @@ def main() -> None:
         windows = [""]
         if total > WINDOW:
             windows = [f"{a}-{min(a + WINDOW - 1, total)}" for a in range(1, total + 1, WINDOW)]
-        wkey = lambda w: f"{u.rstrip('/')}#{w or 'all'}"
+        def wkey(w: str) -> str:
+            return f"{u.rstrip('/')}#{w or 'all'}"
         todo_w = [w for w in windows
                   if prog.get(wkey(w), {}).get("status") != "ok"]
         if not todo_w:

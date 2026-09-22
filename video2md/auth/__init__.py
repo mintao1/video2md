@@ -6,10 +6,11 @@
 """
 from __future__ import annotations
 
-from fastapi import Request  # 接线层允许碰框架（acctkit 本体不碰）；勿用 TYPE_CHECKING 字符串注解——FastAPI 解析不到会把参数当 query 导致 422
+from fastapi import (
+    Request,  # 接线层允许碰框架（acctkit 本体不碰）；勿用 TYPE_CHECKING 字符串注解——FastAPI 解析不到会把参数当 query 导致 422
+)
 
-from acctkit import (AuthEngine, AuthError, Identity, NoCredentials, Principal,  # noqa: F401
-                     build_from_env)
+from acctkit import AuthEngine, AuthError, Identity, NoCredentials, Principal, build_from_env  # noqa: F401
 from acctkit.store import JsonFileStore
 
 from ..config import ENV, USERS_FILE

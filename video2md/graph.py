@@ -38,8 +38,7 @@ from .config import ENV, PROJ
 from .graph_obs import GraphObsHandler
 from .llm import assemble_entry_note, llm_task, select_frames
 from .resolve import extract_url
-from .runs import (_STAGE_FNS, _load_runs, _run_outputs, _run_stage,
-                   _runs_file_lock, _runs_merge, create_run)
+from .runs import _STAGE_FNS, _load_runs, _run_outputs, _run_stage, _runs_file_lock, _runs_merge, create_run
 from .state import RunState
 from .util import _STAGE_LOGS, RunLog, fmt_hms, load_state, redact, save_state
 
@@ -454,7 +453,8 @@ def make_checkpointer_from_env(env: dict | None = None) -> tuple:
     pool = ConnectionPool(conninfo=dsn, min_size=1, max_size=5, open=True,
                           kwargs={"autocommit": True, "prepare_threshold": 0})
     try:
-        saver = PostgresSaver(pool)
+        # dict 行工厂：langgraph PostgresSaver 官方口径（psycopg 默认 tuple 行不匹配其反序列化）
+        saver = PostgresSaver(pool)  # type: ignore[arg-type]
         saver.setup()  # 幂等建表
     except Exception:
         pool.close()

@@ -44,4 +44,24 @@ package = false
 [dependency-groups]
 dev = [
     "pytest>=9.1.1",
+    "ruff>=0.8",
+    "mypy>=1.13",
+    # smoke_ci.sh 的进程级 mockpool 用 Form/UploadFile（compose 冒烟里这依赖由
+    # gpu-router 镜像带入；进程级跑法需要本仓自带）
+    "python-multipart>=0.0.9",
 ]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 110
+
+[tool.ruff.lint]
+# 保守集：pyflakes + 关键 pycodestyle + isort；不动现有代码风格
+select = ["E4", "E7", "E9", "F", "I"]
+
+[tool.mypy]
+python_version = "3.12"
+# langgraph/httpx 等无内联桩，缺桩不报错
+ignore_missing_imports = true
+# 非 strict 起步：函数体内部类型错误也查
+check_untyped_defs = true

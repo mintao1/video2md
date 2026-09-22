@@ -16,7 +16,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from video2md.frames import _NORM, ocr_remote, ocr_vision
 
 
-
 def main() -> int:
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
     if not args:

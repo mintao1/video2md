@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  # 离线测试：pytest 契约测试 + 8 个脚本式测试 + 进程级 mockpool 全链冒烟（假 LLM 档，零 token）
+  # 注：test_e2e.sh（say 合成语音 + Vision OCR）是 Mac 开发机专属验收，不进 Linux CI
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+          enable-cache: true
+      - name: Install ffmpeg（test_e2e.sh 合成视频需要）
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
+      # 不带 mac extra（Linux 无 Vision OCR，走远程池路径）；不带 evals extra（test_evals.py 假桩）
+      - run: uv sync --frozen
+      - name: pytest（契约 + acctkit）
+        run: uv run pytest test_api_contract.py test_acctkit.py -q
+      - name: 脚本式测试（8 个，全离线）
+        run: |
+          for t in test_graph test_llm test_observability test_otel_replay \
+                   test_evals test_graph_obs test_resolve test_remote_clients; do
+            echo "=== $t ==="
+            uv run python3 "$t.py"
+          done
+      - name: e2e（进程级 mockpool 冒烟：testsrc2 夹具 + 假 LLM，零 token，跨平台）
+        run: bash scripts/smoke_ci.sh
+
+  # 静态门禁：lint + 类型检查（配置在 pyproject.toml [tool.ruff]/[tool.mypy]）
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+          enable-cache: true
+      - run: uv sync --frozen
+      - run: uv run ruff check video2md acctkit scripts
+      - run: uv run mypy video2md acctkit
+
+  # 生产镜像构建路径验证（此前只在服务器上验证过）
+  docker-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t video2md:ci .

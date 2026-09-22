@@ -27,6 +27,7 @@ import base64
 import hashlib
 import os
 import threading
+from collections.abc import Sequence
 
 from opentelemetry.metrics import Observation
 from opentelemetry.sdk.metrics import MeterProvider
@@ -34,8 +35,15 @@ from opentelemetry.sdk.metrics.view import ExplicitBucketHistogramAggregation, V
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor, SimpleSpanProcessor
-from opentelemetry.trace import (NonRecordingSpan, SpanContext, Status, StatusCode,
-                                 TraceFlags, set_span_in_context)
+from opentelemetry.trace import (
+    NonRecordingSpan,
+    Span,
+    SpanContext,
+    Status,
+    StatusCode,
+    TraceFlags,
+    set_span_in_context,
+)
 
 from .config import ENV
 
@@ -54,7 +62,7 @@ _TRACER = None
 _LOCK = threading.Lock()
 
 # 指标仪表（init 后非 None；辅助函数全部惰性判空，未配置端点时零开销）
-_M = {}  # name → instrument
+_M: dict = {}  # name → instrument
 _RUNTIME_GAUGE_FN = None  # api 注册：() → {"queued": int, "active": int}
 
 _RUNS: dict[str, "_RunTrace"] = {}
@@ -191,10 +199,12 @@ class _RunTrace:
         parent_ctx = set_span_in_context(NonRecordingSpan(anchor))
         # Langfuse OTel 映射（官方 ingestion 文档）：trace 名/用户/metadata 走 langfuse.*
         # 前缀才落进 trace 的可过滤字段，裸 key 只会进 metadata.attributes 杂物袋
-        attrs = {"langfuse.trace.name": "video2md-run", "run_id": run_id,
-                 "langfuse.environment": _env("V2MD_ENV", "development")}
+        attrs: dict[str, str | bool | int | float | Sequence[str]] = {
+            "langfuse.trace.name": "video2md-run", "run_id": run_id,
+            "langfuse.environment": _env("V2MD_ENV", "development")}
         if user_id:
             attrs["langfuse.user.id"] = user_id
+        # Langfuse 官方口径 tags 是 string[]（OTel 原生支持序列值，无需拼串）
         attrs["langfuse.trace.tags"] = ["video2md", f"mode:{_artifact_mode()}"]
         # root 观察体的 input = 入口 URL（trace 级 input 在 v4 已废弃，用语义等价物；
         # 名/身份分离：名字当 API 保持常量，URL 是数据进 input）
@@ -203,9 +213,10 @@ class _RunTrace:
         attrs.update({f"langfuse.trace.metadata.{k}": str(v)
                       for k, v in (trace_meta or {}).items() if v})
         # root 立即开立：长阶段跑到哪一步在 Langfuse 实时可见，不用等收尾
-        self.root = _TRACER.start_span("video2md-run", attributes=attrs,
-                                       context=parent_ctx)
-        self.open: dict[str, object] = {}
+        assert _TRACER is not None  # _ensure_started() 已保证 init() 成功
+        self.root: Span = _TRACER.start_span("video2md-run", attributes=attrs,
+                                             context=parent_ctx)
+        self.open: dict[str, Span] = {}
         self.user_id = user_id
 
 
@@ -264,6 +275,7 @@ def record(rec: dict, *, run_id: str, label: str, trace_name: str = "",
         if not span_id:
             # info 点事件 → 零时长 span，挂在当前最深开口 span（无则 root）下，树形不摊平
             parent = list(rt.open.values())[-1] if rt.open else rt.root
+            assert _TRACER is not None
             _TRACER.start_span(event, context=set_span_in_context(parent),
                                attributes={**_scalar_attrs(rec), **uid_attr}).end()
             if event == "graph:end":  # trace 出口：root 观察体 output = 终态
@@ -272,12 +284,14 @@ def record(rec: dict, *, run_id: str, label: str, trace_name: str = "",
             return
         if status == "started":
             parent = rt.open.get(rec.get("parentSpanId") or "") or rt.root
+            assert _TRACER is not None
             rt.open[span_id] = _TRACER.start_span(event, context=set_span_in_context(parent),
                                                   attributes={**_scalar_attrs(rec), **uid_attr})
             return
         # completed/failed/exited → 闭合 span；悬空闭合（进程重启丢 started）补零时长 span 留痕
         s = rt.open.pop(span_id, None)
         if s is None:
+            assert _TRACER is not None
             s = _TRACER.start_span(event, context=set_span_in_context(rt.root))
         for k, v in _scalar_attrs(rec).items():
             s.set_attribute(k, v)

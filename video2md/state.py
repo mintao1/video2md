@@ -10,7 +10,6 @@ from __future__ import annotations
 from typing import TypedDict
 
 
-
 class RunState(TypedDict, total=False):
     run_id: str          # 图 thread_id == run_id：checkpoint 与 runs.json 同键
     url: str             # 原始输入（可能带分享文本，resolve 节点负责剥）

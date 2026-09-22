@@ -11,30 +11,49 @@ import sys
 import tempfile
 import threading
 import time
+import typing
 import uuid
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
 
-from . import artsink
-from .config import ENV, MAX_TRANSCRIPT_CHARS, PROJ
-from .util import RunLog, _STAGE_LOGS, current_log, fmt_hms, load_state, probe, redact, sanitize_filename, video_fingerprint
-from . import observability
-from .resolve import _part_selected, ensure_scheme, normalize_url, resolve_url
-from .download import download_entry, download_images
-from .transcribe import transcribe
-from .frames import _NORM, extract_frame_candidates, frame_pool_size, manifest_of, merge_timeline, name_candidates, ocr_candidates, publish_named, select_content_frames
+from . import artsink, observability
 from .clips import cut_clip_files, insert_clip_embeds, remote_cut_clips
-from .note import MIN_NOTE_TRANSCRIPT_CHARS, append_index, extract_toc, looks_like_refusal, render_note, sanitize_embeds, write_note, write_transcript
-
-
-
-
-
-
-
-
-
-
+from .config import ENV, MAX_TRANSCRIPT_CHARS, PROJ
+from .download import download_entry, download_images
+from .frames import (
+    _norm,
+    extract_frame_candidates,
+    frame_pool_size,
+    manifest_of,
+    merge_timeline,
+    name_candidates,
+    ocr_candidates,
+    publish_named,
+    select_content_frames,
+)
+from .note import (
+    MIN_NOTE_TRANSCRIPT_CHARS,
+    append_index,
+    extract_toc,
+    looks_like_refusal,
+    render_note,
+    sanitize_embeds,
+    write_note,
+    write_transcript,
+)
+from .resolve import _part_selected, ensure_scheme, normalize_url, resolve_url
+from .transcribe import transcribe
+from .util import (
+    _STAGE_LOGS,
+    RunLog,
+    current_log,
+    fmt_hms,
+    load_state,
+    probe,
+    redact,
+    sanitize_filename,
+    video_fingerprint,
+)
 
 # ---------------------------------------------------------------- run 会话（LangGraph 阶段编排）
 # 本地管线拆成阶段：download → transcribe → frames → ocr → select → clips → note。
@@ -141,15 +160,15 @@ def create_run(url: str, part_items: str = "", force: bool = False,
 
     artifacts: dict[str, dict] = {}
     for e in entries:
-        art = {}
+        art: dict = {}
         v = done_by_url.get(e["url"].rstrip("/"))
         if v is not None and not force:
             if artsink.current_mode() != "deliver":
                 art["skipped"] = True  # vault 旧语义：已处理过即跳过，不重复烧 token 重写
             elif _deliver_reusable(v):
                 art["skipped"] = True
-                art["skipped_from"] = {"run_id": v.get("run_id", ""),
-                                       "title": v.get("title", "")}  # 客户端凭它拉旧 bundle
+                art["skipped_from"] = {"run_id": v.get("run_id", ""),  # 客户端凭它拉旧 bundle
+                                       "title": v.get("title", "")}
         artifacts[e["url"]] = art
     run = {
         "run_id": uuid.uuid4().hex[:8],
@@ -332,7 +351,7 @@ def cmd_stage(run_id: str, stage: str, args_json: str) -> None:
 
 
 # ---- 阶段函数（图节点/CLI/__stage 手动排障共用；args 为 dict 便于子进程 JSON 传参）----
-_STAGE_FNS: dict[str, callable] = {}
+_STAGE_FNS: dict[str, typing.Callable] = {}
 
 
 
@@ -477,7 +496,7 @@ def _stage_ocr(run, entry, art, tmp, args):
         seen_txt: set[str] = set()
         olines: list[str] = []
         for t, txt, _c in ocr_items:
-            key = _NORM(txt)
+            key = _norm(txt)
             if not txt or key in seen_txt:
                 continue
             seen_txt.add(key)

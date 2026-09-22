@@ -11,12 +11,11 @@ import re
 import shutil
 import subprocess
 import tarfile
-from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 
 from . import artsink
 from .config import CLIP_SPAN, ENV
-
 
 
 def _clip_window(t: float, dur: float, segs: list[dict] | None) -> tuple[float, float]:
@@ -100,15 +99,15 @@ def remote_cut_clips(published: list, video: Path, dur: float,
             http.close()
     in_dir = tmp / "clips_http_in"
     in_dir.mkdir(parents=True, exist_ok=True)
-    results: dict[str, bool] = {}
     with tarfile.open(fileobj=io.BytesIO(r.content)) as tf:
         for m in tf.getmembers():
             if m.name == "_result.json":
-                results = {k: bool(v) for k, v in
-                           json.loads(tf.extractfile(m).read().decode()).items()}
+                pass  # 服务端结果清单：成功与否以产物文件落盘为准（见下方 ok_n 统计）
             elif m.isfile() and "/" not in m.name and m.name.endswith(".mp4"):
+                fh_src = tf.extractfile(m)
+                assert fh_src is not None  # m.isfile() 保证 extractfile 不返回 None
                 with (in_dir / m.name).open("wb") as fh:
-                    fh.write(tf.extractfile(m).read())
+                    fh.write(fh_src.read())
     ok_n = 0
     for fname, spec in todo:
         src = in_dir / spec[0]
