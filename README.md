@@ -90,7 +90,7 @@ ssh lcode-4c 'cd ~/stack/video2md && \
 #    ⚠ 实测 2026-09-22：依赖变更触发的全量 `uv sync` 在该机可能 0 CPU/0 socket 挂死
 #    （三次复现；小范围 uv pip install 正常）。挂死就杀掉重试 `--progress=plain`；
 #    纯代码改动可用补丁层秒级绕过：
-#      printf 'FROM video2md:latest\nCOPY video2md/ /app/video2md/\n' > /tmp/patch.Dockerfile
+#      printf 'FROM video2md:latest\nCOPY video2md/ /app/video2md/\nCOPY acctkit/ /app/acctkit/\n' > /tmp/patch.Dockerfile
 #      docker build -t video2md:latest -f /tmp/patch.Dockerfile . && docker compose ... up -d
 #    依赖小版本升级同样绕得动（2026-09-22 langgraph 1.2.12 实操）：补丁层里加
 #      COPY pyproject.toml uv.lock /app/ 和
@@ -159,6 +159,71 @@ python3 scripts/rerun_failed.py [url...]
 | `review` | 启用校对 LLM（更准、更慢） |
 | `max_frames` | 候选帧池上限（默认 60） |
 | `resolve_only` | 只解析建 run 不驱动（批量脚本分窗预飞用；后续正式 POST 会 dedup 命中并驱动） |
+
+## HTTP 后端契约（多用户产品 · Phase 1）
+
+GUI 前端把本服务当正式后端：契约硬化在 `video2md/models.py`（Pydantic request/response），
+交互式文档 **`/docs` + `/openapi.json` 已开**（生产要关由网关负责）。图核 `run_graph` 不感知鉴权。
+
+**鉴权（可插拔 provider，工程在顶层 [`acctkit/`](#acctkit可复用账号登录模块顶层包)，`video2md/auth/` 只是接线）**：
+- `V2MD_AUTH=off`（默认）：不校验，所有无 token 请求归同一个稳定 dev uid——
+  本机开发、SSH 隧道、`test_e2e.sh`、`batch_csv.py` 全靠它，行为与 Phase 1 之前一致。
+- `V2MD_AUTH=google`：前端 Google 登录拿 `id_token` → 头 `Authorization: Bearer <id_token>`
+  → 后端 `google-auth` 验签（JWKS/iss/exp，`audience=GOOGLE_CLIENT_ID`）取 `sub`。
+  **后端不持 client secret**，只需 OAuth「Web」客户端的 client_id。
+- `V2MD_AUTH_PROVIDERS` 逗号列表按序尝试；**微信（code→openid）是 Phase 2 预留 provider**，
+  加实现即插，`current_identity` 与 run 隔离层零改。
+- 身份表 `users.json`（`V2MD_USERS_FILE`，容器指 data 卷）：`(provider, external_id) → uid`
+  首登自动开户；**run 按内部 uid 归属**（`run["owner"]`），他人 run 的
+  `/runs/{id}`、`/note`、`/events` 一律 403，不存在才 404；dedup 也按 owner 隔离
+  （不同用户同链接各建各的 run）。将来 Google+微信账号联动 = 归并到同一 uid。
+- CORS：`V2MD_CORS_ORIGINS` 逗号列表放行 GUI origin（空=不挂中间件）。
+  生产绑公网务必 `V2MD_AUTH=google` + 反代 TLS（Google 回调需 https）。
+- `/healthz` `/queue` `/preflight` **保持不鉴权**（docker healthcheck / gpu_router 看门狗在打）。
+
+**进度双通道**：轮询 `GET /runs/{id}` 保留原形状；新增 SSE
+`GET /runs/{run_id}/events`（text/event-stream，同样过 owner 校验）——
+连上先推 `{"event":"connected","status","url"}` 快照，之后每条 `data:` 即
+`logs/run-*.jsonl` 的事件记录（含 `graph:*` 图级事件），15s 无事件发 `: ping`，
+`graph:end`/终态即关流。进程内总线扇出（`video2md/events.py`），多 worker 前的
+Redis pub/sub 留 Phase 2。
+
+**错误契约**：非 2xx 统一 `{"error": {"code", "message", "details"}}`
+（`AUTH_REQUIRED`/`FORBIDDEN`/`NOT_FOUND`/`VALIDATION`…；422 带定位信息）。
+
+## acctkit：可复用账号登录模块（顶层包）
+
+登录工程本体在 **`acctkit/`**——零 Web 框架依赖、零宿主依赖（标准库 + 可选 google-auth，
+整个目录拷进别的项目即用）。对外接口只有一个：
+
+```python
+identity = await engine.authenticate(request.headers)   # Mapping[str,str] → Identity(uid,…)
+```
+
+藏在这一个方法后面的全部行为：provider 按序尝试（`NoCredentials` 换下一家 /
+`AuthError` 直抛）、验出的外部身份落库成**稳定内部 uid**（首登自动开户、email/name 回填）、
+同步存储 I/O 丢线程。没有 mode 标志——「不校验模式」就是列表排成 `[Fake, Dev]`，
+与生产接线共用同一条按序语义。
+
+两个可替换缝（各自两个真适配器，不是假想缝）：
+
+| 缝 | 已落地适配器 | 挂法 |
+|---|---|---|
+| `AuthProvider` | `GoogleProvider(client_id)`（ID-Token 验签，不持 secret）/ `DevProvider` / `FakeProvider` | 微信（code→openid）等新登录方式实现 `authenticate(headers)` 后 `register_provider("wechat", 工厂)` 即挂，引擎/存储/隔离零改 |
+| `IdentityStore` | `JsonFileStore(path)`（fcntl 跨进程锁 + tmp rename 原子替换）/ `MemoryStore`（测试） | 换 Postgres 用户表 = 同协议再写一个适配器 |
+
+宿主接线（本项目 = `video2md/auth/`，仅二十来行）：
+
+```python
+engine = build_from_env(ENV, "V2MD_", store=JsonFileStore(USERS_FILE))  # 配置解析策略在工厂里
+async def current_identity(request: Request) -> Identity:               # 唯一框架适配器
+    return await engine.authenticate(request.headers)                   # 注解务必真 import Request，
+                                                                        # TYPE_CHECKING 字符串注解会被 FastAPI 当 query 参数
+```
+
+`build_from_env(env, prefix)` 认 `{prefix}AUTH` / `{prefix}AUTH_PROVIDERS` /
+`{prefix}USERS_FILE` / `GOOGLE_CLIENT_ID` 四个键，别的项目换前缀即复用同一套配置语义。
+`AuthError.status` 只是建议码——HTTP 响应形状（错误包络、401/403 转译）永远是宿主的。
 
 ## 阶段与质量门禁
 
@@ -252,6 +317,8 @@ python3 test_llm.py             # LLM 客户端：模板渲染/重试纪律/流�
 python3 test_graph.py           # 图编排：节点序/失败路由/幂等短路/兜底/熔断/partial/checkpoint 裁剪（全打桩离线）
 python3 test_resolve.py         # URL 解析/条目展开/幂等键（离线）
 python3 test_remote_clients.py  # 算力池薄客户端 HTTP 契约（MockTransport 离线）
+python3 -m pytest test_api_contract.py  # HTTP 后端契约：鉴权/owner 403/422 错误形状/SSE 关流/OpenAPI（TestClient 离线）
+python3 -m pytest test_acctkit.py       # acctkit 模块自身接口：provider 次序/Google 打桩/JsonFileStore 开户回填/前缀工厂（零宿主零网络）
 python3 test_observability.py   # OTel 桥：span 树/gen_ai 属性/traceId 确定性/指标仪表/deadman（InMemory 离线）
 python3 test_otel_replay.py     # 历史回放：jsonl→span 树重建/悬空闭合/时间戳还原（InMemory 离线）
 python3 test_evals.py           # evals 旁路：指标编排/scores 三运输路径/回归对比（假 deepeval/ragas/langfuse）

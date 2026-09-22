@@ -14,3 +14,8 @@ secrets/
 .zcode/
 deploy/fixtures/smoke.mp4
 deploy/smoke-vault/
+
+# 多用户身份表（acctkit JsonFileStore 运行时产物，同 runs/state 口径）
+users.json
+users.json.lock
+users.json.tmp.*

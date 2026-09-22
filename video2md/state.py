@@ -18,6 +18,7 @@ class RunState(TypedDict, total=False):
     force: bool          # True=忽略 state 幂等全量重跑
     review: bool         # True=整理后过一遍校对 LLM
     max_frames: int      # 目标帧数（select 启发式兜底也用）
+    owner: str           # 归属内部 uid（多用户隔离；图核不读，仅随 run 记录流转给 resolve 做 owner 级去重）
 
     run: dict            # runs.py 的 run 记录（entries/artifacts/stages/status/tmp）
     select_payload: dict  # 选帧 LLM 过滤后的 _stage_select args（{"frames"|"selections"}）

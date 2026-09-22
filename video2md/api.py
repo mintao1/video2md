@@ -5,21 +5,26 @@ POST /runs 入队 → 后台任务内嵌跑完整张 LangGraph（阶段即节点
 GET /runs/{id} 看终态。串行纪律不变：asyncio 信号量=1，对齐旧单 worker 模型
 （4C 小机上 ffmpeg/whisper 是 CPU 密集，并行只会互相拖死）。
 
-端点契约：
-  POST /runs          {url, part_items?, force?, review?, max_frames?} → {run_id, status}
-  GET  /runs/{id}     run 记录 + 任务状态 + 逐条目产物进度（沿用 serve 的形状）
-  GET  /runs/{id}/note  产出 markdown（标题/路径/正文），供云上调取
-  GET  /queue         {queue_len, running}——gpu_router 的 colab 看门狗回读这里
-  GET  /healthz       存活探针（Docker healthcheck）
-  GET  /preflight     开跑前体检（ffmpeg/磁盘/vault/算力池）
+Phase 1（多用户后端契约硬化）：鉴权可插拔（默认 off，生产 google ID-Token）、
+Pydantic 请求/响应契约、重开 OpenAPI、run 按内部 uid 归属隔离（越权 403）、
+SSE 实时进度（GET /runs/{id}/events）与轮询并存。核心 run_graph 不动，本层只是传输。
 
-恢复语义：进程重启时把 runs.json 里 created/running 的 run 重新入队（同 run_id），
-graph 的 resolve 节点幂等复用该 run，阶段节点按产物字段跳过已完成条目——
-与旧 _load_jobs 语义一致，只是 jobs.json 不再需要。
+端点契约：
+  POST /runs            {url, part_items?, force?, review?, max_frames?, resolve_only?} → {run_id, total, ...}
+  GET  /runs/{id}       run 记录 + 任务状态 + 逐条目产物进度（沿用 serve 的形状）
+  GET  /runs/{id}/note  产出 markdown（标题/路径/正文），供云上调取
+  GET  /runs/{id}/events SSE 实时进度（graph:*/stage 事件流；轮询 GET /runs/{id} 仍在）
+  GET  /queue           {queue_len, running}——gpu_router 的 colab 看门狗回读这里（运维探针，不鉴权）
+  GET  /healthz         存活探针（Docker healthcheck，不鉴权）
+  GET  /preflight       开跑前体检（ffmpeg/磁盘/vault/算力池，不鉴权）
+
+恢复语义：进程重启时把 runs.json 里 running 的 run 重新入队（同 run_id、同 owner），
+graph 的 resolve 节点幂等复用该 run，阶段节点按产物字段跳过已完成条目。
 """
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 import shutil
 import tempfile
@@ -31,10 +36,18 @@ from pathlib import Path
 
 import httpx
 import uvicorn
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse, StreamingResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from .config import ENV, LOG_DIR, OUT_DIR
+from .config import CORS_ORIGINS, ENV, LOG_DIR, OUT_DIR
+from . import events
+from .auth import AuthError, Identity, current_identity
 from .graph import make_checkpointer, run_graph
+from .models import (PreflightOut, QueueOut, RunCreate, RunCreatedOut, RunNotesOut,
+                     RunStatusOut, HealthOut)
 from .runs import _load_runs, _runs_file_lock, _runs_merge, _save_runs
 from . import observability
 
@@ -142,11 +155,13 @@ def _prune_orphan_tmps(min_age_h: float = 6.0) -> None:
 
 
 # ---------------------------------------------------------------- 任务表
-_TASKS: dict[str, dict] = {}          # run_id → {status, url, created, started, finished, errors}
+_TASKS: dict[str, dict] = {}          # run_id → {status, url, owner, created, started, finished, errors}
 _SEMA = asyncio.Semaphore(1)          # 串行执行：单 worker 语义
 _CHECKPOINTER = None                  # lifespan 注入的 SqliteSaver
 
 _TASKS_KEEP = 200                     # 内存任务表上限（超出裁最老，runs.json 才是真相）
+
+_TERMINAL_STATUSES = ("done", "partial", "error")
 
 
 def _now() -> str:
@@ -155,7 +170,6 @@ def _now() -> str:
 
 def _req_log(method: str, path: str, code: int, **fields) -> None:
     """请求审计 jsonl（证明调用方是否真的打到服务；2026-09-22 前叫 serve-requests.jsonl）。"""
-    import json
     rec = {"ts": _now(), "method": method, "path": path, "code": code, **fields}
     print(f"[req] {method} {path} → {code} " + " ".join(f"{k}={str(v)[:60]}" for k, v in fields.items()))
     try:
@@ -166,11 +180,26 @@ def _req_log(method: str, path: str, code: int, **fields) -> None:
         pass
 
 
+def _require_run_access(run_id: str, ident: Identity) -> dict | None:
+    """run 归属校验（越权 403 / 不存在 404），返回 runs.json 记录（可能仅有内存任务）。
+
+    owner 恒为内部 uid（run 建时写入）；AUTH=off 下所有无 token 请求共享同一 dev uid，
+    故 e2e/batch 自起自取照常通过。
+    """
+    run = _load_runs().get(run_id)
+    task = _TASKS.get(run_id)
+    if not run and not task:
+        raise HTTPException(404, f"run {run_id} 不存在")
+    owner = (run.get("owner", "") if run else task.get("owner", "")) or ""
+    if owner != ident.uid:
+        raise HTTPException(403, f"无权访问 run {run_id}")
+    return run
+
 
 # ---------------------------------------------------------------- 后台执行
 
 async def _drive(run_id: str, url: str, part_items: str, force: bool,
-                 review: bool, max_frames: int) -> None:
+                 review: bool, max_frames: int, owner: str = "") -> None:
     """排队等信号量 → 线程里跑同步 graph（stage 函数全是同步阻塞，不能堵事件循环）。"""
     async with _SEMA:
         _TASKS[run_id].update(status="running", started=_now())
@@ -183,7 +212,7 @@ async def _drive(run_id: str, url: str, part_items: str, force: bool,
             final = await asyncio.to_thread(run_graph, url, part_items=part_items,
                                             force=force, review=review,
                                             max_frames=max_frames, run_id=run_id,
-                                            checkpointer=_CHECKPOINTER)
+                                            checkpointer=_CHECKPOINTER, owner=owner)
             _TASKS[run_id].update(status=final.get("status") or "done",
                                   finished=_now(), errors=(final.get("errors") or [])[-10:])
         except Exception as exc:  # graph 节点已全捕获，走到这是框架级异常
@@ -197,17 +226,16 @@ async def _drive(run_id: str, url: str, part_items: str, force: bool,
 
 
 def _enqueue(url: str, part_items: str, force: bool, review: bool,
-             max_frames: int, run_id: str = "") -> dict:
+             max_frames: int, run_id: str = "", owner: str = "") -> dict:
     run_id = run_id or uuid.uuid4().hex[:8]
-    _TASKS[run_id] = {"status": "queued", "url": url, "created": _now()}
+    _TASKS[run_id] = {"status": "queued", "url": url, "owner": owner, "created": _now()}
     if len(_TASKS) > _TASKS_KEEP:  # 裁最老的已完成记录（queued/running 永不裁）
         done = sorted((k for k, v in _TASKS.items() if v.get("finished")),
                       key=lambda k: _TASKS[k]["finished"])
         for k in done[: len(_TASKS) - _TASKS_KEEP]:
             _TASKS.pop(k, None)
-    asyncio.create_task(_drive(run_id, url, part_items, force, review, max_frames))
+    asyncio.create_task(_drive(run_id, url, part_items, force, review, max_frames, owner))
     return {"run_id": run_id, "status": "queued"}
-
 
 
 # ---------------------------------------------------------------- app
@@ -215,6 +243,7 @@ def _enqueue(url: str, part_items: str, force: bool, review: bool,
 @asynccontextmanager
 async def _lifespan(app: FastAPI):
     global _CHECKPOINTER
+    events.bind_loop(asyncio.get_running_loop())  # SSE 总线钉住主循环（工作线程据此投递）
     _CHECKPOINTER = make_checkpointer()
     # 遥测出口：OTEL_EXPORTER_OTLP_ENDPOINT（collector）> LANGFUSE 直连 > 纯本地 jsonl
     observability.init()
@@ -237,65 +266,106 @@ async def _lifespan(app: FastAPI):
                 _runs_merge(r)
             continue
         _enqueue(r["url"], r.get("part_items", ""), bool(r.get("force")), False, 60,
-                 run_id=r["run_id"])
+                 run_id=r["run_id"], owner=r.get("owner", ""))
         resumed += 1
     if resumed:
         print(f"♻️ 恢复 {resumed} 个中断 run（上次服务退出前未跑完）")
     yield
 
 
-app = FastAPI(title="video2md", lifespan=_lifespan, docs_url=None, redoc_url=None)
+app = FastAPI(title="video2md", version="0.2.0", lifespan=_lifespan,
+              docs_url="/docs", redoc_url=None, openapi_url="/openapi.json")
+
+# CORS：仅当配了 origin 才挂（同源/SSH 隧道开发不需要，也避免误开 *）
+if CORS_ORIGINS:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=CORS_ORIGINS,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
 
+# ---------------------------------------------------------------- 统一错误信封
 
-@app.post("/runs")
-async def post_runs(request: Request) -> dict:
+def _err(code: int, message: str, details=None) -> JSONResponse:
+    return JSONResponse(status_code=code,
+                        content={"error": {"code": code, "message": message,
+                                           "details": details}})
+
+
+@app.exception_handler(AuthError)
+async def _on_auth_error(request: Request, exc: AuthError) -> JSONResponse:
+    return _err(exc.status, exc.message)
+
+
+# fastapi.HTTPException 比 starlette 基类更具体（端点里 raise 的都是它）——单独注册确保走统一信封
+@app.exception_handler(HTTPException)
+async def _on_http_error(request: Request, exc: HTTPException) -> JSONResponse:
+    return _err(exc.status_code, str(exc.detail),
+                details=exc.headers.get("X-Error") if exc.headers else None)
+
+
+@app.exception_handler(StarletteHTTPException)
+async def _on_starlette_error(request: Request, exc: StarletteHTTPException) -> JSONResponse:
+    return _err(exc.status_code, str(exc.detail))
+
+
+@app.exception_handler(RequestValidationError)
+async def _on_validation_error(request: Request, exc: RequestValidationError) -> JSONResponse:
+    return _err(422, "请求校验失败", details=exc.errors())
+
+
+# ---------------------------------------------------------------- 用户级端点（鉴权 + 归属）
+
+@app.post("/runs", response_model=RunCreatedOut,
+          summary="发起一次视频转文档（异步作业：同步解析建 run，后台驱动整张图）")
+async def post_runs(body: RunCreate, ident: Identity = Depends(current_identity)) -> dict:
     """同步解析建 run（旧 serve 语义：响应即知 total/all_skipped，批量驱动靠它分窗），
     随后异步驱动整张图。解析慢点（抖音分享页抓取 70s+）所以在线程里跑，不堵事件循环。"""
     from .graph import resolve_run
     from .resolve import extract_url
 
-    data = await request.json()
-    url = extract_url(str(data.get("url", "")).strip())
-    part_items = str(data.get("part_items", "")).strip()
-    force = bool(data.get("force"))
+    url = extract_url((body.url or "").strip())
+    part_items = (body.part_items or "").strip()
     if not url:
-        _req_log("POST", "/runs", 400, error="缺 url")
+        _req_log("POST", "/runs", 400, user=ident.uid, error="缺 url")
         raise HTTPException(400, "缺 url")
     run_id = uuid.uuid4().hex[:8]
-    run, err, is_dup = await asyncio.to_thread(resolve_run, url, part_items, force, run_id)
+    run, err, is_dup = await asyncio.to_thread(
+        resolve_run, url, part_items, body.force, run_id, ident.uid)
     if err:
-        _req_log("POST", "/runs", 400, url=url[:80], error=err[:120])
+        _req_log("POST", "/runs", 400, user=ident.uid, url=url[:80], error=err[:120])
         raise HTTPException(400, err)
     skipped = [bool(a.get("skipped")) for a in run["artifacts"].values()]
     resp = {"run_id": run["run_id"], "total": run["total"],
             "entries": [{"index": i, "url": e["url"], "skipped": s}
                         for i, (e, s) in enumerate(zip(run["entries"], skipped), 1)],
             "all_skipped": bool(skipped) and all(skipped)}
-    if data.get("resolve_only"):
-        # 只解析不驱动（批量脚本分窗预飞）；后续同 URL+part_items 的正式 POST
+    if body.resolve_only:
+        # 只解析不驱动（批量脚本分窗预飞）；后续同 URL+part_items+owner 的正式 POST
         # 会 dedup 命中这条记录并入队驱动——探测残档不会被启动恢复捡走（只认 running）
-        _req_log("POST", "/runs", 200, run_id=run["run_id"], resolve_only=True)
+        _req_log("POST", "/runs", 200, run_id=run["run_id"], resolve_only=True, user=ident.uid)
         return {**resp, "status": "created"}
     if is_dup and _TASKS.get(run["run_id"], {}).get("status") in ("queued", "running"):
-        _req_log("POST", "/runs", 200, run_id=run["run_id"], dedup=True)
+        _req_log("POST", "/runs", 200, run_id=run["run_id"], dedup=True, user=ident.uid)
         return {**resp, "status": _TASKS[run["run_id"]]["status"], "dedup": True}
     # 新 run 或「旧 run 驱动已死」的 dedup 残档——都入队驱动（图内幂等重入）
     _TASKS[run["run_id"]] = {"status": "queued", "url": url, "part_items": part_items,
-                             "created": _now()}
-    asyncio.create_task(_drive(run["run_id"], url, part_items, force,
-                               bool(data.get("review")), int(data.get("max_frames") or 60)))
-    _req_log("POST", "/runs", 200, run_id=run["run_id"], total=run["total"], dedup=is_dup)
+                             "owner": ident.uid, "created": _now()}
+    asyncio.create_task(_drive(run["run_id"], url, part_items, body.force,
+                               body.review, body.max_frames, ident.uid))
+    _req_log("POST", "/runs", 200, run_id=run["run_id"], total=run["total"],
+             dedup=is_dup, user=ident.uid)
     return {**resp, "status": "queued", "dedup": is_dup}
 
 
 
-@app.get("/runs/{run_id}")
-def get_run(run_id: str) -> dict:
-    run = _load_runs().get(run_id)
+@app.get("/runs/{run_id}", response_model=RunStatusOut, summary="run 终态 + 逐条目产物进度")
+def get_run(run_id: str, ident: Identity = Depends(current_identity)) -> dict:
+    run = _require_run_access(run_id, ident)
     task = _TASKS.get(run_id)
-    if not run and not task:
-        raise HTTPException(404, f"run {run_id} 不存在")
     out: dict = {"run_id": run_id}
     if task:
         out["task"] = {k: task.get(k) for k in ("status", "url", "created", "started",
@@ -322,19 +392,75 @@ def get_run(run_id: str) -> dict:
 
 
 
-@app.get("/runs/{run_id}/note")
-def get_run_notes(run_id: str) -> dict:
-    """产出的 markdown（云上调取口）：标题 + vault 路径 + 正文。"""
-    run = _load_runs().get(run_id)
+@app.get("/runs/{run_id}/note", response_model=RunNotesOut,
+         summary="产出的 markdown（标题 + vault 路径 + 正文）")
+def get_run_notes(run_id: str, ident: Identity = Depends(current_identity)) -> dict:
+    run = _require_run_access(run_id, ident)
     if not run:
-        raise HTTPException(404, f"run {run_id} 不存在")
+        return {"run_id": run_id, "status": None, "notes": []}
     notes = [{"title": a.get("title", ""), "path": a.get("note", ""), "md": a.get("md", "")}
              for a in (run.get("artifacts") or {}).values() if a.get("note")]
     return {"run_id": run_id, "status": run.get("status"), "notes": notes}
 
 
 
-@app.get("/queue")
+def _sse(data: dict) -> str:
+    return f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
+
+
+def _run_current_status(run_id: str) -> tuple[str | None, str | None]:
+    """(status, url) 快照：内存任务优先（实时），回退 runs.json。"""
+    task = _TASKS.get(run_id)
+    if task:
+        return task.get("status"), task.get("url")
+    run = _load_runs().get(run_id)
+    if run:
+        return run.get("status"), run.get("url")
+    return None, None
+
+
+
+@app.get("/runs/{run_id}/events", summary="SSE 实时进度（graph:*/stage 事件流）")
+async def run_events(run_id: str, request: Request,
+                     ident: Identity = Depends(current_identity)) -> StreamingResponse:
+    """连上即发一条 connected 快照，随后把该 run 的事件总线原样转发；见收尾事件即关流。
+
+    图在工作线程里 publish → 主循环 call_soon_threadsafe 投递；慢/断客户端靠 keepalive +
+    队列上限丢弃兜底，绝不反压主管线。轮询 GET /runs/{id} 仍并存（前端可只用其一）。
+    """
+    _require_run_access(run_id, ident)
+    q = events.subscribe(run_id)
+
+    async def gen():
+        try:
+            st, url = _run_current_status(run_id)
+            yield _sse({"event": "connected", "run_id": run_id, "status": st, "url": url})
+            while True:
+                if await request.is_disconnected():
+                    break
+                try:
+                    rec = await asyncio.wait_for(q.get(), timeout=15)
+                except asyncio.TimeoutError:
+                    yield ": ping\n\n"  # 注释行保活，穿透反代空闲超时
+                    continue
+                yield _sse(rec)
+                if events.is_terminal(rec):
+                    break
+                cur, _ = _run_current_status(run_id)
+                if cur in _TERMINAL_STATUSES:
+                    yield _sse({"event": "run_finalized", "run_id": run_id, "status": cur})
+                    break
+        finally:
+            events.unsubscribe(run_id, q)
+
+    return StreamingResponse(gen(), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache",
+                                      "Connection": "keep-alive", "X-Accel-Buffering": "no"})
+
+
+# ---------------------------------------------------------------- 运维探针（不鉴权：容器 healthcheck / gpu_router 看门狗）
+
+@app.get("/queue", response_model=QueueOut)
 def get_queue() -> dict:
     """gpu_router 的 colab 看门狗回读（queue_url 指这里）——判队列保温。"""
     return {"queue_len": sum(1 for v in _TASKS.values() if v.get("status") == "queued"),
@@ -342,13 +468,13 @@ def get_queue() -> dict:
 
 
 
-@app.get("/healthz")
+@app.get("/healthz", response_model=HealthOut)
 def healthz() -> dict:
     return {"ok": True, "ts": _now()}
 
 
 
-@app.get("/preflight")
+@app.get("/preflight", response_model=PreflightOut)
 def preflight() -> dict:
     return _preflight()
 

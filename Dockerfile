@@ -26,6 +26,7 @@ RUN uv sync --frozen --no-dev --extra evals
 # 无 mac extra：pyobjc 是 macOS 专属，Linux 镜像天然不含
 
 COPY video2md/ ./video2md/
+COPY acctkit/ ./acctkit/
 COPY README.md ./
 
 ENV PATH="/app/.venv/bin:$PATH" \

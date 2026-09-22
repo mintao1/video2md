@@ -83,6 +83,16 @@ for _pk in ("HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "NO_PROXY",
         os.environ.setdefault(_pk, ENV[_pk])
 
 
+# 身份表（多用户鉴权：(provider, external_id) → 稳定内部 uid）：容器里指到 data 卷
+USERS_FILE = Path(ENV.get("V2MD_USERS_FILE", str(PROJ / "users.json")))
+
+# 鉴权配置解析已收进 acctkit.build_from_env（V2MD_AUTH / V2MD_AUTH_PROVIDERS /
+# GOOGLE_CLIENT_ID 语义见 acctkit/engine.py 与 README「acctkit」节；off 缺省保证
+# e2e/batch 无 token 也能跑），接线在 video2md/auth/__init__.py，此处不再镜像一份。
+# CORS 放行 origin（逗号分隔；GUI 前端域名）。空=不加 CORS 中间件（同源/隧道开发够用）
+CORS_ORIGINS = [o.strip() for o in (ENV.get("V2MD_CORS_ORIGINS", "") or "").split(",") if o.strip()]
+
+
 VAULT = Path(ENV.get("OBSIDIAN_VAULT", str(Path.home() / "Documents/Obsidian Vault")))
 
 

@@ -13,6 +13,7 @@ from datetime import date, datetime
 from pathlib import Path
 
 from .config import LOG_DIR, STATE_FILE
+from . import events  # 进程内 SSE 总线（_write 的第三下游；events 无本地依赖，不成环）
 
 
 
@@ -113,6 +114,10 @@ class RunLog:
         with self._lock:  # 并行阶段（剪节段/OCR）多线程写同一 jsonl
             with self.path.open("a") as f:
                 f.write(json.dumps(out, ensure_ascii=False) + "\n")
+        try:
+            events.publish(self.run_id, out)  # SSE 总线（工作线程安全投递，见 events）
+        except Exception:
+            pass  # 下游 sink 任何异常都不许影响主管线
         try:
             from . import observability  # 惰性导入：未配 OTel 端点/Langfuse 时零开销
             observability.record(out, run_id=self.run_id, label=self.label,

@@ -97,10 +97,12 @@ def _runs_merge(run: dict) -> dict:
 
 
 
-def create_run(url: str, part_items: str = "", force: bool = False) -> dict:
+def create_run(url: str, part_items: str = "", force: bool = False,
+               owner: str = "") -> dict:
     """建 run：resolve 展开条目 + 临时目录；已按 url 幂等处理的条目标 skipped（force=True 强制全量）。
 
-    返回 run（未落盘前）；落盘由调用方 _runs_merge。
+    返回 run（未落盘前）；落盘由调用方 _runs_merge。owner = 归属内部 uid（多用户隔离，
+    图核不读，仅供 API 层做越权校验；CLI/开发传 ""）。
     """
     url = ensure_scheme(url)
     entries = resolve_url(url) if url.startswith(("http://", "https://")) else []
@@ -128,6 +130,7 @@ def create_run(url: str, part_items: str = "", force: bool = False) -> dict:
     run = {
         "run_id": uuid.uuid4().hex[:8],
         "url": url, "part_items": part_items,
+        "owner": owner,
         "created": datetime.now().isoformat(timespec="seconds"),
         "tmp": tempfile.mkdtemp(prefix="video2md-run-"),
         "total": len(entries),

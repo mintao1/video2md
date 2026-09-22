@@ -79,7 +79,8 @@ def node_resolve(state: RunState) -> dict:
     force = bool(state.get("force"))
     if not url:
         return {"status": "error", "errors": [*state.get("errors", []), "缺 url"]}
-    run, err, _dup = resolve_run(url, part_items, force, run_id=state["run_id"])
+    run, err, _dup = resolve_run(url, part_items, force, run_id=state["run_id"],
+                                 owner=state.get("owner", ""))
     if err:
         return {"status": "error", "errors": [*state.get("errors", []), err]}
     return {"run": run}
@@ -87,23 +88,26 @@ def node_resolve(state: RunState) -> dict:
 
 
 def resolve_run(url: str, part_items: str = "", force: bool = False,
-                run_id: str = "") -> tuple[dict, str, bool]:
+                run_id: str = "", owner: str = "") -> tuple[dict, str, bool]:
     """建 run 的同步入口（api.py POST /runs 与 node_resolve 共用）。
 
     返回 (run, err, is_dup)：err 非空即失败；is_dup=True 时 run 是进行中旧 run
     （调用方须自己判活：旧 run 的驱动已死就得重新入队驱动它）。
+    owner 参与去重比对：多用户下同一 URL 由不同 owner 提交各建各的 run（互不复用、
+    不串产物），同一 owner 重发同链仍复用其进行中的 run。CLI/开发 owner="" 保持旧全局去重。
     """
     part_items = (part_items or "").strip()
-    # 同链接同分区的进行中 run 复用（对齐 serve._post_runs 的 dedup；
+    # 同链接同分区同归属的进行中 run 复用（对齐 serve._post_runs 的 dedup；
     # part_items 必须参与比对——同合集的分区补跑共享 URL，只按 URL 去重会把新分区并进旧 run）
     dup = next((r for r in _load_runs().values()
                 if r.get("url") == url and str(r.get("part_items", "")).strip() == part_items
+                and (r.get("owner", "") or "") == (owner or "")
                 and r.get("status") in ("created", "running")), None)
     if dup:
         print(f"♻️ 复用进行中的 run {dup['run_id']}（{dup['total']} 条目），继续推进")
         return dup, "", True
     try:
-        run = create_run(url, part_items, force=force)
+        run = create_run(url, part_items, force=force, owner=owner)
     except RuntimeError as exc:
         return {}, str(exc)[:300], False
     if run_id:
@@ -388,13 +392,19 @@ def make_checkpointer(path: Path = CHECKPOINT_DB):
 
 
 def run_graph(url: str, *, part_items: str = "", force: bool = False, review: bool = False,
-              max_frames: int = 60, run_id: str = "", checkpointer=None) -> dict:
-    """一次 run 的入口（api.py 后台任务与 graph-run CLI 共用）。返回终态 state。"""
+              max_frames: int = 60, run_id: str = "", checkpointer=None,
+              owner: str = "") -> dict:
+    """一次 run 的入口（api.py 后台任务与 graph-run CLI 共用）。返回终态 state。
+
+    owner = 归属内部 uid（多用户隔离）：随初始 state 流转到 resolve，做 owner 级去重；
+    图核其余节点不读它。CLI/开发留空串=旧全局去重语义。
+    """
     from . import deadman
 
     run_id = run_id or uuid.uuid4().hex[:8]
     initial: RunState = {"run_id": run_id, "url": url, "part_items": part_items,
                          "force": force, "review": review, "max_frames": max_frames,
+                         "owner": owner,
                          "entry_idx": 1, "errors": [], "status": "running"}
     graph = build_graph(checkpointer)
     # note 回环每条目 1 个 superstep（8 + total + 2；V2MD_EVAL 接线时每条目 2 个），
