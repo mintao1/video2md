@@ -39,7 +39,7 @@ def main() -> None:
                          ensure_ascii=False, indent=1))
         sys.exit(0 if final.get("status") in ("done", "partial") else 1)
     if len(sys.argv) > 1 and sys.argv[1] == "__stage":
-        # 内部入口：serve 的阶段 job 子进程（worker 以 `__stage <run> <stage> <args-json>` 拉起）
+        # 单阶段手动排障入口：`__stage <run_id> <stage> '<args JSON>'` 重放一个阶段（详见 runs.cmd_stage）
         ap = argparse.ArgumentParser(prog="video2md __stage")
         ap.add_argument("run_id")
         ap.add_argument("stage")

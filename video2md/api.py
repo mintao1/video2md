@@ -12,7 +12,6 @@ GET /runs/{id} 看终态。串行纪律不变：asyncio 信号量=1，对齐旧�
   GET  /queue         {queue_len, running}——gpu_router 的 colab 看门狗回读这里
   GET  /healthz       存活探针（Docker healthcheck）
   GET  /preflight     开跑前体检（ffmpeg/磁盘/vault/算力池）
-  GET  /checkpoint    对账快照（任务表计数 + 算力池可达性 + 临时目录残留）
 
 恢复语义：进程重启时把 runs.json 里 created/running 的 run 重新入队（同 run_id），
 graph 的 resolve 节点幂等复用该 run，阶段节点按产物字段跳过已完成条目——
@@ -86,24 +85,6 @@ def _preflight() -> dict:
     return {"ok": all(c["ok"] for c in checks), "checks": checks,
             "ts": datetime.now().isoformat(timespec="seconds")}
 
-
-
-def _checkpoint() -> dict:
-    """对账快照：任务表计数 + 算力池可达性 + 临时目录残留。"""
-    counts: dict[str, int] = {}
-    for t in _TASKS.values():
-        counts[t.get("status", "?")] = counts.get(t.get("status", "?"), 0) + 1
-    snap = {"ts": _now(), "counts": counts,
-            "queue_len": sum(1 for v in _TASKS.values() if v.get("status") == "queued"),
-            "running": sum(1 for v in _TASKS.values() if v.get("status") == "running"),
-            "tmp_leftovers": len(list(Path(tempfile.gettempdir()).glob("video2md-*")))}
-    remote = (ENV.get("V2MD_REMOTE") or "").strip()
-    if remote.startswith(("http://", "https://")):
-        try:
-            snap["gpu_pool"] = httpx.get(f"{remote.rstrip('/')}/status", timeout=2).json()
-        except Exception as exc:
-            snap["gpu_pool"] = {"ok": False, "error": str(exc)[:100]}
-    return snap
 
 
 def _cleanup_stale_runs(max_age_days: int = 30, idle_hours: float = 24.0) -> None:
@@ -370,14 +351,6 @@ def healthz() -> dict:
 @app.get("/preflight")
 def preflight() -> dict:
     return _preflight()
-
-
-
-@app.get("/checkpoint")
-def checkpoint() -> dict:
-    return _checkpoint()
-
-
 
 def cmd_api(port: int) -> None:
     # launchd/容器环境 PATH 极简，补齐框架/homebrew 路径让子进程找得到 yt-dlp/whisper/ffmpeg

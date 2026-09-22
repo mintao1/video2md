@@ -11,3 +11,5 @@ __pycache__/
 tmp/
 data/
 .zcode/
+deploy/fixtures/smoke.mp4
+deploy/smoke-vault/

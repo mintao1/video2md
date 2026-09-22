@@ -16,6 +16,11 @@ VAULT="${OBSIDIAN_VAULT:-$HOME/Documents/Obsidian Vault}"
 NOTEDIR="$VAULT/资料库/视频笔记"
 fail() { echo "❌ $1"; exit 1; }
 
+# Vision OCR 依赖 pyobjc（mac extra）：venv 被剥 extra 时 OCR 全灭而 run 照样 partial
+# （错误只躺 ocr_raw），白跑一轮才见分晓——起跑前拦死并给出修法
+uv run python -c "import Foundation, Vision" 2>/dev/null \
+  || fail "缺 mac extra（Vision OCR 会全灭）：先 uv sync --extra mac --extra evals"
+
 TMP=$(mktemp -d /tmp/v2md-e2e-XXXXXX)
 
 # .env 临时切本地算力（远程池挂了会把 e2e 拖进无关故障域），退出时恢复

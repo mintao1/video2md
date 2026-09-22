@@ -136,7 +136,6 @@ curl localhost:8790/runs/<run_id>          # 终态 + 逐条目 done map + parti
 curl localhost:8790/runs/<run_id>/note     # 产出 markdown（标题/路径/正文）
 curl localhost:8790/preflight              # 开跑前体检（ffmpeg/磁盘/vault/算力池）
 curl localhost:8790/queue                  # {queue_len, running}（gpu_router 看门狗回读）
-curl localhost:8790/checkpoint             # 对账快照（算力池/临时目录残留）
 
 # 本地调试（不经 HTTP）
 uv run python -m video2md graph-run <url> [--force] [--review] [--max-frames 60]
