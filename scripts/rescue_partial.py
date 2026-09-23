@@ -56,7 +56,22 @@ def main() -> int:
     ap.add_argument("--no-tmp-guard", dest="tmp_guard", action="store_false",
                     help="不给其它 running run 的 tmp 上保护标志（默认给——防 API 复活；"
                          "注意标志会让 finalize 跳过清理本 run tmp，抢救对象别是 running 态）")
+    ap.add_argument("--force-running", action="store_true",
+                    help="API 活着也照跑（明知双写风险时用）")
     a = ap.parse_args()
+
+    # 前置：API 必须已停——worker 串行信号量只活在 API 进程里，双进程并发写同一
+    # vault 笔记文件会互相覆盖。healthz 可达即拒绝开跑（--force-running 可跳过）。
+    if not a.force_running:
+        import urllib.error
+        import urllib.request
+        try:
+            with urllib.request.urlopen("http://127.0.0.1:8790/healthz", timeout=3):
+                print("❌ API 还在服务 healthz——先 docker stop video2md-video2md-1 再跑"
+                      "（确认要并行加 --force-running）")
+                return 2
+        except (urllib.error.URLError, OSError):
+            pass  # 连不上 = 已停，正是我们要的
 
     db = runs._load_runs()
     old = db.get(a.run_id)
@@ -131,7 +146,8 @@ def main() -> int:
         src = Path(old_art.get("video", ""))
         dst = None
         if src.is_file():
-            dst = Path(run["tmp"]) / src.name
+            # 名字对齐 download_entry 的产物形态（p{idx:03d}-video.mp4），下游按名引用不踩坑
+            dst = Path(run["tmp"]) / f"p{idx:03d}-{src.name.split('-', 1)[-1]}"
             shutil.copy2(src, dst)
         elif has_video:
             print(f"  ⚠ 旧视频 {src} 已被清理，退化为重新下载")
