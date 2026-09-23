@@ -5,6 +5,11 @@
 `video2md/llm.py` httpx 直连 openai-compatible 端点（默认 Kimi-K3）。
 GPU 重活（转写/OCR/剪辑）外包给 [gpu_router](https://github.com/mintao1/gpu-router) 算力池（Colab/Kaggle/Modal/ZeroGPU/国内云动态选举）。
 
+**生产形态 = 云服务器 · 多用户 API**：登录鉴权（Google id_token/设备流 + 微信扫码）→
+run 按 uid 归属隔离 → deliver「云端不储存」投递（bundle 拉取 + ACK/TTL 即焚），
+公网经反代 TLS 暴露。整体分层见[终局布局](#终局布局云服务器--多用户)，落地步骤见
+[部署](#部署云服务器--多用户)章。
+
 ```
 POST /runs（FastAPI 内嵌图，串行信号量=1）
   resolve（剥分享文本/展开合集/state 幂等标记）
@@ -46,73 +51,118 @@ POST /runs（FastAPI 内嵌图，串行信号量=1）
 
 ## 运行拓扑
 
-| | Mac 本地（开发） | lcode-4c（生产，4C/7.5G） |
+| | 本地开发（Mac/任意开发机） | 云服务器（生产 · 多用户） |
 |---|---|---|
-| 入口 | `uv run python -m video2md api`（或 `graph-run` CLI） | docker compose 双服务 |
+| 入口 | `uv run python -m video2md api`（或 `graph-run` CLI） | docker compose（api + gpu_router [+ 观测栈]）+ 反代 TLS 域名 |
+| 鉴权 | `V2MD_AUTH=off`（无 token 归同一 dev uid） | `V2MD_AUTH=google`（`Authorization: Bearer <id_token>`；设备流/微信可并列） |
 | OCR | macOS Vision（`uv sync --extra mac`）或远程池 | 远程池（Linux 无 Vision） |
 | 转写/剪辑 | 本地 whisper/ffmpeg 或远程池 | 远程池（镜像不含 whisper/torch） |
-| 代理 | Clash 等本地出口 | `V2MD_PROXY=http://127.0.0.1:17897`（Mac→服务器 SSH 隧道转发，`com.singtrain.proxytunnel`） |
-| 笔记落地 | 本地 Obsidian vault | `vault` docker 卷 → Syncthing 同步回 Mac |
+| 出网 | Clash 等本地出口（可选） | `V2MD_PROXY` 出网代理；国内站需大陆住宅类出口（风控，见「出网与风控」） |
+| 笔记落地 | vault 直写本地 Obsidian | deliver 模式：outbox 在架 → 客户端拉 bundle → ACK/TTL 即焚 |
 
-> **本机无常驻服务（2026-09-22 起）**：原 launchd 8790 实例已停，Mac 回归纯开发机——
-> 开发时手动 `uv run python -m video2md api`；恢复常驻 = plist 改回原名（现为
-> `~/Library/LaunchAgents/com.linmintao.video2md-server.plist.disabled`）+ `launchctl
-> bootstrap gui/$UID …/com.linmintao.video2md-server.plist`。本机运行时产物（logs/
-> runs.json/state.json 等）已归档 `~/Archive/dify-video2md-local-2026-09-22*.tar.gz`。
+## 部署（云服务器 · 多用户）
 
-## 部署 lcode-4c
+前提（厂商中立——任意云 VM / 自托管服务器皆可）：
+- Docker + Compose（≥2C4G 起步；GPU 全在远端算力池，服务器本身不需 GPU）
+- 一个域名 + TLS 证书（Google 登录回调要求 https；Caddy 可全自动签续）
+- LLM 端点凭证（openai-compatible 三键）
+- 至少一家 GPU provider 凭证（colab-cli token / kaggle.json / …，缺了对应 provider 自动冷却）
+- Google OAuth「Web」客户端的 client_id（后端只验签不持 secret）；插件/CLI 无浏览器登录
+  另备「TV 与 Limited Input」型 client（设备流，需 client_secret）
+- 两仓库同级放 `~/stack/{video2md,gpu_router}`（别处则设 `GPU_ROUTER_DIR`）
 
-前提：服务器 Docker + Compose；两仓库同级放 `~/stack/{video2md,gpu_router}`
-（别处则设 `GPU_ROUTER_DIR`）。全部命令在 Mac 上执行：
+**1. 代码与凭证**（secrets 0600，只放服务器，不进 git）：
 
 ```bash
-# 1. 同步代码（secrets 被排除，单独放）
-rsync -az --delete --exclude '.venv' --exclude 'logs' --exclude '__pycache__' \
-  --exclude '.env' --exclude 'secrets' --exclude 'state.json*' --exclude 'runs.json*' \
-  --exclude 'data' --exclude '.DS_Store' \
-  ./ lcode-4c:~/stack/video2md/
-rsync -az --delete --exclude '.venv' --exclude 'logs' --exclude '__pycache__' \
-  --exclude 'gpu_router.json' --exclude '.DS_Store' \
-  ~/Desktop/开发项目/gpu_router/ lcode-4c:~/stack/gpu_router/
+# 服务器上拉两仓库（或从开发机 rsync——排除 .venv/logs/secrets/data 等本地产物）
+git clone <本仓库地址> ~/stack/video2md
+git clone <gpu_router 地址>  ~/stack/gpu_router
 
-# 2. 凭证（0600；只放服务器，不进 git）
-#    secrets/video2md.env   ← LLM_BASE_URL / LLM_API_KEY / LLM_MODEL（本机 SSOT 是 ~/.config/video2md.env）
-#                            + V2MD_DEADMAN_PING_URL（可选，死人开关）
-#    secrets/gpu_router.env ← HTTP_PROXY=http://127.0.0.1:17897 等（出墙代理，SSH 隧道转发）
-#    secrets/obs.env        ← LANGFUSE_BASIC / HTTPS_PROXY / GF_SECURITY_ADMIN_PASSWORD（观测栈，可选）
-#    secrets/colab-cli/token.json（可选；缺了 colab provider 自动冷却）
-scp ~/.config/video2md.env lcode-4c:~/stack/video2md/secrets/video2md.env
-
-# 3. 构建（x86 原生构建；PIP_INDEX_URL 走清华镜像，ghcr/debian 源已换国内镜像）
-ssh lcode-4c 'cd ~/stack/video2md && \
-  PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple \
-  docker compose -f docker-compose.yml -f docker-compose.obs.yml build'
-#    ⚠ 实测 2026-09-22：依赖变更触发的全量 `uv sync` 在该机可能 0 CPU/0 socket 挂死
-#    （三次复现；小范围 uv pip install 正常）。挂死就杀掉重试 `--progress=plain`；
-#    纯代码改动可用补丁层秒级绕过：
-#      printf 'FROM video2md:latest\nCOPY video2md/ /app/video2md/\nCOPY acctkit/ /app/acctkit/\n' > /tmp/patch.Dockerfile
-#      docker build -t video2md:latest -f /tmp/patch.Dockerfile . && docker compose ... up -d
-#    依赖小版本升级同样绕得动（2026-09-22 langgraph 1.2.12 实操）：补丁层里加
-#      COPY pyproject.toml uv.lock /app/ 和
-#      RUN PIP_INDEX_URL=… UV_INDEX_URL=… uv pip install --python /app/.venv/bin/python \
-#          langgraph==<版本> langchain-core==<版本>
-#    （uv pip 不走挂死的 sync 代码路径；版本与 uv.lock 保持一致）
-
-# 4. 起栈（含观测栈：collector/prometheus/grafana）+ 体检
-ssh lcode-4c 'cd ~/stack/video2md && \
-  docker compose -f docker-compose.yml -f docker-compose.obs.yml up -d && \
-  curl -s localhost:8790/healthz && curl -s localhost:8790/preflight && \
-  curl -s "localhost:9700/status?refresh=true" && \
-  docker logs video2md-otel-collector-1 2>&1 | tail -3'
-#    观测栈验证：curl -s 127.0.0.1:9090/-/healthy（prometheus）· curl -s 127.0.0.1:3000/api/health（grafana）
-#    真跑一条后：Langfuse Cloud 看 trace/generation；Grafana 走 ssh -L 3000:127.0.0.1:3000 lcode-4c
+# secrets/ 目录：
+#   secrets/video2md.env   ← LLM_BASE_URL / LLM_API_KEY / LLM_MODEL
+#                            + 多用户生产档（见下）+ V2MD_DEADMAN_PING_URL（可选，死人开关）
+#   secrets/gpu_router.env ← 出网代理 env（HTTP_PROXY 等，可选但强烈建议）
+#   secrets/obs.env        ← LANGFUSE_BASIC / GF_SECURITY_ADMIN_PASSWORD（观测栈，可选）
+#   secrets/colab-cli/token.json、secrets/kaggle/kaggle.json（可选）
 ```
+
+`secrets/video2md.env` 多用户生产档（完整键义见 `.env.example`）：
+
+```ini
+V2MD_AUTH=google                            # 绝不 off 上公网（见下检查清单）
+V2MD_AUTH_PROVIDERS=google,google_device    # 接微信扫码改 google,wechat
+V2MD_ARTIFACT_MODE=deliver                  # 云端不储存：outbox + ACK/TTL 即焚
+V2MD_CORS_ORIGINS=https://app.example.com   # GUI 前端 origin 白名单
+V2MD_ENV=production                         # 遥测环境标签（compose 已默认）
+GOOGLE_CLIENT_ID=xxxxx.apps.googleusercontent.com
+# GOOGLE_CLIENT_SECRET=…     # 仅设备流需要（TV/Limited-Input 型 client）
+# WECHAT_APP_ID / WECHAT_APP_SECRET=…        # 微信扫码（可选）
+# V2MD_PG_DSN=postgresql://… # Postgres checkpointer（可选，缺省 sqlite）
+```
+
+**2. 构建 + 起栈 + 体检**（国内服务器可 `PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple` 加速）：
+
+```bash
+cd ~/stack/video2md
+docker compose -f docker-compose.yml -f docker-compose.obs.yml build
+docker compose -f docker-compose.yml -f docker-compose.obs.yml up -d
+curl -s localhost:8790/healthz && curl -s localhost:8790/preflight && \
+  curl -s "localhost:9700/status?refresh=true"
+# 观测栈验证：curl -s 127.0.0.1:9090/-/healthy（prometheus）· curl -s 127.0.0.1:3000/api/health（grafana）
+# 真跑一条后：Langfuse Cloud 看 trace/generation；Grafana 访问见「可观测性」节
+```
+
+**3. 反代 TLS（公网唯一入口）**——api 只绑服务器回环（`V2MD_HOST=127.0.0.1`），公网
+流量全部经反代终结 TLS。nginx 示例（SSE 必须关缓冲，否则 `GET /runs/{id}/events`
+事件流被攒包）：
+
+```nginx
+server {
+    listen 443 ssl http2;
+    server_name api.example.com;
+    ssl_certificate     /etc/letsencrypt/live/api.example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/api.example.com/privkey.pem;
+
+    location / {
+        proxy_pass http://127.0.0.1:8790;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_buffering off;         # SSE 必需
+        proxy_read_timeout 3600s;    # bundle 大包下载 / SSE 长连接
+        client_max_body_size 512m;   # 预留将来上传面
+    }
+}
+```
+
+Caddy 等价（自动 TLS，主体两行）：
+
+```caddyfile
+api.example.com {
+    reverse_proxy 127.0.0.1:8790 { flush_interval -1 }   # flush_interval -1 = SSE 不缓冲
+}
+```
+
+安全组口径：**只放行 80/443**；api(8790)、算力池(9700)、观测栈(3000/9090/4318…) 全部
+只绑回环，公网不可达。
+
+**4. 公网上线检查清单**：
+
+| 项 | 口径 |
+|---|---|
+| `V2MD_AUTH` | 必须 `google`——`off` 档下测试头 `X-Test-Auth` 可假冒任意 uid，等于裸奔 |
+| `V2MD_CORS_ORIGINS` | GUI 前端 origin 白名单（逗号分隔；空 = 不挂 CORS 中间件，仅同源/内网适用） |
+| `V2MD_ARTIFACT_MODE` | `deliver`（多用户「云端不储存」；vault 直写是开发/自托管姿势） |
+| `V2MD_ENV` | `production`（compose 已配；Langfuse 开发/生产分项目） |
+| `/docs` `/openapi.json` | 生产由网关关闭（反代 deny 该路径） |
+| `/healthz` `/queue` `/preflight` | 刻意不鉴权（docker healthcheck / 看门狗探针在打）；经反代后公网同样可达——介意信息暴露可在反代层限源 |
 
 ### 备份与恢复（2026-09-23）
 
 `scripts/backup.sh`（服务器上跑，cron 每日）：打包 `v2md-data` 卷（state/runs/users/
-checkpoints/logs）+ `vault` 卷（笔记产物——Syncthing 只算同步不算备份，误删会照样同步
-过去）+ PG 在跑时 `pg_dump`；落盘 `backups/daily/`（默认留 7 份）+ `backups/weekly/`
+checkpoints/logs）+ `vault` 卷（vault 模式产物——deliver 形态不用此卷）+ PG 在跑时
+`pg_dump`；落盘 `backups/daily/`（默认留 7 份）+ `backups/weekly/`
 （周一晋升，留 4 份）+ sha256 manifest。恢复走 `scripts/restore.sh <日期>`（先校验
 manifest，覆盖前自动快照现有卷到 `backups/pre-restore-<日期>/`）。
 
@@ -121,21 +171,57 @@ manifest，覆盖前自动快照现有卷到 `backups/pre-restore-<日期>/`）�
 15 4 * * * /home/<user>/stack/video2md/scripts/backup.sh >> /var/log/v2md-backup.log 2>&1
 
 # 手动跑 / 恢复演练（建议每季度做一次：恢复到临时 dst 验证归档可用）
-ssh lcode-4c '~/stack/video2md/scripts/backup.sh --dst /mnt/backup/v2md'
-ssh lcode-4c '~/stack/video2md/scripts/restore.sh 2026-09-23 --only data'   # 交互确认
+ssh <server> '~/stack/video2md/scripts/backup.sh --dst /mnt/backup/v2md'
+ssh <server> '~/stack/video2md/scripts/restore.sh 2026-09-23 --only data'   # 交互确认
 ```
 
 - **secrets/ 不在卷里**：`secrets/video2md.env`、`secrets/obs.env`、colab/kaggle token
-  在宿主目录——手工纳入你的备份（或至少记入密码管理器）；丢了 = LLM 凭证/飞书机器人重配。
+  在宿主目录——手工纳入你的备份（或至少记入密码管理器）；丢了 = LLM 凭证/登录配置重配。
 - **一致性口径**：runs.json/state.json 原子 rename 写，tar 视角恒完整；checkpoints.sqlite
   可丢弃（成功 run 会删 checkpoint），接受瞬时不一致；严格一致可先 `docker compose stop video2md` 再备。
-- **异地上传**（rclone/restic 推 B2/S3/OSS）暂未集成——本地盘炸 = 备份同灭，上云前
-  备份只防「误删/坏卷」不防「整机损失」。
+- **异地容灾**：`V2MD_BACKUP_REMOTE`（rclone remote，如 `b2:v2md-backup`）配置后
+  `backup.sh` 在本地备份 + manifest 校验完自动 `rclone copy` 推对象存储——只落本地盘的
+  备份防不了整机损失，异地副本是数据安全面的一环（见[终局布局](#终局布局云服务器--多用户)）。
 
-- **网络拓扑**：双服务均 `network_mode: host`——gpu_router 要直连宿主回环上的隧道代理
-  （`127.0.0.1:17897`），video2md 与池子互访也走回环。api 绑 `127.0.0.1:8790`（无认证，
-  公网经安全组拦截；外部调用走 SSH 隧道 `ssh -L 8790:127.0.0.1:8790 lcode-4c` 或加 nginx 反代）
-- **Postgres checkpointer（按需，缺省 sqlite 零变化）**：`V2MD_CHECKPOINTER=postgres` +
+### 发布与回滚
+
+镜像经 CI 发布 GHCR（不可变 tag），部署/回滚走 tag 驱动脚本：
+
+```bash
+# 发版：打 tag 推上去 → CI release job 构建 + push ghcr.io/mintao1/video2md
+#   （tag = semver + sha-<短哈希>；镜像 LABEL 带 version/revision）
+git tag v0.3.0 && git push origin v0.3.0
+
+# 部署：目标机 checkout tag → compose build → up -d → healthz/preflight 体检
+scripts/deploy.sh v0.3.0 --host user@server          # 或设 V2MD_DEPLOY_HOST
+
+# 回滚 = 部署上一个可用 tag（体检失败时脚本非零退出并提示）
+scripts/deploy.sh v0.2.0 --host user@server
+```
+
+- GHCR 镜像同时是**灾备存档**：git 不可用时可 `docker pull ghcr.io/mintao1/video2md:<tag>`
+  手动顶上；`/healthz` 的 `version` 字段与镜像 LABEL 同源（pyproject 单源），核对线上
+  版本不用进容器
+- 日常跟进 main：`scripts/deploy.sh main --host user@server`（跟随分支，不推荐生产）
+
+### 运行面要点
+
+- **并发与配额**（执行层/限流配额的落地键，全进程内零外部依赖）：`V2MD_MAX_CONCURRENT_RUNS`
+  （默认 1=单 worker 语义；调大前 checkpointer 建议切 postgres，vault 自托管保持 1）；
+  `V2MD_QUEUE_MAX`（总队列，超 → 429 `QUEUE_FULL`）/`V2MD_USER_QUEUE_MAX`（每用户在途，
+  429 `USER_QUEUE_FULL`）/`V2MD_USER_SUBMIT_PER_MIN`（60s 滑窗，429 `RATE_LIMITED`；
+  三者 0=不设限）。`/queue` 响应带 `limits` 档位；429 走统一错误信封
+- **上传面与路径白名单**（产物层）：`POST /uploads`（multipart，挂鉴权）流式落
+  `data/uploads/<uid>/`，带单文件上限（`V2MD_UPLOAD_MAX_GB`）、每用户配额
+  （`V2MD_UPLOAD_QUOTA_GB`）、类型白名单与 TTL 清扫（`V2MD_UPLOADS_TTL_H`）；返回的
+  `path` 直接喂 `POST /runs`。非 http 输入按 `V2MD_LOCAL_PATHS`（默认 `auto`：
+  AUTH=off 放行本地路径=开发/自托管姿势，鉴权档只认本人 uploads 白名单内路径；
+  `allow`/`deny` 显式覆盖）——拒绝 422 `LOCAL_PATH_FORBIDDEN`
+- **网络拓扑**：双服务均 `network_mode: host`——算力池/队列在宿主回环
+  （`127.0.0.1:9700`），出网代理也常驻宿主回环（桥接网络够不到）。api 绑
+  `127.0.0.1:8790`，公网唯一入口 = 反代 TLS（见部署章）；服务器本地调试可
+  `ssh -L 8790:127.0.0.1:8790 <server>` 打隧道。
+- **Postgres checkpointer（按需，缺省 sqlite）**：`V2MD_CHECKPOINTER=postgres` +
   `V2MD_PG_DSN`（两行进 `secrets/video2md.env`）。compose 的 postgres:17-alpine 挂
   `profiles:["pg"]` 默认**不起**（外部托管 PG 只给 DSN 同入口）：
   ```bash
@@ -143,37 +229,35 @@ ssh lcode-4c '~/stack/video2md/scripts/restore.sh 2026-09-23 --only data'   # �
   echo 'V2MD_PG_DSN=postgresql://v2md:***@127.0.0.1:5432/v2md' >> secrets/video2md.env
   docker compose --profile pg up -d postgres   # PG 未就绪时 api fail-fast + restart 自拉起
   ```
-  依赖变更走上面的 patch 层实操（uv sync 挂死教训）：
-  ```dockerfile
-  COPY pyproject.toml uv.lock /app/
-  RUN PIP_INDEX_URL=… uv pip install --python /app/.venv/bin/python \
-      langgraph-checkpoint-postgres==3.1.2 "psycopg[binary,pool]==3.3.6"
-  ```
   checkpoint 是易失数据（done 即 `delete_thread` 裁剪），**无存量迁移**。
-- **deliver 形态激活（按需，缺省 vault 零变化）**：`V2MD_ARTIFACT_MODE=deliver` +
+- **deliver 形态激活**：`V2MD_ARTIFACT_MODE=deliver` +
   可选 `V2MD_OUTBOX_DIR`（容器指 data 卷）/`V2MD_OUTBOX_TTL_H`（默认 24）。
   产物不落 vault、runs.json 不养正文，bundle 拉取 + ACK/TTL 双路即焚（契约见
   [HTTP 后端契约](#http-后端契约多用户产品--phase-12)节）
-- **国内站风控**：机房 IP 直连 B站 秒 412，故 `V2MD_PROXY + V2MD_PROXY_DOMESTIC=1`
-  让 yt-dlp 子进程走隧道出口（住宅 IP）；进程内 httpx（LLM 等）不受影响仍直连
-- **YouTube**：同一隧道出口即可（`V2MD_PROXY` 对非国内站同样生效）；隧道断则境外源不可用
+- **出网与风控（厂商中立口径）**：云服务器访问境外源（YouTube/Colab/Kaggle/HF/Langfuse）
+  需出网代理时配 `V2MD_PROXY`——只作用于 yt-dlp 等子进程，进程内 httpx（LLM 等）不受
+  影响仍直连。国内视频站（B站/抖音/小红书）对机房 IP 风控（B站对境外 IP 412 + 对
+  非大陆 IP 地域锁，普通机场节点实测全灭）：需 `V2MD_PROXY_DOMESTIC=1` 且代理侧有
+  **大陆住宅类出口**才能稳定抓取——这是选代理链路的硬约束，部署前先验证。
 - **无可用 provider 时**：池子 `/status` 全灭 → 转写失败。兜底选项：给
-  `gpu_router.docker.json` 的 `aliyun` provider 填国内 GPU 容器地址，或给服务器配独立代理
+  `gpu_router.docker.json` 的 `aliyun` provider 填国内 GPU 容器地址
 
-### Syncthing（笔记同步回本地 Obsidian · 可选兜底）
+## 终局布局（云服务器 · 多用户）
 
-服务器上 vault 卷 ↔ Mac 的 Obsidian vault。Syncthing 免费 P2P、二进制友好（mp4 节段）：
+单公网入口、账目按 uid 隔离、算力池化、云端不储存、异地容灾——各层布局：
 
-```bash
-# 服务器：docker 跑 syncthing（挂载 vault 卷），或 apt install syncthing 后 systemd 跑
-# Mac：brew install syncthing（或 syncthing-macos）
-# 两侧互加设备（服务器安全组开 22000/tcp 或走 relay），共享文件夹：
-#   服务器端路径 = /var/lib/docker/volumes/video2md_vault/_data  →  Mac 端 = ~/Documents/Obsidian Vault/资料库/视频笔记
-# 仅需双向同步该目录；冲突策略默认即可（笔记只增不改）
-```
-
-> **与 Obsidian 插件的关系**：`obsidian-plugin/`（下节）走 API 主动领取，不碰卷——两条路
-> 互不冲突，可并存（vault 模式给 Syncthing，deliver 模式给插件）。
+| 层 | 布局 |
+|---|---|
+| 入口 | 域名 + 反代 TLS 是唯一公网入口（SSE 不缓冲；`/docs` `/openapi.json` 网关侧关闭）；安全组只放 80/443，api/算力池/观测栈全回环 |
+| 鉴权与账目 | acctkit 登录（Google id_token / 设备流 / 微信扫码，provider 可插拔）；身份表 `(provider, external_id) → uid` 首登开户、多 provider 归并同一 uid；run 按 uid 归属——越权 403、dedup 按 owner 隔离 |
+| 执行 | 多 worker 并发：队列调度 + 每用户并发上限 + 公平排队，单用户长任务不阻塞他人；进度事件经 Redis pub/sub 扇出，SSE 在多 worker 下口径一致 |
+| 状态 | Postgres 承载 users / runs / state（各存储走同协议适配器，如 `IdentityStore`）+ checkpointer；单文件 JSON 形态只属开发机 |
+| 产物 | deliver「云端不储存」：per-run outbox 在架 → bundle zip 拉取 → ACK/TTL 即焚；上传走专用上传面 + 路径白名单（不收裸本地路径） |
+| 限流配额 | per-user 限流（入口/反代层）+ 磁盘配额 + 队列长度上限 |
+| 算力 | gpu_router 算力池独立伸缩（Colab/Kaggle/Modal/ZeroGPU/国内云动态选举），与 api 解耦——api 侧零 GPU，服务器只跑轻编排 |
+| 数据安全 | 本地备份（daily/weekly + sha256 manifest + 季度恢复演练）+ rclone/restic 异地推对象存储（B2/S3/OSS） |
+| 发布 | CI（lint/test/build）→ 镜像 push registry（不可变 tag 锚 git sha）→ 部署流水线上线 + healthz/preflight 体检 → 按 tag 一键回滚 |
+| 观测告警 | OTel → collector → Langfuse（trace/LLM 成本按 uid 归因）+ Prometheus/Grafana（指标）；Alertmanager → 飞书卡片；死人开关 + run 卡死看门狗（exit 自愈） |
 
 ## Obsidian 插件（Video2MD Inbox · 产物回传主路）
 
@@ -182,34 +266,15 @@ ssh lcode-4c '~/stack/video2md/scripts/restore.sh 2026-09-23 --only data'   # �
 `DELETE artifacts` ACK 即焚。附带命令面板提交链接与 Google 设备流登录。工程在
 `obsidian-plugin/`（TypeScript + esbuild，CI 有独立 plugin job）。
 
-**前置**：服务器切 deliver 模式 + google_device 鉴权（compose env
-`V2MD_ARTIFACT_MODE: deliver`、`V2MD_AUTH_PROVIDERS: google,google_device`，
-secrets 里配 TV/Limited-Input 型 `GOOGLE_CLIENT_ID/SECRET`）；存量 run 收编用
+**前置**：服务器切 deliver 模式 + google_device 鉴权（生产档进 `secrets/video2md.env`：
+`V2MD_ARTIFACT_MODE=deliver`、`V2MD_AUTH_PROVIDERS=google,google_device`，
+另配 TV/Limited-Input 型 `GOOGLE_CLIENT_ID/SECRET`）；存量 run 收编用
 `python scripts/migrate_run_owner.py --to <uid> [--status done] [--dry-run]`。
 
-**SSH 隧道（launchd 常驻，仿 9222 CDP 隧道先例）**——API 只绑服务器回环，插件经隧道访问：
-
-```bash
-mkdir -p ~/Library/LaunchAgents
-cat > ~/Library/LaunchAgents/com.video2md.tunnel.plist <<'EOF'
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0"><dict>
-  <key>Label</key><string>com.video2md.tunnel</string>
-  <key>ProgramArguments</key><array>
-    <string>/usr/bin/ssh</string><string>-N</string>
-    <string>-o</string><string>ServerAliveInterval=30</string>
-    <string>-o</string><string>ExitOnForwardFailure=yes</string>
-    <string>-L</string><string>8790:127.0.0.1:8790</string>
-    <string>lcode-4c</string>
-  </array>
-  <key>RunAtLoad</key><true/>
-  <key>KeepAlive</key><true/>
-</dict></plist>
-EOF
-launchctl load ~/Library/LaunchAgents/com.video2md.tunnel.plist
-curl -s http://127.0.0.1:8790/healthz   # {"ok":true,...} 即隧道通
-```
+**API 访问**——云服务器形态：按部署章起反代 TLS 后，插件设置页填
+`https://api.example.com`，「登录」走 Google 设备流（浏览器输码授权）即可，无需任何
+隧道。自托管单机形态 API 只绑回环时，可 `ssh -L 8790:127.0.0.1:8790 <server>` 隧道
+访问 `http://127.0.0.1:8790`（常驻可做成系统服务）。
 
 **构建与安装**：
 
@@ -229,6 +294,17 @@ cp main.js manifest.json "$HOME/Documents/Obsidian Vault/.obsidian/plugins/video
 # 发起（同步解析建 run → 后台跑图；合集自动展开，part_items 分窗，force 全量重跑，review 开校对）
 curl -X POST localhost:8790/runs -H 'Content-Type: application/json' \
   -d '{"url": "https://www.bilibili.com/video/BV…", "part_items": "1,3-5", "force": false, "review": false}'
+
+# 生产（云服务器 · 多用户）：公网域名 + 登录态（id_token 从前端登录侧拿）
+curl -X POST https://api.example.com/runs -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer <google_id_token>' \
+  -d '{"url": "https://www.youtube.com/watch?v=…"}'
+
+# 本地文件走上传面（多用户）：上传 → path 直接喂 /runs
+up=$(curl -s -X POST https://api.example.com/uploads \
+  -H 'Authorization: Bearer <google_id_token>' -F file=@demo.mp4 | jq -r .path)
+curl -X POST https://api.example.com/runs -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer <google_id_token>' -d "{\"url\": \"$up\"}"
 
 # 状态 / 产物
 curl localhost:8790/runs/<run_id>          # 终态 + 逐条目 done map + partial_failures
@@ -277,24 +353,25 @@ GUI 前端把本服务当正式后端：契约硬化在 `video2md/models.py`（P
   取 unionid 优先（openid 兜底），`put_identity("wechat", <unionid>, <同一 uid>)` 把微信
   身份归并到已存在的 Google uid，两家登录进同一个账号（见 `test_acctkit` 双 provider 归并测）。
 - CORS：`V2MD_CORS_ORIGINS` 逗号列表放行 GUI origin（空=不挂中间件）。
-  生产绑公网务必 `V2MD_AUTH=google` + 反代 TLS（Google 回调需 https）。
+  生产绑公网务必 `V2MD_AUTH=google` + 反代 TLS（Google 回调需 https）——完整口径见
+  部署章「公网上线检查清单」。
 - `/healthz` `/queue` `/preflight` **保持不鉴权**（docker healthcheck / gpu_router 看门狗在打）。
 
 **进度双通道**：轮询 `GET /runs/{id}` 保留原形状；新增 SSE
 `GET /runs/{run_id}/events`（text/event-stream，同样过 owner 校验）——
 连上先推 `{"event":"connected","status","url"}` 快照，之后每条 `data:` 即
 `logs/run-*.jsonl` 的事件记录（含 `graph:*` 图级事件），15s 无事件发 `: ping`，
-`graph:end`/终态即关流。进程内总线扇出（`video2md/events.py`），多 worker 前的
-Redis pub/sub 留 Phase 2。
+`graph:end`/终态即关流。事件总线扇出（`video2md/events.py`；多 worker 形态下经
+Redis pub/sub，见终局布局·执行层）。
 
 **错误契约**：非 2xx 统一 `{"error": {"code", "message", "details"}}`
 （`AUTH_REQUIRED`/`FORBIDDEN`/`NOT_FOUND`/`VALIDATION`…；422 带定位信息）。
 
-**产物形态双模式（`V2MD_ARTIFACT_MODE`，缺省 vault=现状零变化）**：
+**产物形态双模式（`V2MD_ARTIFACT_MODE`）**：
 
 | | `vault`（开发机默认） | `deliver`（多用户「云端不储存」） |
 |---|---|---|
-| 落点 | 直写 Obsidian vault（Syncthing 回本地） | per-run outbox → finalize 搬到在架位 `V2MD_OUTBOX_DIR/<run_id>/` |
+| 落点 | 直写 Obsidian vault（自托管，自行同步回本地） | per-run outbox → finalize 搬到在架位 `V2MD_OUTBOX_DIR/<run_id>/` |
 | runs.json | 养 `md` 全文（`/note` 的原语义） | **剥正文**——`/note` 从在架文件现读 |
 | 生命周期 | 永久（vault 归用户） | TTL（`V2MD_OUTBOX_TTL_H`，默认 24h）到期惰性焚 + 周期 sweep + 启动兜底；**ACK 即焚不等 TTL** |
 | 幂等跳过 | 同 URL 处理过即跳（旧语义） | 仅当**同 owner 且源产物还在架**才跳（否则老实重烧——产物在别人手里，跳过=给个拿不到东西的空条目）；命中时响应条目带 `from_run` 指旧 run |
@@ -414,9 +491,11 @@ evals 旁路：scripts/eval_notes.py → Langfuse scores（SDK 直挂，黑洞�
   设计依据存档：`docs/research/2026-09-22-otel-critique-review.md`——traceId 为何用
   sha256 约定 + OTel SpanContext 锚（合法 SDK 机制，四组件免 Langfuse SDK 对齐）
   而非 `create_trace_id`；`/fail` 是 healthchecks.io 标准告警路径；RAGAS 保留决策。
-- **指标（Grafana）**：起观测栈后 `ssh -L 3000:127.0.0.1:3000 lcode-4c` →
-  http://127.0.0.1:3000 看预置看板：run 终态速率、阶段耗时、LLM token/调用量、
-  熔断计数、队列深度。指标进程内存态，重启清零（运行态非账本）。
+- **指标（Grafana）**：Grafana 仅绑服务器回环——本地经
+  `ssh -L 3000:127.0.0.1:3000 <server>` 隧道（或反代 + 自行加访问控制）打开
+  dashboards 看预置看板：run 终态速率、阶段耗时、LLM token/调用量、熔断计数、队列深度。
+  指标进程内存态，重启清零（运行态非账本）。已开匿名只读（GF_AUTH_ANONYMOUS_*，
+  面板仅回环+隧道可达，写操作仍需 admin）。
 - **死人开关**：配 `V2MD_DEADMAN_PING_URL` 后 run 开始 ping `/start`、done/partial
   ping 原 URL、error ping `/fail`——「任务压根没跑/挂死」只有外部监控看得见。
 - **run 卡死看门狗（2026-09-23）**：`video2md/watchdog.py`——graph.invoke 无超时，
@@ -503,4 +582,5 @@ kb.py（Dify dataset 入库）、对应测试与 dify 专属运维脚本。**新
   云上容器不含 whisper——转写必须走算力池
 - **换 LLM**：改 `~/.config/video2md.env` 的 `LLM_BASE_URL/LLM_API_KEY/LLM_MODEL`，重启服务
 - **从 Dify 迁来**：`legacy/` 里的 DSL 不再维护；Dify 基座（`~/dify/docker`）可整体停用
-- **隐私**：视频本体不出本机/本服务器；转录文本经 LLM 中转（`LLM_BASE_URL` 指向的服务）
+- **隐私**：deliver 模式云端不留产物（bundle 拉取 + ACK/TTL 即焚，tmp 跑完必删）；
+  转录文本经 LLM 中转（`LLM_BASE_URL` 指向的服务）

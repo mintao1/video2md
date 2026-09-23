@@ -1,4 +1,4 @@
-# video2md + gpu_router 生产编排（lcode-4c）。
+# video2md + gpu_router 生产编排（云服务器 · 多用户）。
 # 目录约定：两仓库同级（默认 ../gpu_router；可用 GPU_ROUTER_DIR 环境变量覆盖，
 # 如 Mac 上 GPU_ROUTER_DIR=~/Desktop/开发项目/gpu_router）。
 # 凭证：secrets/ 目录（gitignore，部署时手工放）：
@@ -9,7 +9,7 @@ name: video2md
 
 volumes:
   v2md-data: {}        # state.json / runs.json / checkpoints.sqlite / logs
-  vault: {}            # 笔记产物（Syncthing 同步回本地 Obsidian 的就是这个卷）
+  vault: {}            # vault 模式产物卷（deliver 多用户形态不用此卷）
   gpu-router-logs: {}  # provider 冷却/用量记账
   v2md-pg: {}          # Postgres checkpointer 数据（仅 --profile pg 时用到）
 
@@ -21,8 +21,9 @@ services:
         PIP_INDEX_URL: ${PIP_INDEX_URL:-}   # 国内机构建传清华镜像，见 README 部署章
     image: video2md-gpu-router
     restart: unless-stopped
-    # host 网络：Colab/Kaggle/HF 的出墙代理是宿主机 127.0.0.1:17897（Mac 的 SSH 隧道转发），
-    # 桥接网络够不到宿主回环——host 网络直连。9700 监听全接口但安全组不放行（无认证不暴露公网）
+    # host 网络：出网代理常驻宿主回环（桥接网络够不到），host 直连；代理地址按服务器实际
+    # 进 secrets/gpu_router.env。9700 监听全接口但安全组不放行（无认证不暴露公网；
+    # 公网唯一入口 = api 侧反代 TLS，见 README 部署章）
     network_mode: host
     volumes:
       - ${GPU_ROUTER_DIR:-../gpu_router}/gpu_router.docker.json:/app/gpu_router.json:ro
@@ -30,7 +31,7 @@ services:
       - ./secrets/colab-cli:/root/.config/colab-cli   # rw：OAuth token 刷新要回写 token.json
       - ./secrets/kaggle:/root/.kaggle:ro
     env_file:
-      - path: ./secrets/gpu_router.env   # HTTP_PROXY=http://127.0.0.1:17897 等
+      - path: ./secrets/gpu_router.env   # HTTP_PROXY=http://127.0.0.1:<回环代理端口> 等
         required: false
 
   video2md:
@@ -44,19 +45,24 @@ services:
       gpu_router:
         condition: service_started
     # host 网络：① 算力池/队列都在宿主回环（127.0.0.1:9700 / :8790）；② yt-dlp 子进程
-    # 走 V2MD_PROXY=127.0.0.1:17897（SSH 隧道出口）绕国内站对机房 IP 的风控。
-    # api 绑定 V2MD_HOST=127.0.0.1（无认证服务，只露回环；外用 SSH 隧道/nginx，见 README）
+    # 走 V2MD_PROXY 绕国内站对机房 IP 的风控（代理侧需大陆住宅出口，见 README「出网与风控」）。
+    # api 绑定 V2MD_HOST=127.0.0.1 只露回环——公网唯一入口 = 反代 TLS（见 README 部署章）；
+    # 多用户生产档键（V2MD_AUTH / ARTIFACT_MODE / CORS_ORIGINS / GOOGLE_CLIENT_ID…）
+    # 进 secrets/video2md.env（由 V2MD_SECRETS_FILE 读，不走 compose env）
     network_mode: host
     environment:
       TZ: Asia/Shanghai
       V2MD_HOST: 127.0.0.1
       V2MD_ENV: production   # 遥测环境标签：Langfuse 开发/生产分项目（README 可观测性节）
+      # 执行层档位进 secrets/video2md.env 按服务器核数调（键义见 .env.example）：
+      #   V2MD_MAX_CONCURRENT_RUNS=2 起 + V2MD_QUEUE_MAX/V2MD_USER_QUEUE_MAX；
+      #   并发>1 时 checkpointer 配套切 postgres（V2MD_CHECKPOINTER=postgres + PG_DSN）
       V2MD_SECRETS_FILE: /run/video2md.env
       V2MD_REMOTE: http://127.0.0.1:9700
       V2MD_OCR_REMOTE: http://127.0.0.1:9700
       V2MD_CLIPS_REMOTE: http://127.0.0.1:9700
       V2MD_CLIPS_SOURCE: remote
-      V2MD_PROXY: http://127.0.0.1:17897
+      V2MD_PROXY: http://127.0.0.1:17898
       V2MD_PROXY_DOMESTIC: "1"
       # run 卡死看门狗：生产配 exit——标 error 后进程退出（码 70），restart 自愈并恢复队列；
       # 开发机默认 mark（只标记+告警，不动进程）。详见 video2md/watchdog.py 模块注释
