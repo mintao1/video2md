@@ -31,7 +31,14 @@ import sys
 import time
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+# 项目根进 path：脚本可能放在项目外（容器里挂 /work/rp.py），此时以镜像代码所在目录
+# （-w /app）兜底。'' in sys.path 时它已指向脚本目录，补上父级即可。
+_root = Path(__file__).resolve().parent.parent
+if not (_root / "video2md").is_dir():
+    _root = Path.cwd()
+for p in (str(_root), str(_root / ".venv" / "lib" / "python3.12" / "site-packages")):
+    if p not in sys.path and Path(p).exists():
+        sys.path.insert(0, p)
 
 from video2md import runs  # noqa: E402
 from video2md.graph import resolve_run  # noqa: E402
