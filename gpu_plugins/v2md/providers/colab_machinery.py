@@ -545,11 +545,16 @@ def colab_run_ocr(images: list[Path], tmp: Path) -> list[dict]:
     t0 = time.time()
     try:
         _ensure_colab_session()
+        # 探测必须跑 worker 的真 import（from rapidocr import RapidOCR）：
+        # `import rapidocr` 只测包在不在，测不到 onnxruntime 后端缺失——
+        # colab 回收重建后 pip 列表里 rapidocr 还在、onnxruntime 却被裁掉，
+        # 旧写法「DEPS-OK」直接放行 → 整批 OCR 跑到远端才炸
+        # 「onnxruntime is not installed.」（实测烧掉 6be93c9d 一整轮）。
         probe = _colab(["exec", "-s", SESSION], timeout=300, retries=2,
-                       stdin="import rapidocr\nprint('DEPS' + '-OK')")
+                       stdin="from rapidocr import RapidOCR\nprint('DEPS' + '-OK')")
         if "DEPS-OK" not in probe:
-            print("  ⏳ 会话内安装 rapidocr…")
-            _colab(["install", "-s", SESSION, "rapidocr"], timeout=600)
+            print("  ⏳ 会话内安装 rapidocr + onnxruntime…")
+            _colab(["install", "-s", SESSION, "rapidocr", "onnxruntime"], timeout=600)
         for local, remote in ((tar, "/content/frames.tar"),
                               (worker, "/content/v2md_worker.py")):
             _colab(["upload", "-s", SESSION, str(local), remote], timeout=600)
