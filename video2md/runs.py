@@ -191,6 +191,11 @@ def create_run(url: str, part_items: str = "", force: bool = False,
 _CRITICAL_STAGE_OK = {"download": "video", "transcribe": "segs",
                       "frames": "candidates", "ocr": "ocr_raw"}
 
+# 断点续跑的产物守卫：阶段 → 「出什么算完成」。熔断重驱动时循环头即跳，不重复烧。
+# clips 的产物字段是 clips_done（见 _stage_clips）；select/note 各自 published/note。
+_STAGE_OK_FIELD = {**_CRITICAL_STAGE_OK, "select": "published", "clips": "clips_done",
+                   "note": "note"}
+
 
 
 _CB_GLOBAL_PAT = re.compile(
@@ -265,12 +270,20 @@ def _run_stage_inner(run: dict, stage: str, args: dict, log: "RunLog") -> None:
     failed: list[str] = []
     last_sig, streak, breaker = "", 0, ""
     cb_threshold = int(ENV.get("V2MD_CB_THRESHOLD", "3"))
+    ok_field = _STAGE_OK_FIELD.get(stage)
     for idx, entry in enumerate(run["entries"], 1):
         from . import watchdog  # 惰性导入：每条目开头打心跳（长阶段日志稀疏，事件流会饿）
         watchdog.touch(run["run_id"])
         art = run["artifacts"].setdefault(entry["url"], {})
         if art.get("skipped"):
             print(f"    ⏭ 条目 {idx}/{len(run['entries'])} 已处理过（state 幂等），跳过")
+            continue
+        # 断点续跑：上一轮该阶段已出产物即跳——熔断烧掉的 run 重驱动时不再白烧 token
+        # （实测 2e6466b7：download 全成 → transcribe 熔 → 重驱动若逐条重下载+重转录，
+        # 每条多花 5min 只为撞同一个 colab 回收）。各阶段函数本有产物守卫，这里只是
+        # 把「跳过」提前到循环头、与 skipped 同款留痕。
+        if ok_field and art.get(ok_field):
+            print(f"    ⏭ 条目 {idx}/{len(run['entries'])} {stage} 已有产物，跳过")
             continue
         print(f"    · 条目 {idx}/{len(run['entries'])}：{stage}")
         # 多条目：每个条目一个子目录。共享 tmp 时 `frames/`、`asr/` 的 mkdir 会撞 FileExistsError
