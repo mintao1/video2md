@@ -57,6 +57,26 @@ jobs:
       - run: uv run ruff check video2md acctkit scripts
       - run: uv run mypy video2md acctkit
 
+  # Obsidian 插件（obsidian-plugin/）：类型检查 + 纯逻辑单测（zip-slip 闸/写盘计划/
+  # 索引去重）+ 生产打包。Node 24 跑 .ts 走 type-stripping，与本地开发口径一致。
+  plugin:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: obsidian-plugin/package-lock.json
+      - run: npm ci
+        working-directory: obsidian-plugin
+      - run: npx tsc --noEmit
+        working-directory: obsidian-plugin
+      - run: node --test src/*.test.ts
+        working-directory: obsidian-plugin
+      - run: npm run build
+        working-directory: obsidian-plugin
+
   # 生产镜像构建路径验证（此前只在服务器上验证过）
   docker-build:
     runs-on: ubuntu-latest

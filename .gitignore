@@ -19,3 +19,8 @@ deploy/smoke-vault/
 users.json
 users.json.lock
 users.json.tmp.*
+
+# Obsidian 插件构建产物与依赖
+obsidian-plugin/node_modules/
+obsidian-plugin/main.js
+obsidian-plugin/main.js.map

@@ -160,7 +160,7 @@ ssh lcode-4c '~/stack/video2md/scripts/restore.sh 2026-09-23 --only data'   # �
 - **无可用 provider 时**：池子 `/status` 全灭 → 转写失败。兜底选项：给
   `gpu_router.docker.json` 的 `aliyun` provider 填国内 GPU 容器地址，或给服务器配独立代理
 
-### Syncthing（笔记同步回本地 Obsidian）
+### Syncthing（笔记同步回本地 Obsidian · 可选兜底）
 
 服务器上 vault 卷 ↔ Mac 的 Obsidian vault。Syncthing 免费 P2P、二进制友好（mp4 节段）：
 
@@ -171,6 +171,57 @@ ssh lcode-4c '~/stack/video2md/scripts/restore.sh 2026-09-23 --only data'   # �
 #   服务器端路径 = /var/lib/docker/volumes/video2md_vault/_data  →  Mac 端 = ~/Documents/Obsidian Vault/资料库/视频笔记
 # 仅需双向同步该目录；冲突策略默认即可（笔记只增不改）
 ```
+
+> **与 Obsidian 插件的关系**：`obsidian-plugin/`（下节）走 API 主动领取，不碰卷——两条路
+> 互不冲突，可并存（vault 模式给 Syncthing，deliver 模式给插件）。
+
+## Obsidian 插件（Video2MD Inbox · 产物回传主路）
+
+把「服务器产物 → 开发侧 vault」解耦成装在 Obsidian 里的独立插件：轮询本人名下 done run →
+拉 `GET /runs/{id}/bundle` zip → 解包写进 `资料库/视频笔记/`（索引按 wikilink 去重 append）→
+`DELETE artifacts` ACK 即焚。附带命令面板提交链接与 Google 设备流登录。工程在
+`obsidian-plugin/`（TypeScript + esbuild，CI 有独立 plugin job）。
+
+**前置**：服务器切 deliver 模式 + google_device 鉴权（compose env
+`V2MD_ARTIFACT_MODE: deliver`、`V2MD_AUTH_PROVIDERS: google,google_device`，
+secrets 里配 TV/Limited-Input 型 `GOOGLE_CLIENT_ID/SECRET`）；存量 run 收编用
+`python scripts/migrate_run_owner.py --to <uid> [--status done] [--dry-run]`。
+
+**SSH 隧道（launchd 常驻，仿 9222 CDP 隧道先例）**——API 只绑服务器回环，插件经隧道访问：
+
+```bash
+mkdir -p ~/Library/LaunchAgents
+cat > ~/Library/LaunchAgents/com.video2md.tunnel.plist <<'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>Label</key><string>com.video2md.tunnel</string>
+  <key>ProgramArguments</key><array>
+    <string>/usr/bin/ssh</string><string>-N</string>
+    <string>-o</string><string>ServerAliveInterval=30</string>
+    <string>-o</string><string>ExitOnForwardFailure=yes</string>
+    <string>-L</string><string>8790:127.0.0.1:8790</string>
+    <string>lcode-4c</string>
+  </array>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+</dict></plist>
+EOF
+launchctl load ~/Library/LaunchAgents/com.video2md.tunnel.plist
+curl -s http://127.0.0.1:8790/healthz   # {"ok":true,...} 即隧道通
+```
+
+**构建与安装**：
+
+```bash
+cd obsidian-plugin && npm ci && npm run build
+mkdir -p "$HOME/Documents/Obsidian Vault/.obsidian/plugins/video2md-obsidian"
+cp main.js manifest.json "$HOME/Documents/Obsidian Vault/.obsidian/plugins/video2md-obsidian/"
+# Obsidian → 设置 → 第三方插件 → 启用 Video2MD Inbox → 设置页点「登录」（浏览器输码授权）
+```
+
+登录后状态栏显示同步节拍；`立即同步收件箱` 命令手动触发；设置页可调轮询间隔、目标
+文件夹与 autoAck。首次使用建议先点「连接测试」确认隧道与凭据两档都通。
 
 ## 用法
 
