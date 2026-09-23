@@ -8,7 +8,6 @@ import re
 import shutil
 import subprocess
 import time
-import urllib.parse
 from pathlib import Path
 
 import httpx
@@ -285,8 +284,19 @@ def douyin_user_resolve(url: str, *, max_pages: int = 40, budget_s: float = 240.
     except Exception as exc:
         raise RuntimeError("抖音博主枚举需要本机 Chrome 开着远程调试端口 9222（且已登录抖音）"
                              f"；当前连不上：{exc}") from exc
-    tab = httpx.put(f"{_CDP_HTTP}/json/new?{urllib.parse.quote(page_url, safe='')}",
-                    timeout=10).json()
+    # about:blank 开签、挂好监听再 navigate：直接带 URL 开签，首屏 post XHR 可能抢在
+    # Network.enable 前跑完——作品少到不翻页的博主全程只有这一条 XHR，漏接即判失败
+    # （2026-09-23 实测：11 作品博主稳定复现）；且重页面加载会拖垮 /json/new 的响应
+    # （httpx 超时但页签其实已建，还会漏签）。
+    try:
+        tab = httpx.put(f"{_CDP_HTTP}/json/new?about:blank", timeout=10).json()
+    except Exception:
+        # 响应丢了就从页签表认领最新的 about:blank（建好没收到回复的情形）；没有才真失败
+        blanks = [t for t in httpx.get(f"{_CDP_HTTP}/json", timeout=5).json()
+                  if t.get("type") == "page" and t.get("url") == "about:blank"]
+        if not blanks:
+            raise
+        tab = blanks[-1]
     tab_id, ws_url = tab["id"], tab["webSocketDebuggerUrl"]
     # Chrome 窗口被遮挡/最小化时渲染停摆 → IntersectionObserver 不触发 → 懒加载不翻页。
     # 扫描期间把窗口唤到前台（实测：可见时 27/27，遮挡时只能拿到第一页）
@@ -310,11 +320,14 @@ def douyin_user_resolve(url: str, *, max_pages: int = 40, budget_s: float = 240.
 
         send("Network.enable")
         send("Page.enable")
+        send("Page.navigate", {"url": page_url})  # 监听就绪后才导航：首屏 XHR 必被捕获
         body_calls: dict[int, str] = {}  # 消息 id → requestId
         t0 = time.time()
         last_n, stale_scrolls = -1, 0
         pages = 0
-        first_xhr_deadline = t0 + 25  # 页面渲染 + 首个 post XHR 的等待上限
+        # 首条 post XHR 等待上限。2026-09-23 实测：风控预热（verify_center 质询）会把首 XHR
+        # 拖到 16s+，质询重的时段超 25s 被误判「未登录」——放宽到 90s，真死会话代价只是多等一分钟
+        first_xhr_deadline = t0 + 90
         expect_n: int | None = None   # 页面「作品 N」声明的总数（确定性的翻页停止条件）
 
         def read_expect() -> None:
