@@ -17,6 +17,12 @@ vault/outbox。state.json 幂等：已出笔记的条目 resolve 时自动标 sk
   docker stop video2md-video2md-1
   docker exec video2md-video2md-1 python scripts/rescue_partial.py <run_id> [--dry-run] [--max-entries N]
   docker start video2md-video2md-1
+
+⚠️ 停 API 必须用 `docker update --restart=no <c> && docker stop <c>`（或先 stop batch
+容器）：compose 的 restart=unless-stopped 下 `docker stop` 会触发 daemon 对「被停止时
+restart 开着」的容器在 exec 间隙立即拉起（实测踩过），API 复活即恢复中断 run、与脚本
+双写 vault。本脚本自带防护：入口把其它 running run 的 tmp_cleaned 置位——重启恢复扫
+不碰它们的目录（tmp 保留），只是该轮不自动续跑（下次人工/重发同链驱动）。
 """
 import argparse
 import json
@@ -47,6 +53,21 @@ def main() -> int:
     if not old:
         print(f"❌ run {a.run_id} 不存在")
         return 1
+
+    # 防「stop 后 API 复活」：restart=unless-stopped 下 docker stop 会触发 daemon 在
+    # exec 间隙立即拉起容器（实测踩过），API 起来就恢复 running run、与脚本双写。
+    # tmp_cleaned=True 让 _cleanup_stale_runs/_prune_orphan_tmps/lifespan 恢复扫描三处
+    # 全部跳过这些目录——tmp 文件原地保留，只是该轮不自动续跑（下次重发同链驱动）。
+    with runs._runs_file_lock():
+        db2 = runs._load_runs()
+        n_guard = 0
+        for r in db2.values():
+            if r.get("status") == "running" and not r.get("tmp_cleaned"):
+                r["tmp_cleaned"] = True
+                n_guard += 1
+        if n_guard:
+            runs._save_runs(db2)
+            print(f"🛡 已给 {n_guard} 个 running run 上 tmp 保护（防 API 复活抢跑）")
     url = old.get("url", "")
     entries = old.get("entries", [])
     arts = old.get("artifacts", {})
