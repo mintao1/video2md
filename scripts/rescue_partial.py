@@ -46,6 +46,9 @@ def main() -> int:
     ap.add_argument("run_id")
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--max-entries", type=int, default=0, help="最多补几条（0=不限）")
+    ap.add_argument("--no-tmp-guard", dest="tmp_guard", action="store_false",
+                    help="不给其它 running run 的 tmp 上保护标志（默认给——防 API 复活；"
+                         "注意标志会让 finalize 跳过清理本 run tmp，抢救对象别是 running 态）")
     a = ap.parse_args()
 
     db = runs._load_runs()
@@ -58,16 +61,18 @@ def main() -> int:
     # exec 间隙立即拉起容器（实测踩过），API 起来就恢复 running run、与脚本双写。
     # tmp_cleaned=True 让 _cleanup_stale_runs/_prune_orphan_tmps/lifespan 恢复扫描三处
     # 全部跳过这些目录——tmp 文件原地保留，只是该轮不自动续跑（下次重发同链驱动）。
-    with runs._runs_file_lock():
-        db2 = runs._load_runs()
-        n_guard = 0
-        for r in db2.values():
-            if r.get("status") == "running" and not r.get("tmp_cleaned"):
-                r["tmp_cleaned"] = True
-                n_guard += 1
-        if n_guard:
-            runs._save_runs(db2)
-            print(f"🛡 已给 {n_guard} 个 running run 上 tmp 保护（防 API 复活抢跑）")
+    # ⚠ 副作用：finalize 也认这个标志不清理本 run 的 tmp——抢救对象自己别带 running。
+    if a.tmp_guard:
+        with runs._runs_file_lock():
+            db2 = runs._load_runs()
+            n_guard = 0
+            for r in db2.values():
+                if r.get("status") == "running" and not r.get("tmp_cleaned"):
+                    r["tmp_cleaned"] = True
+                    n_guard += 1
+            if n_guard:
+                runs._save_runs(db2)
+                print(f"🛡 已给 {n_guard} 个 running run 上 tmp 保护（防 API 复活抢跑）")
     url = old.get("url", "")
     entries = old.get("entries", [])
     arts = old.get("artifacts", {})
@@ -159,17 +164,24 @@ def drive_and_wait(url: str, rid: str, idx: int, owner: str,
 
     def _patch() -> None:
         # 搬视频须在入队之前：_run_stage 每阶段从 runs.json reload，先入队可能把
-        # 预置的 video path 冲掉。锁内读-改-写。
-        if dst is None:
-            return
+        # 预置的 video path 冲掉。锁内读-改-写。没搬成也要过一遍：把 state 携带的
+        # 死文件 video/images path 清掉，否则 download 见产物非空即「跳过」。
         with runs._runs_file_lock():
             fresh = runs._load_runs()[rid]
             a = fresh["artifacts"].setdefault(fresh["entries"][0]["url"], {})
             a.pop("skipped", None)
-            a.update(video=str(dst), duration=float(old_art.get("duration") or 0),
-                     width=int(old_art.get("width") or 0),
-                     height=int(old_art.get("height") or 0),
-                     fp=old_art.get("fp", ""), uploader=old_art.get("uploader", ""))
+            if dst is None:
+                for k in ("video", "images"):
+                    v = a.get(k)
+                    dead = (not v) if isinstance(v, list) else \
+                        (bool(v) and not Path(v).is_file())
+                    if k in a and (dead or not v):
+                        a.pop(k, None)
+            else:
+                a.update(video=str(dst), duration=float(old_art.get("duration") or 0),
+                         width=int(old_art.get("width") or 0),
+                         height=int(old_art.get("height") or 0),
+                         fp=old_art.get("fp", ""), uploader=old_art.get("uploader", ""))
             runs._runs_merge(fresh)
 
     async def _submit() -> None:
