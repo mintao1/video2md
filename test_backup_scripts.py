@@ -128,5 +128,58 @@ r = run_restore("2026-09-23", "--dst", str(dst), "--only", "data", "--yes")
 assert r.returncode == 1 and "manifest 校验失败" in r.stderr, \
     f"manifest 不匹配必须拒绝恢复：{r.stdout} {r.stderr}"
 
+# ---- 7. 异地容灾：V2MD_BACKUP_REMOTE 驱动 rclone；失败不阻断本地保留 -----------------
+RCLONE_CALLS = TMP / "rclone-calls.log"
+RCLONE_CALLS.unlink(missing_ok=True)
+(SHIM / "rclone").write_text(f"""#!/bin/bash
+echo "$*" >> {RCLONE_CALLS}
+exit 0
+""")
+(SHIM / "rclone").chmod(0o755)
+
+
+def run_backup_env(env: dict, *args: str) -> subprocess.CompletedProcess:
+    return subprocess.run(["bash", str(BACKUP), *args], env=env,
+                          capture_output=True, text=True, timeout=60)
+
+
+# 未配 remote → 不推 rclone
+dst7 = TMP / "bak-remote-off"
+r = run_backup("--dst", str(dst7))
+assert r.returncode == 0, r.stderr
+assert not RCLONE_CALLS.exists() or not RCLONE_CALLS.read_text().strip(), \
+    "未配 V2MD_BACKUP_REMOTE 不得推远端"
+
+# 配了 remote → rclone copy <dst> <remote>（排 .lock），本地链路照常
+ENV_REMOTE = {**ENV, "V2MD_BACKUP_REMOTE": "b2:v2md-backup"}
+dst8 = TMP / "bak-remote-on"
+r = run_backup_env(ENV_REMOTE, "--dst", str(dst8))
+assert r.returncode == 0, r.stderr
+assert "异地推送" in r.stdout, r.stdout
+c = RCLONE_CALLS.read_text()
+assert f"copy {dst8} b2:v2md-backup --transfers 4" in c, c
+assert "--exclude .lock/**" in c, "锁目录不得推远端"
+assert (dst8 / "manifest.sha256").exists(), "本地 manifest 不受 remote 影响"
+
+# rclone 失败 → 只告警不阻断（退出码 3 区分），本地备份照留
+RCLONE_CALLS.unlink(missing_ok=True)
+(SHIM / "rclone").write_text(f"""#!/bin/bash
+echo "$*" >> {RCLONE_CALLS}
+exit 1
+""")
+(SHIM / "rclone").chmod(0o755)
+dst9 = TMP / "bak-remote-fail"
+r = run_backup_env(ENV_REMOTE, "--dst", str(dst9))
+assert r.returncode == 3, f"rclone 失败应以退出码 3 区分：{r.returncode}"
+assert "rclone 推送失败" in r.stderr, r.stderr
+assert (dst9 / "manifest.sha256").exists(), "失败不阻断本地保留"
+
+# 配了 remote 但服务器无 rclone → 同样告警退出 3
+(SHIM / "rclone").unlink()
+dst10 = TMP / "bak-remote-nobin"
+r = run_backup_env(ENV_REMOTE, "--dst", str(dst10))
+assert r.returncode == 3 and "无 rclone" in r.stderr, (r.returncode, r.stderr)
+assert (dst10 / "manifest.sha256").exists()
+
 shutil.rmtree(TMP, ignore_errors=True)
 print("✅ test_backup_scripts.py 全部通过")

@@ -134,11 +134,20 @@ class RunNotesOut(BaseModel):
 class QueueOut(BaseModel):
     queue_len: int
     running: int
+    limits: dict[str, int] | None = Field(
+        None, description="执行层档位（max_concurrent/queue_max/user_queue_max；0=不设限）")
 
 
 class HealthOut(BaseModel):
     ok: bool
     ts: str
+    version: str = Field("", description="运行中版本（pyproject dist metadata 单源）")
+
+
+class UploadOut(BaseModel):
+    path: str = Field(description="落地路径（容器内绝对路径，直接作为 POST /runs 的 url）")
+    size: int = Field(description="字节数")
+    name: str = Field(description="原始文件名（sanitize 后）")
 
 
 class PreflightCheck(BaseModel):

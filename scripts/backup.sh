@@ -3,21 +3,23 @@
 #
 # 备什么（对齐 docker-compose.yml 卷）：
 #   - v2md-data 卷   state.json / runs.json / users.json / checkpoints.sqlite / logs（SSOT 小文件）
-#   - vault 卷       笔记产物（Syncthing 只算同步不算备份——误删/勒索会照样同步过去）
+#   - vault 卷       vault 模式笔记产物（自托管形态；同步 ≠ 备份——误删/勒索会照样同步过去）
 #   - Postgres       仅当容器在跑时 pg_dump（checkpointer 数据；成功 run 会删 checkpoint，
 #                    本卷可丢弃度高，dump 失败不阻断整体备份，只告警退出码）
+#   - 异地容灾       V2MD_BACKUP_REMOTE 配了 rclone remote（如 b2:v2md-backup）则推远端
+#                    （对象存储 B2/S3/OSS）；失败只告警不阻断本地保留（退出码区分）
 #
 # 一致性口径：runs.json/state.json 均为「tmp 写完 + 原子 rename」发布（runs.py/_save_runs），
 # tar 视角恒为完整文件；checkpoints.sqlite 在跑动中可能瞬时不一致——可丢弃观测数据，接受。
 # 严格一致可先 docker compose stop video2md 再备（cron 里自行加，默认不停机）。
 #
-# 用法（lcode-4c crontab：15 4 * * * /path/to/video2md/scripts/backup.sh >> /var/log/v2md-backup.log 2>&1）：
+# 用法（crontab：15 4 * * * /path/to/video2md/scripts/backup.sh >> /var/log/v2md-backup.log 2>&1）：
 #   scripts/backup.sh                          # 默认备到 <repo>/backups/
 #   scripts/backup.sh --dst /mnt/backup/v2md   # 自定义落盘目录
 #   scripts/backup.sh --keep-daily 14 --keep-weekly 8
 #   scripts/backup.sh --dry-run                # 只打印将执行的命令
 #
-# 恢复：scripts/restore.sh（同目录）。异地上传（rclone/restic）暂未集成，见 README 部署章。
+# 恢复：scripts/restore.sh（同目录）。异地推远端由 V2MD_BACKUP_REMOTE 环境变量开启。
 set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -26,6 +28,7 @@ KEEP_DAILY=7
 KEEP_WEEKLY=4
 DRY_RUN=0
 COMPOSE="docker compose -f $REPO_DIR/docker-compose.yml"
+BACKUP_REMOTE="${V2MD_BACKUP_REMOTE:-}"   # rclone remote（如 b2:v2md-backup）；空=只备本地
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -140,4 +143,22 @@ if [[ $DRY_RUN -eq 0 ]]; then
   echo "✓ manifest → $MANIFEST ($(grep -c . "$MANIFEST") 个文件)"
 fi
 
+# 7) 异地容灾（可选）：rclone 推远端对象存储——本地盘炸 ≠ 备份同灭的解药。
+#    失败只告警不阻断（本地保留策略已生效），用退出码 3 区分。
+REMOTE_RC=0
+if [[ -n "$BACKUP_REMOTE" ]]; then
+  if command -v rclone >/dev/null 2>&1; then
+    if run rclone copy "$DST_DIR" "$BACKUP_REMOTE" --transfers 4 --exclude '.lock/**'; then
+      [[ $DRY_RUN -eq 0 ]] && echo "✓ 异地推送 → $BACKUP_REMOTE"
+    else
+      echo "⚠ rclone 推送失败（本地备份已保留，不阻断；修好后可手工重推）" >&2
+      REMOTE_RC=3
+    fi
+  else
+    echo "⚠ V2MD_BACKUP_REMOTE 已配但服务器无 rclone（apt/brew 安装后下轮生效）" >&2
+    REMOTE_RC=3
+  fi
+fi
+
 echo "── 备份完成 $STAMP"
+exit $REMOTE_RC

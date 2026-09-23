@@ -2,8 +2,9 @@
 
 Dify 时代的双进程分工（Dify 画布轮询 ←HTTP→ serve.py 阶段打工）收拢为单进程：
 POST /runs 入队 → 后台任务内嵌跑完整张 LangGraph（阶段即节点），客户端轮询
-GET /runs/{id} 看终态。串行纪律不变：asyncio 信号量=1，对齐旧单 worker 模型
-（4C 小机上 ffmpeg/whisper 是 CPU 密集，并行只会互相拖死）。
+GET /runs/{id} 看终态。并发上限纪律：asyncio 信号量=V2MD_MAX_CONCURRENT_RUNS
+（默认 1 = 单 worker 语义；生产多用户调大，checkpointer 建议切 postgres，
+vault 自托管姿势建议保持 1）。入队前配额闸：总队列/每用户在途/60s 滑窗提交频率。
 
 Phase 1（多用户后端契约硬化）：鉴权可插拔（默认 off，生产 google ID-Token）、
 Pydantic 请求/响应契约、重开 OpenAPI、run 按内部 uid 归属隔离（越权 403）、
@@ -11,13 +12,14 @@ SSE 实时进度（GET /runs/{id}/events）与轮询并存。核心 run_graph �
 
 端点契约：
   POST /runs            {url, part_items?, force?, review?, max_frames?, resolve_only?} → {run_id, total, ...}
+  POST /uploads         multipart 上传视频/音频 → {path,size,name}（path 直接喂 /runs；多用户上传面）
   GET  /runs/{id}       run 记录 + 任务状态 + 逐条目产物进度（沿用 serve 的形状）
   GET  /runs/{id}/note  产出 markdown（标题/路径/正文），供云上调取
   GET  /runs/{id}/events SSE 实时进度（graph:*/stage 事件流；轮询 GET /runs/{id} 仍在）
   GET  /runs/{id}/bundle   deliver 模式产物整包 zip（笔记/帧/转录/节段/索引-append）——云端不
                            储存，只在此窗口发送到用户端；已焚/过期 410
   DELETE /runs/{id}/artifacts deliver 模式 ACK 即焚：客户端确认收完，云端立刻销毁产物
-  GET  /queue           {queue_len, running}——gpu_router 的 colab 看门狗回读这里（运维探针，不鉴权）
+  GET  /queue           {queue_len, running, limits}——gpu_router 的 colab 看门狗回读这里（运维探针，不鉴权）
   GET  /healthz         存活探针（Docker healthcheck，不鉴权）
   GET  /preflight       开跑前体检（ffmpeg/磁盘/vault 或 outbox/算力池，不鉴权）
 
@@ -34,13 +36,14 @@ import tempfile
 import time
 import uuid
 import zipfile
+from collections import deque
 from contextlib import asynccontextmanager, suppress
 from datetime import datetime
 from pathlib import Path
 
 import httpx
 import uvicorn
-from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, HTTPException, Request, UploadFile
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
@@ -49,7 +52,23 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from . import artsink, events, observability, watchdog
 from .auth import AuthError, Identity, current_identity
-from .config import CORS_ORIGINS, ENV, LOG_DIR, OUT_DIR, WATCHDOG_PERIOD_S
+from .config import (
+    CORS_ORIGINS,
+    ENV,
+    LOCAL_PATHS,
+    LOG_DIR,
+    MAX_CONCURRENT_RUNS,
+    OUT_DIR,
+    QUEUE_MAX,
+    UPLOAD_MAX_GB,
+    UPLOAD_QUOTA_GB,
+    UPLOADS_DIR,
+    UPLOADS_TTL_H,
+    USER_QUEUE_MAX,
+    USER_SUBMIT_PER_MIN,
+    VERSION,
+    WATCHDOG_PERIOD_S,
+)
 from .graph import make_checkpointer_from_env, run_graph
 from .models import (
     ArtifactsAckOut,
@@ -64,9 +83,10 @@ from .models import (
     RunListOut,
     RunNotesOut,
     RunStatusOut,
+    UploadOut,
 )
 from .runs import _load_runs, _runs_file_lock, _runs_merge, _save_runs
-from .util import redact
+from .util import redact, sanitize_filename
 
 # ---------------------------------------------------------------- 运维函数（原 serve.py）
 
@@ -210,7 +230,7 @@ def _sweep_outbox() -> int:
 
 # ---------------------------------------------------------------- 任务表
 _TASKS: dict[str, dict] = {}          # run_id → {status, url, owner, created, started, finished, errors}
-_SEMA = asyncio.Semaphore(1)          # 串行执行：单 worker 语义
+_SEMA = asyncio.Semaphore(MAX_CONCURRENT_RUNS)   # 并发闸门：默认 1=单 worker 语义（V2MD_MAX_CONCURRENT_RUNS）
 _CHECKPOINTER = None                  # lifespan 注入（sqlite/postgres 由 V2MD_CHECKPOINTER 定）
 def _ck_closer() -> None:
     pass  # checkpointer 资源释放钩子（PG 分支关连接池）
@@ -256,6 +276,110 @@ def _require_run_access(run_id: str, ident: Identity) -> dict | None:
     if owner != ident.uid:
         raise HTTPException(403, f"无权访问 run {run_id}")
     return run
+
+
+# ---------------------------------------------------------------- 配额闸（终局布局·限流配额）
+
+_USER_SUBMIT_TS: dict[str, deque] = {}  # uid → 60s 滑窗提交时间戳（monotonic）
+
+
+def _admit_submission(uid: str) -> None:
+    """POST /runs 入队前的配额闸（进程内）：总队列 / 每用户在途 / 滑窗提交频率。
+
+    超限一律 429 + X-Error 符号码（错误信封统一转译）；0 = 该项不设限。
+    """
+    active = [v for v in _TASKS.values() if v.get("status") in ("queued", "running")]
+    if QUEUE_MAX and len(active) >= QUEUE_MAX:
+        raise HTTPException(429, f"队列已满（{len(active)}/{QUEUE_MAX}），稍后重试",
+                            headers={"X-Error": "QUEUE_FULL"})
+    if USER_QUEUE_MAX:
+        mine = sum(1 for v in active if v.get("owner") == uid)
+        if mine >= USER_QUEUE_MAX:
+            raise HTTPException(429, f"你在途/排队的 run 已达上限（{mine}/{USER_QUEUE_MAX}）",
+                                headers={"X-Error": "USER_QUEUE_FULL"})
+    if USER_SUBMIT_PER_MIN:
+        now = time.monotonic()
+        dq = _USER_SUBMIT_TS.setdefault(uid, deque())
+        while dq and now - dq[0] > 60:
+            dq.popleft()
+        if len(dq) >= USER_SUBMIT_PER_MIN:
+            raise HTTPException(429, f"提交过频（限 {USER_SUBMIT_PER_MIN} 次/分钟），稍后重试",
+                                headers={"X-Error": "RATE_LIMITED"})
+        dq.append(now)
+
+
+# ---------------------------------------------------------------- 本地路径白名单 + 上传面
+
+_UPLOAD_EXT_OK = {".mp4", ".mov", ".mkv", ".webm", ".m4a", ".mp3", ".wav"}
+
+
+def _validate_run_url(url: str, uid: str) -> None:
+    """非 http 输入的白名单闸（终局布局·产物层：不收裸本地路径）。
+
+    V2MD_LOCAL_PATHS：auto（默认）= AUTH=off 放行（开发/自托管），AUTH≠off 只认本人
+    uploads 目录内路径；allow/deny 显式覆盖。拒绝 → 422 LOCAL_PATH_FORBIDDEN。
+    """
+    if url.startswith(("http://", "https://")):
+        return
+    if LOCAL_PATHS == "allow":
+        return
+    if LOCAL_PATHS == "auto" and (ENV.get("V2MD_AUTH") or "off").strip().lower() == "off":
+        return  # 开发/自托管姿势：本地路径输入是文档化能力（e2e/batch/容器内路径）
+    inside = False
+    try:
+        p = Path(url).expanduser().resolve()
+        owned = (UPLOADS_DIR / uid).resolve()
+        inside = p == owned or owned in p.parents
+    except (OSError, RuntimeError):
+        inside = False
+    if inside:
+        return
+    hint = ("本地路径输入已被禁用（V2MD_LOCAL_PATHS=deny）" if LOCAL_PATHS == "deny"
+            else "多用户档不收裸本地路径：先 POST /uploads 上传，或自托管设 V2MD_LOCAL_PATHS=allow")
+    raise HTTPException(422, hint, headers={"X-Error": "LOCAL_PATH_FORBIDDEN"})
+
+
+def _du_bytes(root: Path) -> int:
+    """上传配额用的目录体积（walk 求和；上传频率低，遍历可接受）。"""
+    total = 0
+    for f in root.rglob("*"):
+        try:
+            if f.is_file():
+                total += f.stat().st_size
+        except OSError:
+            continue
+    return total
+
+
+def _sweep_uploads() -> int:
+    """uploads TTL 清扫：超龄文件物理删、空目录回收（启动跑一遍 + 周期兜底）。"""
+    if not UPLOADS_DIR.is_dir():
+        return 0
+    cutoff = time.time() - UPLOADS_TTL_H * 3600
+    n = 0
+    for f in UPLOADS_DIR.rglob("*"):
+        try:
+            if f.is_file() and f.stat().st_mtime < cutoff:
+                f.unlink()
+                n += 1
+        except OSError:
+            continue
+    for d in sorted((p for p in UPLOADS_DIR.rglob("*") if p.is_dir()), reverse=True):
+        with suppress(OSError):
+            d.rmdir()  # 只删空目录（rmdir 非递归，有文件自然失败）
+    return n
+
+
+async def _uploads_sweeper(period_s: float = 600.0) -> None:
+    """上传面周期 TTL 清扫（与 outbox sweeper 同款纪律：异常只留痕不终止）。"""
+    while True:
+        await asyncio.sleep(period_s)
+        try:
+            n = await asyncio.to_thread(_sweep_uploads)
+            if n:
+                print(f"🧹 uploads 清扫：删 {n} 个超龄文件（TTL {UPLOADS_TTL_H:g}h）")
+        except Exception as exc:
+            print(f"⚠ uploads 清扫异常（下轮重试）：{redact(str(exc))[:160]}")
 
 
 # ---------------------------------------------------------------- deliver 产物在架态（TTL/ACK 即焚）
@@ -381,6 +505,7 @@ async def _lifespan(app: FastAPI):
     _prune_orphan_tmps()
     if artsink.current_mode() == "deliver":
         _sweep_outbox()  # 停机期间到期的产物，起来先物理焚掉（冷启动口径）
+    _sweep_uploads()    # 上传面同款：停机期间超龄的源文件先清
     # 恢复中断的 run（对齐旧 _load_jobs 的语义；error 的不自动重跑，避免双份产物）。
     # tmp 已没了的 run 不可恢复（产物文件随目录一起没了，续跑只会拿空产物硬跑）：
     # 标记 error 收场，不占用执行信号量。
@@ -401,11 +526,13 @@ async def _lifespan(app: FastAPI):
         print(f"♻️ 恢复 {resumed} 个中断 run（上次服务退出前未跑完）")
     sweeper = (asyncio.create_task(_outbox_sweeper())
                if artsink.current_mode() == "deliver" else None)
+    uploads_sw = asyncio.create_task(_uploads_sweeper())
     # run 卡死看门狗：周期扫内存任务表，心跳超时按 V2MD_WATCHDOG_ACTION 处置
     # （mark=标 error 等人工；exit=进程退出靠容器重启自愈，见 watchdog.py 模块注释）
     wd = asyncio.create_task(watchdog.loop(_TASKS, WATCHDOG_PERIOD_S))
     yield
     wd.cancel()
+    uploads_sw.cancel()
     if sweeper:
         sweeper.cancel()
     try:  # 释放 checkpointer 资源（PG 分支关池；sqlite 是 no-op）
@@ -414,7 +541,7 @@ async def _lifespan(app: FastAPI):
         print(f"⚠ checkpointer 关闭异常（退出流程不拦）：{exc}")
 
 
-app = FastAPI(title="video2md", version="0.2.0", lifespan=_lifespan,
+app = FastAPI(title="video2md", version=VERSION, lifespan=_lifespan,
               docs_url="/docs", redoc_url=None, openapi_url="/openapi.json")
 
 # CORS：仅当配了 origin 才挂（同源/SSH 隧道开发不需要，也避免误开 *）
@@ -459,6 +586,45 @@ async def _on_validation_error(request: Request, exc: RequestValidationError) ->
 
 
 # ---------------------------------------------------------------- 用户级端点（鉴权 + 归属）
+
+@app.post("/uploads", response_model=UploadOut,
+          summary="上传视频/音频文件（多用户专用上传面：落地后 path 直接喂 POST /runs）")
+async def post_upload(file: UploadFile, ident: Identity = Depends(current_identity)) -> dict:
+    """流式落盘 data/uploads/<uid>/（不进内存）；单文件上限/每用户配额/类型白名单，
+    TTL 到期惰性清扫——「云端不储存」口径延伸到源文件。"""
+    name = sanitize_filename(file.filename or "upload")
+    ext = Path(name).suffix.lower()
+    if ext not in _UPLOAD_EXT_OK:
+        raise HTTPException(422, f"不支持的文件类型 {ext or '(无后缀)'}："
+                                 f"{'/'.join(sorted(_UPLOAD_EXT_OK))}",
+                            headers={"X-Error": "UNSUPPORTED_TYPE"})
+    dest_dir = UPLOADS_DIR / ident.uid
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    dest = dest_dir / f"{uuid.uuid4().hex[:8]}-{name}"
+    max_bytes = int(UPLOAD_MAX_GB * 1e9)
+    n = 0
+    try:
+        with dest.open("wb") as out:
+            while chunk := await file.read(1 << 20):
+                n += len(chunk)
+                if n > max_bytes:
+                    raise HTTPException(413, f"文件超上限 {UPLOAD_MAX_GB:g}GB",
+                                        headers={"X-Error": "FILE_TOO_LARGE"})
+                out.write(chunk)
+    except HTTPException:
+        with suppress(OSError):
+            dest.unlink()
+        raise
+    finally:
+        await file.close()
+    if UPLOAD_QUOTA_GB and _du_bytes(dest_dir) > UPLOAD_QUOTA_GB * 1e9:
+        with suppress(OSError):
+            dest.unlink()
+        raise HTTPException(413, f"上传配额已满（{UPLOAD_QUOTA_GB:g}GB/用户），清理旧文件后重试",
+                            headers={"X-Error": "QUOTA_EXCEEDED"})
+    _req_log("POST", "/uploads", 200, user=ident.uid, name=name, bytes=n)
+    return {"path": str(dest), "size": n, "name": name}
+
 
 _GOOGLE_DEVICE_CODE_URL = "https://oauth2.googleapis.com/device/code"
 
@@ -559,6 +725,8 @@ async def post_runs(body: RunCreate, ident: Identity = Depends(current_identity)
     if not url:
         _req_log("POST", "/runs", 400, user=ident.uid, error="缺 url")
         raise HTTPException(400, "缺 url")
+    _admit_submission(ident.uid)   # 配额闸（队列/每用户在途/滑窗频率）——便宜检查放最前
+    _validate_run_url(url, ident.uid)  # 非 http 输入的白名单闸（多用户档不收裸本地路径）
     run_id = uuid.uuid4().hex[:8]
     run, err, is_dup = await asyncio.to_thread(
         resolve_run, url, part_items, body.force, run_id, ident.uid)
@@ -580,11 +748,10 @@ async def post_runs(body: RunCreate, ident: Identity = Depends(current_identity)
     if is_dup and _TASKS.get(run["run_id"], {}).get("status") in ("queued", "running"):
         _req_log("POST", "/runs", 200, run_id=run["run_id"], dedup=True, user=ident.uid)
         return {**resp, "status": _TASKS[run["run_id"]]["status"], "dedup": True}
-    # 新 run 或「旧 run 驱动已死」的 dedup 残档——都入队驱动（图内幂等重入）
-    _TASKS[run["run_id"]] = {"status": "queued", "url": url, "part_items": part_items,
-                             "owner": ident.uid, "created": _now()}
-    asyncio.create_task(_drive(run["run_id"], url, part_items, body.force,
-                               body.review, body.max_frames, ident.uid))
+    # 新 run 或「旧 run 驱动已死」的 dedup 残档——都入队驱动（图内幂等重入）；
+    # POST 与 lifespan 恢复共用同一条入队路径（dedup 判活在上面，_enqueue 只管排队）
+    _enqueue(url, part_items, body.force, body.review, body.max_frames,
+             run_id=run["run_id"], owner=ident.uid)
     _req_log("POST", "/runs", 200, run_id=run["run_id"], total=run["total"],
              dedup=is_dup, user=ident.uid)
     return {**resp, "status": "queued", "dedup": is_dup}
@@ -750,15 +917,18 @@ async def run_events(run_id: str, request: Request,
 
 @app.get("/queue", response_model=QueueOut)
 def get_queue() -> dict:
-    """gpu_router 的 colab 看门狗回读（queue_url 指这里）——判队列保温。"""
+    """gpu_router 的 colab 看门狗回读（queue_url 指这里）——判队列保温；
+    limits 顺带公开并发/队列档位（探针口径，无敏感信息）。"""
     return {"queue_len": sum(1 for v in _TASKS.values() if v.get("status") == "queued"),
-            "running": sum(1 for v in _TASKS.values() if v.get("status") == "running")}
+            "running": sum(1 for v in _TASKS.values() if v.get("status") == "running"),
+            "limits": {"max_concurrent": MAX_CONCURRENT_RUNS, "queue_max": QUEUE_MAX,
+                       "user_queue_max": USER_QUEUE_MAX}}
 
 
 
 @app.get("/healthz", response_model=HealthOut)
 def healthz() -> dict:
-    return {"ok": True, "ts": _now()}
+    return {"ok": True, "ts": _now(), "version": VERSION}
 
 
 

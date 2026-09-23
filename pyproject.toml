@@ -11,6 +11,7 @@ dependencies = [
     "langgraph>=1.2",
     "langgraph-checkpoint-sqlite>=3.1",
     "fastapi>=0.115",
+    "python-multipart>=0.0.20",  # POST /uploads（multipart 流式上传面；镜像 --no-dev 也要有）
     "yt-dlp>=2025.9.0",
     "uvicorn>=0.30",
     # 遥测出口（OTel SDK：traces+metrics → 本机 collector；未配端点时零开销纯 jsonl）
@@ -46,9 +47,6 @@ dev = [
     "pytest>=9.1.1",
     "ruff>=0.8",
     "mypy>=1.13",
-    # smoke_ci.sh 的进程级 mockpool 用 Form/UploadFile（compose 冒烟里这依赖由
-    # gpu-router 镜像带入；进程级跑法需要本仓自带）
-    "python-multipart>=0.0.9",
 ]
 
 [tool.ruff]

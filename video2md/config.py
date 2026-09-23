@@ -126,6 +126,42 @@ WATCHDOG_ACTION = (ENV.get("V2MD_WATCHDOG_ACTION") or "mark").strip().lower()
 if WATCHDOG_ACTION not in ("mark", "exit"):
     raise RuntimeError(f"未知 V2MD_WATCHDOG_ACTION：{WATCHDOG_ACTION}（支持 mark|exit）")
 
+# 执行层并发与配额（终局布局·执行层/限流配额的进程内落地）：
+#   并发闸门默认 1 = 单 worker 语义；生产多用户调大——并发>1 时 checkpointer 建议
+#   切 postgres（sqlite 单连接弱）、vault 自托管姿势建议保持 1。三个上限 0 = 不设限；
+#   提交限流按 uid 60s 滑窗（入队前闸，429 信封）。
+MAX_CONCURRENT_RUNS = max(1, int(ENV.get("V2MD_MAX_CONCURRENT_RUNS", "1") or 1))
+QUEUE_MAX = int(ENV.get("V2MD_QUEUE_MAX", "100") or 0)
+USER_QUEUE_MAX = int(ENV.get("V2MD_USER_QUEUE_MAX", "5") or 0)
+USER_SUBMIT_PER_MIN = int(ENV.get("V2MD_USER_SUBMIT_PER_MIN", "30") or 0)
+
+# 上传面（多用户专用 POST /uploads）：落地根/单文件上限/每用户配额/TTL 惰性清扫。
+# 容器里 UPLOADS_DIR 指到 data 卷；TTL 到期物理删——「云端不储存」口径。
+UPLOADS_DIR = Path(ENV.get("V2MD_UPLOADS_DIR", str(PROJ / "data" / "uploads")))
+UPLOAD_MAX_GB = float(ENV.get("V2MD_UPLOAD_MAX_GB", "2") or 2)
+UPLOAD_QUOTA_GB = float(ENV.get("V2MD_UPLOAD_QUOTA_GB", "5") or 5)
+UPLOADS_TTL_H = float(ENV.get("V2MD_UPLOADS_TTL_H", "24") or 24)
+
+# 本地路径输入策略（POST /runs 的 url 收非 http 时）：auto = AUTH=off 放行（开发/
+# 自托管），AUTH≠off 只认本人 uploads 白名单内路径；allow/deny 显式覆盖。
+LOCAL_PATHS = (ENV.get("V2MD_LOCAL_PATHS") or "auto").strip().lower()
+if LOCAL_PATHS not in ("auto", "allow", "deny"):
+    raise RuntimeError(f"未知 V2MD_LOCAL_PATHS：{LOCAL_PATHS}（支持 auto|allow|deny）")
+
+# 版本单源：dist metadata（已安装时）→ pyproject.toml（源码/镜像直跑，Dockerfile 有 COPY）
+# → "0.0.0"。FastAPI version 与 /healthz 都读这里，不手工双写。
+try:
+    from importlib.metadata import PackageNotFoundError
+    from importlib.metadata import version as _pkg_version
+    VERSION = _pkg_version("video2md")
+except PackageNotFoundError:
+    try:
+        import tomllib
+        with (PROJ / "pyproject.toml").open("rb") as _pf:
+            VERSION = str(tomllib.load(_pf)["project"]["version"])
+    except (OSError, KeyError, tomllib.TOMLDecodeError):
+        VERSION = "0.0.0"
+
 
 
 # ---------------------------------------------------------------- fin

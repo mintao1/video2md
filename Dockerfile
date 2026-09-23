@@ -1,7 +1,16 @@
 # video2md 容器镜像：python3.12-slim + ffmpeg + 项目依赖（不含 whisper/torch——
 # 转写/OCR/剪辑走 gpu_router 远程池，见 docker-compose.yml 的 V2MD_*_REMOTE）。
-# 在目标架构上构建（服务器 x86：直接在 lcode-4c 上 docker build，避免 Mac arm64 交叉构建）。
+# 在目标架构上构建（服务器 x86：直接在目标机上 docker build，避免 Mac arm64 交叉构建；
+# CI/registry 走 buildx 多架构，见 .github/workflows/ci.yml 的 release job）。
 FROM python:3.12-slim
+
+# 版本注入（CI release job 传 --build-arg；本地构建缺省空，运行时版本以 pyproject 兜底为准）
+ARG VERSION=""
+ARG GIT_SHA=""
+LABEL org.opencontainers.image.title="video2md" \
+      org.opencontainers.image.version="${VERSION}" \
+      org.opencontainers.image.revision="${GIT_SHA}" \
+      org.opencontainers.image.source="https://github.com/mintao1/video2md"
 
 # Debian 源换清华镜像（国内服务器从 deb.debian.org 拉 ffmpeg 依赖龟速实测 ~60KB/s；
 # Mac/海外构建也无害——tuna 全球可达）

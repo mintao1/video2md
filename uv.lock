@@ -3627,6 +3627,7 @@ dependencies = [
     { name = "opentelemetry-sdk" },
     { name = "pillow" },
     { name = "psycopg", extra = ["binary", "pool"] },
+    { name = "python-multipart" },
     { name = "pyyaml" },
     { name = "uvicorn" },
     { name = "websocket-client" },
@@ -3649,7 +3650,6 @@ mac = [
 dev = [
     { name = "mypy" },
     { name = "pytest" },
-    { name = "python-multipart" },
     { name = "ruff" },
 ]
 
@@ -3670,6 +3670,7 @@ requires-dist = [
     { name = "psycopg", extras = ["binary", "pool"], specifier = ">=3.3.6" },
     { name = "pyobjc-framework-cocoa", marker = "extra == 'mac'", specifier = ">=10.3" },
     { name = "pyobjc-framework-vision", marker = "extra == 'mac'", specifier = ">=10.3" },
+    { name = "python-multipart", specifier = ">=0.0.20" },
     { name = "pyyaml", specifier = ">=6.0.3" },
     { name = "ragas", marker = "extra == 'evals'", specifier = ">=0.3" },
     { name = "uvicorn", specifier = ">=0.30" },
@@ -3682,7 +3683,6 @@ provides-extras = ["mac", "evals"]
 dev = [
     { name = "mypy", specifier = ">=1.13" },
     { name = "pytest", specifier = ">=9.1.1" },
-    { name = "python-multipart", specifier = ">=0.0.9" },
     { name = "ruff", specifier = ">=0.8" },
 ]
 

@@ -40,7 +40,16 @@ from .llm import assemble_entry_note, llm_task, select_frames
 from .resolve import extract_url
 from .runs import _STAGE_FNS, _load_runs, _run_outputs, _run_stage, _runs_file_lock, _runs_merge, create_run
 from .state import RunState
-from .util import _STAGE_LOGS, RunLog, fmt_hms, load_state, redact, save_state
+from .util import (
+    _STAGE_LOGS,
+    RunLog,
+    bind_current_run,
+    fmt_hms,
+    load_state,
+    redact,
+    save_state,
+    state_file_lock,
+)
 
 CHECKPOINT_DB = PROJ / "data" / "checkpoints.sqlite"
 
@@ -229,18 +238,20 @@ def node_note_entry(state: RunState) -> dict:
         run.setdefault("partial_failures", {}).setdefault("note", []).append(str(idx))
         _persist(run)
         return {**nxt, "errors": [*state.get("errors", []), msg]}
-    # state.json 幂等 SSOT 逐条落盘（移植自 _stage_kb 末段：重发同 URL 跳过本条目）
-    state_db = load_state()
-    # owner：deliver 模式的幂等跳过判「谁的产物、还在不在架」（见 runs.create_run）；
-    # vault 模式此字段闲置（旧全局去重语义不变）
-    state_db[art["fp"]] = {"note": art.get("note", ""), "transcript": art.get("transcript_path", ""),
-                           "title": art.get("title", ""), "url": entry.get("url", ""),
-                           "date": date.today().isoformat(), "run_id": run["run_id"],
-                           "owner": run.get("owner", ""),
-                           "status": "completed",
-                           "spans": [{k: v for k, v in sp.items() if k != "spanId"}
-                                     for sp in run.get("span_log", [])][-80:]}
-    save_state(state_db)
+    # state.json 幂等 SSOT 逐条落盘（移植自 _stage_kb 末段：重发同 URL 跳过本条目）。
+    # 「load→改→save」整段持锁：并发 run 各落各的 fp 时不丢更新
+    with state_file_lock():
+        state_db = load_state()
+        # owner：deliver 模式的幂等跳过判「谁的产物、还在不在架」（见 runs.create_run）；
+        # vault 模式此字段闲置（旧全局去重语义不变）
+        state_db[art["fp"]] = {"note": art.get("note", ""), "transcript": art.get("transcript_path", ""),
+                               "title": art.get("title", ""), "url": entry.get("url", ""),
+                               "date": date.today().isoformat(), "run_id": run["run_id"],
+                               "owner": run.get("owner", ""),
+                               "status": "completed",
+                               "spans": [{k: v for k, v in sp.items() if k != "spanId"}
+                                         for sp in run.get("span_log", [])][-80:]}
+        save_state(state_db)
     _persist(run)
     return nxt
 
@@ -474,6 +485,7 @@ def run_graph(url: str, *, part_items: str = "", force: bool = False, review: bo
     from . import deadman
 
     run_id = run_id or uuid.uuid4().hex[:8]
+    bind_current_run(run_id)  # 并发多 run 时 current_log() 按 ContextVar 取本 run 的 log
     initial: RunState = {"run_id": run_id, "url": url, "part_items": part_items,
                          "force": force, "review": review, "max_frames": max_frames,
                          "owner": owner,

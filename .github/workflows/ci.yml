@@ -3,6 +3,7 @@ name: CI
 on:
   push:
     branches: [main]
+    tags: ['v*']   # 打 tag 触发 release（镜像发布 GHCR；test/lint/plugin 对 tag 同样把关）
   pull_request:
 
 jobs:
@@ -83,3 +84,43 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: docker build -t video2md:ci .
+
+  # 发布（终局布局·发布层）：打 v* tag → 镜像 push GHCR，不可变 tag 锚 git sha + semver。
+  # 服务器部署/回滚走 scripts/deploy.sh <tag>；GHCR 镜像同时是灾备存档。
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [test, lint, plugin, docker-build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: 镜像元数据（semver + sha 不可变 tag + latest）
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,prefix=sha-
+            type=raw,value=latest,enable=${{ !contains(github.ref, '-') }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          build-args: |
+            VERSION=${{ steps.meta.outputs.version }}
+            GIT_SHA=${{ github.sha }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

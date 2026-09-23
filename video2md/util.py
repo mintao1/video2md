@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import contextlib
+import contextvars
 import hashlib
 import json
 import re
@@ -59,8 +60,22 @@ def load_state() -> dict:
 
 
 
+_STATE_LOCK = threading.RLock()  # state.json 读改写串行化（RLock：锁内可再调 save_state）
+
+
 def save_state(s: dict) -> None:
-    STATE_FILE.write_text(json.dumps(s, ensure_ascii=False, indent=2))
+    """原子写（per-thread tmp + rename，锁内串行）——并发 run 下不撕裂、不互相截断。"""
+    with _STATE_LOCK:
+        tmp = STATE_FILE.parent / f"{STATE_FILE.name}.tmp.{threading.get_ident()}"
+        tmp.write_text(json.dumps(s, ensure_ascii=False, indent=2))
+        tmp.replace(STATE_FILE)
+
+
+@contextlib.contextmanager
+def state_file_lock():
+    """「load → 改 → save」整段持锁（node_note_entry 的幂等落盘），防并发丢更新。"""
+    with _STATE_LOCK:
+        yield
 
 
 
@@ -75,13 +90,27 @@ def redact(s: str) -> str:
 
 
 
-# run_id → 进行中的 RunLog（runs._run_stage 注册；transcribe/clips 等深层函数据此
-# 取当前 log 打细粒度子 span，不用层层透传。放在 util 是为了避免 transcribe→runs 循环 import）
+# run_id → 进行中的 RunLog（runs._run_stage / graph_obs 注册；transcribe/clips 等
+# 深层函数据此取当前 log 打细粒度子 span，不用层层透传。放在 util 是为了避免 transcribe→runs 循环 import）
 _STAGE_LOGS: dict[str, "RunLog"] = {}
+
+# 当前执行上下文的 run_id（run_graph 入口 set；asyncio.to_thread 每次拷贝 context，
+# 并发多 run 时各自线程看到各自的值）——current_log 的并发正确性来源。
+_CURRENT_RUN_ID: contextvars.ContextVar[str] = contextvars.ContextVar("v2md_current_run_id",
+                                                                      default="")
+
+
+def bind_current_run(run_id: str) -> None:
+    """把当前执行线程绑定到 run（run_graph 入口调一次，覆盖整张图的所有深层调用）。"""
+    _CURRENT_RUN_ID.set(run_id)
 
 
 def current_log() -> "RunLog | None":
-    """当前活跃的阶段 RunLog（api 串行驱动阶段，任意时刻最多一个）。"""
+    """当前活跃的阶段 RunLog：并发多 run 时按 ContextVar 的 run_id 取本 run 的 log；
+    未绑定（__stage 子进程入口/旧单跑路径）回退「dict 第一个」。"""
+    rid = _CURRENT_RUN_ID.get()
+    if rid and rid in _STAGE_LOGS:
+        return _STAGE_LOGS[rid]
     return next(iter(_STAGE_LOGS.values()), None)
 
 

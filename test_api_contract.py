@@ -21,10 +21,12 @@ os.environ.update({
     "V2MD_RUNS_FILE": str(Path(_TMP) / "runs.json"),
     "V2MD_STATE_FILE": str(Path(_TMP) / "state.json"),
     "V2MD_LOG_DIR": str(Path(_TMP) / "logs"),
+    "V2MD_UPLOADS_DIR": str(Path(_TMP) / "uploads"),
     "V2MD_SECRETS_FILE": str(Path(_TMP) / "nonexistent.env"),
     "OBSIDIAN_VAULT": str(Path(_TMP) / "vault"),
     "V2MD_REMOTE": "",
     "V2MD_CORS_ORIGINS": "",
+    "V2MD_USER_SUBMIT_PER_MIN": "1000",  # 套件整体抬高滑窗，配额行为由专测 monkeypatch 收紧
     "V2MD_FAKE_LLM": "1",  # 兜底：任何意外真驱动也不烧 token
 })
 
@@ -472,6 +474,263 @@ def test_auth_device_token_pending_then_ok(client, monkeypatch):
                    lambda self, dc: {"id_token": "JWT"})
         ok = client.post("/auth/device/token", json={"device_code": "DC"})
         assert ok.status_code == 200 and ok.json() == {"id_token": "JWT"}
+
+
+# ---------------------------------------------------------------- 配额闸（终局布局·限流配额）
+
+def test_queue_full_429(client):
+    import video2md.api as _api
+    _api._TASKS["occupied"] = {"status": "queued", "url": "u", "owner": "someone",
+                               "created": "x"}
+    try:
+        monkey = pytest.MonkeyPatch.context()
+        with monkey as mp:
+            mp.setattr(_api, "QUEUE_MAX", 1)
+            r = client.post("/runs", json={"url": "https://example.test/x",
+                                           "resolve_only": True})
+        assert r.status_code == 429 and r.json()["error"]["code"] == 429
+    finally:
+        _api._TASKS.pop("occupied", None)
+
+
+def test_user_queue_full_429(client):
+    import video2md.api as _api
+    _api._TASKS["mine"] = {"status": "running", "url": "u", "owner": _dev_uid(),
+                           "created": "x"}
+    try:
+        with pytest.MonkeyPatch.context() as mp:
+            mp.setattr(_api, "USER_QUEUE_MAX", 1)
+            r = client.post("/runs", json={"url": "https://example.test/x",
+                                           "resolve_only": True})
+        assert r.status_code == 429
+    finally:
+        _api._TASKS.pop("mine", None)
+
+
+def test_rate_limited_429(client, monkeypatch):
+    import video2md.api as _api
+
+    def fake_resolve(url, part_items, force, run_id, owner):
+        return ({"run_id": run_id or "rk", "total": 1,
+                 "entries": [{"playlist_index": 1, "url": "e"}],
+                 "artifacts": {"e": {}}, "status": "created"}, "", False)
+
+    import video2md.graph as graph_mod
+    monkeypatch.setattr(graph_mod, "resolve_run", fake_resolve)
+    _api._USER_SUBMIT_TS.clear()
+    try:
+        with pytest.MonkeyPatch.context() as mp:
+            mp.setattr(_api, "USER_SUBMIT_PER_MIN", 1)
+            first = client.post("/runs", json={"url": "https://example.test/a",
+                                               "resolve_only": True})
+            second = client.post("/runs", json={"url": "https://example.test/b",
+                                                "resolve_only": True})
+        assert first.status_code == 200, first.text
+        assert second.status_code == 429
+    finally:
+        _api._USER_SUBMIT_TS.clear()
+
+
+# ---------------------------------------------------------------- 本地路径白名单 + 上传面
+
+def _stub_resolve(monkeypatch):
+    """POST /runs 成功路径共用：假 resolve（不落盘也行，_TASKS/runs.json 形状由并发专测覆盖）。"""
+    import video2md.graph as graph_mod
+
+    def fake_resolve(url, part_items, force, run_id, owner):
+        return ({"run_id": run_id or "rk", "total": 1,
+                 "entries": [{"playlist_index": 1, "url": url}],
+                 "artifacts": {url: {}}, "status": "created"}, "", False)
+
+    monkeypatch.setattr(graph_mod, "resolve_run", fake_resolve)
+
+
+def test_local_path_policy(client, monkeypatch):
+    import video2md.api as _api
+    _stub_resolve(monkeypatch)
+    # auto + AUTH=off（本套件 env）→ 裸路径放行（开发/自托管姿势）
+    ok = client.post("/runs", json={"url": "/etc/passwd", "resolve_only": True})
+    assert ok.status_code == 200, ok.text
+
+    # deny → 422 LOCAL_PATH_FORBIDDEN（闸在 resolve 之前，无需真解析）
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(_api, "LOCAL_PATHS", "deny")
+        denied = client.post("/runs", json={"url": "/etc/passwd"})
+        assert denied.status_code == 422
+        assert denied.json()["error"]["code"] == 422
+
+    # auto + AUTH=google → 只认本人 uploads 白名单内路径
+    up = Path(_TMP) / "up-policy"
+    dev = _dev_uid()
+    mine = up / dev / "clip.mp4"
+    mine.parent.mkdir(parents=True, exist_ok=True)
+    mine.write_bytes(b"x")
+    other = up / "uid_other" / "steal.mp4"
+    other.parent.mkdir(parents=True, exist_ok=True)
+    other.write_bytes(b"x")
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(_api, "LOCAL_PATHS", "auto")
+        mp.setattr(_api, "UPLOADS_DIR", up)
+        mp.setitem(_api.ENV, "V2MD_AUTH", "google")
+        assert client.post("/runs", json={"url": str(mine),
+                                          "resolve_only": True}).status_code == 200
+        for bad in ("/etc/passwd", str(other), str(up / "escape.mp4")):
+            r = client.post("/runs", json={"url": bad})
+            assert r.status_code == 422, (bad, r.text)
+
+
+def test_upload_roundtrip_and_gates(client, monkeypatch):
+    import video2md.api as _api
+    up = Path(_TMP) / "uploads"
+    monkeypatch.setattr(_api, "UPLOADS_DIR", up)
+    dev = _dev_uid()
+
+    r = client.post("/uploads", files={"file": ("demo.mp4", b"hello" * 100, "video/mp4")})
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["name"] == "demo.mp4" and body["size"] == 500
+    p = Path(body["path"])
+    assert p.exists() and p.parent == up / dev  # 落在本人白名单目录（可直接喂 /runs）
+
+    _stub_resolve(monkeypatch)
+    fed = client.post("/runs", json={"url": body["path"], "resolve_only": True})
+    assert fed.status_code == 200, fed.text  # uploads 内路径过白名单
+
+    # 类型白名单：可执行文件拒收
+    assert client.post("/uploads",
+                       files={"file": ("evil.exe", b"MZ", "application/x-msdownload")}).status_code == 422
+    # 文件名 sanitize：路径穿越片段被剥
+    sneak = client.post("/uploads", files={"file": ("../..%2Fc.mp4", b"ab", "video/mp4")})
+    assert sneak.status_code == 200
+    assert "/" not in Path(sneak.json()["name"]).name and sneak.json()["name"].endswith(".mp4")
+
+    # 单文件上限 → 413，且半截文件已删
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(_api, "UPLOAD_MAX_GB", 0.000001)  # ≈1KB
+        big = client.post("/uploads", files={"file": ("big.mp4", b"x" * 4096, "video/mp4")})
+    assert big.status_code == 413
+    assert not list((up / dev).glob("big.mp4"))
+
+    # 每用户配额 → 413，且刚传的文件回滚删除
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(_api, "UPLOAD_QUOTA_GB", 0.000001)
+        quota = client.post("/uploads", files={"file": ("q.mp4", b"x" * 2048, "video/mp4")})
+    assert quota.status_code == 413
+    assert not list((up / dev).glob("q.mp4"))
+
+
+def test_sweep_uploads_ttl(client, monkeypatch):
+    import video2md.api as _api
+    up = Path(_TMP) / "uploads-sweep"
+    f = up / _dev_uid() / "old.mp4"
+    f.parent.mkdir(parents=True, exist_ok=True)
+    f.write_bytes(b"x")
+    stale = time.time() - 100000  # >24h TTL
+    os.utime(f, (stale, stale))
+    monkeypatch.setattr(_api, "UPLOADS_DIR", up)
+    assert _api._sweep_uploads() == 1 and not f.exists()
+    assert _api._sweep_uploads() == 0  # 幂等
+
+
+# ---------------------------------------------------------------- 并发执行（终局布局·执行层）
+
+def test_concurrent_runs_and_per_user_cap(client, monkeypatch):
+    import asyncio
+
+    import video2md.api as _api
+
+    def fake_graph(url, *, part_items="", force=False, review=False, max_frames=60,
+                   run_id="", checkpointer=None, owner=""):
+        time.sleep(0.25)
+        return {"status": "done", "run_id": run_id}
+
+    def fake_resolve(url, part_items, force, run_id, owner):
+        rec = {"run_id": run_id, "url": url, "part_items": part_items, "owner": owner,
+               "created": "2026-01-01T00:00:00", "tmp": "", "total": 1,
+               "entries": [{"playlist_index": 1, "url": url}],
+               "artifacts": {}, "stages": {}, "status": "created"}
+        db = runs._load_runs()
+        db[run_id] = rec
+        runs._save_runs(db)
+        return rec, "", False
+
+    import video2md.graph as graph_mod
+    monkeypatch.setattr(graph_mod, "resolve_run", fake_resolve)
+    monkeypatch.setattr(_api, "run_graph", fake_graph)
+    monkeypatch.setattr(_api, "_SEMA", asyncio.Semaphore(2))  # 并发闸门=2
+    monkeypatch.setattr(_api, "MAX_CONCURRENT_RUNS", 2)       # /queue 的 limits 档位同源
+    made: list[str] = []
+    try:
+        for i in (1, 2):
+            r = client.post("/runs", json={"url": f"https://example.test/c{i}"})
+            assert r.status_code == 200, r.text
+            made.append(r.json()["run_id"])
+        time.sleep(0.05)
+        q = client.get("/queue").json()
+        assert q["running"] == 2, q  # 信号量=2：两条同时进入 running
+        assert q["limits"]["max_concurrent"] == 2
+
+        # 第三条：每用户在途上限（收紧到 2）→ 429 USER_QUEUE_FULL
+        with pytest.MonkeyPatch.context() as mp:
+            mp.setattr(_api, "USER_QUEUE_MAX", 2)
+            third = client.post("/runs", json={"url": "https://example.test/c3"})
+            assert third.status_code == 429
+
+        deadline = time.time() + 5
+        while time.time() < deadline:
+            if client.get("/queue").json()["running"] == 0:
+                break
+            time.sleep(0.05)
+        final = {rid: client.get(f"/runs/{rid}").json()["task"]["status"] for rid in made}
+        assert final == {made[0]: "done", made[1]: "done"}, final
+    finally:
+        for rid in made:
+            _api._TASKS.pop(rid, None)
+
+
+def test_current_log_contextvar_two_threads():
+    """并发多 run 时 current_log 按 ContextVar 取本 run 的 log（不再 dict 第一个）。"""
+    from video2md import util
+    log_a = util.RunLog("stageA", run_id="runA")
+    log_b = util.RunLog("stageB", run_id="runB")
+    util._STAGE_LOGS.update(runA=log_a, runB=log_b)
+    errs: list = []
+
+    def worker(rid, log):
+        try:
+            util.bind_current_run(rid)
+            for _ in range(50):
+                got = util.current_log()
+                assert got is log, f"{rid}: 实得 {getattr(got, 'run_id', None)}"
+                time.sleep(0.001)
+        except AssertionError as exc:
+            errs.append(exc)
+
+    t1 = threading.Thread(target=worker, args=("runA", log_a))
+    t2 = threading.Thread(target=worker, args=("runB", log_b))
+    t1.start()
+    t2.start()
+    t1.join()
+    t2.join()
+    util._STAGE_LOGS.pop("runA", None)
+    util._STAGE_LOGS.pop("runB", None)
+    assert not errs, errs
+
+
+def test_state_save_concurrent_no_tear():
+    """state.json 原子写：四线程并发全量写，读侧恒为合法完整 JSON。"""
+    from video2md import util
+
+    def worker(i: int) -> None:
+        for k in range(50):
+            util.save_state({f"k{i}": k})
+
+    ts = [threading.Thread(target=worker, args=(i,)) for i in range(4)]
+    for t in ts:
+        t.start()
+    for t in ts:
+        t.join()
+    assert isinstance(util.load_state(), dict)  # 无半截 JSON / JSONDecodeError
 
 
 def run_all() -> None:  # `python3 test_api_contract.py` 兜底（无 pytest 时）
