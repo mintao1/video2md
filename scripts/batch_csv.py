@@ -64,11 +64,11 @@ def extract_urls(csv_path: str) -> list[str]:
 
 def verify_written(d: dict) -> str:
     """每个非 skipped 条目都要有 note 产物——防「run done 但单条目没写盘」的假阳性
-    （PARTIAL-FAIL 不打 error）。数据就在 GET /runs/{id} 响应里，不用再回查第二次。"""
-    bad = [f"条目{e.get('index')}(缺{','.join(s for s in ('download', 'transcribe', 'select', 'note')
-                                                 if not (e.get('done') or {}).get(s))})"
-           for e in d.get("entries", []) if not e.get("skipped")]
-    bad = [b for b in bad if "缺" in b]
+    （PARTIAL-FAIL 不打 error）。数据就在 GET /runs/{id} 响应里，不用再回查第二次。
+    只以 note 为准：clips 是可选阶段（不开切片时 done.clips 恒 False），download 等
+    中间态在部分失败场景本就缺失，逐段报只会制造噪音误判。"""
+    bad = [f"条目{e.get('index')}" for e in d.get("entries", [])
+           if not e.get("skipped") and not (e.get("done") or {}).get("note")]
     return "" if not bad else "未写盘: " + "、".join(bad[:5])
 
 
