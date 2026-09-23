@@ -387,6 +387,93 @@ def test_preflight_swaps_vault_for_outbox(client, deliver):
     assert "outbox" in names and "vault" not in names
 
 
+# ---------------------------------------------------------------- GET /runs 列表（插件收件箱发现）
+
+def test_run_list_owner_scoped_and_status_filter(client):
+    put_identity("test", "alice", "uid_alice")
+    put_identity("test", "bob", "uid_bob")
+    _seed_run("r_a1", "uid_alice", status="done")
+    _seed_run("r_a2", "uid_alice", status="error")
+    _seed_run("r_b1", "uid_bob", status="done")
+
+    items = client.get("/runs", headers={"X-Test-Auth": "alice"}).json()["items"]
+    assert {i["run_id"] for i in items} == {"r_a1", "r_a2"}
+    only_done = client.get("/runs?status=done", headers={"X-Test-Auth": "alice"}).json()["items"]
+    assert [i["run_id"] for i in only_done] == ["r_a1"]
+    # done_entries：note 有且非 skipped 的条目数（_seed_run 的形状=1）
+    assert only_done[0]["done_entries"] == 1
+    # vault 模式不带 artifacts 块（契约零扰动口径，同 GET /runs/{id}）
+    assert only_done[0]["artifacts"] is None
+    assert client.get("/runs", headers={"X-Test-Auth": "alice"}).json()["mode"] == "vault"
+
+
+def test_run_list_deliver_marks_shelf_present(client, deliver):
+    put_identity("test", "alice", "uid_alice")
+    _seed_delivered_run("r_on", "uid_alice", deliver)
+    _seed_delivered_run("r_off", "uid_alice", deliver, burned=True)
+    items = {i["run_id"]: i for i in
+             client.get("/runs?status=done", headers={"X-Test-Auth": "alice"}).json()["items"]}
+    assert items["r_on"]["artifacts"] == {"mode": "deliver", "present": True,
+                                          **{"expires": items["r_on"]["artifacts"]["expires"]}}
+    assert items["r_off"]["artifacts"]["present"] is False
+
+
+# ---------------------------------------------------------------- /auth/device/*（设备流桥）
+
+def test_auth_device_code_requires_config(client, monkeypatch):
+    import video2md.api as _api
+    monkeypatch.setattr(_api, "ENV", {})  # 未配 client 凭据 → 500（服务端配置问题）
+    assert client.post("/auth/device/code").status_code == 500
+
+
+def test_auth_device_code_proxies_google(client, monkeypatch):
+    import httpx
+
+    import video2md.api as _api
+    monkeypatch.setattr(_api, "ENV", {"GOOGLE_CLIENT_ID": "cid", "GOOGLE_CLIENT_SECRET": "sec"})
+
+    class _Resp:
+        status_code = 200
+        @staticmethod
+        def json():
+            return {"device_code": "DC", "user_code": "ABCD-1234",
+                    "verification_url": "https://google.com/device",
+                    "expires_in": 1800, "interval": 5}
+
+    async def _fake_post(self, url, data=None, **kw):  # noqa: ANN001
+        assert url == _api._GOOGLE_DEVICE_CODE_URL
+        assert data["client_id"] == "cid"
+        return _Resp()
+
+    monkeypatch.setattr(httpx.AsyncClient, "post", _fake_post)
+    r = client.post("/auth/device/code")
+    assert r.status_code == 200, r.text
+    assert r.json() == {"device_code": "DC", "user_code": "ABCD-1234",
+                        "verification_url": "https://google.com/device",
+                        "expires_in": 1800, "interval": 5}
+
+
+def test_auth_device_token_pending_then_ok(client, monkeypatch):
+    from acctkit import providers as _p
+
+    import video2md.api as _api
+    monkeypatch.setattr(_api, "ENV", {"GOOGLE_CLIENT_ID": "cid", "GOOGLE_CLIENT_SECRET": "sec"})
+
+    # 用户还没授权：Google 回 400 authorization_pending → 桥透传 401（客户端继续轮询）
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(_p.GoogleDeviceProvider, "_exchange",
+                   lambda self, dc: (_ for _ in ()).throw(
+                       _p.AuthError("Google 设备流未就绪（authorization_pending）", status=401)))
+        r = client.post("/auth/device/token", json={"device_code": "DC"})
+        assert r.status_code == 401
+
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(_p.GoogleDeviceProvider, "_exchange",
+                   lambda self, dc: {"id_token": "JWT"})
+        ok = client.post("/auth/device/token", json={"device_code": "DC"})
+        assert ok.status_code == 200 and ok.json() == {"id_token": "JWT"}
+
+
 def run_all() -> None:  # `python3 test_api_contract.py` 兜底（无 pytest 时）
     import sys
     sys.exit(pytest.main([__file__, "-q"]))
