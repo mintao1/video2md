@@ -53,11 +53,15 @@ from .config import CORS_ORIGINS, ENV, LOG_DIR, OUT_DIR, WATCHDOG_PERIOD_S
 from .graph import make_checkpointer_from_env, run_graph
 from .models import (
     ArtifactsAckOut,
+    DeviceCodeOut,
+    DeviceTokenBody,
+    DeviceTokenOut,
     HealthOut,
     PreflightOut,
     QueueOut,
     RunCreate,
     RunCreatedOut,
+    RunListOut,
     RunNotesOut,
     RunStatusOut,
 )
@@ -455,6 +459,92 @@ async def _on_validation_error(request: Request, exc: RequestValidationError) ->
 
 
 # ---------------------------------------------------------------- 用户级端点（鉴权 + 归属）
+
+_GOOGLE_DEVICE_CODE_URL = "https://oauth2.googleapis.com/device/code"
+
+
+@app.post("/auth/device/code", response_model=DeviceCodeOut,
+          summary="设备流登录第一步：向 Google 申请 device_code/user_code")
+async def auth_device_code() -> dict:
+    """给没有浏览器重定向能力的客户端（Obsidian 插件、CLI）用：服务端桥。"""
+    d = await _google_device_code()
+    _req_log("POST", "/auth/device/code", 200, user="(anon)")
+    return d
+
+
+@app.post("/auth/device/token", response_model=DeviceTokenOut,
+          summary="设备流轮询：device_code → id_token（用户授权前 401 pending）")
+async def auth_device_token(body: DeviceTokenBody) -> dict:
+    """acctkit 的 authenticate 是 headers 入参契约，换票逻辑复用其私有 _exchange；
+    成功即回 id_token——插件此后所有请求带 `Authorization: Bearer <id_token>`，
+    与网页端同一条 GoogleProvider 验签路径（external_id=sub 归并同一 uid）。"""
+    from acctkit.providers import GoogleDeviceProvider
+
+    cid = ENV.get("GOOGLE_CLIENT_ID", "").strip()
+    secret = ENV.get("GOOGLE_CLIENT_SECRET", "").strip()
+    if not (cid and secret):
+        raise HTTPException(500, "服务端未配置 GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET，"
+                                 "无法提供设备流登录")
+    p = GoogleDeviceProvider(cid, secret)
+    try:
+        tok = await asyncio.to_thread(p._exchange, body.device_code)
+    except AuthError as exc:
+        raise HTTPException(exc.status, exc.message) from exc
+    idt = str(tok.get("id_token") or "")
+    if not idt:
+        raise HTTPException(401, "Google 设备流未返回 id_token")
+    _req_log("POST", "/auth/device/token", 200, user="(anon)")
+    return {"id_token": idt}
+
+
+async def _google_device_code() -> dict:
+    cid = ENV.get("GOOGLE_CLIENT_ID", "").strip()
+    secret = ENV.get("GOOGLE_CLIENT_SECRET", "").strip()
+    if not (cid and secret):
+        raise HTTPException(500, "服务端未配置 GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET，"
+                                 "无法提供设备流登录")
+    try:
+        async with httpx.AsyncClient(timeout=15) as c:
+            r = await c.post(_GOOGLE_DEVICE_CODE_URL,
+                             data={"client_id": cid, "client_secret": secret,
+                                   "scope": "openid email profile"})
+    except Exception as exc:
+        raise HTTPException(502, f"Google device/code 不可达：{type(exc).__name__}") from exc
+    d = r.json()
+    if r.status_code != 200:
+        raise HTTPException(502, f"Google device/code 拒绝：{str(d)[:200]}")
+    return {"device_code": d["device_code"], "user_code": d["user_code"],
+            "verification_url": d["verification_url"],
+            "expires_in": int(d.get("expires_in") or 0), "interval": int(d.get("interval") or 5)}
+
+
+@app.get("/runs", response_model=RunListOut,
+         summary="列出本人名下的 run（插件收件箱发现新产物用）")
+def get_runs(status: str = "", limit: int = 50,
+             ident: Identity = Depends(current_identity)) -> dict:
+    """owner 过滤同 _require_run_access 口径；created 倒序。deliver 模式下逐条标
+    在架状态（_outbox_live 含惰性焚——过期即 present=false，不掺假）。"""
+    limit = max(1, min(limit, 500))
+    mode = artsink.current_mode()
+    rows = []
+    for r in sorted(_load_runs().values(), key=lambda x: str(x.get("created") or ""), reverse=True):
+        if (r.get("owner", "") or "") != ident.uid:
+            continue
+        if status and r.get("status") != status:
+            continue
+        done_n = sum(1 for a in (r.get("artifacts") or {}).values()
+                     if a.get("note") and not a.get("skipped"))
+        arts = None
+        if mode == "deliver":
+            path, exp = _outbox_live(r)
+            arts = {"mode": "deliver", "present": path is not None, "expires": exp}
+        rows.append({"run_id": r.get("run_id"), "url": r.get("url"),
+                     "status": r.get("status"), "created": r.get("created"),
+                     "total": r.get("total"), "done_entries": done_n, "artifacts": arts})
+        if len(rows) >= limit:
+            break
+    return {"items": rows, "mode": mode}
+
 
 @app.post("/runs", response_model=RunCreatedOut,
           summary="发起一次视频转文档（异步作业：同步解析建 run，后台驱动整张图）")

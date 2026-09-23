@@ -14,6 +14,7 @@ from __future__ import annotations
 import abc
 import asyncio
 import json
+import urllib.error
 import urllib.request
 from collections.abc import Callable, Mapping
 from urllib.parse import urlencode
@@ -81,6 +82,82 @@ class GoogleProvider(AuthProvider):
         from google.oauth2 import id_token as gid
 
         return gid.verify_oauth2_token(token, grequests.Request(), audience=self.client_id)
+
+
+class GoogleDeviceProvider(GoogleProvider):
+    """Google OAuth 设备流（RFC 8628）：``Authorization: GoogleDevice <device_code>``
+    带设备码，服务端到 Google token 端点换 id_token，再走父类同一套 JWKS 验签取 sub。
+
+    给「没有浏览器重定向能力」的客户端（Obsidian 插件、CLI）用：客户端先经
+    ``POST /auth/device/code`` 拿 user_code+verification_url（或直连 Google），用户
+    在任意浏览器输码授权；客户端轮询本凭据直到 authorization_pending 转好。
+    external_id=sub 与 GoogleProvider **同口径**——设备流登录和前端 id_token 登录
+    归并成同一个 uid，产物归属不割裂。需要 client 是 OAuth 应用里「TV 与 Limited Input
+    类型」（Web 型 client 无 device code 授权端点）。
+
+    Google 端点可注入（_token_url）供测试打桩；网络异常按凭据失败收口 401（细节不外泄），
+    未配置 client_id = 500（服务端问题），authorization_pending/slow_down = 401（未登录）。
+    """
+    name = "google_device"
+
+    def __init__(self, client_id: str = "", client_secret: str = "",
+                 token_url: str = "https://oauth2.googleapis.com/token"):
+        super().__init__(client_id)
+        self.client_secret = (client_secret or "").strip()
+        self._token_url = token_url
+
+    async def authenticate(self, headers: Mapping[str, str]) -> Principal:
+        device_code = credential_token(headers, self.name, "GoogleDevice")
+        if not self.client_id:
+            raise AuthError("服务端未配置 Google client_id", status=500)
+        try:  # 同步阻塞 I/O → 丢线程（同 WeChat._exchange 纪律）
+            tok = await asyncio.to_thread(self._exchange, device_code)
+        except AuthError:
+            raise
+        except Exception as exc:
+            raise AuthError(f"Google 设备码换取失败：{type(exc).__name__}", status=401) from exc
+        idt = str(tok.get("id_token") or "")
+        if not idt:
+            raise AuthError("Google 设备流未返回 id_token", status=401)
+        return await self._principal_from_idt(idt)
+
+    def _exchange(self, device_code: str) -> dict:
+        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+        req = urllib.request.Request(
+            self._token_url,
+            data=urlencode({"client_id": self.client_id, "client_secret": self.client_secret,
+                            "device_code": device_code,
+                            "grant_type": "urn:ietf:params:oauth:grant-type:device_code"}
+                           ).encode(),
+            headers={"Content-Type": "application/x-www-form-urlencoded",
+                     "User-Agent": "acctkit"})
+        try:
+            with opener.open(req, timeout=10) as resp:
+                return json.loads(resp.read().decode("utf-8"))
+        except urllib.error.HTTPError as e:
+            try:
+                body = json.loads(e.read().decode("utf-8"))
+            except Exception:
+                body = {}
+            err = str(body.get("error") or "")
+            # pending/slow_down = 用户还没授权（属「未登录」401，客户端继续轮询）；
+            # expired/invalid_grant = 凭据废了（401，须重新发起设备流）
+            raise AuthError(f"Google 设备流未就绪（{err or e.code}）", status=401) from e
+
+    async def _principal_from_idt(self, idt: str) -> Principal:
+        try:
+            payload = await asyncio.to_thread(self._verify, idt)
+        except AuthError:
+            raise
+        except Exception as exc:
+            raise AuthError(f"Google ID-Token 校验失败：{type(exc).__name__}", status=401) from exc
+        sub = str(payload.get("sub") or "")
+        if not sub:
+            raise AuthError("Google ID-Token 缺 sub", status=401)
+        return Principal(provider="google", external_id=sub,  # 归并到 google 身份口径
+                         email=payload.get("email"), name=payload.get("name"),
+                         raw={k: payload.get(k) for k in ("email", "email_verified", "name", "picture")
+                              if payload.get(k) is not None})
 
 
 class WeChatProvider(AuthProvider):
@@ -188,6 +265,8 @@ class FakeProvider(AuthProvider):
 FactoriesT = dict[str, Callable[[Mapping[str, str]], AuthProvider]]
 _FACTORIES: FactoriesT = {
     GoogleProvider.name: lambda env: GoogleProvider(env.get("GOOGLE_CLIENT_ID", "")),
+    GoogleDeviceProvider.name: lambda env: GoogleDeviceProvider(
+        env.get("GOOGLE_CLIENT_ID", ""), env.get("GOOGLE_CLIENT_SECRET", "")),
     WeChatProvider.name: lambda env: WeChatProvider(env.get("WECHAT_APP_ID", ""),
                                                      env.get("WECHAT_APP_SECRET", "")),
     DevProvider.name: lambda env: DevProvider(),

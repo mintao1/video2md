@@ -14,6 +14,7 @@ from .providers import (
                         AuthProvider,
                         DevProvider,
                         FakeProvider,
+                        GoogleDeviceProvider,
                         GoogleProvider,
                         WeChatProvider,
                         bearer_token,
@@ -26,7 +27,8 @@ from .store import IdentityStore, JsonFileStore, MemoryStore
 __all__ = [
     "AuthEngine", "build_from_env",
     "AuthError", "NoCredentials", "Principal", "Identity",
-    "AuthProvider", "GoogleProvider", "WeChatProvider", "DevProvider", "FakeProvider",
+    "AuthProvider", "GoogleProvider", "GoogleDeviceProvider", "WeChatProvider",
+    "DevProvider", "FakeProvider",
     "bearer_token", "credential_token", "make_provider", "register_provider",
     "IdentityStore", "JsonFileStore", "MemoryStore",
 ]

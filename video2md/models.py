@@ -81,6 +81,42 @@ class ArtifactsAckOut(BaseModel):
     status: str = Field(description="burned=已即时销毁（ACK 即焚）")
 
 
+# ---------------------------------------------------------------- GET /runs（列表 · 插件收件箱发现用）
+
+class RunListItem(BaseModel):
+    run_id: str
+    url: str
+    status: str | None = None
+    created: str | None = None
+    total: int | None = None
+    done_entries: int = Field(0, description="note 产物已写成的条目数（skipped 不计入）")
+    artifacts: ArtifactsInfo | None = Field(
+        None, description="deliver 模式在架状态；vault 模式为 None")
+
+
+class RunListOut(BaseModel):
+    items: list[RunListItem]
+    mode: str = Field(description="当前产物形态 vault|deliver（客户端据此决定拉不拉 bundle）")
+
+
+# ---------------------------------------------------------------- /auth/device/*（设备流登录桥）
+
+class DeviceCodeOut(BaseModel):
+    device_code: str
+    user_code: str
+    verification_url: str
+    expires_in: int
+    interval: int
+
+
+class DeviceTokenBody(BaseModel):
+    device_code: str = Field(..., min_length=1)
+
+
+class DeviceTokenOut(BaseModel):
+    id_token: str = Field(description="验签后即等价 Bearer 凭据，插件存本地复用")
+
+
 # ---------------------------------------------------------------- note / queue / health / preflight
 
 class NoteItem(BaseModel):
