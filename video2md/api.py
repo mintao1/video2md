@@ -47,9 +47,9 @@ from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from starlette.background import BackgroundTask
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from . import artsink, events, observability
+from . import artsink, events, observability, watchdog
 from .auth import AuthError, Identity, current_identity
-from .config import CORS_ORIGINS, ENV, LOG_DIR, OUT_DIR
+from .config import CORS_ORIGINS, ENV, LOG_DIR, OUT_DIR, WATCHDOG_PERIOD_S
 from .graph import make_checkpointer_from_env, run_graph
 from .models import (
     ArtifactsAckOut,
@@ -344,6 +344,7 @@ async def _drive(run_id: str, url: str, part_items: str, force: bool,
             observability.metric_run(_TASKS[run_id].get("status", "error"))
             observability.close_run(run_id)  # 兜底闭合 run 级 root span（各 stage 已各自闭合）
             observability.flush()
+            watchdog.forget(run_id)  # 终态清心跳（_HEARTBEATS 不随 run 数增长）
 
 
 
@@ -396,7 +397,11 @@ async def _lifespan(app: FastAPI):
         print(f"♻️ 恢复 {resumed} 个中断 run（上次服务退出前未跑完）")
     sweeper = (asyncio.create_task(_outbox_sweeper())
                if artsink.current_mode() == "deliver" else None)
+    # run 卡死看门狗：周期扫内存任务表，心跳超时按 V2MD_WATCHDOG_ACTION 处置
+    # （mark=标 error 等人工；exit=进程退出靠容器重启自愈，见 watchdog.py 模块注释）
+    wd = asyncio.create_task(watchdog.loop(_TASKS, WATCHDOG_PERIOD_S))
     yield
+    wd.cancel()
     if sweeper:
         sweeper.cancel()
     try:  # 释放 checkpointer 资源（PG 分支关池；sqlite 是 no-op）

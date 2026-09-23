@@ -1,8 +1,11 @@
-# 观测栈 override：otel-collector + prometheus + grafana（2026-09-22 定稿架构）。
+# 观测栈 override：otel-collector + prometheus + grafana + alertmanager + feishu-webhook
+#（2026-09-22 定稿架构；2026-09-23 加告警链）。
 # 用法：docker compose -f docker-compose.yml -f docker-compose.obs.yml up -d
 #
 # 拓扑：video2md ─OTLP→ collector:4318 ─┬─ traces → Langfuse Cloud（HTTPS_PROXY 出墙）
 #                                       └─ metrics → :8889 → prometheus → grafana
+# 告警链：prometheus 规则（deploy/prometheus-rules.yml）→ alertmanager:9093
+#         → feishu-webhook:9760 转译 → 飞书群机器人（AM 无原生飞书 receiver）
 # 与主栈同 host 网络：出口代理在宿主回环（127.0.0.1:17897 SSH 隧道），桥接网络够不到。
 # 全部只绑 127.0.0.1，公网零暴露。Mac 开发机查看：
 #   ssh -L 3000:127.0.0.1:3000 lcode-4c   → http://127.0.0.1:3000（Grafana，admin 密码见 secrets/obs.env）
@@ -12,6 +15,7 @@
 #   LANGFUSE_BASIC=base64("PK:SK")     # printf '%s:%s' "$PK" "$SK" | base64
 #   HTTPS_PROXY=http://127.0.0.1:17897
 #   GF_SECURITY_ADMIN_PASSWORD=<grafana admin 密码>
+#   FEISHU_WEBHOOK_URL=https://open.feishu.cn/open-apis/bot/v2/hook/<uuid>  # 飞书群机器人（告警链）
 
 volumes:
   obs-prometheus: {}
@@ -45,8 +49,37 @@ services:
       - --storage.tsdb.retention.time=90d
     volumes:
       - ./deploy/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./deploy/prometheus-rules.yml:/etc/prometheus/prometheus-rules.yml:ro
       - obs-prometheus:/prometheus
     mem_limit: 768m
+
+  # 告警路由：Prometheus rule_files 评估结果发这里 → 转译器 → 飞书（见 deploy/alertmanager.yml）
+  alertmanager:
+    image: prom/alertmanager:v0.28.1
+    restart: unless-stopped
+    network_mode: host   # 收 127.0.0.1:9093（prometheus 同机直投）
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
+      - --web.listen-address=127.0.0.1:9093
+    volumes:
+      - ./deploy/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+    mem_limit: 128m
+
+  # AM → 飞书卡片转译器：复用 video2md 镜像（fastapi/httpx 都在），不另建 Dockerfile。
+  # 密钥 FEISHU_WEBHOOK_URL 在 secrets/obs.env；未配置时转译器对 /alert 回 503（AM 会重试）。
+  feishu-webhook:
+    image: video2md
+    restart: unless-stopped
+    network_mode: host   # AM 在宿主回环 9093，转译器也只绑回环 9760
+    command: ["python", "/app/deploy/feishu_webhook.py"]
+    environment:
+      TZ: Asia/Shanghai
+    volumes:
+      - ./deploy/feishu_webhook.py:/app/deploy/feishu_webhook.py:ro
+    env_file:
+      - path: ./secrets/obs.env
+        required: false
+    mem_limit: 128m
 
   grafana:
     image: grafana/grafana:12.1.0

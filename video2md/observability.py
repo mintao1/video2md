@@ -150,6 +150,7 @@ def init(*, endpoint: str = "", headers: dict | None = None,
 def _make_instruments(meter) -> None:
     _M["runs"] = meter.create_counter("v2md_runs", description="完成的 run（按终态）")
     _M["cb"] = meter.create_counter("v2md_circuit_breaker_trips", description="熔断次数（按阶段）")
+    _M["watchdog"] = meter.create_counter("v2md_watchdog_trips", description="看门狗卡死判定次数")
     _M["stage_entries"] = meter.create_counter("v2md_stage_entries",
                                                description="阶段条目结果（ok/failed/skipped）")
     _M["llm_requests"] = meter.create_counter("v2md_llm_requests", description="LLM 调用（按任务/终态）")
@@ -372,6 +373,12 @@ def metric_stage(stage: str, status: str, seconds: float,
 def metric_cb(stage: str) -> None:
     if _M:
         _M["cb"].add(1, {"stage": stage})
+
+
+def metric_watchdog() -> None:
+    """看门狗卡死判定次数（watchdog.trip；告警规则 WatchdogTripped 消费）。"""
+    if _M:
+        _M["watchdog"].add(1)
 
 
 def metric_llm(task: str, status: str, seconds: float,

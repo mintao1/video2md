@@ -119,6 +119,14 @@ OUTBOX_DIR = Path(ENV.get("V2MD_OUTBOX_DIR", str(PROJ / "data" / "outbox")))
 OUTBOX_TTL_H = float(ENV.get("V2MD_OUTBOX_TTL_H", "24") or 24)
 
 
+# run 卡死看门狗（watchdog.py）：心跳超时判定。单条 3h 转录属正常，默认 2h 无任何活动才判。
+WATCHDOG_TIMEOUT_S = float(ENV.get("V2MD_WATCHDOG_TIMEOUT_S", "7200") or 7200)
+WATCHDOG_PERIOD_S = float(ENV.get("V2MD_WATCHDOG_PERIOD_S", "60") or 60)
+WATCHDOG_ACTION = (ENV.get("V2MD_WATCHDOG_ACTION") or "mark").strip().lower()
+if WATCHDOG_ACTION not in ("mark", "exit"):
+    raise RuntimeError(f"未知 V2MD_WATCHDOG_ACTION：{WATCHDOG_ACTION}（支持 mark|exit）")
+
+
 
 # ---------------------------------------------------------------- fin
 # dify_kit / DIFY_* / dataset_api 已随 Dify 抽离（2026-09-21）摘除：

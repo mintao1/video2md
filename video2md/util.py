@@ -118,6 +118,11 @@ class RunLog:
             with self.path.open("a") as f:
                 f.write(json.dumps(out, ensure_ascii=False) + "\n")
         try:
+            from . import watchdog  # 惰性导入：心跳打点（看门狗判定「run 活着」的最细粒度信号）
+            watchdog.touch(self.run_id)
+        except Exception:
+            pass  # 下游 sink 任何异常都不许影响主管线
+        try:
             events.publish(self.run_id, out)  # SSE 总线（工作线程安全投递，见 events）
         except Exception:
             pass  # 下游 sink 任何异常都不许影响主管线

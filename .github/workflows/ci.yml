@@ -29,8 +29,20 @@ jobs:
             echo "=== $t ==="
             uv run python3 "$t.py"
           done
+      - name: 运维三件套测试（看门狗/告警配置/备份脚本，全离线）
+        run: |
+          for t in test_watchdog test_alert_rules test_backup_scripts; do
+            echo "=== $t ==="
+            uv run python3 "$t.py"
+          done
       - name: e2e（进程级 mockpool 冒烟：testsrc2 夹具 + 假 LLM，零 token，跨平台）
         run: bash scripts/smoke_ci.sh
+      - name: 告警配置校验（promtool/amtool；规则结构由 test_alert_rules.py 覆盖）
+        run: |
+          docker run --rm -v "$PWD/deploy:/deploy:ro" --entrypoint promtool \
+            prom/prometheus:v3.5.0 check rules /deploy/prometheus-rules.yml
+          docker run --rm -v "$PWD/deploy:/deploy:ro" --entrypoint amtool \
+            prom/alertmanager:v0.28.1 check-config /deploy/alertmanager.yml
 
   # 静态门禁：lint + 类型检查（配置在 pyproject.toml [tool.ruff]/[tool.mypy]）
   lint:

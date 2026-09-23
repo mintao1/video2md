@@ -37,6 +37,9 @@ exporters:
       queue_size: 1000
   prometheus:
     endpoint: 127.0.0.1:8889
+    # 指标流断掉后序列保留 5m 再过期——过期后 absent_over_time 才为真，
+    # 告警规则 Video2mdSilent（deploy/prometheus-rules.yml）依赖该语义
+    metric_expiration: 5m
 
 service:
   pipelines:

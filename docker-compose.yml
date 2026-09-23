@@ -50,6 +50,7 @@ services:
     environment:
       TZ: Asia/Shanghai
       V2MD_HOST: 127.0.0.1
+      V2MD_ENV: production   # 遥测环境标签：Langfuse 开发/生产分项目（README 可观测性节）
       V2MD_SECRETS_FILE: /run/video2md.env
       V2MD_REMOTE: http://127.0.0.1:9700
       V2MD_OCR_REMOTE: http://127.0.0.1:9700
@@ -57,6 +58,9 @@ services:
       V2MD_CLIPS_SOURCE: remote
       V2MD_PROXY: http://127.0.0.1:17897
       V2MD_PROXY_DOMESTIC: "1"
+      # run 卡死看门狗：生产配 exit——标 error 后进程退出（码 70），restart 自愈并恢复队列；
+      # 开发机默认 mark（只标记+告警，不动进程）。详见 video2md/watchdog.py 模块注释
+      V2MD_WATCHDOG_ACTION: exit
       OBSIDIAN_VAULT: /vault
     volumes:
       - v2md-data:/app/data

@@ -108,6 +108,30 @@ ssh lcode-4c 'cd ~/stack/video2md && \
 #    真跑一条后：Langfuse Cloud 看 trace/generation；Grafana 走 ssh -L 3000:127.0.0.1:3000 lcode-4c
 ```
 
+### 备份与恢复（2026-09-23）
+
+`scripts/backup.sh`（服务器上跑，cron 每日）：打包 `v2md-data` 卷（state/runs/users/
+checkpoints/logs）+ `vault` 卷（笔记产物——Syncthing 只算同步不算备份，误删会照样同步
+过去）+ PG 在跑时 `pg_dump`；落盘 `backups/daily/`（默认留 7 份）+ `backups/weekly/`
+（周一晋升，留 4 份）+ sha256 manifest。恢复走 `scripts/restore.sh <日期>`（先校验
+manifest，覆盖前自动快照现有卷到 `backups/pre-restore-<日期>/`）。
+
+```bash
+# 服务器 crontab -e：每日 04:15 备份（logs 落 /var/log/v2md-backup.log）
+15 4 * * * /home/<user>/stack/video2md/scripts/backup.sh >> /var/log/v2md-backup.log 2>&1
+
+# 手动跑 / 恢复演练（建议每季度做一次：恢复到临时 dst 验证归档可用）
+ssh lcode-4c '~/stack/video2md/scripts/backup.sh --dst /mnt/backup/v2md'
+ssh lcode-4c '~/stack/video2md/scripts/restore.sh 2026-09-23 --only data'   # 交互确认
+```
+
+- **secrets/ 不在卷里**：`secrets/video2md.env`、`secrets/obs.env`、colab/kaggle token
+  在宿主目录——手工纳入你的备份（或至少记入密码管理器）；丢了 = LLM 凭证/飞书机器人重配。
+- **一致性口径**：runs.json/state.json 原子 rename 写，tar 视角恒完整；checkpoints.sqlite
+  可丢弃（成功 run 会删 checkpoint），接受瞬时不一致；严格一致可先 `docker compose stop video2md` 再备。
+- **异地上传**（rclone/restic 推 B2/S3/OSS）暂未集成——本地盘炸 = 备份同灭，上云前
+  备份只防「误删/坏卷」不防「整机损失」。
+
 - **网络拓扑**：双服务均 `network_mode: host`——gpu_router 要直连宿主回环上的隧道代理
   （`127.0.0.1:17897`），video2md 与池子互访也走回环。api 绑 `127.0.0.1:8790`（无认证，
   公网经安全组拦截；外部调用走 SSH 隧道 `ssh -L 8790:127.0.0.1:8790 lcode-4c` 或加 nginx 反代）
@@ -344,6 +368,22 @@ evals 旁路：scripts/eval_notes.py → Langfuse scores（SDK 直挂，黑洞�
   熔断计数、队列深度。指标进程内存态，重启清零（运行态非账本）。
 - **死人开关**：配 `V2MD_DEADMAN_PING_URL` 后 run 开始 ping `/start`、done/partial
   ping 原 URL、error ping `/fail`——「任务压根没跑/挂死」只有外部监控看得见。
+- **run 卡死看门狗（2026-09-23）**：`video2md/watchdog.py`——graph.invoke 无超时，
+  ffmpeg/yt-dlp 挂死时工作线程永远占着串行信号量（队列饿死且死人开关不响：进程没死）。
+  心跳三源取最小龄：RunLog 每条事件 / `_run_stage_inner` 每条目循环 / `started`+stages ts
+  兜底；api 内周期任务（`V2MD_WATCHDOG_PERIOD_S`，默认 60s）扫内存任务表，最近活动超
+  `V2MD_WATCHDOG_TIMEOUT_S`（默认 7200s）判卡死。动作 `V2MD_WATCHDOG_ACTION`：
+  `mark`（默认，开发机）= run 标 error + 死人开关 /fail + 指标 `v2md_watchdog_trips_total`
+  （卡死线程无法强杀，信号量仍占，需人工重启）；`exit`（生产 compose 已配）= 标记后
+  `os._exit(70)`，容器 restart 自愈、lifespan 只重投 running 状态的 run（不会死循环）。
+- **告警链（2026-09-23）**：Prometheus 规则（`deploy/prometheus-rules.yml`，8 条：
+  指标流沉默/看门狗触发/run error/partial/熔断/队列积压/LLM 失败/collector 掉线）
+  → Alertmanager（`deploy/alertmanager.yml`，critical 4h 重发、warning 12h，
+  critical 抑制同源 warning）→ 飞书转译器（`deploy/feishu_webhook.py`，AM 无原生飞书
+  receiver，卡片格式转译 + 持密钥）→ 飞书群机器人。密钥 `FEISHU_WEBHOOK_URL` 进
+  `secrets/obs.env`；配置校验进 CI（promtool/amtool + `test_alert_rules.py`）。
+  恢复（resolved）也通知（卡片绿色）。`absent_over_time` 沉默告警依赖 collector 的
+  `metric_expiration: 5m`（deploy/otel-collector.yml）。
 - **evals 旁路**：`scripts/eval_notes.py` 对 state.json 已完成条目批量打分
   （DeepEval G-Eval/Faithfulness/Summarization + RAGAS faithfulness；judge 走自有
   LLM 端点，可用 `V2MD_JUDGE_MODEL` 单独换模型），分数回写 Langfuse 同 trace，
@@ -364,7 +404,7 @@ evals 旁路：scripts/eval_notes.py → Langfuse scores（SDK 直挂，黑洞�
 
 [![CI](https://github.com/mintao1/video2md/actions/workflows/ci.yml/badge.svg)](https://github.com/mintao1/video2md/actions/workflows/ci.yml)
 
-push/PR 自动跑三个 job（`.github/workflows/ci.yml`）：**test**（pytest 契约 + 8 个脚本式测试 + `scripts/smoke_ci.sh` 进程级 mockpool 全链冒烟，全离线零 token）、
+push/PR 自动跑三个 job（`.github/workflows/ci.yml`）：**test**（pytest 契约 + 11 个脚本式测试（含运维三件套）+ `scripts/smoke_ci.sh` 进程级 mockpool 全链冒烟 + 告警配置 promtool/amtool 校验，全离线零 token）、
 **lint**（ruff + mypy）、**docker-build**（生产镜像构建路径）。CI 跑什么，本地就能跑什么：
 
 ```bash
@@ -386,6 +426,9 @@ python3 -m pytest test_api_contract.py  # HTTP 后端契约：鉴权/owner 403/4
                                         # + deliver 面（bundle zip/ACK 410/TTL 惰性焚/sweep/owner 收紧幂等）（TestClient 离线）
 python3 -m pytest test_acctkit.py       # acctkit 模块自身接口：provider 次序/Google+微信打桩/开户回填归并/前缀工厂（零宿主零网络）
 python3 test_observability.py   # OTel 桥：span 树/gen_ai 属性/traceId 确定性/指标仪表/deadman（InMemory 离线）
+python3 test_watchdog.py        # run 卡死看门狗：三层心跳判定/mark 翻转/exit 自愈/异常静默（离线）
+python3 test_alert_rules.py     # 告警配置：规则结构/指标名对齐/AM 路由/飞书卡片拼装（YAML 离线）
+python3 test_backup_scripts.py  # 备份脚本：dry-run 拼装/防重入锁/retention/manifest 校验（stub docker 离线）
 python3 test_otel_replay.py     # 历史回放：jsonl→span 树重建/悬空闭合/时间戳还原（InMemory 离线）
 python3 test_evals.py           # evals 旁路：指标编排/scores 三运输路径/回归对比（假 deepeval/ragas/langfuse）
 ./test_e2e.sh                   # 端到端：合成视频 → 自起 api（假 LLM）→ 全断言（本地 whisper，不烧 token）

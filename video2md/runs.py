@@ -266,6 +266,8 @@ def _run_stage_inner(run: dict, stage: str, args: dict, log: "RunLog") -> None:
     last_sig, streak, breaker = "", 0, ""
     cb_threshold = int(ENV.get("V2MD_CB_THRESHOLD", "3"))
     for idx, entry in enumerate(run["entries"], 1):
+        from . import watchdog  # 惰性导入：每条目开头打心跳（长阶段日志稀疏，事件流会饿）
+        watchdog.touch(run["run_id"])
         art = run["artifacts"].setdefault(entry["url"], {})
         if art.get("skipped"):
             print(f"    ⏭ 条目 {idx}/{len(run['entries'])} 已处理过（state 幂等），跳过")
