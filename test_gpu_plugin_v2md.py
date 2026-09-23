@@ -44,8 +44,8 @@ plugs = load_plugins(["v2md"], [V2MD_ROOT / "gpu_plugins"])
 check("v2md 插件加载 + 三能力契约",
       len(plugs) == 1 and plugs[0].capabilities ==
       {"asr": "transcribe", "clips": "cut_clips", "ocr": "ocr"})
-check("PROVIDER_IMPL 声明三 kind",
-      set(plugs[0].module.PROVIDER_IMPL) == {"colab-cli", "kaggle", "zerogpu"})
+check("PROVIDER_IMPL 声明四 kind（http 能力方法归本插件，内核零业务）",
+      set(plugs[0].module.PROVIDER_IMPL) == {"http", "colab-cli", "kaggle", "zerogpu"})
 
 # ================================================================ 配置聚合
 print("== 配置聚合 ==")
@@ -107,6 +107,26 @@ res, who = r.call("asr", "transcribe", _TMP / "x.m4a", "turbo", "zh", _TMP)
 check("router.call(asr) 经插件契约走通", who == "modal" and res["model"] == "turbo")
 res, who = r.call("ocr", "ocr", [_TMP / "g_001.jpg"], _TMP)
 check("router.call(ocr) 走通", who == "modal" and res[0]["text"] == "你好")
+
+# clips 契约（原 gpu_router 内核 http 契约用例迁入）：tar 解包 + _result.json 回填
+specs = [{"out": "a-c01-0000.mp4", "s0": 0.0, "s1": 2.0}]
+results, out_dir = hp.cut_clips(None, "https://cdn/x.mp4", specs, _TMP)
+check("http clips：tar 解包 + _result.json",
+      results.get("a-c01-0000.mp4") is True
+      and (out_dir / "a-c01-0000.mp4").read_bytes() == b"fake-mp4-bytes")
+specs2 = [{"out": "miss-c01-0000.mp4", "s0": 0.0, "s1": 1.0}]
+results2, _ = hp.cut_clips(None, "https://cdn/x.mp4", specs2, _TMP)
+check("http clips：缺片回填 False", results2.get("miss-c01-0000.mp4") is False)
+bad = httpx.MockTransport(lambda req: httpx.Response(500, text="boom"))
+hp._client = httpx.Client(transport=bad, base_url="https://x.modal.run")
+try:
+    hp.transcribe(_TMP / "x.m4a", "turbo", "zh", _TMP)
+    check("http 转录 500 → RuntimeError（task 失败换下家）", False)
+except RuntimeError:
+    check("http 转录 500 → RuntimeError（task 失败换下家）", True)
+finally:
+    hp._client = httpx.Client(transport=httpx.MockTransport(handler),
+                              base_url="https://x.modal.run")
 
 # ================================================================ server 端点契约
 print("== server 端点（插件注册）==")

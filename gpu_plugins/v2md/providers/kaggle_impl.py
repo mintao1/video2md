@@ -1,8 +1,8 @@
-"""kaggle provider 的 v2md 能力实现：三段内核模板 + transcribe / cut_clips / ocr。
+"""kaggle provider 的 v2md 能力实现：三段内核模板 + 推送机械 + transcribe/cut_clips/ocr。
 
-原 gpu_router/providers/kaggle.py 的内核模板与方法体迁入（业务归 video2md）。
-gpu_router 侧 KaggleProvider 保留基础设施（凭证/数据集推送/内核轮询），能力方法
-经 PROVIDER_IMPL 动态装载，基础设施经 provider 实例传入。
+原 gpu_router 内核的内核模板、数据集推送、内核轮询、产物读取全部迁入（业务归
+video2md）。gpu_router 侧 KaggleProvider 只留凭证/kg CLI/健康/配额语义；数据集与
+内核默认名 v2md-io / v2md-job 归本插件，provider extra 的 dataset/kernel 可覆盖。
 """
 from __future__ import annotations
 
@@ -11,6 +11,83 @@ import shutil
 import tarfile
 from pathlib import Path
 
+
+
+# ---------------------------------------------------------------- 推送机械（原内核方法迁入）
+def _ensure_dataset(p, user: str) -> str:
+    slug = p.dataset or f"{user}/v2md-io"
+    if p._dataset_ready:
+        return slug
+    out = p._kg(["datasets", "list", "-m", "-s", "v2md-io"], timeout=120)
+    p._dataset_exists = slug in out
+    p._dataset_ready = True
+    return slug
+
+
+def _push_inputs(p, tmp: Path, files: list[Path]) -> str:
+    """输入打成滚动数据集新版本（整包替换 = 数据集不随任务数膨胀）。返回 slug。"""
+    import json as _json
+    import shutil as _sh
+    user = p._creds_user()
+    slug = _ensure_dataset(p, user)
+    stage = tmp / "dataset"
+    stage.mkdir(exist_ok=True)
+    for f in files:
+        _sh.copy(f, stage / f.name)
+    (stage / "dataset-metadata.json").write_text(_json.dumps({
+        "title": slug.split("/", 1)[1], "id": slug,
+        "licenses": [{"name": "CC0-1.0"}]}))
+    if getattr(p, "_dataset_exists", False):
+        p._kg(["datasets", "version", "-p", str(stage), "-m", "v2md job",
+               "--dir-mode", "skip"], timeout=900)
+    else:
+        p._kg(["datasets", "create", "-p", str(stage), "--dir-mode", "skip"],
+              timeout=900)
+        p._dataset_exists = True
+    return slug
+
+
+def _run_kernel(p, tmp: Path, script: str, dataset_slug: str) -> Path:
+    """push 内核 → 轮询 → 拉产物目录。返回产物目录路径。"""
+    import json as _json
+    import time as _time
+    user = p._creds_user()
+    slug = p.kernel or f"{user}/v2md-job"
+    kdir = tmp / "kernel"
+    kdir.mkdir(exist_ok=True)
+    (kdir / "script.py").write_text(script)
+    (kdir / "kernel-metadata.json").write_text(_json.dumps({
+        "id": slug, "title": slug.split("/", 1)[1], "code_file": "script.py",
+        "language": "python", "kernel_type": "script", "is_private": "true",
+        "enable_gpu": "true", "enable_internet": "true",
+        "dataset_sources": [dataset_slug],
+        "competition_sources": [], "kernel_sources": []}))
+    p._kg(["kernels", "push", "-p", str(kdir)], timeout=300)
+    deadline = _time.time() + p.max_wait
+    while _time.time() < deadline:
+        _time.sleep(20)
+        out = p._kg(["kernels", "status", slug], timeout=60)
+        low = out.lower()
+        if "complete" in low:
+            out_dir = tmp / "kernel-out"
+            out_dir.mkdir(exist_ok=True)
+            p._kg(["kernels", "output", slug, "-p", str(out_dir)], timeout=900)
+            return out_dir
+        if "error" in low or "cancel" in low:
+            raise RuntimeError(f"Kaggle 内核失败: {out.strip()[:200]}")
+    raise RuntimeError(f"Kaggle 内核超时（>{int(p.max_wait)}s）")
+
+
+def _read_out(out_dir: Path) -> dict:
+    st_file = out_dir / "status.json"
+    if st_file.exists():
+        st = json.loads(st_file.read_text())
+        if st.get("state") == "error":
+            raise RuntimeError(f"Kaggle 内核报错: {str(st.get('error'))[:300]}")
+    out_file = out_dir / "out.json"
+    if not out_file.exists():
+        raise RuntimeError("Kaggle 产物缺 out.json（内核可能没跑完）")
+    return json.loads(out_file.read_text())
 
 
 # ---------------------------------------------------------------- 内核脚本模板
@@ -174,9 +251,9 @@ def transcribe(provider, audio: Path, model: str, language: str, tmp: Path) -> d
     with provider.lock:
         args = tmp / "v2md_args.json"
         args.write_text(json.dumps({"model": model, "language": language}))
-        slug = provider._push_inputs(tmp, [audio, args])
-        out_dir = provider._run_kernel(tmp, _KERNEL_ASR, slug)
-        return provider._read_out(out_dir)
+        slug = _push_inputs(provider, tmp, [audio, args])
+        out_dir = _run_kernel(provider, tmp, _KERNEL_ASR, slug)
+        return _read_out(out_dir)
 
 
 def ocr(provider, images: list[Path], tmp: Path) -> list[dict]:
@@ -185,9 +262,9 @@ def ocr(provider, images: list[Path], tmp: Path) -> list[dict]:
         with tarfile.open(tar, "w") as tf:
             for p in images:
                 tf.add(p, arcname=p.name)
-        slug = provider._push_inputs(tmp, [tar])
-        out_dir = provider._run_kernel(tmp, _KERNEL_OCR, slug)
-        return provider._read_out(out_dir).get("results", [])
+        slug = _push_inputs(provider, tmp, [tar])
+        out_dir = _run_kernel(provider, tmp, _KERNEL_OCR, slug)
+        return _read_out(out_dir).get("results", [])
 
 
 def cut_clips(provider, video: Path | None, direct_url: str, clips: list[dict],
@@ -202,8 +279,8 @@ def cut_clips(provider, video: Path | None, direct_url: str, clips: list[dict],
             if video.resolve() != up.resolve():
                 shutil.copy(video, up)
             inputs.append(up)
-        slug = provider._push_inputs(tmp, inputs)
-        out_dir = provider._run_kernel(tmp, _KERNEL_CLIPS, slug)
+        slug = _push_inputs(provider, tmp, inputs)
+        out_dir = _run_kernel(provider, tmp, _KERNEL_CLIPS, slug)
         st_file = out_dir / "status.json"
         if st_file.exists():
             st = json.loads(st_file.read_text())

@@ -11,11 +11,14 @@ gpu_router 内核经 plugins.py 协议加载本包——gpu_router.json：
 - ocr    → ocr(images, tmp) -> [{"name", "text", "conf", "err"}]
 
 provider 侧实现：
-- http kind（Modal/隧道/国内云）：部署 reference/app.py（同目录，原 gpu_router/reference 迁入）
-- colab-cli kind：providers/colab_machinery.py（原 gpu_router/providers/colab_machinery 迁入，
-  lease/queue 看门狗协同是 video2md 专属，随插件走）
-- kaggle / zerogpu kind：providers/kaggle_impl.py、providers/zerogpu_impl.py
-  （v2md 内核模板与 Space，原实现迁入；gpu_router 侧 provider 类已泛化）
+- http kind（Modal/隧道/国内云）：providers/http_impl.py（原 gpu_router 内核
+  http_generic 的能力方法迁入；服务端部署 reference/app.py，同目录原 gpu_router/reference）
+- colab-cli kind：providers/colab_impl.py + providers/colab_machinery.py（能力方法、
+  token 体检、extra→机械配置 _bind 注入；lease/queue 看门狗协同是 video2md 专属）
+- kaggle kind：providers/kaggle_impl.py（内核模板 + 数据集/内核推送机械，
+  v2md-io / v2md-job 默认名随插件走）
+- zerogpu kind：providers/zerogpu_impl.py（Space 调用，原实现迁入）
+gpu_router 侧 provider 类均为纯平台壳，业务方法全部经 PROVIDER_IMPL 装载。
 
 WATCHDOG：Colab 会话空闲自动关停（原 __main__ 硬编码逻辑迁入，内核只起线程）。
 """
@@ -46,6 +49,7 @@ KIND_CAPABILITIES = {
 
 # 各 kind 的能力实现模块（gpu_router 侧 build_provider 据此装载业务方法）
 PROVIDER_IMPL = {
+    "http": "v2md.providers.http_impl",
     "colab-cli": "v2md.providers.colab_impl",
     "kaggle": "v2md.providers.kaggle_impl",
     "zerogpu": "v2md.providers.zerogpu_impl",
