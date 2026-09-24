@@ -49,13 +49,15 @@ def main() -> int:
     if not pg.pg_enabled():
         sys.exit("✗ V2MD_PG_DSN 未配置（secrets/video2md.env 或环境变量）")
 
-    pool = pg.shared_pool()
+    pool = pg.make_pool(pg.pg_dsn())  # 独立池：先应用迁移基线（P0-5，store 构造不再隐式建表）
     try:
+        from video2md.pgmigrate import apply_migrations
+        apply_migrations(pool)
         if "runs" in only:
             src = _read_json("V2MD_RUNS_FILE", "runs.json")
             print(f"runs : {len(src)} 条" + ("（dry-run 不写）" if a.dry_run else ""))
             if src and not a.dry_run:
-                st = PostgresRunsStore(pool)  # 构造即幂等建表
+                st = PostgresRunsStore(pool)
                 for run in src.values():
                     st.merge(run)
         if "state" in only:
@@ -72,7 +74,7 @@ def main() -> int:
         print("✅ 迁移完成" if not a.dry_run else "· dry-run 完成")
         return 0
     finally:
-        pg.close_shared_pool()
+        pool.close()
 
 
 if __name__ == "__main__":

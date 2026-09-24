@@ -36,19 +36,7 @@ class PostgresRunsStore:
     """runs 表：run_id PK + 提取列 + record jsonb（整条 run dict）。"""
 
     def __init__(self, pool: ConnectionPool):
-        self.pool = pool
-        with pool.connection() as conn:
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS v2md_runs (
-                    run_id  text PRIMARY KEY,
-                    owner   text NOT NULL DEFAULT '',
-                    status  text NOT NULL DEFAULT '',
-                    created text NOT NULL DEFAULT '',
-                    updated timestamptz NOT NULL DEFAULT now(),
-                    record  jsonb NOT NULL
-                )""")
-            conn.execute("CREATE INDEX IF NOT EXISTS v2md_runs_status_idx ON v2md_runs (status)")
-            conn.execute("CREATE INDEX IF NOT EXISTS v2md_runs_owner_idx ON v2md_runs (owner)")
+        self.pool = pool  # 建表已上收 migrations/0001（P0-5），构造只接线
 
     def load(self) -> dict:
         with self.pool.connection() as conn:
@@ -83,14 +71,7 @@ class PostgresStateStore:
     文件档的 fp 是外层 dict key（不进记录体），故表单存 fp 列。"""
 
     def __init__(self, pool: ConnectionPool):
-        self.pool = pool
-        with pool.connection() as conn:
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS v2md_state (
-                    fp      text PRIMARY KEY,
-                    updated timestamptz NOT NULL DEFAULT now(),
-                    record  jsonb NOT NULL
-                )""")
+        self.pool = pool  # 建表已上收 migrations/0001（P0-5），构造只接线
 
     def load(self) -> dict:
         with self.pool.connection() as conn:
@@ -120,17 +101,7 @@ class PostgresTaskStore:
     """
 
     def __init__(self, pool: ConnectionPool):
-        self.pool = pool
-        with pool.connection() as conn:
-            PostgresRunsStore(pool)  # 幂等建 v2md_runs（独立实例化 task store 也自足）
-            conn.execute(
-                "ALTER TABLE v2md_runs ADD COLUMN IF NOT EXISTS claimed_by text NOT NULL DEFAULT ''")
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS v2md_submit_log (
-                    uid   text PRIMARY KEY,
-                    ts    timestamptz NOT NULL DEFAULT now(),
-                    count integer NOT NULL DEFAULT 1
-                )""")
+        self.pool = pool  # v2md_runs·claimed_by·v2md_submit_log 建表已上收 migrations/0001（P0-5）
 
     # ---------------------------------------------------------------- 队列视图
 

@@ -27,21 +27,7 @@ if TYPE_CHECKING:
 
 class PostgresIdentityStore(IdentityStore):
     def __init__(self, pool: ConnectionPool):
-        self.pool = pool
-        with pool.connection() as conn:
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS v2md_users (
-                    uid     text PRIMARY KEY,
-                    created text NOT NULL DEFAULT '',
-                    record  jsonb NOT NULL
-                )""")
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS v2md_identities (
-                    provider    text NOT NULL,
-                    external_id text NOT NULL,
-                    uid         text NOT NULL,
-                    PRIMARY KEY (provider, external_id)
-                )""")
+        self.pool = pool  # 建表已上收 video2md/migrations/0001（P0-5），构造只接线
 
     # ---- 内部：用户记录读写（行锁串行化，防并发回填/追加丢更新）
 

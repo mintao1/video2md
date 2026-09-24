@@ -7,7 +7,10 @@
 #   scripts/deploy.sh <tag> --dir ~/stack/video2md   # 服务器上仓库路径
 #   scripts/deploy.sh <tag> --dry-run                # 只打印将执行的命令
 #
-# 流程：git fetch --tags → checkout <tag> → compose build → up -d → healthz/preflight 体检。
+# 流程：git fetch --tags → checkout <tag> → compose build → up -d → schema 迁移（P0-5）→
+#       healthz/preflight 体检。迁移放 up -d 后：api 建池校验落后会 crash-loop 等 schema，
+#       migrate 完成后 restart 自愈（对齐「PG 未就绪 fail-fast 自愈」既有口径）；
+#       库版本超前（回滚到旧代码）则 migrate 拒继续——部署停在这，交人工判断。
 # 体检失败 → 非零退出并提示回滚命令（deploy.sh <上一个可用 tag>）。
 # GHCR 上按 tag 存档的镜像（ci.yml release job）是灾备：git 不可用时可直接
 #   docker pull ghcr.io/mintao1/video2md:<tag> 手动顶上。
@@ -48,6 +51,9 @@ REF="$TAG"
 echo "── 部署 $TAG → $HOST:$DIR"
 remote "cd $DIR && git fetch --tags --prune && git checkout -f $REF && $COMPOSE build"
 remote "cd $DIR && $COMPOSE up -d"
+
+echo "── schema 迁移（幂等；json 档部署自动跳过）"
+remote "cd $DIR && $COMPOSE run --rm --no-deps video2md python -m video2md migrate"
 
 echo "── 体检（healthz / preflight）"
 HEALTH_OK=0

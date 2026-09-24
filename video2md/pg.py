@@ -37,12 +37,18 @@ def make_pool(dsn: str) -> ConnectionPool:
 
 
 def shared_pool() -> ConnectionPool:
-    """lazy 单例；DSN 缺失抛 RuntimeError（调用方应先 pg_enabled() 判档）。"""
+    """lazy 单例；DSN 缺失抛 RuntimeError（调用方应先 pg_enabled() 判档）。
+
+    P0-5：建池即校验 schema 版本——store/checkpointer/events 全走本收口，落后/超前
+    一律拒起并提示跑 `python -m video2md migrate`。make_pool 不校验（migrate CLI
+    与真库测试用 make_pool 自管 schema）。"""
     global _POOL
     if _POOL is None:
         if not pg_enabled():
             raise RuntimeError("V2MD_PG_DSN 未配置：PG 档存储/事件扇出不可用")
         _POOL = make_pool(pg_dsn())
+        from .pgmigrate import validate_schema
+        validate_schema(_POOL)
     return _POOL
 
 

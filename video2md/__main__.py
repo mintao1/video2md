@@ -18,6 +18,23 @@ def main() -> None:
         a = ap.parse_args(sys.argv[2:])
         cmd_api(a.port)
         return
+    if len(sys.argv) > 1 and sys.argv[1] == "migrate":
+        # schema 迁移（P0-5）：应用待迁移版本后校验，幂等可重跑；api 建池即校验，
+        # 落后拒起等本命令。json 档（无 DSN）exit 0——deploy.sh 对 json 部署照常走。
+        from . import pg
+        from .pgmigrate import SCHEMA_LATEST, apply_migrations, validate_schema
+        if not pg.pg_enabled():
+            print("· V2MD_PG_DSN 未配置（json 档）：无 schema 可迁移")
+            return
+        pool = pg.make_pool(pg.pg_dsn())
+        try:
+            applied = apply_migrations(pool)
+            print(f"✅ 迁移就绪：库版本 {SCHEMA_LATEST}"
+                  + (f"（本次新应用：{applied}）" if applied else "（无待应用，幂等重跑）"))
+            validate_schema(pool)
+        finally:
+            pool.close()
+        return
     if len(sys.argv) > 1 and sys.argv[1] == "graph-run":
         # LangGraph 单次直跑（调试/对拍用；生产入口是 api 服务的 POST /runs）
         from .graph import make_checkpointer_from_env, run_graph
@@ -65,7 +82,7 @@ def main() -> None:
                 print(f"{rid}  {r.get('created', '')}  {r.get('status', '')}  "
                       f"条目 {r.get('total', 0)}  url={r.get('url', '')[:60]}")
         return
-    sys.exit("用法：video2md api [--port 8790] | graph-run <url> [--force] [--review] | runs [run_id]"
+    sys.exit("用法：video2md api [--port 8790] | migrate | graph-run <url> [--force] [--review] | runs [run_id]"
              "（__stage 为单阶段手动排障入口；Dify 时代的 serve 已归档 legacy/serve.py）")
 
 

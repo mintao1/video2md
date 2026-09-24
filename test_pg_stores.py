@@ -2,6 +2,7 @@
 """test_pg_stores.py — P3/P4a PG 档真库测试（需要 V2MD_TEST_PG_DSN；未配则整文件 skip）。
 
 覆盖：
+- 迁移纪律（P0-5）：裸库校验拒起、apply_migrations 首应用/幂等重跑、版本改低拒起、重跑自愈
 - PostgresRunsStore：merge/load 往返、并发 merge 不丢、函数级分派（_load_runs/_runs_merge/
   _runs_file_lock no-op/_save_runs 禁用）、json 缺省档回归
 - PostgresStateStore：逐 fp upsert（键只增不删）、函数级分派、json 缺省档回归
@@ -45,7 +46,7 @@ from video2md import events, pg, pgstore, runs, util, watchdog  # noqa: E402
 from video2md.auth.pg_store import PostgresIdentityStore  # noqa: E402
 from video2md.config import ENV  # noqa: E402
 
-pool = pg.make_pool(DSN)  # 独立池（绕开 shared 单例，便于收尾 close）
+pool = pg.make_pool(DSN)  # 独立池（绕开 shared 单例——shared 建池即校验 schema，本测试自管）
 
 
 def _truncate(*tables: str) -> None:
@@ -54,8 +55,33 @@ def _truncate(*tables: str) -> None:
             conn.execute(f"TRUNCATE {t}")
 
 
+# ---- 0. 迁移纪律（P0-5：migrations/ 基线 + v2md_schema_version + 落后/超前拒起）-------
+from video2md import pgmigrate  # noqa: E402
+
+with pool.connection() as conn:  # 重置版本表：重跑本测试时也走「存量表盖戳」路径
+    conn.execute("DROP TABLE IF EXISTS v2md_schema_version")
+try:
+    pgmigrate.validate_schema(pool)
+    raise AssertionError("裸库（无版本表）校验必须拒起并提示 migrate")
+except RuntimeError as e:
+    assert "migrate" in str(e)
+assert pgmigrate.apply_migrations(pool) == [1]        # 首应用/存量库盖戳 = 全部注册版本
+assert pgmigrate.apply_migrations(pool) == []          # 连跑两次幂等：已应用跳过、不重复记行
+pgmigrate.validate_schema(pool)
+with pool.connection() as conn:                        # 验收口径：手工把版本改低 → 拒起
+    conn.execute("UPDATE v2md_schema_version SET version = 0 WHERE version = 1")
+try:
+    pgmigrate.validate_schema(pool)
+    raise AssertionError("版本落后必须拒起")
+except RuntimeError:
+    pass
+pgmigrate.apply_migrations(pool)                       # 重跑迁移自愈（0001 幂等 → 补记版本行）
+pgmigrate.validate_schema(pool)
+print("✅ 迁移纪律（裸库拒起/首应用/幂等重跑/落后拒起/自愈恢复）")
+
+
 # ---- 1. PostgresRunsStore -----------------------------------------------------------
-st_runs = pgstore.PostgresRunsStore(pool)  # 构造即幂等建表
+st_runs = pgstore.PostgresRunsStore(pool)  # 表由 §0 迁移建好，构造只接线（P0-5）
 _truncate("v2md_runs")
 st_runs.merge({"run_id": "r1", "owner": "u_a", "status": "created",
                "created": "2026-01-01T00:00:00", "entries": [1, 2]})
@@ -125,7 +151,7 @@ assert json.loads(util.STATE_FILE.read_text())["j"]["url"] == "jj"
 print("✅ PostgresStateStore（upsert/分派/json 回归）")
 
 # ---- 3. PostgresIdentityStore -------------------------------------------------------
-ids = PostgresIdentityStore(pool)  # 构造即幂等建表
+ids = PostgresIdentityStore(pool)  # 表由 §0 迁移建好（P0-5）
 _truncate("v2md_users", "v2md_identities")
 i1 = ids.resolve(Principal(provider="google", external_id="g1", email="a@x.com", name="A"))
 assert i1.is_new and i1.uid.startswith("u_")
@@ -211,7 +237,7 @@ watchdog._LOCAL_HB.clear()
 print("✅ events PG 扇出（跨进程互通/回声去重）+ cmd 心跳通道")
 
 # ---- 5. PostgresTaskStore（P4b 多副本真相源）----------------------------------------
-tasks = pgstore.PostgresTaskStore(pool)  # 构造即幂等建表 + claimed_by 列
+tasks = pgstore.PostgresTaskStore(pool)  # 表由 §0 迁移建好（含 claimed_by 列）
 _truncate("v2md_runs", "v2md_submit_log")
 
 st_runs.merge({"run_id": "t_q", "owner": "u_a", "status": "queued", "created": "2026-01-01"})

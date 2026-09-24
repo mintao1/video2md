@@ -35,12 +35,20 @@ json 档并发纪律：线程锁 + `fcntl` flock + per-pid tmp rename 原子写�
 
 | 表 | 定义处 | 要点 |
 |---|---|---|
-| `v2md_runs` | `pgstore.py:41-51` | run_id PK + owner/status/created 提取列 + `record jsonb`（**唯一真相**，提取列是其可查镜像）+ claimed_by（P4b 补列） |
-| `v2md_state` | `pgstore.py:88-93` | fp PK + record jsonb |
-| `v2md_users` / `v2md_identities` | `auth/pg_store.py:33-44` | uid PK；(provider, external_id) PK → uid |
-| `v2md_submit_log` | `pgstore.py:129-133` | 60s 滑窗限流计数（单语句 upsert 原子判定） |
+| `v2md_runs` | `migrations/0001_init.sql` | run_id PK + owner/status/created 提取列 + `record jsonb`（**唯一真相**，提取列是其可查镜像）+ claimed_by（P4b 租约） |
+| `v2md_state` | `migrations/0001_init.sql` | fp PK + record jsonb |
+| `v2md_users` / `v2md_identities` | `migrations/0001_init.sql` | uid PK；(provider, external_id) PK → uid |
+| `v2md_submit_log` | `migrations/0001_init.sql` | 60s 滑窗限流计数（单语句 upsert 原子判定） |
+| `v2md_schema_version` | `pgmigrate.py` 建表 | 迁移记账（version PK + 文件名 + 应用时间） |
 
-切换路径：`scripts/migrate_json_to_pg.py` 幂等导入存量（反向迁移明确不提供）。⚠ **无 schema 版本化机制**（批判②可演进性 H，ROADMAP P0-5 清偿前）：DDL 在 store 构造函数内 `CREATE TABLE IF NOT EXISTS`，演进靠 `ALTER ... IF NOT EXISTS` 补丁。
+**schema 迁移纪律（P0-5 ✅）**：`video2md/migrations/`（包内目录，随镜像走）是 DDL 唯一真相，
+store 构造函数只接线不建表；`v2md_schema_version` 逐迁移记账；`pg.shared_pool()` 建池即校验，
+落后/超前一律拒起并提示 `python -m video2md migrate`（deploy.sh 在 up -d 后自动跑该步，
+json 档跳过）。全部迁移幂等（IF NOT EXISTS）——存量库重跑 no-op 直接补记版本行（基线盖戳）。
+边界：langgraph `PostgresSaver.setup()` 自管的 `checkpoints*` 表族同库共存，不收编。
+加新迁移 = 落一个 `NNNN_*.sql` + `pgmigrate.MIGRATIONS` 注册表加一行。
+
+切换路径：`scripts/migrate_json_to_pg.py` 幂等导入存量（反向迁移明确不提供，导入前自动应用迁移基线）。
 
 ## 任务表两档口径（批判① E2 修订后）
 
@@ -81,7 +89,7 @@ json 档并发纪律：线程锁 + `fcntl` flock + per-pid tmp rename 原子写�
 
 ## 已知限制
 
-1. **无 schema 版本化迁移**（P0-5）：绿字段演进靠幂等 DDL 补丁，破坏性变更无机制保护。
+1. ~~无 schema 版本化迁移~~（P0-5 ✅ 已闭环：migrations/ + v2md_schema_version + 建池校验拒起）。
 2. **PG 池无超时参数化**（P1-8）：PG 挂起时池获取无限阻塞，故障放大为 API 全挂。
 3. rescue/migrate 工具只认 json 档（P1-3）。
 4. `runs.json` 无界增长（完成 run 永不删记录，只有 tmp 清理）——长期膨胀未治理（随 P1-6 容量实测定价）。
