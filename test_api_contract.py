@@ -96,6 +96,31 @@ def test_operational_probes_no_auth(client):
     assert client.get("/preflight").status_code == 200
 
 
+# ---------------------------------------------------------------- 配置防呆（P0-1）
+
+def _import_config_with_env(**overrides):
+    """子进程隔离 import config——config 在 import 期读 env 且 fail-fast，本套件进程内
+    已 import 过一次，无法同进程重放不同 env 组合（继承 os.environ 再覆盖目标键：
+    真实环境变量在 load_env 合并序里最优先，结果确定）。"""
+    import subprocess
+    import sys
+    env = {**os.environ, **overrides}
+    return subprocess.run([sys.executable, "-c", "import video2md.config"],
+                          capture_output=True, text=True, env=env,
+                          cwd=str(Path(__file__).resolve().parent), timeout=60)
+
+
+def test_production_auth_failfast():
+    # production + off / 缺省 → import 期 RuntimeError，stderr 指明两键与修法
+    for bad in ({"V2MD_AUTH": "off"}, {"V2MD_AUTH": ""}):
+        r = _import_config_with_env(V2MD_ENV="production", **bad)
+        assert r.returncode != 0, bad
+        assert "V2MD_AUTH" in r.stderr and "V2MD_ENV" in r.stderr, r.stderr
+    # development + off（本套件自身组合）/ production + google → 放行
+    assert _import_config_with_env(V2MD_ENV="development", V2MD_AUTH="off").returncode == 0
+    assert _import_config_with_env(V2MD_ENV="production", V2MD_AUTH="google").returncode == 0
+
+
 # ---------------------------------------------------------------- 鉴权：provider 无关 + 归属隔离
 
 def test_owner_scoped_access(client):

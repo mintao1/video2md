@@ -65,6 +65,17 @@ def load_env() -> dict[str, str]:
 ENV = load_env()
 
 
+# 运行档位（P0-1 生产防呆）：V2MD_ENV 此前只是遥测标签（observability.py 读），自此处
+# 升格为一等配置——production 档强制鉴权，裸奔组合 import 期即 fail-fast（compose 生产
+# 编排设 V2MD_ENV: production，V2MD_AUTH 走 secrets 文件亦经 load_env 合入，此闸可见）。
+DEPLOY_ENV = (ENV.get("V2MD_ENV") or "development").strip().lower()
+if DEPLOY_ENV == "production" and (ENV.get("V2MD_AUTH") or "off").strip().lower() in ("", "off"):
+    raise RuntimeError(
+        "V2MD_ENV=production 但 V2MD_AUTH=off（或未配置）：生产档禁止无鉴权裸奔。"
+        "修法：secrets/video2md.env 设 V2MD_AUTH=google（+ GOOGLE_CLIENT_ID）；"
+        "非生产环境勿设 V2MD_ENV=production。检查清单见 docs/architecture/05-security.md")
+
+
 # 持久化文件位置：容器里由 compose 指到 data 卷（/app/data/…），本机默认项目根
 STATE_FILE = Path(ENV.get("V2MD_STATE_FILE", str(PROJ / "state.json")))
 

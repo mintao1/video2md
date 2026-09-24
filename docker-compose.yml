@@ -53,7 +53,8 @@ services:
     environment:
       TZ: Asia/Shanghai
       V2MD_HOST: 127.0.0.1
-      V2MD_ENV: production   # 遥测环境标签：Langfuse 开发/生产分项目（README 可观测性节）
+      V2MD_ENV: production   # 遥测环境标签（Langfuse 分项目）+ 生产档位：强制 V2MD_AUTH≠off
+                           # （config.py import 期 fail-fast，P0-1；V2MD_AUTH 在 secrets 文件里配）
       # 执行层档位进 secrets/video2md.env 按服务器核数调（键义见 .env.example）：
       #   V2MD_MAX_CONCURRENT_RUNS=2 起 + V2MD_QUEUE_MAX/V2MD_USER_QUEUE_MAX；
       #   并发>1 时 checkpointer 配套切 postgres（V2MD_CHECKPOINTER=postgres + PG_DSN）
