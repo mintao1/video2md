@@ -37,6 +37,7 @@ import time
 import uuid
 import zipfile
 from collections import deque
+from collections.abc import Callable
 from contextlib import asynccontextmanager, suppress
 from datetime import datetime
 from pathlib import Path
@@ -362,6 +363,34 @@ def _admit_submission(uid: str) -> None:
 # ---------------------------------------------------------------- 本地路径白名单 + 上传面
 
 _UPLOAD_EXT_OK = {".mp4", ".mov", ".mkv", ".webm", ".m4a", ".mp3", ".wav"}
+
+# 内容嗅探（P0-6）：后缀白名单可被改名绕过，任意内容会进 ffprobe/ffmpeg 解析路径——
+# 流式写盘后读首 16 字节比对容器魔数，不符即删 + 422（与 413 分支同款回滚）。
+# 与 _UPLOAD_EXT_OK 一一映射；取保守白名单：现代编码器（ffmpeg/yt-dlp 产物）必带标准头，
+# 误杀优先于漏放。mp3 兼容 ID3v2 前缀与裸帧同步（0xFF 0xEx）两种起点。
+_UPLOAD_MAGIC: dict[str, Callable[[bytes], bool]] = {
+    ".mp4": lambda b: len(b) >= 8 and b[4:8] == b"ftyp",
+    ".mov": lambda b: len(b) >= 8 and b[4:8] == b"ftyp",
+    ".m4a": lambda b: len(b) >= 8 and b[4:8] == b"ftyp",
+    ".mkv": lambda b: b.startswith(b"\x1a\x45\xdf\xa3"),          # EBML
+    ".webm": lambda b: b.startswith(b"\x1a\x45\xdf\xa3"),
+    ".wav": lambda b: len(b) >= 12 and b[:4] == b"RIFF" and b[8:12] == b"WAVE",
+    ".mp3": lambda b: b.startswith(b"ID3")
+                     or (len(b) >= 2 and b[0] == 0xFF and (b[1] & 0xE0) == 0xE0),
+}
+
+
+def _upload_magic_ok(path: Path, ext: str) -> bool:
+    """首 16 字节容器头比对（容器魔数全在前 16 字节内，一次便宜的同步读）。"""
+    check = _UPLOAD_MAGIC.get(ext)
+    if check is None:
+        return True  # 白名单外后缀在入口已 422，此处防御性兜底
+    try:
+        with path.open("rb") as f:
+            head = f.read(16)
+    except OSError:
+        return False
+    return bool(check(head))
 
 
 def _validate_run_url(url: str, uid: str) -> None:
@@ -712,6 +741,11 @@ async def post_upload(file: UploadFile, ident: Identity = Depends(current_identi
             dest.unlink()
         raise HTTPException(413, f"上传配额已满（{UPLOAD_QUOTA_GB:g}GB/用户），清理旧文件后重试",
                             headers={"X-Error": "QUOTA_EXCEEDED"})
+    if not _upload_magic_ok(dest, ext):  # P0-6：后缀过了内容也得过，防改名绕过进 ffmpeg
+        with suppress(OSError):
+            dest.unlink()
+        raise HTTPException(422, f"文件内容与 {ext} 容器格式不符（魔数校验失败）",
+                            headers={"X-Error": "UNSUPPORTED_TYPE"})
     _req_log("POST", "/uploads", 200, user=ident.uid, name=name, bytes=n)
     return {"path": str(dest), "size": n, "name": name}
 

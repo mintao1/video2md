@@ -636,7 +636,9 @@ def test_upload_roundtrip_and_gates(client, monkeypatch):
     monkeypatch.setattr(_api, "UPLOADS_DIR", up)
     dev = _dev_uid()
 
-    r = client.post("/uploads", files={"file": ("demo.mp4", b"hello" * 100, "video/mp4")})
+    # 最小合法 mp4 头（size + ftyp + brand…）：魔数校验只看首 16 字节，后续补零到 500B
+    mp4 = b"\x00\x00\x00\x18ftypisom\x00\x00\x02\x00isomiso2" + b"\x00" * 476
+    r = client.post("/uploads", files={"file": ("demo.mp4", mp4, "video/mp4")})
     assert r.status_code == 200, r.text
     body = r.json()
     assert body["name"] == "demo.mp4" and body["size"] == 500
@@ -651,9 +653,30 @@ def test_upload_roundtrip_and_gates(client, monkeypatch):
     assert client.post("/uploads",
                        files={"file": ("evil.exe", b"MZ", "application/x-msdownload")}).status_code == 422
     # 文件名 sanitize：路径穿越片段被剥
-    sneak = client.post("/uploads", files={"file": ("../..%2Fc.mp4", b"ab", "video/mp4")})
+    sneak = client.post("/uploads", files={"file": ("../..%2Fc.mp4", mp4, "video/mp4")})
     assert sneak.status_code == 200
     assert "/" not in Path(sneak.json()["name"]).name and sneak.json()["name"].endswith(".mp4")
+
+    # 魔数校验（P0-6）：文本改名 .mp4 → 422 且文件已删（X-Error 符号码经统一信封
+    # 转译进 error.details，非响应头）；各白名单格式的合法容器头放行
+    fake = client.post("/uploads", files={"file": ("fake.mp4", b"hello" * 100, "video/mp4")})
+    assert fake.status_code == 422
+    assert fake.json()["error"]["details"] == "UNSUPPORTED_TYPE"
+    assert not list((up / dev).glob("*fake.mp4"))
+    wav = b"RIFF\x24\x08\x00\x00WAVEfmt " + b"\x00" * 16
+    assert client.post("/uploads", files={"file": ("a.wav", wav, "audio/wav")}).status_code == 200
+    mkv = b"\x1a\x45\xdf\xa3" + b"\x00" * 28
+    assert client.post("/uploads", files={"file": ("a.mkv", mkv, "video/x-matroska")}).status_code == 200
+    mp3 = b"ID3\x04\x00\x00\x00\x00\x00\x00" + b"\x00" * 22
+    assert client.post("/uploads", files={"file": ("a.mp3", mp3, "audio/mpeg")}).status_code == 200
+    m4a = b"\x00\x00\x00\x18ftypM4A " + b"\x00" * 16
+    assert client.post("/uploads", files={"file": ("a.m4a", m4a, "audio/mp4")}).status_code == 200
+    # 裸 MPEG 帧同步（无 ID3 前缀的 mp3）也放行
+    raw_mp3 = b"\xff\xfb\x90\x00" + b"\x00" * 28
+    assert client.post("/uploads", files={"file": ("b.mp3", raw_mp3, "audio/mpeg")}).status_code == 200
+    # wav 壳但非 WAVE（如 AVI 的 RIFF 头）→ 拒
+    assert client.post("/uploads",
+                       files={"file": ("c.wav", b"RIFF\x00\x00\x00\x00AVI ", "audio/wav")}).status_code == 422
 
     # 单文件上限 → 413，且半截文件已删
     with pytest.MonkeyPatch.context() as mp:
@@ -665,7 +688,7 @@ def test_upload_roundtrip_and_gates(client, monkeypatch):
     # 每用户配额 → 413，且刚传的文件回滚删除
     with pytest.MonkeyPatch.context() as mp:
         mp.setattr(_api, "UPLOAD_QUOTA_GB", 0.000001)
-        quota = client.post("/uploads", files={"file": ("q.mp4", b"x" * 2048, "video/mp4")})
+        quota = client.post("/uploads", files={"file": ("q.mp4", mp4, "video/mp4")})
     assert quota.status_code == 413
     assert not list((up / dev).glob("q.mp4"))
 
