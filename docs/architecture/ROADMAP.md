@@ -64,11 +64,17 @@
 
 ## P1：上量前必须（9 项）
 
-### P1-1 claimed_by 租约认领（出界项①）
+### P1-1 claimed_by 租约认领（出界项①）✅
 - **动机**：批判② R3——queued 态 run 无属主，多副本下「谁驱动队列里的活」未定
 - **内容**：queued 态也心跳 + 租约字段；watchdog 大盘巡检覆盖 queued 超龄（不只 running）；steal 语义扩到 queued
 - **验收**：杀副本 A（持 queued 项）→ 副本 B 租约到期接管，run 不丢不重
-- **工作量**：L ｜ **阻塞**：P0-5（schema 演进需迁移纪律先行）
+- **工作量**：L ｜ **阻塞**：P0-5（schema 演进需迁移纪律先行）｜ **状态**：✅ 机制级全绿（见 commit）。
+  实施发现比记载更深（批判补遗 2026-09-25-p1-1-findings.md）：queued 此前**从不落库**（DB 停在
+  created），配额闸/跨副本判活/gauge/重启恢复全看不见排队项。落地口径：`_enqueue` PG 档
+  `mark_queued` 落库+钉名；lifespan `_queue_hb_loop` 排队心跳；**双租约**（排队项短租约
+  3×WATCHDOG_PERIOD_S 接管重投不标 error，运行项维持 2h 卡死判定）；`_drive` 拿信号量先
+  `still_mine` 复核——被划走静默让位（「不重」半边）。零 DDL（claimed_by/updated 即租约字段，
+  P0-5 先行的兑现）。真双进程杀副本验收归 P1-4（阻塞边解除）
 
 ### P1-2 跨进程 cancel 端点（出界项②）
 - **动机**：批判② R3——A 副本驱动的 run，B 副本收到 cancel 无法转发
@@ -84,9 +90,10 @@
 
 ### P1-4 多副本冒烟进 CI（出界项④）
 - **动机**：批判① E4——跨进程语义只经单进程双实例模拟验证
-- **内容**：`docker-compose.smoke.yml` 加 `video2md` 副本 2（或 scale）+ 真 PG，断言：A 提交 B 可见 /queue、A 死 B 接管、SSE 跨副本关流；进 CI 或夜间 job
-- **验收**：CI 真双进程冒烟绿；批判① E4 口径随之修订为已闭环
-- **工作量**：M ｜ **阻塞**：P1-1
+- **内容**：`docker-compose.smoke.yml` 加 `video2md` 副本 2（或 scale）+ 真 PG，断言：A 提交 B 可见 /queue、A 死 B 接管（running 与 queued 两态）、SSE 跨副本关流；进 CI 或夜间 job。
+  **含批判补遗②（2026-09-25）**：`recover_candidates` 不看 claimed_by——稳态副本 B 重启会把健康 A 的 running 行整批抢走重投（双驱动）；冒烟须断言「B 重启不抢 A 活 run」，修复需进程级存活信号（cmd 通道 proc 心跳），与本项同窗落地
+- **验收**：CI 真双进程冒烟绿（含 B 重启不抢活）；批判① E4 口径随之修订为已闭环
+- **工作量**：M ｜ **阻塞**：P1-1（✅ 已解封）
 
 ### P1-5 SLO 定义 + 告警 SLO 化
 - **动机**：批判②维度 3/7——告警事件式非 SLO 式
