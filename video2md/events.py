@@ -40,6 +40,7 @@ _PROC_ID = uuid.uuid4().hex[:8]  # 扇出回声去重：泵跳过自己进程发
 
 _PUMP: threading.Thread | None = None
 _PUMP_STOP = threading.Event()
+_PUMP_READY = threading.Event()  # LISTEN 注册完成；注册前提交的 NOTIFY 会被 PG 静默丢弃
 
 
 def _pg_mode() -> bool:
@@ -52,6 +53,11 @@ def bind_loop(loop: asyncio.AbstractEventLoop) -> None:
     _LOOP = loop
     if _pg_mode():
         _ensure_pump()
+        # 等 LISTEN 注册完成才返回：NOTIFY 只投给提交时刻已在 LISTEN 的会话（不回补），
+        # 泵建连期间发出的通知会被 PG 静默丢弃——启动路径有界等待，杜绝「publish 抢在
+        # LISTEN 前」竞态（subscribe 的防御性 _ensure_pump 不等待：那跑在事件循环线程，
+        # 阻塞会卡 SSE；生产路径 bind_loop 在 lifespan 已先行拉起并等就绪）。
+        _PUMP_READY.wait(timeout=5.0)
 
 
 def subscribe(run_id: str) -> asyncio.Queue:
@@ -159,6 +165,7 @@ def _pump_loop() -> None:
             conn = psycopg.connect(dsn, autocommit=True)
             conn.execute(f"LISTEN {_CHANNEL}")
             conn.execute(f"LISTEN {_CMD_CHANNEL}")
+            _PUMP_READY.set()  # autocommit 下 LISTEN 即时生效；断线重连后再置（幂等）
             while not _PUMP_STOP.is_set():
                 for n in conn.notifies(timeout=5):  # 空闲 5s 醒来查 stop
                     if getattr(n, "channel", "") == _CMD_CHANNEL:
@@ -201,6 +208,7 @@ def _on_cmd(payload: str) -> None:
 def shutdown() -> None:
     """lifespan 退出时停泵（local 档 no-op）。daemon 线程，进程退出本身也兜底。"""
     _PUMP_STOP.set()
+    _PUMP_READY.clear()  # 同进程重启（测试复跑/重绑）重新等 LISTEN 就绪
 
 
 def is_terminal(rec: dict) -> bool:
