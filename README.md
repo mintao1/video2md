@@ -7,11 +7,11 @@ GPU 重活（转写/OCR/剪辑）外包给 [gpu_router](https://github.com/minta
 
 **生产形态 = 云服务器 · 多用户 API**：登录鉴权（Google id_token/设备流 + 微信扫码）→
 run 按 uid 归属隔离 → deliver「云端不储存」投递（bundle 拉取 + ACK/TTL 即焚），
-公网经反代 TLS 暴露。整体分层见[终局布局](#终局布局云服务器--多用户)，落地步骤见
-[部署](#部署云服务器--多用户)章。
+公网经反代 TLS 暴露。整体分层与各阶段落地状态见
+[终局布局](#终局布局云服务器--多用户)，落地步骤见[部署](#部署云服务器--多用户)章。
 
 ```
-POST /runs（FastAPI 内嵌图，串行信号量=1）
+POST /runs（FastAPI 内嵌图，并发闸门 V2MD_MAX_CONCURRENT_RUNS，默认 1=串行）
   resolve（剥分享文本/展开合集/state 幂等标记）
     → download → transcribe → frames → ocr          # 阶段节点 = runs.py 的 _stage_*（熔断/条目容错保留）
     → select_frames_llm（对照转录本选帧；失败/空选 → 本地启发式兜底，run 不炸）
@@ -270,6 +270,21 @@ scripts/deploy.sh v0.2.0 --host user@server
 | 数据安全 | 本地备份（daily/weekly + sha256 manifest + 季度恢复演练）+ rclone/restic 异地推对象存储（B2/S3/OSS） |
 | 发布 | CI（lint/test/build）→ 镜像 push registry（不可变 tag 锚 git sha）→ 部署流水线上线 + healthz/preflight 体检 → 按 tag 一键回滚 |
 | 观测告警 | OTel → collector → Langfuse（trace/LLM 成本按 uid 归因）+ Prometheus/Grafana（指标）；Alertmanager → 飞书卡片；死人开关 + run 卡死看门狗（exit 自愈） |
+
+### 落地状态（2026-09-24：P1–P4b 全落地）
+
+| 阶段 | 落地内容 |
+|---|---|
+| P1/P2（e320ee5） | 执行层并发闸门 `V2MD_MAX_CONCURRENT_RUNS` + 配额限流（`V2MD_QUEUE_MAX`/`V2MD_USER_QUEUE_MAX`/`V2MD_USER_SUBMIT_PER_MIN`，429 统一信封）、`POST /uploads` 上传面 + 路径白名单、current_log ContextVar / state.json 原子写、GHCR 发布流水线（tag 驱动 + `deploy.sh` + 版本单源）、`backup.sh` rclone 异地钩子 |
+| P3 | 存储后端分派 `json`（缺省）｜`postgres`：`V2MD_RUNS/STATE/USERS_STORE` 三存储 + checkpointer 同池、`V2MD_EVENTS=pg`（LISTEN/NOTIFY 跨进程 SSE 扇出）；存量导入 `scripts/migrate_json_to_pg.py`（幂等） |
+| P4b（3f7bb1a） | 任务表 PG 真相源 `V2MD_TASKS_STORE=postgres`：`/queue`·配额·dedup·watchdog 大盘巡检·启动认领恢复（`FOR UPDATE SKIP LOCKED`，并发副本只有一份拿到候选集）、events `v2md_cmds` 心跳广播、多副本 tmp 保护 |
+
+**出界项（P4b 规划明确记录不做；距「完整多副本生产」尚差四件）**：
+
+- `claimed_by` 租约认领（queued 态也心跳 → 真正的跨副本工作窃取调度）
+- 跨进程 cancel 端点（A 副本驱动的 run，B 副本收到 cancel 请求无法转发）
+- rescue/migrate 工具的 PG 档适配（`scripts/rescue_partial.py`、`scripts/migrate_json_to_pg.py` 仍只认 json/runs.json）
+- 多副本冒烟进 CI（现为一次性脚本，未固化）
 
 ## Obsidian 插件（Video2MD Inbox · 产物回传主路）
 
