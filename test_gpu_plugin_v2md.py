@@ -234,6 +234,88 @@ try:
 finally:
     hp.cut_clips = _orig_cut
 
+# ================================================================ kaggle_impl 迁 tasking 契约
+print("== kaggle_impl（机械上收内核 tasking，插件只剩模板+解析）==")
+import importlib
+
+from gpu_router.config import _provider_from_dict
+from gpu_router.providers import build_provider
+from gpu_router.providers.kaggle import KaggleProvider
+
+kimpl = importlib.import_module("v2md.providers.kaggle_impl")
+kp = build_provider(_provider_from_dict({"name": "kg", "kind": "kaggle"}),
+                    {"kaggle": ["v2md.providers.kaggle_impl"]})
+check("kaggle provider 装载插件三能力方法",
+      all(callable(getattr(kp, m, None)) for m in ("transcribe", "cut_clips", "ocr")))
+
+kb = KaggleProvider(capabilities=("asr",))
+kb._user = "u1"
+kimpl._bind(kb)
+check("_bind 钉回 v2md 命名（模板 IN=/kaggle/input/v2md-io 联动）",
+      kb.dataset == "u1/v2md-io" and kb.kernel == "u1/v2md-job")
+kb_cfg = KaggleProvider(extra={"dataset": "x/y"})
+kb_cfg._user = "u1"
+kimpl._bind(kb_cfg)
+check("_bind 不覆盖显式配置", kb_cfg.dataset == "x/y" and kb_cfg.kernel == "u1/v2md-job")
+
+
+def _stub_run(arts):
+    def _rt(files, spec, want, **kw):
+        return "t-1", {k: v for k, v in arts.items() if k in want}
+    return _rt
+
+
+kp.run_task = _stub_run({
+    "out.json": json.dumps({"model": "turbo", "segments": [1]}).encode(),
+    "status.json": b'{"state":"done"}'})
+res = kp.transcribe(_TMP / "x.m4a", "turbo", "zh", _TMP)
+check("transcribe：run_task 产物解析", res["model"] == "turbo")
+
+kp.run_task = _stub_run({"status.json": b'{"state":"error","error":"CUDA OOM"}'})
+try:
+    kp.transcribe(_TMP / "x.m4a", "turbo", "zh", _TMP)
+    check("内核 status error → 业务报错", False)
+except RuntimeError as exc:
+    check("内核 status error → 业务报错", "CUDA OOM" in str(exc))
+
+kp.run_task = _stub_run({
+    "out.json": b'{"results":[{"name":"g.jpg","text":"hi","conf":0.5}]}',
+    "status.json": b'{"state":"done"}'})
+res = kp.ocr([_TMP / "g_001.jpg"], _TMP)
+check("ocr：results 提取", res[0]["text"] == "hi")
+
+buf = io.BytesIO()
+with tarfile.open(fileobj=buf, mode="w") as tf:
+    data = b"mp4"
+    info = tarfile.TarInfo("a-c01-0000.mp4")
+    info.size = len(data)
+    tf.addfile(info, io.BytesIO(data))
+kp.run_task = _stub_run({
+    "clips.tar": buf.getvalue(),
+    "clips_result.json": b'{"a-c01-0000.mp4": true, "b-c02.mp4": false}',
+    "status.json": b'{"state":"done"}'})
+results, od = kp.cut_clips(None, "https://cdn/x.mp4",
+                           [{"out": "a-c01-0000.mp4", "s0": 0, "s1": 2},
+                            {"out": "b-c02.mp4", "s0": 0, "s1": 1}], _TMP)
+check("cut_clips：解包 + 缺片回填 False",
+      results["a-c01-0000.mp4"] is True and results["b-c02.mp4"] is False
+      and (od / "a-c01-0000.mp4").read_bytes() == b"mp4")
+
+seen = {}
+
+
+def _capture_run(files, spec, want, **kw):
+    seen.update(files=files, spec=spec, want=want)
+    return "t", {"status.json": b'{"state":"done"}',
+                 "clips_result.json": b"{}"}
+
+
+kp.run_task = _capture_run
+kp.cut_clips(_TMP / "x.m4a", "", [{"out": "a.mp4", "s0": 0, "s1": 1}], _TMP)
+check("视频以 Path 进 files（流式不进内存）+ spec 带内核脚本",
+      isinstance(seen["files"]["clip-src.mp4"], Path) and "script" in seen["spec"]
+      and "clip_job.json" in seen["files"])
+
 # ================================================================ 全灭 502
 print("== 全灭 502 ==")
 # 有插件但唯一 provider 健康探测失败 → 端点在、转发全灭 → 502
