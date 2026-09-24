@@ -12,6 +12,8 @@
 
 ## P0：上公网前必须（7 项）
 
+> **进度**：✅ 6/7（P0-1 dc0184d · P0-3 63bfe84 · P0-5 a3056e4 · P0-6 7ae5b7b · P0-7 9e834a2）；余 P0-2（依赖 P0-4 的 XFF 信任锚）、P0-4（需域名/TLS 决策）。
+
 ### P0-1 AUTH=off 生产防呆 🔒
 - **动机**：批判② S1——`V2MD_ENV=production` + `V2MD_AUTH=off` 共存即裸奔；config.py 已有 fail-fast 先例（`config.py:113-115`）
 - **内容**：`config.py` 启动校验：`V2MD_ENV=production` 时 `V2MD_AUTH` 不得为 `off`/空，违例 `RuntimeError` 明示修法；CI 加一条配置组合测试
@@ -36,11 +38,15 @@
 - **验收**：`smoke_compose.sh` 或新增 smoke 走反代路径断言 `/docs` 被拦；README 部署章改指仓内配置
 - **工作量**：M ｜ **阻塞**：无（P2-3 蓝绿依赖此项）
 
-### P0-5 schema 迁移纪律 🔧
+### P0-5 schema 迁移纪律 🔧 ✅
 - **动机**：批判②可演进性 H——DDL 散在构造函数，`claimed_by` 靠 ALTER 补丁（`pgstore.py:127`）
 - **内容**：`migrations/` 目录（`0001_init.sql` 起，幂等）+ `schema_version` 表 + store 构造前启动校验（版本不符拒绝启动并提示跑迁移）；存量 `CREATE/ALTER IF NOT EXISTS` 收编为 0001 基线
 - **验收**：手工 `UPDATE schema_version` 改低 → api 启动拒起；迁移脚本连跑两次幂等；CI 真库 job 跑迁移路径
-- **工作量**：M ｜ **阻塞**：无（P1-1 依赖此项）
+- **工作量**：M ｜ **阻塞**：无（P1-1 依赖此项）｜ **状态**：✅ a3056e4。落地修正两处口径：
+  ① migrations/ 放包内 `video2md/migrations/`（Dockerfile 只 COPY video2md/，仓根目录进不了镜像）；
+  ② 版本表名 `v2md_schema_version`（同库共存 langgraph checkpoints*，通用名撞名风险）。
+  校验收口 `pg.shared_pool()` 建池即校验（全消费者必经），超前（回滚旧代码）亦拒起；deploy.sh
+  up -d 后自动 migrate，json 档跳过
 
 ### P0-6 上传 magic number 校验 🔒
 - **动机**：批判② S5——后缀白名单可绕过，任意内容进 ffmpeg 解析路径
