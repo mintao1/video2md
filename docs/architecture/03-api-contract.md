@@ -15,6 +15,7 @@
 | GET /runs/{id}/note | owner | 产出 markdown（deliver 下从在架文件现读，已焚 410） | `api.py:883` |
 | GET /runs/{id}/bundle | owner+deliver | 产物整包 zip，现打包发完即删 | `api.py:924` |
 | DELETE /runs/{id}/artifacts | owner+deliver | ACK 即焚（rmtree 物理销毁），再删 410 | `api.py:940` |
+| POST /runs/{id}/cancel | owner | 撤销进行中 run（P1-2）：排队立即 error(cancelled) 留痕；运行中协作式（条目循环头 SystemExit，长单阶段内无取消点）；他副本驱动走 cmd 广播回 cancelling；终态 409 `NOT_CANCELLABLE` | `api.py` cancel_run |
 | GET /runs/{id}/events | owner | SSE：connected 快照 → 事件流 → 终态关流；15s `: ping` 保活 | `api.py:966` |
 | POST /auth/device/code | **匿名** | Google 设备流第一步 | `api.py:708` |
 | POST /auth/device/token | **匿名** | device_code → id_token | `api.py:717` |

@@ -76,11 +76,17 @@
   `still_mine` 复核——被划走静默让位（「不重」半边）。零 DDL（claimed_by/updated 即租约字段，
   P0-5 先行的兑现）。真双进程杀副本验收归 P1-4（阻塞边解除）
 
-### P1-2 跨进程 cancel 端点（出界项②）
+### P1-2 跨进程 cancel 端点（出界项②）✅
 - **动机**：批判② R3——A 副本驱动的 run，B 副本收到 cancel 无法转发
 - **内容**：`DELETE /runs/{id}`（或 POST cancel）：本进程在跑直接撤；非本进程走 events `v2md_cmds` 通道发 cancel 指令，目标进程收到后中断（协作式：阶段循环头查标志）
 - **验收**：双副本冒烟中向 B 发 cancel 停掉 A 的 run；终态 error(cancelled) 留痕
-- **工作量**：M ｜ **阻塞**：P1-1
+- **工作量**：M ｜ **阻塞**：P1-1（✅）｜ **状态**：✅ 机制级全绿（见 commit）。落地口径：
+  **`POST /runs/{id}/cancel`** 而非 DELETE——记录留痕不删除，与 DELETE /artifacts 的真删除语义
+  区分（AIP-135）。本进程 queued 立即翻 error(cancelled)；running 协作式（`_run_stage_inner`
+  条目循环头 SystemExit 走既有熔断通道）；他副本驱动 `publish_cmd("cancel")` 广播，收端只对
+  本地驱动 run 落标志（防外部泄漏），回 cancelling。实施抓出并修复**复活竞态**：端点清标志
+  先于挂起 _drive 醒来 → 已撤销 run 被复活驱动——标志生命周期改归 _drive finally。长单阶段
+  内无取消点为已知限制（按处方「阶段循环头」）。真双进程 cancel 验收随 P1-4 冒烟
 
 ### P1-3 rescue/migrate 工具 PG 档适配（出界项③）
 - **动机**：批判② R3——`scripts/rescue_partial.py`、`migrate_json_to_pg.py` 只认 json 档
