@@ -860,8 +860,12 @@ def test_tasks_pg_dead_dup_requeues(client, monkeypatch):
 
 
 def run_all() -> None:  # `python3 test_api_contract.py` 兜底（无 pytest 时）
+    # 必须走子进程：直跑时本模块已以 __main__ 身份 exec 过一遍（env 段 + import video2md.*），
+    # 同进程再 pytest.main(__file__) 会把本文件二次加载成独立模块 → 两份 _TMP/两份 config
+    # 快照落在不同临时目录，读侧写侧错位（实测泄漏打穿 deliver 幂等与 owner 隔离两例）。
+    import subprocess
     import sys
-    sys.exit(pytest.main([__file__, "-q"]))
+    sys.exit(subprocess.run([sys.executable, "-m", "pytest", __file__, "-q"]).returncode)
 
 
 if __name__ == "__main__":

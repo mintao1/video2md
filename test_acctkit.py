@@ -340,8 +340,10 @@ def test_build_from_env_provider_list_and_unknown():
 
 
 def run_all() -> None:  # `python3 test_acctkit.py` 兜底（无 pytest 时）
+    # 子进程执行：避免直跑时本模块以 __main__ 先 exec、同进程再被 pytest 二次加载成双实例
+    import subprocess
     import sys
-    sys.exit(pytest.main([__file__, "-q"]))
+    sys.exit(subprocess.run([sys.executable, "-m", "pytest", __file__, "-q"]).returncode)
 
 
 if __name__ == "__main__":
