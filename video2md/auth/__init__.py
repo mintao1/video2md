@@ -35,6 +35,16 @@ async def current_identity(request: Request) -> Identity:
     return await engine.authenticate(request.headers)
 
 
+async def optional_identity(request: Request) -> Identity | None:
+    """可选鉴权依赖：无/坏凭据返回 None 不 401——匿名可达端点（如 /preflight）的
+    「带有效凭证则升级视图」判权用。注意 off 档 providers=[fake,dev] 恒过，
+    是否算真实凭证由调用方按 V2MD_AUTH 档位另判（见 api._preflight_privileged）。"""
+    try:
+        return await engine.authenticate(request.headers)
+    except AuthError:
+        return None
+
+
 # 测试/运维辅助：直落本引擎的身份表（预置映射 / Principal→Identity 解析）
 def put_identity(provider: str, external_id: str, uid: str) -> None:
     engine.store.put_identity(provider, external_id, uid)

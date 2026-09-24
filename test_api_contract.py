@@ -121,6 +121,32 @@ def test_production_auth_failfast():
     assert _import_config_with_env(V2MD_ENV="production", V2MD_AUTH="google").returncode == 0
 
 
+# ---------------------------------------------------------------- /preflight 信息收敛（P0-3）
+
+def test_preflight_privilege_rules():
+    from video2md.api import _preflight_privileged, _preflight_public
+    assert _preflight_privileged("127.0.0.1", False) is True      # 回环（deploy.sh/容器体检）
+    assert _preflight_privileged("::1", False) is True
+    assert _preflight_privileged("localhost", False) is True
+    assert _preflight_privileged("203.0.113.9", False) is False   # 公网匿名
+    assert _preflight_privileged("203.0.113.9", True) is True     # 真实认证
+    pub = _preflight_public({"ok": True, "ts": "t", "checks": [
+        {"name": "ffmpeg", "ok": True, "detail": "/usr/local/bin/ffmpeg"},
+        {"name": "gpu_pool", "ok": False, "detail": "算力池可用 provider: colab, kaggle"}]})
+    assert pub == {"ok": True, "ts": "t",
+                   "checks": [{"name": "ffmpeg", "ok": True}, {"name": "gpu_pool", "ok": False}]}
+
+
+def test_preflight_anonymous_redacted(client):
+    # TestClient host="testclient" 非回环；本套件 AUTH=off 非真实认证 → 全部 detail 剥除
+    r = client.get("/preflight")
+    assert r.status_code == 200
+    assert r.json()["ok"] is True
+    for c in r.json()["checks"]:
+        assert c.get("detail", "") == "", c
+    assert "ffmpeg" in r.text and "provider" not in r.text.lower()
+
+
 # ---------------------------------------------------------------- 鉴权：provider 无关 + 归属隔离
 
 def test_owner_scoped_access(client):

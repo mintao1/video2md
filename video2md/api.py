@@ -21,7 +21,7 @@ SSE 实时进度（GET /runs/{id}/events）与轮询并存。核心 run_graph �
   DELETE /runs/{id}/artifacts deliver 模式 ACK 即焚：客户端确认收完，云端立刻销毁产物
   GET  /queue           {queue_len, running, limits}——gpu_router 的 colab 看门狗回读这里（运维探针，不鉴权）
   GET  /healthz         存活探针（Docker healthcheck，不鉴权）
-  GET  /preflight       开跑前体检（ffmpeg/磁盘/vault 或 outbox/算力池，不鉴权）
+  GET  /preflight       开跑前体检（ffmpeg/磁盘/vault 或 outbox/算力池；匿名面 detail 脱敏，P0-3）
 
 恢复语义：进程重启时把 runs.json 里 running 的 run 重新入队（同 run_id、同 owner），
 graph 的 resolve 节点幂等复用该 run，阶段节点按产物字段跳过已完成条目。
@@ -51,7 +51,7 @@ from starlette.background import BackgroundTask
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from . import artsink, events, observability, watchdog
-from .auth import AuthError, Identity, current_identity
+from .auth import AuthError, Identity, current_identity, optional_identity
 from .config import (
     CORS_ORIGINS,
     ENV,
@@ -139,6 +139,20 @@ def _preflight() -> dict:
         add("gpu_pool", ok, detail)
     return {"ok": all(c["ok"] for c in checks), "checks": checks,
             "ts": datetime.now().isoformat(timespec="seconds")}
+
+
+def _preflight_public(payload: dict) -> dict:
+    """匿名视图（P0-3）：checks[].detail 全部剥除——detail 含 ffmpeg 绝对路径、磁盘
+    余量、vault/outbox 路径、算力池 provider 名与内网 base URL，匿名面只回结论。"""
+    return {"ok": payload["ok"], "ts": payload["ts"],
+            "checks": [{"name": c["name"], "ok": c["ok"]} for c in payload["checks"]]}
+
+
+def _preflight_privileged(client_host: str, authed: bool) -> bool:
+    """完整 detail 判权：回环（deploy.sh / 容器内 Dockerfile 体检路径）或真实认证。
+    off 档 authenticate 恒过（acctkit providers=[fake,dev] 兜底），不构成凭证语义 →
+    非回环一律脱敏，公网暴露时 off 档 detail 亦不外泄。"""
+    return client_host in ("127.0.0.1", "::1", "localhost") or authed
 
 
 
@@ -1032,9 +1046,13 @@ def healthz() -> dict:
 
 
 
-@app.get("/preflight", response_model=PreflightOut)
-def preflight() -> dict:
-    return _preflight()
+@app.get("/preflight", response_model=PreflightOut, summary="开跑前体检（匿名面脱敏，P0-3：detail 仅回环/真实认证可见）")
+def preflight(request: Request, ident: Identity | None = Depends(optional_identity)) -> dict:
+    full = _preflight()
+    host = (request.client.host if request.client else "") or ""
+    real_auth = (ENV.get("V2MD_AUTH") or "off").strip().lower() not in ("", "off", "none")
+    return full if _preflight_privileged(host, real_auth and ident is not None) \
+        else _preflight_public(full)
 
 def cmd_api(port: int) -> None:
     # launchd/容器环境 PATH 极简，补齐框架/homebrew 路径让子进程找得到 yt-dlp/whisper/ffmpeg
