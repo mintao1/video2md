@@ -193,7 +193,7 @@ def _on_notify(payload: str) -> None:
 
 
 def _on_cmd(payload: str) -> None:
-    """指令通道收端（泵线程）：当前只有 hb → watchdog.heartbeat_local 落跨进程缓存。"""
+    """指令通道收端（泵线程）：hb → watchdog 跨进程心跳缓存；cancel → 本地驱动 run 落取消标志。"""
     try:
         msg = json.loads(payload)
         if msg.get("src") == _PROC_ID:
@@ -201,6 +201,12 @@ def _on_cmd(payload: str) -> None:
         if msg.get("action") == "hb":
             from . import watchdog
             watchdog.heartbeat_local(str(msg.get("run_id") or ""))
+        elif msg.get("action") == "cancel":
+            rid = str(msg.get("run_id") or "")
+            from . import api, runs  # 惰性：泵线程，防 import 环（api 顶导 events）
+            t = api._TASKS.get(rid)
+            if rid and t and t.get("status") in ("queued", "running"):
+                runs.request_cancel(rid)  # 只对本地驱动的 run 落标志，外部 run 不泄漏
     except Exception:
         pass  # 脏 payload 不许杀泵
 

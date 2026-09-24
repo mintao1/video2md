@@ -300,6 +300,36 @@ def _run_stage(run: dict, stage: str, args: dict) -> None:
         observability.flush()  # __stage 子进程短命，退出前排空 sink 队列
 
 
+# ---------------------------------------------------------------- P1-2 协作式取消
+# run_id 集合（GIL 下 set 读写原子；cmd 泵线程写、图工作线程读）。本进程驱动的 run
+# 收到取消请求（api 端点本地直置 / events v2md_cmds 远端广播→_on_cmd 只对本地驱动的
+# run 落标志）后，条目循环头查到即抛 SystemExit——走既有熔断语义，run_graph 捕获后
+# 终态 error 留痕（验收口径 error(cancelled)）。已知限制：长单阶段（如 3h 转录）内部
+# 无取消点，取消在下一循环头生效（ROADMAP P1-2 处方即「阶段循环头查标志」）。
+_CANCEL: set[str] = set()
+
+
+def request_cancel(run_id: str) -> None:
+    """登记取消请求（幂等）。跨进程广播由 api 端点负责（events.publish_cmd）。"""
+    if run_id:
+        _CANCEL.add(run_id)
+
+
+def cancel_requested(run_id: str) -> bool:
+    return run_id in _CANCEL
+
+
+def forget_cancel(run_id: str) -> None:
+    """终态清理（_drive finally / 排队撤销路径），防集合随 run 数增长。"""
+    _CANCEL.discard(run_id)
+
+
+def _check_cancel(run_id: str) -> None:
+    """条目循环头取消检查：有请求即抛 SystemExit 终止后续条目与阶段。"""
+    if run_id in _CANCEL:
+        raise SystemExit("用户取消（cancelled）：条目循环头拦截")
+
+
 def _run_stage_inner(run: dict, stage: str, args: dict, log: "RunLog") -> None:
     tmp = Path(run["tmp"])
     tmp.mkdir(parents=True, exist_ok=True)  # 目录丢了（系统清理/上轮异常中断）会让 download 直接 ENOENT
@@ -310,6 +340,7 @@ def _run_stage_inner(run: dict, stage: str, args: dict, log: "RunLog") -> None:
     for idx, entry in enumerate(run["entries"], 1):
         from . import watchdog  # 惰性导入：每条目开头打心跳（长阶段日志稀疏，事件流会饿）
         watchdog.touch(run["run_id"])
+        _check_cancel(run["run_id"])  # P1-2：协作式取消点（排队/远端广播的请求在此生效）
         art = run["artifacts"].setdefault(entry["url"], {})
         if art.get("skipped"):
             print(f"    ⏭ 条目 {idx}/{len(run['entries'])} 已处理过（state 幂等），跳过")

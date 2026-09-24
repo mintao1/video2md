@@ -83,7 +83,8 @@ def client(_clean_state):
 def test_openapi_and_docs_enabled(client):
     assert client.get("/openapi.json").status_code == 200
     spec = client.get("/openapi.json").json()
-    for path in ("/runs", "/runs/{run_id}", "/runs/{run_id}/note", "/runs/{run_id}/events"):
+    for path in ("/runs", "/runs/{run_id}", "/runs/{run_id}/note", "/runs/{run_id}/events",
+                 "/runs/{run_id}/cancel"):
         assert path in spec["paths"], path
     assert client.get("/docs").status_code == 200
 
@@ -704,6 +705,148 @@ def test_sweep_uploads_ttl(client, monkeypatch):
     monkeypatch.setattr(_api, "UPLOADS_DIR", up)
     assert _api._sweep_uploads() == 1 and not f.exists()
     assert _api._sweep_uploads() == 0  # 幂等
+
+
+# ---------------------------------------------------------------- 协作式取消（P1-2）
+
+def _cancel_stubs(monkeypatch, graph_fn):
+    """取消三测共用：假 resolve 落 runs.json 记录 + 假图（graph_fn 自带取消行为）。
+    注意：真 run_graph 会把终态 merge 回 runs.json 记录（GET /runs/{id} 顶层 status
+    读记录），假图必须同款收尾——只改 _TASKS 的假图会让顶层 status 永远停在 running。"""
+    import asyncio
+
+    import video2md.api as _api
+    import video2md.graph as graph_mod
+    import video2md.runs as _runs_mod
+
+    def fake_resolve(url, part_items, force, run_id, owner):
+        rec = {"run_id": run_id, "url": url, "part_items": part_items, "owner": owner,
+               "created": "2026-01-01T00:00:00", "tmp": "", "total": 1,
+               "entries": [{"playlist_index": 1, "url": url}],
+               "artifacts": {}, "stages": {}, "status": "created"}
+        db = _runs_mod._load_runs()
+        db[run_id] = rec
+        _runs_mod._save_runs(db)
+        return rec, "", False
+
+    def recording_graph(url, *, part_items="", force=False, review=False, max_frames=60,
+                        run_id="", checkpointer=None, owner=""):
+        final = graph_fn(url, run_id=run_id)  # (status, errors) —— 真实语义的取消/完成判定
+        with _runs_mod._runs_file_lock():
+            rec = _runs_mod._load_runs().get(run_id) or {"run_id": run_id}
+            rec["status"] = final["status"]
+            if final.get("errors"):
+                rec["errors"] = final["errors"]
+            _runs_mod._runs_merge(rec)
+        return final
+
+    monkeypatch.setattr(graph_mod, "resolve_run", fake_resolve)
+    monkeypatch.setattr(_api, "run_graph", recording_graph)
+    monkeypatch.setattr(_api, "_SEMA", asyncio.Semaphore(1))
+    return _api, _runs_mod
+
+
+def _poll_status(client, run_id, want, timeout_s=8.0) -> str:
+    deadline = time.monotonic() + timeout_s
+    st = ""
+    while time.monotonic() < deadline:
+        st = client.get(f"/runs/{run_id}").json().get("status") or ""
+        if st == want:
+            return st
+        time.sleep(0.05)
+    return st
+
+
+def test_cancel_queued_immediate(client, monkeypatch):
+    def fake_graph(url, *, run_id=""):
+        time.sleep(0.5)  # 首跑占住唯一信号量 → 第二个 run 排队
+        return {"status": "done", "run_id": run_id}
+
+    _api, _runs_mod = _cancel_stubs(monkeypatch, fake_graph)
+    first = client.post("/runs", json={"url": "https://example.test/cq1"}).json()
+    second = client.post("/runs", json={"url": "https://example.test/cq2"}).json()
+    assert second["status"] == "queued"
+
+    r = client.post(f"/runs/{second['run_id']}/cancel")
+    assert r.status_code == 200 and r.json()["status"] == "error", r.text
+    # 立即翻终态：任务视图 + runs 记录双重留痕（error(cancelled)）
+    assert client.get(f"/runs/{second['run_id']}").json()["status"] == "error"
+    rec = _runs_mod._load_runs()[second["run_id"]]
+    assert rec["status"] == "error" and any("cancelled" in e for e in rec.get("errors", []))
+
+    # 首跑完成后，撤销项不得被 _drive 唤醒驱动（静默退场，不翻 running/done）；
+    # 取消标志归 _drive 醒来后的退场路径/finally 清——端点不清（防复活竞态）。
+    assert _poll_status(client, first["run_id"], "done") == "done"
+    time.sleep(0.5)  # 给唤醒后的退场路径留足窗口
+    st = client.get(f"/runs/{second['run_id']}").json().get("status")
+    assert st == "error", f"撤销的排队项被唤醒驱动成了 {st}"
+    assert not _runs_mod.cancel_requested(second["run_id"])
+
+
+def test_cancel_running_cooperative(client, monkeypatch):
+    import video2md.runs as _runs_mod
+
+    def cooperative_graph(url, *, run_id=""):
+        # 模拟条目循环头检查（真检查在 _run_stage_inner，另有直测）：标志到 → error 留痕
+        deadline = time.monotonic() + 5
+        while time.monotonic() < deadline and not _runs_mod.cancel_requested(run_id):
+            time.sleep(0.02)
+        if _runs_mod.cancel_requested(run_id):
+            return {"status": "error", "run_id": run_id,
+                    "errors": ["用户取消（cancelled）：条目循环头拦截"]}
+        return {"status": "done", "run_id": run_id}
+
+    _api, _runs_mod = _cancel_stubs(monkeypatch, cooperative_graph)
+    rid = client.post("/runs", json={"url": "https://example.test/cc-r1"}).json()["run_id"]
+    assert _poll_status(client, rid, "running") == "running"
+
+    c = client.post(f"/runs/{rid}/cancel")
+    assert c.status_code == 200 and c.json()["status"] == "cancelling", c.text
+    assert _poll_status(client, rid, "error") == "error"
+    assert not _runs_mod.cancel_requested(rid)  # _drive finally 清标志
+
+
+def test_cancel_terminal_conflict_and_access(client):
+    put_identity("test", "alice", "uid_alice")
+    put_identity("test", "bob", "uid_bob")
+    _seed_run("r_done", "uid_alice")  # 终态 → 409 NOT_CANCELLABLE
+    r = client.post("/runs/r_done/cancel", headers={"X-Test-Auth": "alice"})
+    assert r.status_code == 409
+    assert r.json()["error"]["details"] == "NOT_CANCELLABLE"
+    assert client.post("/runs/r_done/cancel", headers={"X-Test-Auth": "bob"}).status_code == 403
+    assert client.post("/runs/ghost/cancel", headers={"X-Test-Auth": "alice"}).status_code == 404
+
+
+def test_stage_loop_head_cancel_gate():
+    """真检查点直测：_run_stage_inner 条目循环头，标志在 → SystemExit(cancelled)；
+    标志不在 → skipped-only 条目正常走完（不被误伤）。"""
+    import tempfile as _tf
+
+    from video2md import runs as rmod
+
+    class _Span:
+        def __enter__(self):
+            return self
+        def __exit__(self, *a):
+            return False
+        def __setitem__(self, k, v):
+            pass
+
+    class _Log:
+        def span(self, *a, **k):
+            return _Span()
+
+    run = {"run_id": "cx1", "tmp": _tf.mkdtemp(prefix="v2md-cancel-"), "entries": [{"url": "u"}],
+           "artifacts": {"u": {"skipped": True}}, "stages": {}}
+    rmod.request_cancel("cx1")
+    try:
+        rmod._run_stage_inner(run, "download", {}, _Log())
+        raise AssertionError("循环头取消必须抛 SystemExit")
+    except SystemExit as exc:
+        assert "cancelled" in str(exc)
+    finally:
+        rmod.forget_cancel("cx1")
+    rmod._run_stage_inner(run, "download", {}, _Log())  # 无标志：skipped 正常走完不抛
 
 
 # ---------------------------------------------------------------- 并发执行（终局布局·执行层）

@@ -19,6 +19,8 @@ SSE 实时进度（GET /runs/{id}/events）与轮询并存。核心 run_graph �
   GET  /runs/{id}/bundle   deliver 模式产物整包 zip（笔记/帧/转录/节段/索引-append）——云端不
                            储存，只在此窗口发送到用户端；已焚/过期 410
   DELETE /runs/{id}/artifacts deliver 模式 ACK 即焚：客户端确认收完，云端立刻销毁产物
+  POST /runs/{id}/cancel 撤销进行中 run（P1-2）：排队立即 error(cancelled)；运行中协作式
+                        （循环头拦截）；他副本驱动走 cmd 广播；终态 409
   GET  /queue           {queue_len, running, limits}——gpu_router 的 colab 看门狗回读这里（运维探针，不鉴权）
   GET  /healthz         存活探针（Docker healthcheck，不鉴权）
   GET  /preflight       开跑前体检（ffmpeg/磁盘/vault 或 outbox/算力池；匿名面 detail 脱敏，P0-3）
@@ -73,6 +75,7 @@ from .config import (
 from .graph import make_checkpointer_from_env, run_graph
 from .models import (
     ArtifactsAckOut,
+    CancelOut,
     DeviceCodeOut,
     DeviceTokenBody,
     DeviceTokenOut,
@@ -86,7 +89,7 @@ from .models import (
     RunStatusOut,
     UploadOut,
 )
-from .runs import _load_runs, _runs_file_lock, _runs_merge
+from .runs import _load_runs, _runs_file_lock, _runs_merge, cancel_requested, forget_cancel, request_cancel
 from .util import redact, sanitize_filename
 
 # ---------------------------------------------------------------- 运维函数（原 serve.py）
@@ -541,7 +544,25 @@ async def _drive(run_id: str, url: str, part_items: str, force: bool,
         if be is not None and not be.still_mine(run_id, _PROC_ID):
             _TASKS.pop(run_id, None)   # 已被他副本接管：本进程视图让位，DB 真相由接管者续写
             watchdog.forget(run_id)
+            forget_cancel(run_id)
             print(f"↪ run {run_id} 排队期间租约被其他副本接管，本进程让位不驱动")
+            return
+        if cancel_requested(run_id):
+            # P1-2：排队期被撤销。远端 cmd 撤销（本进程仍持 queued）由此处代翻终态——
+            # 记录写入归持有者，单写者纪律；翻完静默退场，不占信号量跑图。
+            t = _TASKS.get(run_id)
+            if t and t.get("status") in ("queued", "running"):
+                _flip_cancelled(run_id, "用户取消（cancelled）：排队期间撤销")
+            forget_cancel(run_id)
+            watchdog.forget(run_id)
+            return
+        t = _TASKS.get(run_id)
+        if t is None or t.get("status") not in ("queued", "running"):
+            # 端点本地撤销已翻终态（取消标志归本协程 finally 清——端点刻意不清，防
+            # 「标志先清、_drive 后醒」竞态复活已撤销的 run）：醒来时任务已非排队/
+            # 运行态（或已被裁剪）→ 静默退场。
+            forget_cancel(run_id)
+            watchdog.forget(run_id)
             return
         _TASKS[run_id].update(status="running", started=_now())
         run = _load_runs().get(run_id)  # created/queued → running（启动恢复与排队接管都汇到这）
@@ -566,7 +587,21 @@ async def _drive(run_id: str, url: str, part_items: str, force: bool,
             observability.close_run(run_id)  # 兜底闭合 run 级 root span（各 stage 已各自闭合）
             observability.flush()
             watchdog.forget(run_id)  # 终态清心跳（_HEARTBEATS 不随 run 数增长）
+            forget_cancel(run_id)    # P1-2：清取消标志（同款防增长纪律）
 
+
+
+def _flip_cancelled(run_id: str, msg: str) -> None:
+    """终态翻转 error(cancelled)：内存任务表 + runs 记录同步留痕（SSE/轮询面自动生效）。"""
+    t = _TASKS.get(run_id)
+    if t is not None:
+        t.update(status="error", finished=_now(), errors=[*(t.get("errors") or []), msg][-10:])
+    with _runs_file_lock():
+        run = _load_runs().get(run_id)
+        if run:
+            run["status"] = "error"
+            run["errors"] = [*(run.get("errors") or []), msg][-20:]
+            _runs_merge(run)
 
 
 def _enqueue(url: str, part_items: str, force: bool, review: bool,
@@ -1044,6 +1079,45 @@ def _run_current_status(run_id: str) -> tuple[str | None, str | None]:
         return run.get("status"), run.get("url")
     return None, None
 
+
+
+@app.post("/runs/{run_id}/cancel", response_model=CancelOut,
+          summary="撤销进行中的 run（排队项立即生效；运行中协作式；跨副本走 cmd 广播）")
+def cancel_run(run_id: str, ident: Identity = Depends(current_identity)) -> dict:
+    """P1-2 跨进程取消。动作端点而非 DELETE：记录留痕不删除（终态 error(cancelled)），
+    与 DELETE /artifacts 的真删除语义区分（AIP-135 口径）。
+
+    - 本进程 queued：无在途工作，立即翻终态（_drive 醒来见标志静默退场）；
+    - 本进程 running：登记标志回 cancelling，协作式生效——下一个条目循环头
+      SystemExit 走既有熔断通道，终态由 run_graph 留痕（长单阶段内无取消点）；
+    - 他副本驱动（PG 档判 DB）：cmd 广播 cancel，目标副本只对本地驱动落标志；
+    - 终态/未驱动：409 NOT_CANCELLABLE。
+    """
+    _require_run_access(run_id, ident)  # 404 不存在 / 403 越权
+    task = _TASKS.get(run_id)
+    local = (task or {}).get("status")
+    if local in ("queued", "running"):
+        request_cancel(run_id)
+        if local == "queued":
+            _flip_cancelled(run_id, "用户取消（cancelled）：排队期间撤销")
+            # 不清取消标志：挂起的 _drive 醒来按标志/终态静默退场（标志归其 finally 清）。
+            # 此处先清会有「标志先清、_drive 后醒」竞态——已撤销的 run 被复活驱动。
+            watchdog.forget(run_id)
+            return {"run_id": run_id, "status": "error"}
+        return {"run_id": run_id, "status": "cancelling"}
+    st = None
+    be = _tasks_backend()
+    if be is not None:
+        try:
+            st, _url = be.get_status_url(run_id)
+        except Exception:
+            st = None
+        if st in ("queued", "running"):
+            events.publish_cmd("cancel", run_id)  # 目标副本 _on_cmd → 本地驱动才落标志
+            return {"run_id": run_id, "status": "cancelling", "remote": True}
+    raise HTTPException(409, f"run {run_id} 无可取消的进行中任务"
+                             f"（当前 {local or st or '无任务记录'}）",
+                        headers={"X-Error": "NOT_CANCELLABLE"})
 
 
 @app.get("/runs/{run_id}/events", summary="SSE 实时进度（graph:*/stage 事件流）")

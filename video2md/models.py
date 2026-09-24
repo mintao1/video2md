@@ -131,6 +131,14 @@ class RunNotesOut(BaseModel):
     notes: list[NoteItem] = Field(default_factory=list)
 
 
+class CancelOut(BaseModel):
+    """POST /runs/{id}/cancel：排队项立即撤销回 error；运行中/他副本驱动回 cancelling
+    （协作式——本进程循环头或 cmd 通道生效后翻终态，轮询/SSE 可见）。"""
+    run_id: str
+    status: str
+    remote: bool = False
+
+
 class QueueOut(BaseModel):
     queue_len: int
     running: int

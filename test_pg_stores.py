@@ -414,5 +414,44 @@ vapi._TASKS_PG = None
 vapi._tasks_pg_resolved = False
 print("✅ P1-1 排队租约（落库钉名/心跳/短租约接管/让位判据/大盘走查）")
 
+
+# ---- 7. P1-2：cmd 取消通道（远端广播 → 本地驱动 run 落标志，外部 run 不泄漏）---------
+from video2md import runs as vruns  # noqa: E402
+
+vwd._reset_for_tests()
+vapi._TASKS.clear()
+vapi._TASKS_PG = tasks
+vapi._tasks_pg_resolved = True
+vapi._TASKS["local1"] = {"status": "running", "url": "http://x/l1"}
+
+
+def _send_cmd(src: str, action: str, rid: str) -> None:
+    import psycopg
+    payload = json.dumps({"src": src, "action": action, "run_id": rid})
+    with psycopg.connect(DSN, autocommit=True) as conn:
+        conn.execute("SELECT pg_notify(%s, %s)", (events._CMD_CHANNEL, payload))
+
+
+async def _cancel_cmd_main() -> None:
+    events.bind_loop(asyncio.get_running_loop())  # 拉泵（§4 末已 shutdown，重绑）
+    await asyncio.to_thread(_send_cmd, "other-proc", "cancel", "local1")
+    deadline = time.monotonic() + 8
+    while time.monotonic() < deadline and not vruns.cancel_requested("local1"):
+        await asyncio.sleep(0.1)
+    assert vruns.cancel_requested("local1"), "他副本 cancel 广播应落本地驱动 run 的标志"
+    await asyncio.to_thread(_send_cmd, "other-proc", "cancel", "foreign1")  # 非本地驱动
+    await asyncio.sleep(1.5)
+    assert not vruns.cancel_requested("foreign1"), "外部 run 不得落本地标志（防泄漏）"
+
+
+asyncio.run(_cancel_cmd_main())
+events.shutdown()
+vruns.forget_cancel("local1")
+vwd._reset_for_tests()
+vapi._TASKS.clear()
+vapi._TASKS_PG = None
+vapi._tasks_pg_resolved = False
+print("✅ P1-2 cmd 取消通道（本地驱动落标志/外部 run 不泄漏）")
+
 pool.close()
 print("✅ test_pg_stores.py 全部通过")
