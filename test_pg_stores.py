@@ -8,6 +8,9 @@
 - PostgresIdentityStore：首登开户（is_new）、二次登录同 uid + email 回填持久化、
   put_identity 归并、并发首登同 uid 且无孤儿账号行
 - events PG 扇出：跨「进程」NOTIFY → 本地订阅收到（双实例互通）、自身回声不双投
+- PostgresTaskStore（P4b 多副本真相源）：counts/is_alive/active_for/total_active、
+  recover_candidates 认领互斥+tmp 缺失直接 error、steal_if_unclaimed 租约拒抢/过期抢到、
+  heartbeat 终态不续、submit_window_count 滑窗限频
 
 运行：V2MD_TEST_PG_DSN=postgresql://v2md:v2md@127.0.0.1:5432/v2md python3 test_pg_stores.py
 （CI 由 services: postgres 提供；本地 docker run 临时库即可——测试自带 TRUNCATE，别指生产库）
@@ -18,6 +21,7 @@ import os
 import sys
 import tempfile
 import threading
+import time
 from pathlib import Path
 
 DSN = os.environ.get("V2MD_TEST_PG_DSN") or ""
@@ -37,7 +41,7 @@ os.environ.update({
 sys.path.insert(0, str(Path(__file__).parent))
 
 from acctkit.models import Principal  # noqa: E402
-from video2md import events, pg, pgstore, runs, util  # noqa: E402
+from video2md import events, pg, pgstore, runs, util, watchdog  # noqa: E402
 from video2md.auth.pg_store import PostgresIdentityStore  # noqa: E402
 from video2md.config import ENV  # noqa: E402
 
@@ -175,10 +179,134 @@ async def _evt_main() -> None:
     events.unsubscribe("evrun2", q2)
 
 
+def _simulate_other_proc(src: str) -> None:
+    """模拟另一进程的指令广播：同 _notify_pg 的替身口径——src 钉成别家、走真 NOTIFY。"""
+    import json as _json
+
+    import psycopg
+
+    payload = _json.dumps({"src": src, "action": "hb", "run_id": "hb-run"})
+    with psycopg.connect(DSN, autocommit=True) as conn:
+        conn.execute("SELECT pg_notify(%s, %s)", (events._CMD_CHANNEL, payload))
+
+
+async def _cmd_main() -> None:
+    events.bind_loop(asyncio.get_running_loop())  # 拉起 LISTEN 泵（含 v2md_cmds 通道）
+    await asyncio.to_thread(_simulate_other_proc, "other-proc")
+    deadline = time.monotonic() + 8
+    while time.monotonic() < deadline and "hb-run" not in watchdog._LOCAL_HB:
+        await asyncio.sleep(0.1)
+    assert "hb-run" in watchdog._LOCAL_HB, "他进程 hb 通知应落 _LOCAL_HB 缓存"
+    # 自身回声：publish_cmd src=_PROC_ID → 泵跳过，不污染别的 run
+    await asyncio.to_thread(events.publish_cmd, "hb", "hb-self")
+    await asyncio.sleep(1.5)
+    assert "hb-self" not in watchdog._LOCAL_HB, "自身回声不得落缓存"
+
+
 asyncio.run(_evt_main())
+asyncio.run(_cmd_main())
 events.shutdown()
 ENV["V2MD_EVENTS"] = "local"
-print("✅ events PG 扇出（跨进程互通/回声去重）")
+watchdog._LOCAL_HB.clear()
+print("✅ events PG 扇出（跨进程互通/回声去重）+ cmd 心跳通道")
+
+# ---- 5. PostgresTaskStore（P4b 多副本真相源）----------------------------------------
+tasks = pgstore.PostgresTaskStore(pool)  # 构造即幂等建表 + claimed_by 列
+_truncate("v2md_runs", "v2md_submit_log")
+
+st_runs.merge({"run_id": "t_q", "owner": "u_a", "status": "queued", "created": "2026-01-01"})
+st_runs.merge({"run_id": "t_r", "owner": "u_a", "status": "running", "created": "2026-01-01",
+               "started": "2026-01-01T00:00:00", "url": "http://x/t_r"})
+st_runs.merge({"run_id": "t_d", "owner": "u_b", "status": "done", "created": "2026-01-01"})
+c = tasks.counts()
+assert c == {"queued": 1, "running": 1}, c
+assert tasks.total_active() == 2
+assert tasks.active_for("u_a") == 2 and tasks.active_for("u_b") == 0
+assert tasks.is_alive("t_r") and tasks.is_alive("t_q") and not tasks.is_alive("t_d")
+assert tasks.get_status_url("t_r") == ("running", "http://x/t_r")
+
+# heartbeat：running 续、终态不续
+assert tasks.heartbeat("t_r") is True
+assert tasks.heartbeat("t_d") is False
+
+# recover_candidates：tmp 缺失直接翻 error；认领窗口内候选只归一份（SKIP LOCKED）
+missing = {"run_id": "rec_miss", "owner": "u", "status": "running", "created": "",
+           "url": "http://x/m", "tmp": "/nonexistent-v2md-tmp", "tmp_cleaned": False}
+alive_run = {"run_id": "rec_ok", "owner": "u", "status": "running", "created": "",
+             "url": "http://x/ok", "tmp": ""}
+for rid in ("t_q", "t_r", "t_d"):  # 清场：只留 rec_* 两行 running，断言精确
+    with pool.connection() as conn:
+        conn.execute("DELETE FROM v2md_runs WHERE run_id=%s", (rid,))
+st_runs.merge(missing)
+st_runs.merge(alive_run)
+_tmp_missing = lambda r: bool(r.get("tmp")) and not Path(str(r["tmp"])).exists()
+first = tasks.recover_candidates(_tmp_missing, "临时目录已被清理")
+assert {r["run_id"] for r in first} == {"rec_ok"}, f"存活中断 run 必须进候选：{first}"
+loaded = st_runs.load()
+assert loaded["rec_miss"]["status"] == "error", loaded["rec_miss"]
+with pool.connection() as conn:
+    col = conn.execute("SELECT status, claimed_by FROM v2md_runs WHERE run_id='rec_miss'").fetchone()
+assert col[0] == "error" and col[1] == ""  # 提取列同步翻转
+
+# SKIP LOCKED 互斥：持锁事务未提交期间，另一连接的认领扫描拿不到任何候选。
+# （生产里 recover 返回即 _enqueue→_drive merge 翻 queued/running，行离开 running 态——
+#  不存在「提交后仍被重复捡」的窗口；这里用 holder 事务模拟该保护窗口。）
+pool2 = pg.make_pool(DSN)  # 模拟第二副本的连接池
+try:
+    with pool.connection() as claimer:
+        claimer.execute("BEGIN")
+        rows = claimer.execute(
+            "SELECT run_id FROM v2md_runs WHERE status='running' FOR UPDATE SKIP LOCKED"
+        ).fetchall()
+        assert [r[0] for r in rows] == ["rec_ok"], rows  # 唯一存活的 running 行
+        with pool2.connection() as other:
+            other.execute("BEGIN")
+            blocked = other.execute(
+                "SELECT run_id FROM v2md_runs WHERE status='running' FOR UPDATE SKIP LOCKED"
+            ).fetchall()
+            assert blocked == [], f"他副本正持锁恢复时本副本应拿到空集：{blocked}"
+            other.execute("COMMIT")
+        claimer.execute("COMMIT")
+finally:
+    pool2.close()
+
+# steal_if_unclaimed：租约内拒抢、无主可钉、过期可抢。
+# 注意 merge 整行覆盖会把 claimed_by 刷回默认 ''——钉名必须走直接 UPDATE。
+st_runs.merge({"run_id": "st1", "owner": "u", "status": "running", "created": "",
+               "url": "http://x/s"})
+with pool.connection() as conn:
+    conn.execute("UPDATE v2md_runs SET claimed_by='other-proc' WHERE run_id='st1'")
+assert tasks.steal_if_unclaimed("st1", 3600, "me") is None  # 他进程持有且租约未过期
+with pool.connection() as conn:  # 把 updated 拨回 2h 前 → 租约过期可接管
+    conn.execute("UPDATE v2md_runs SET updated=now()-interval '7200 seconds' WHERE run_id='st1'")
+rec = tasks.steal_if_unclaimed("st1", 3600, "me")
+assert rec and rec["run_id"] == "st1"
+with pool.connection() as conn:
+    cb = conn.execute("SELECT claimed_by FROM v2md_runs WHERE run_id='st1'").fetchone()[0]
+assert cb == "me"
+
+# mark_stuck_error / recheck_age：仍 running 才动；翻后 recheck 有值
+assert tasks.mark_stuck_error("st1", "大盘看门狗测试留痕") is True
+assert st_runs.load()["st1"]["status"] == "error"
+assert "大盘看门狗测试留痕" in st_runs.load()["st1"]["errors"][-1]
+assert tasks.mark_stuck_error("st1", "二次不应生效") is False
+
+# stale_running：updated 超龄的 running 行被筛出，刚 merge 的不入
+st_runs.merge({"run_id": "old1", "owner": "u", "status": "running", "created": "",
+               "url": "http://x/o"})
+with pool.connection() as conn:
+    conn.execute("UPDATE v2md_runs SET updated=now()-interval '7200 seconds' WHERE run_id='old1'")
+rows = tasks.stale_running(3600)
+ids = {r["run_id"] for r in rows}
+assert "old1" in ids and "t_r" not in ids, ids  # t_r 刚 heartbeat 过，不入
+assert all("last_active_epoch" in r and "claimed_by" in r for r in rows)
+
+# submit_window_count：滑窗计数——返回「登记本次之后」的在窗次数（per_min=N → 第 N+1
+# 次返回 N+1，调用方判 >= per_min 即限流；被拒提交也占时间戳，对齐 json 档滑窗行为）
+n_win = [tasks.submit_window_count("u_x") for _ in range(4)]
+assert n_win == [1, 2, 3, 4], n_win
+assert tasks.submit_window_count("u_y") == 1  # 独立 uid 互不影响
+print("✅ PostgresTaskStore（队列视图/心跳/认领恢复/steal 租约/stale 巡检/滑窗）")
 
 pool.close()
 print("✅ test_pg_stores.py 全部通过")

@@ -213,12 +213,16 @@ scripts/deploy.sh v0.2.0 --host user@server
   共享进程级连接池，与 checkpointer 同池）。PG 档：runs merge 行级原子（多实例并发
   安全）、state 逐 fp upsert、身份表走 acctkit `IdentityStore` 同协议 PG 适配器；
   切换前 `scripts/migrate_json_to_pg.py` 导入存量（幂等）。`V2MD_EVENTS=pg` 开
-  LISTEN/NOTIFY 跨进程 SSE 扇出（缺省 local 进程内）
-- **并发与配额**（执行层/限流配额的落地键，全进程内零外部依赖）：`V2MD_MAX_CONCURRENT_RUNS`
+  LISTEN/NOTIFY 跨进程 SSE 扇出（缺省 local 进程内）；`V2MD_TASKS_STORE=postgres`
+  把任务表读侧也换 PG 真相源——`/queue`、dedup 判活、watchdog 大盘巡检、启动恢复认领
+  （`FOR UPDATE SKIP LOCKED`，并发起的副本只有一份拿到候选集）全走 `v2md_runs`，
+  多进程副本下各实例看到的是同一个队列
+- **并发与配额**（执行层/限流配额的落地键）：`V2MD_MAX_CONCURRENT_RUNS`
   （默认 1=单 worker 语义；调大前 checkpointer 建议切 postgres，vault 自托管保持 1）；
   `V2MD_QUEUE_MAX`（总队列，超 → 429 `QUEUE_FULL`）/`V2MD_USER_QUEUE_MAX`（每用户在途，
   429 `USER_QUEUE_FULL`）/`V2MD_USER_SUBMIT_PER_MIN`（60s 滑窗，429 `RATE_LIMITED`；
-  三者 0=不设限）。`/queue` 响应带 `limits` 档位；429 走统一错误信封
+  三者 0=不设限）。`/queue` 响应带 `limits` 档位；429 走统一错误信封。单机档三道闸
+  进程内零外部依赖；`V2MD_TASKS_STORE=postgres` 后计数与滑窗跨副本一致
 - **上传面与路径白名单**（产物层）：`POST /uploads`（multipart，挂鉴权）流式落
   `data/uploads/<uid>/`，带单文件上限（`V2MD_UPLOAD_MAX_GB`）、每用户配额
   （`V2MD_UPLOAD_QUOTA_GB`）、类型白名单与 TTL 清扫（`V2MD_UPLOADS_TTL_H`）；返回的
@@ -258,7 +262,7 @@ scripts/deploy.sh v0.2.0 --host user@server
 |---|---|
 | 入口 | 域名 + 反代 TLS 是唯一公网入口（SSE 不缓冲；`/docs` `/openapi.json` 网关侧关闭）；安全组只放 80/443，api/算力池/观测栈全回环 |
 | 鉴权与账目 | acctkit 登录（Google id_token / 设备流 / 微信扫码，provider 可插拔）；身份表 `(provider, external_id) → uid` 首登开户、多 provider 归并同一 uid；run 按 uid 归属——越权 403、dedup 按 owner 隔离 |
-| 执行 | 多 worker 并发：队列调度 + 每用户并发上限 + 公平排队，单用户长任务不阻塞他人；进度事件经 pub/sub 扇出（PG LISTEN/NOTIFY），SSE 在多 worker 下口径一致 |
+| 执行 | 多 worker 并发：队列调度 + 每用户并发上限 + 公平排队，单用户长任务不阻塞他人；任务表 PG 真相源（`V2MD_TASKS_STORE=postgres`：/queue·配额·dedup·watchdog 大盘巡检·启动认领恢复走 DB，副本间同一个队列）；进度事件经 pub/sub 扇出（PG LISTEN/NOTIFY），SSE 在多 worker 下口径一致 |
 | 状态 | Postgres 承载 users / runs / state（各存储走同协议适配器，如 `IdentityStore`）+ checkpointer；单文件 JSON 形态只属开发机 |
 | 产物 | deliver「云端不储存」：per-run outbox 在架 → bundle zip 拉取 → ACK/TTL 即焚；上传走专用上传面 + 路径白名单（不收裸本地路径） |
 | 限流配额 | per-user 限流（入口/反代层）+ 磁盘配额 + 队列长度上限 |
@@ -370,7 +374,7 @@ GUI 前端把本服务当正式后端：契约硬化在 `video2md/models.py`（P
 连上先推 `{"event":"connected","status","url"}` 快照，之后每条 `data:` 即
 `logs/run-*.jsonl` 的事件记录（含 `graph:*` 图级事件），15s 无事件发 `: ping`，
 `graph:end`/终态即关流。事件总线扇出（`video2md/events.py`；多 worker 形态下经
-Redis pub/sub，见终局布局·执行层）。
+PG LISTEN/NOTIFY pub/sub，见终局布局·执行层）。
 
 **错误契约**：非 2xx 统一 `{"error": {"code", "message", "details"}}`
 （`AUTH_REQUIRED`/`FORBIDDEN`/`NOT_FOUND`/`VALIDATION`…；422 带定位信息）。

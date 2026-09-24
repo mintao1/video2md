@@ -142,6 +142,13 @@ UPLOAD_MAX_GB = float(ENV.get("V2MD_UPLOAD_MAX_GB", "2") or 2)
 UPLOAD_QUOTA_GB = float(ENV.get("V2MD_UPLOAD_QUOTA_GB", "5") or 5)
 UPLOADS_TTL_H = float(ENV.get("V2MD_UPLOADS_TTL_H", "24") or 24)
 
+# 任务表真相源（P4b·多副本档）：json 缺省 = _TASKS 进程内视图即现状零变化；
+# postgres = /queue、配额闸、dedup 判活、watchdog 巡检、启动恢复认领读 v2md_runs
+# 提取列（record jsonb 仍是状态唯一真相，status 列是其可查镜像）。需先切 RUNS_STORE。
+TASKS_STORE = (ENV.get("V2MD_TASKS_STORE") or "json").strip().lower()
+if TASKS_STORE not in ("json", "postgres"):
+    raise RuntimeError(f"未知 V2MD_TASKS_STORE：{TASKS_STORE}（支持 json|postgres）")
+
 # 本地路径输入策略（POST /runs 的 url 收非 http 时）：auto = AUTH=off 放行（开发/
 # 自托管），AUTH≠off 只认本人 uploads 白名单内路径；allow/deny 显式覆盖。
 LOCAL_PATHS = (ENV.get("V2MD_LOCAL_PATHS") or "auto").strip().lower()

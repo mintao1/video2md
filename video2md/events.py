@@ -11,6 +11,10 @@
   call_soon_threadsafe 机制投给本进程订阅者（payload 带 src 进程号，自身回声跳过，
   不双投）。端点与挂点（RunLog._write）零改动——契约测试只锁 local 档，PG 档在
   test_pg_stores.py 用双实例互通钉住。
+
+P4b 指令通道（同一条泵连接多 LISTEN 一个 channel）：publish_cmd(action, run_id) 发
+小 payload 控制消息；当前只有 "hb"（心跳广播）——别的副本收到后落 watchdog.heartbeat_local
+本地缓存，让大盘 watchdog 的三层信号第一层跨进程可用。cmd 不走 SSE 订阅扇出。
 """
 from __future__ import annotations
 
@@ -30,6 +34,7 @@ _QUEUE_MAX = 500  # 慢/断客户端兜底：队列满丢最旧之外的新事�
 _TERMINAL_EVENTS = {"graph:end"}  # 见到即视为 run 收尾，端点据此可关流
 
 _CHANNEL = "v2md_events"
+_CMD_CHANNEL = "v2md_cmds"  # P4b 指令通道（hb 等小 payload，无截断问题）
 _NOTIFY_MAX = 7900  # PG NOTIFY payload 上限 8000B，留余量
 _PROC_ID = uuid.uuid4().hex[:8]  # 扇出回声去重：泵跳过自己进程发的通知
 
@@ -114,6 +119,23 @@ def _notify_pg(run_id: str, rec: dict, src: str = _PROC_ID) -> None:
         pass
 
 
+def publish_cmd(action: str, run_id: str) -> None:
+    """P4b 指令广播（pg 档）：小 payload 控制消息走独立 channel，永不抛。
+
+    当前只有 "hb"（心跳）：touch 打点时顺带广播，别的副本泵收 → heartbeat_local。
+    local 档 no-op（单进程无跨程可言）。
+    """
+    if not _pg_mode():
+        return
+    try:
+        payload = json.dumps({"src": _PROC_ID, "action": action, "run_id": run_id})
+        from . import pg
+        with pg.shared_pool().connection() as conn:
+            conn.execute("SELECT pg_notify(%s, %s)", (_CMD_CHANNEL, payload))
+    except Exception:
+        pass
+
+
 def _ensure_pump() -> None:
     global _PUMP
     if _PUMP is not None and _PUMP.is_alive():
@@ -136,9 +158,13 @@ def _pump_loop() -> None:
         try:
             conn = psycopg.connect(dsn, autocommit=True)
             conn.execute(f"LISTEN {_CHANNEL}")
+            conn.execute(f"LISTEN {_CMD_CHANNEL}")
             while not _PUMP_STOP.is_set():
                 for n in conn.notifies(timeout=5):  # 空闲 5s 醒来查 stop
-                    _on_notify(n.payload)
+                    if getattr(n, "channel", "") == _CMD_CHANNEL:
+                        _on_cmd(n.payload)
+                    else:
+                        _on_notify(n.payload)
         except Exception:
             time.sleep(1.0)  # 断线/库未就绪：退避重连
         finally:
@@ -155,6 +181,19 @@ def _on_notify(payload: str) -> None:
         if msg.get("src") == _PROC_ID:
             return  # 自身回声：本地扇出已投过，跳过防双投
         _fanout_local(str(msg.get("run_id") or ""), msg.get("rec") or {})
+    except Exception:
+        pass  # 脏 payload 不许杀泵
+
+
+def _on_cmd(payload: str) -> None:
+    """指令通道收端（泵线程）：当前只有 hb → watchdog.heartbeat_local 落跨进程缓存。"""
+    try:
+        msg = json.loads(payload)
+        if msg.get("src") == _PROC_ID:
+            return  # 自身回声：touch 已本地打点，跳过
+        if msg.get("action") == "hb":
+            from . import watchdog
+            watchdog.heartbeat_local(str(msg.get("run_id") or ""))
     except Exception:
         pass  # 脏 payload 不许杀泵
 

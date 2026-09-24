@@ -80,7 +80,9 @@ services:
   #   V2MD_PG_DSN=postgresql://v2md:<密码>@127.0.0.1:5432/v2md
   # 多实例/云上持久档（可选，同 DSN 共享连接池）：
   #   V2MD_RUNS_STORE / V2MD_STATE_STORE / V2MD_USERS_STORE = postgres
-  #   + V2MD_EVENTS=pg（SSE 事件跨进程扇出）——切换前先 scripts/migrate_json_to_pg.py 导入存量
+  #   + V2MD_EVENTS=pg（SSE 事件跨进程扇出）+ V2MD_TASKS_STORE=postgres
+  #     （任务表 PG 真相源：/queue·配额·dedup·watchdog 大盘巡检·启动认领恢复走 DB，多副本安全）
+  #   ——切换前先 scripts/migrate_json_to_pg.py 导入存量
   # 起法：docker compose --profile pg up -d（外部/托管 PG 则不起这条，DSN 直接指过去）
   # ⚠ 刻意不用 depends_on：compose 的 depends_on 会无视 profile 强制拉起被依赖服务；
   #   PG 未就绪时 api fail-fast，靠 restart: unless-stopped 秒级自重启等库。

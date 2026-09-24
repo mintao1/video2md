@@ -151,11 +151,14 @@ def _cleanup_stale_runs(max_age_days: int = 30, idle_hours: float = 24.0) -> Non
       落盘时间算，正常批次阶段间隔以分钟计，撞不上
 
     落盘逐条 merge（json 档=锁内读改写循环，与原 save_all 等价；PG 档=行级原子，
-    save_all 在多实例下会覆盖他进程写入故禁用）。
+    save_all 在多实例下会覆盖他进程写入故禁用）。多副本纪律：在途（queued/running）
+    一律跳过——他进程正驱动的 tmp 不是垃圾，翻终态后再由下一轮清扫收走。
     """
     now = time.time()
     for rid, r in list(_load_runs().items()):
         if r.get("tmp_cleaned"):
+            continue
+        if r.get("status") in ("queued", "running"):
             continue
         try:
             age = now - datetime.fromisoformat(r.get("created", "2000-01-01")).timestamp()
@@ -232,6 +235,26 @@ def _ck_closer() -> None:
 
 _TASKS_KEEP = 200                     # 内存任务表上限（超出裁最老，runs.json 才是真相）
 
+_PROC_ID = uuid.uuid4().hex[:8]       # 副本身份：claimed_by 钉名 / watchdog steal 用
+
+# P4b 多副本档（V2MD_TASKS_STORE=postgres）：_TASKS 写路径保留不动（本进程实时视图），
+# 读侧换 PG 真相源——/queue、配额两闸+滑窗、dedup 判活、watchdog 大盘巡检、启动恢复
+# 认领全部走 v2md_runs（record jsonb 是状态唯一真相，status 提取列是其可查镜像）。
+# 缺省 json 档 _tasks_backend() 恒 None，下列新代码路径整体不激活。
+_TASKS_PG = None            # PostgresTaskStore | None（测试可直改本属性切档）
+_tasks_pg_resolved = False
+
+
+def _tasks_backend():
+    global _TASKS_PG, _tasks_pg_resolved
+    if not _tasks_pg_resolved:
+        _tasks_pg_resolved = True
+        if (ENV.get("V2MD_TASKS_STORE") or "").strip().lower() == "postgres":
+            from . import pg, pgstore
+            _TASKS_PG = pgstore.PostgresTaskStore(pg.shared_pool())
+    return _TASKS_PG
+
+
 _TERMINAL_STATUSES = ("done", "partial", "error")
 
 
@@ -279,10 +302,29 @@ _USER_SUBMIT_TS: dict[str, deque] = {}  # uid → 60s 滑窗提交时间戳（mo
 
 
 def _admit_submission(uid: str) -> None:
-    """POST /runs 入队前的配额闸（进程内）：总队列 / 每用户在途 / 滑窗提交频率。
+    """POST /runs 入队前的配额闸：总队列 / 每用户在途 / 滑窗提交频率。
 
     超限一律 429 + X-Error 符号码（错误信封统一转译）；0 = 该项不设限。
+    PG 档（V2MD_TASKS_STORE=postgres，多副本）三道闸全读 DB 真相源——各副本计数一致、
+    滑窗跨进程不丢；json 档逐字节现状（进程内视图）。
     """
+    be = _tasks_backend()
+    if be is not None:
+        if QUEUE_MAX:
+            n = be.total_active()
+            if n >= QUEUE_MAX:
+                raise HTTPException(429, f"队列已满（{n}/{QUEUE_MAX}），稍后重试",
+                                    headers={"X-Error": "QUEUE_FULL"})
+        if USER_QUEUE_MAX:
+            mine = be.active_for(uid)
+            if mine >= USER_QUEUE_MAX:
+                raise HTTPException(429, f"你在途/排队的 run 已达上限（{mine}/{USER_QUEUE_MAX}）",
+                                    headers={"X-Error": "USER_QUEUE_FULL"})
+        if USER_SUBMIT_PER_MIN:
+            if be.submit_window_count(uid) >= USER_SUBMIT_PER_MIN:
+                raise HTTPException(429, f"提交过频（限 {USER_SUBMIT_PER_MIN} 次/分钟），稍后重试",
+                                    headers={"X-Error": "RATE_LIMITED"})
+        return
     active = [v for v in _TASKS.values() if v.get("status") in ("queued", "running")]
     if QUEUE_MAX and len(active) >= QUEUE_MAX:
         raise HTTPException(429, f"队列已满（{len(active)}/{QUEUE_MAX}），稍后重试",
@@ -453,6 +495,9 @@ async def _drive(run_id: str, url: str, part_items: str, force: bool,
             run["status"] = "running"
             with _runs_file_lock():
                 _runs_merge(run)
+        be = _tasks_backend()
+        if be is not None:
+            be.note_claimed_by(run_id, _PROC_ID)  # 大盘 watchdog 据此区分本进程/他进程残档
         try:
             final = await asyncio.to_thread(run_graph, url, part_items=part_items,
                                             force=force, review=review,
@@ -493,9 +538,18 @@ async def _lifespan(app: FastAPI):
     _CHECKPOINTER, _ck_closer = make_checkpointer_from_env(ENV)
     # 遥测出口：OTEL_EXPORTER_OTLP_ENDPOINT（collector）> LANGFUSE 直连 > 纯本地 jsonl
     observability.init()
-    observability.register_runtime_gauges(lambda: {
-        "queued": sum(1 for v in _TASKS.values() if v.get("status") == "queued"),
-        "active": sum(1 for v in _TASKS.values() if v.get("status") == "running")})
+    def _gauge_counts() -> dict:
+        """队列仪表：PG 档读全盘真相（多副本合计），异常回退本进程视图——gauge 不许炸。"""
+        be = _tasks_backend()
+        if be is not None:
+            try:
+                c = be.counts()
+                return {"queued": c["queued"], "active": c["running"]}
+            except Exception:
+                pass
+        return {"queued": sum(1 for v in _TASKS.values() if v.get("status") == "queued"),
+                "active": sum(1 for v in _TASKS.values() if v.get("status") == "running")}
+    observability.register_runtime_gauges(_gauge_counts)
     _cleanup_stale_runs()
     _prune_orphan_tmps()
     if artsink.current_mode() == "deliver":
@@ -504,21 +558,44 @@ async def _lifespan(app: FastAPI):
     # 恢复中断的 run（对齐旧 _load_jobs 的语义；error 的不自动重跑，避免双份产物）。
     # tmp 已没了的 run 不可恢复（产物文件随目录一起没了，续跑只会拿空产物硬跑）：
     # 标记 error 收场，不占用执行信号量。
+    # PG 档（多副本）走认领制：FOR UPDATE SKIP LOCKED——并发起的副本只有一份拿到候选集，
+    # 败者跳过（他进程正持有行锁在恢复），tmp 缺失的直接 DB 翻 error。
+    be = _tasks_backend()
     resumed = 0
-    for r in _load_runs().values():
-        if r.get("status") != "running" or not r.get("url"):
-            continue
-        if r.get("tmp") and not Path(r["tmp"]).exists() and not r.get("tmp_cleaned"):
-            r["status"] = "error"
-            r["errors"] = [*(r.get("errors") or []), "临时目录已被清理，无法续跑（重发同 URL 新建 run）"]
-            with _runs_file_lock():
-                _runs_merge(r)
-            continue
-        _enqueue(r["url"], r.get("part_items", ""), bool(r.get("force")), False, 60,
-                 run_id=r["run_id"], owner=r.get("owner", ""))
-        resumed += 1
+    if be is not None:
+        def _tmp_missing(rec: dict) -> bool:
+            return bool(rec.get("tmp")) and not Path(str(rec["tmp"])).exists() \
+                and not rec.get("tmp_cleaned")
+        try:
+            cands = be.recover_candidates(_tmp_missing,
+                                          "临时目录已被清理，无法续跑（重发同 URL 新建 run）")
+        except Exception as exc:
+            print(f"⚠ 启动恢复认领失败（按无恢复处理）：{redact(str(exc))[:160]}")
+            cands = []
+        for r in cands:
+            if not r.get("url"):
+                continue
+            _enqueue(r["url"], r.get("part_items", ""), bool(r.get("force")), False, 60,
+                     run_id=r["run_id"], owner=r.get("owner", ""))
+            resumed += 1
+    else:
+        for r in _load_runs().values():
+            if r.get("status") != "running" or not r.get("url"):
+                continue
+            if r.get("tmp") and not Path(r["tmp"]).exists() and not r.get("tmp_cleaned"):
+                r["status"] = "error"
+                r["errors"] = [*(r.get("errors") or []), "临时目录已被清理，无法续跑（重发同 URL 新建 run）"]
+                with _runs_file_lock():
+                    _runs_merge(r)
+                continue
+            _enqueue(r["url"], r.get("part_items", ""), bool(r.get("force")), False, 60,
+                     run_id=r["run_id"], owner=r.get("owner", ""))
+            resumed += 1
     if resumed:
         print(f"♻️ 恢复 {resumed} 个中断 run（上次服务退出前未跑完）")
+    watchdog.set_stealer(lambda rec: _enqueue(
+        rec["url"], rec.get("part_items", ""), bool(rec.get("force")), False, 60,
+        run_id=rec["run_id"], owner=rec.get("owner", "")))
     sweeper = (asyncio.create_task(_outbox_sweeper())
                if artsink.current_mode() == "deliver" else None)
     uploads_sw = asyncio.create_task(_uploads_sweeper())
@@ -744,9 +821,21 @@ async def post_runs(body: RunCreate, ident: Identity = Depends(current_identity)
         # 会 dedup 命中这条记录并入队驱动——探测残档不会被启动恢复捡走（只认 running）
         _req_log("POST", "/runs", 200, run_id=run["run_id"], resolve_only=True, user=ident.uid)
         return {**resp, "status": "created"}
-    if is_dup and _TASKS.get(run["run_id"], {}).get("status") in ("queued", "running"):
+    # PG 档判活读 DB（他进程驱动也算活，不重投）；本进程有活条目仍优先取实时状态。
+    alive = bool(_TASKS.get(run["run_id"], {}).get("status") in ("queued", "running"))
+    be = _tasks_backend() if is_dup else None
+    db_alive = False
+    if is_dup and not alive and be is not None:
+        try:
+            db_alive = be.is_alive(run["run_id"])
+        except Exception:
+            db_alive = False
+    if is_dup and (alive or db_alive):
+        # dedup 命中：旧 run 必在 created/running（resolve_run 语义）；本进程有活条目取实时态，
+        # 否则 DB 判活即他进程驱动中，回 running（queued 瞬态由轮询/SSE 下一拍修正）。
+        cur = _TASKS.get(run["run_id"], {}).get("status") or run.get("status") or "running"
         _req_log("POST", "/runs", 200, run_id=run["run_id"], dedup=True, user=ident.uid)
-        return {**resp, "status": _TASKS[run["run_id"]]["status"], "dedup": True}
+        return {**resp, "status": cur, "dedup": True}
     # 新 run 或「旧 run 驱动已死」的 dedup 残档——都入队驱动（图内幂等重入）；
     # POST 与 lifespan 恢复共用同一条入队路径（dedup 判活在上面，_enqueue 只管排队）
     _enqueue(url, part_items, body.force, body.review, body.max_frames,
@@ -881,6 +970,8 @@ async def run_events(run_id: str, request: Request,
 
     图在工作线程里 publish → 主循环 call_soon_threadsafe 投递；慢/断客户端靠 keepalive +
     队列上限丢弃兜底，绝不反压主管线。轮询 GET /runs/{id} 仍并存（前端可只用其一）。
+    V2MD_EVENTS=pg 档订阅会拉起 events 的 LISTEN 泵：别的副本驱动该 run 时，终态事件经
+    跨进程扇出到达本端点——run_finalized 关流不要求 SSE 连接与驱动进程同侧。
     """
     _require_run_access(run_id, ident)
     q = events.subscribe(run_id)
@@ -917,7 +1008,17 @@ async def run_events(run_id: str, request: Request,
 @app.get("/queue", response_model=QueueOut)
 def get_queue() -> dict:
     """gpu_router 的 colab 看门狗回读（queue_url 指这里）——判队列保温；
-    limits 顺带公开并发/队列档位（探针口径，无敏感信息）。"""
+    limits 顺带公开并发/队列档位（探针口径，无敏感信息）。
+    PG 档读全盘真相源（多副本合计），查询异常回退本进程视图——探针不许炸。"""
+    be = _tasks_backend()
+    if be is not None:
+        try:
+            c = be.counts()
+            return {"queue_len": c["queued"], "running": c["running"],
+                    "limits": {"max_concurrent": MAX_CONCURRENT_RUNS, "queue_max": QUEUE_MAX,
+                               "user_queue_max": USER_QUEUE_MAX}}
+        except Exception:
+            pass
     return {"queue_len": sum(1 for v in _TASKS.values() if v.get("status") == "queued"),
             "running": sum(1 for v in _TASKS.values() if v.get("status") == "running"),
             "limits": {"max_concurrent": MAX_CONCURRENT_RUNS, "queue_max": QUEUE_MAX,

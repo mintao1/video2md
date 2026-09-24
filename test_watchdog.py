@@ -189,4 +189,99 @@ async def _loop_smoke():
 
 asyncio.run(_loop_smoke())
 
+# ---- P4b 大盘巡检 check_cluster（假 backend，离线不碰库）---------------------------
+class _FakeClusterStore:
+    """PostgresTaskStore 的大盘段替身：stale_running 回放固定行，steal/mark 可编排。"""
+
+    def __init__(self, rows, *, steal_rec=None, recheck_age=None):
+        self.rows = rows
+        self.steal_rec = steal_rec
+        self.recheck = recheck_age
+        self.calls: list[str] = []
+        self.marked: list[tuple[str, str]] = []
+
+    def stale_running(self, timeout_s):
+        self.calls.append("stale_running")
+        return list(self.rows)
+
+    def steal_if_unclaimed(self, rid, lease_s, proc):
+        self.calls.append(f"steal:{rid}")
+        return self.steal_rec
+
+    def recheck_age(self, rid):
+        return self.recheck if self.recheck is not None else NOW_WALL - TIMEOUT - 999
+
+    def mark_stuck_error(self, rid, msg):
+        self.calls.append(f"mark:{rid}")
+        self.marked.append((rid, msg))
+        return True
+
+
+def _row(rid="c1", started_epoch=None, claimed_by="", last_active=None):
+    return {"run_id": rid, "started": _iso(started_epoch) if started_epoch else "",
+            "claimed_by": claimed_by,
+            "last_active_epoch": (NOW_WALL - TIMEOUT - 50 if last_active is None else last_active)}
+
+
+# json 缺省档：backend None → DB 段整体不激活（check_once 行为逐字节现状已由上面用例锁死）
+watchdog._reset_for_tests()
+with mock.patch.object(watchdog, "_tasks_backend_safe", lambda: None):
+    assert watchdog.check_cluster(timeout_s=TIMEOUT, now_wall=NOW_WALL) == []
+
+# 1) 叠加信号更年轻（_LOCAL_HB 刚收到 cmd 通知）→ 不误杀
+watchdog._reset_for_tests()
+be = _FakeClusterStore([_row("c1")])
+with mock.patch.object(watchdog, "_tasks_backend_safe", lambda: be), \
+        mock.patch.object(watchdog.deadman, "ping"):
+    watchdog._LOCAL_HB["c1"] = NOW_WALL - 5  # 心跳新鲜：三层取最小龄 → 活着
+    assert watchdog.check_cluster(timeout_s=TIMEOUT, now_wall=NOW_WALL) == []
+assert be.calls == ["stale_running"]  # 未触发 steal
+
+# 2) 无主残档超龄 → steal 抢到 + 复核仍超龄 → 翻 error + 交 stealer 重驱
+watchdog._reset_for_tests()
+rec = {"run_id": "c2", "url": "http://x/c2", "part_items": "", "force": False, "owner": "u"}
+stolen: list[dict] = []
+be = _FakeClusterStore([_row("c2", claimed_by="")], steal_rec=rec)
+watchdog.set_stealer(stolen.append)
+with mock.patch.object(watchdog, "_tasks_backend_safe", lambda: be), \
+        mock.patch.object(watchdog.deadman, "ping"), \
+        mock.patch.object(watchdog.observability, "metric_watchdog"):
+    out = watchdog.check_cluster(timeout_s=TIMEOUT, now_wall=NOW_WALL)
+assert out == ["c2"] and ("c2", ) and stolen == [rec]
+assert any(c.startswith("mark:c2") for c in be.calls)
+
+# 3) 他进程持有且租约未过期（steal 抢不到）→ skip 不动
+watchdog._reset_for_tests()
+be = _FakeClusterStore([_row("c3", claimed_by="other")], steal_rec=None)
+with mock.patch.object(watchdog, "_tasks_backend_safe", lambda: be), \
+        mock.patch.object(watchdog.deadman, "ping"):
+    assert watchdog.check_cluster(timeout_s=TIMEOUT, now_wall=NOW_WALL) == []
+assert "steal:c3" in be.calls and not any(c.startswith("mark:") for c in be.calls)
+
+# 4) steal 持锁后复核发现刚有活动（recheck_age 新鲜）→ 归还认领，不动
+watchdog._reset_for_tests()
+be = _FakeClusterStore([_row("c4")], steal_rec={"run_id": "c4"}, recheck_age=NOW_WALL - 3)
+seen: list[dict] = []
+watchdog.set_stealer(seen.append)
+with mock.patch.object(watchdog, "_tasks_backend_safe", lambda: be), \
+        mock.patch.object(watchdog.deadman, "ping"):
+    assert watchdog.check_cluster(timeout_s=TIMEOUT, now_wall=NOW_WALL) == []
+assert seen == [] and not any(c.startswith("mark:") for c in be.calls)
+
+# 5) 本进程正驱动的活条目被筛出 → 走既有 trip（翻转 runs.json + 任务表）
+watchdog._reset_for_tests()
+_seed_runs_file(_run(stage_ts_epoch=NOW_WALL - 999))
+task_live = _task(NOW_WALL - 999)
+local_tasks = {"r1": task_live}
+be = _FakeClusterStore([_row("r1", claimed_by="me")])
+import video2md.api as _api  # noqa: E402
+with mock.patch.object(watchdog, "_tasks_backend_safe", lambda: be), \
+        mock.patch.object(_api, "_PROC_ID", "me"), \
+        mock.patch.object(_api, "_TASKS", local_tasks), \
+        mock.patch.object(watchdog.deadman, "ping"):
+    out = watchdog.check_cluster(timeout_s=TIMEOUT, now_wall=NOW_WALL)
+assert out == ["r1"] and task_live["status"] == "error"
+watchdog._reset_for_tests()
+watchdog.set_stealer(None)
+
 print("✅ test_watchdog.py 全部通过")

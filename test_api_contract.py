@@ -733,6 +733,132 @@ def test_state_save_concurrent_no_tear():
     assert isinstance(util.load_state(), dict)  # 无半截 JSON / JSONDecodeError
 
 
+# ---------------------------------------------------------------- P4b 任务表 PG 真相源（假后端）
+
+class _FakeTaskStore:
+    """PostgresTaskStore 的读侧替身：只实现 api 接线用到的方法，调用可断言。"""
+
+    def __init__(self, *, queued=0, running=0, active_total=0, mine=0,
+                 alive_ids=(), window_counts=None):
+        self.counts_map = {"queued": queued, "running": running}
+        self._total_active = active_total
+        self._mine = mine
+        self.alive_ids = set(alive_ids)
+        self.window_counts = dict(window_counts or {})
+        self.calls: list[str] = []
+
+    def counts(self) -> dict:
+        self.calls.append("counts")
+        return dict(self.counts_map)
+
+    def total_active(self) -> int:
+        self.calls.append("total_active")
+        return self._total_active
+
+    def active_for(self, uid: str) -> int:
+        self.calls.append(f"active_for:{uid}")
+        return self._mine
+
+    def is_alive(self, run_id: str) -> bool:
+        self.calls.append(f"is_alive:{run_id}")
+        return run_id in self.alive_ids
+
+    def submit_window_count(self, uid: str) -> int:
+        self.calls.append(f"submit_window_count:{uid}")
+        return self.window_counts.get(uid, 0)
+
+    def note_claimed_by(self, run_id: str, proc: str) -> None:
+        self.calls.append(f"note_claimed_by:{run_id}")
+
+
+def test_tasks_pg_backend_readside(client, monkeypatch):
+    """PG 档读侧换源：/queue、配额闸、滑窗全走 fake backend，不再碰进程内 _TASKS。"""
+    import video2md.api as _api
+
+    fake = _FakeTaskStore(queued=7, running=3, active_total=10, mine=4)
+    monkeypatch.setattr(_api, "_TASKS_PG", fake)
+    monkeypatch.setattr(_api, "_tasks_pg_resolved", True)
+    q = client.get("/queue").json()
+    assert q["queue_len"] == 7 and q["running"] == 3
+    assert "counts" in fake.calls
+
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(_api, "QUEUE_MAX", 9)          # fake total_active=10 → 满
+        r = client.post("/runs", json={"url": "https://example.test/a"})
+        assert r.status_code == 429 and r.json()["error"]["details"] == "QUEUE_FULL"
+    assert "total_active" in fake.calls
+
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(_api, "QUEUE_MAX", 0)           # 放行总闸
+        mp.setattr(_api, "USER_QUEUE_MAX", 3)      # fake active_for=4 → 超
+        r = client.post("/runs", json={"url": "https://example.test/b"})
+        assert r.status_code == 429 and r.json()["error"]["details"] == "USER_QUEUE_FULL"
+
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(_api, "USER_QUEUE_MAX", 0)
+        mp.setattr(_api, "USER_SUBMIT_PER_MIN", 2)  # fake 窗口计数已达 2
+        fake.window_counts[_dev_uid()] = 2
+        r = client.post("/runs", json={"url": "https://example.test/c"})
+        assert r.status_code == 429 and r.json()["error"]["details"] == "RATE_LIMITED"
+    assert any(c.startswith("submit_window_count:") for c in fake.calls)
+
+
+def test_tasks_pg_dedup_alive(client, monkeypatch):
+    """dedup 判活 PG 档：本进程 _TASKS 无活条目、DB is_alive=True → 不重投，回旧状态。"""
+    import video2md.graph as graph_mod
+    import video2md.api as _api
+
+    dup_rec = {"run_id": "dupx", "url": "https://example.test/dup", "part_items": "",
+               "owner": _dev_uid(), "created": "2026-01-01T00:00:00", "tmp": "",
+               "total": 1, "entries": [{"playlist_index": 1, "url": "https://example.test/dup"}],
+               "artifacts": {}, "stages": {}, "status": "running"}
+
+    def fake_resolve(url, part_items, force, run_id, owner):
+        return dup_rec, "", True
+
+    fake = _FakeTaskStore(alive_ids={"dupx"})
+    monkeypatch.setattr(graph_mod, "resolve_run", fake_resolve)
+    monkeypatch.setattr(_api, "_TASKS_PG", fake)
+    monkeypatch.setattr(_api, "_tasks_pg_resolved", True)
+    assert "dupx" not in _api._TASKS  # 前提：本进程视角「驱动已死」
+    r = client.post("/runs", json={"url": "https://example.test/dup"})
+    assert r.status_code == 200
+    body = r.json()
+    assert body.get("dedup") is True and body["status"] == "running"
+    assert f"is_alive:dupx" in fake.calls
+    assert "dupx" not in _api._TASKS  # 关键：不得重新入队驱动（他进程正跑）
+
+
+def test_tasks_pg_dead_dup_requeues(client, monkeypatch):
+    """DB 判活=False（崩溃残档）→ 既有重驱路径不变。"""
+    import video2md.graph as graph_mod
+    import video2md.api as _api
+
+    dup_rec = {"run_id": "dead1", "url": "https://example.test/dead", "part_items": "",
+               "owner": _dev_uid(), "created": "2026-01-01T00:00:00", "tmp": "",
+               "total": 1, "entries": [{"playlist_index": 1, "url": "https://example.test/dead"}],
+               "artifacts": {}, "stages": {}, "status": "running"}
+
+    def fake_resolve(url, part_items, force, run_id, owner):
+        return dup_rec, "", True
+
+    enq: list[str] = []
+
+    def spy_enqueue(url, part_items, force, review, max_frames, run_id="", owner=""):
+        enq.append(run_id)
+        return {"run_id": run_id, "status": "queued"}
+
+    fake = _FakeTaskStore(alive_ids=set())
+    monkeypatch.setattr(graph_mod, "resolve_run", fake_resolve)
+    monkeypatch.setattr(_api, "_TASKS_PG", fake)
+    monkeypatch.setattr(_api, "_tasks_pg_resolved", True)
+    monkeypatch.setattr(_api, "_enqueue", spy_enqueue)
+    r = client.post("/runs", json={"url": "https://example.test/dead"})
+    assert r.status_code == 200
+    assert r.json()["status"] == "queued" and r.json().get("dedup") is True
+    assert enq == ["dead1"]
+
+
 def run_all() -> None:  # `python3 test_api_contract.py` 兜底（无 pytest 时）
     import sys
     sys.exit(pytest.main([__file__, "-q"]))
