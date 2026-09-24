@@ -459,18 +459,13 @@ def make_checkpointer_from_env(env: dict | None = None) -> tuple:
     if not dsn:
         raise RuntimeError("V2MD_CHECKPOINTER=postgres 需要配 V2MD_PG_DSN")
     from langgraph.checkpoint.postgres import PostgresSaver
-    from psycopg_pool import ConnectionPool
 
-    pool = ConnectionPool(conninfo=dsn, min_size=1, max_size=5, open=True,
-                          kwargs={"autocommit": True, "prepare_threshold": 0})
-    try:
-        # dict 行工厂：langgraph PostgresSaver 官方口径（psycopg 默认 tuple 行不匹配其反序列化）
-        saver = PostgresSaver(pool)  # type: ignore[arg-type]
-        saver.setup()  # 幂等建表
-    except Exception:
-        pool.close()
-        raise
-    return saver, pool.close
+    from .pg import shared_pool
+    pool = shared_pool()  # 与 P3 三存储/事件扇出共用进程级池（消双池）
+    # dict 行工厂：langgraph PostgresSaver 官方口径（psycopg 默认 tuple 行不匹配其反序列化）
+    saver = PostgresSaver(pool)  # type: ignore[arg-type]
+    saver.setup()  # 幂等建表（池共享，不在此关——生命周期归 pg 模块/api lifespan）
+    return saver, lambda: None
 
 
 

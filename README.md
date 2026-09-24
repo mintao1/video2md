@@ -97,7 +97,9 @@ V2MD_ENV=production                         # 遥测环境标签（compose 已�
 GOOGLE_CLIENT_ID=xxxxx.apps.googleusercontent.com
 # GOOGLE_CLIENT_SECRET=…     # 仅设备流需要（TV/Limited-Input 型 client）
 # WECHAT_APP_ID / WECHAT_APP_SECRET=…        # 微信扫码（可选）
-# V2MD_PG_DSN=postgresql://… # Postgres checkpointer（可选，缺省 sqlite）
+# V2MD_PG_DSN=postgresql://… # Postgres（可选，缺省 sqlite/json 零外部服务）：
+#                            #   checkpointer + 存储三件（RUNS/STATE/USERS_STORE=postgres）
+#                            #   + V2MD_EVENTS=pg（SSE 跨进程扇出）——多实例/云上持久档
 ```
 
 **2. 构建 + 起栈 + 体检**（国内服务器可 `PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple` 加速）：
@@ -206,6 +208,12 @@ scripts/deploy.sh v0.2.0 --host user@server
 
 ### 运行面要点
 
+- **存储后端分派**（终局布局·状态层落地键）：`V2MD_RUNS_STORE` / `V2MD_STATE_STORE` /
+  `V2MD_USERS_STORE` 各自独立 `json`（缺省，行为零变化）| `postgres`（`V2MD_PG_DSN`
+  共享进程级连接池，与 checkpointer 同池）。PG 档：runs merge 行级原子（多实例并发
+  安全）、state 逐 fp upsert、身份表走 acctkit `IdentityStore` 同协议 PG 适配器；
+  切换前 `scripts/migrate_json_to_pg.py` 导入存量（幂等）。`V2MD_EVENTS=pg` 开
+  LISTEN/NOTIFY 跨进程 SSE 扇出（缺省 local 进程内）
 - **并发与配额**（执行层/限流配额的落地键，全进程内零外部依赖）：`V2MD_MAX_CONCURRENT_RUNS`
   （默认 1=单 worker 语义；调大前 checkpointer 建议切 postgres，vault 自托管保持 1）；
   `V2MD_QUEUE_MAX`（总队列，超 → 429 `QUEUE_FULL`）/`V2MD_USER_QUEUE_MAX`（每用户在途，
@@ -250,7 +258,7 @@ scripts/deploy.sh v0.2.0 --host user@server
 |---|---|
 | 入口 | 域名 + 反代 TLS 是唯一公网入口（SSE 不缓冲；`/docs` `/openapi.json` 网关侧关闭）；安全组只放 80/443，api/算力池/观测栈全回环 |
 | 鉴权与账目 | acctkit 登录（Google id_token / 设备流 / 微信扫码，provider 可插拔）；身份表 `(provider, external_id) → uid` 首登开户、多 provider 归并同一 uid；run 按 uid 归属——越权 403、dedup 按 owner 隔离 |
-| 执行 | 多 worker 并发：队列调度 + 每用户并发上限 + 公平排队，单用户长任务不阻塞他人；进度事件经 Redis pub/sub 扇出，SSE 在多 worker 下口径一致 |
+| 执行 | 多 worker 并发：队列调度 + 每用户并发上限 + 公平排队，单用户长任务不阻塞他人；进度事件经 pub/sub 扇出（PG LISTEN/NOTIFY），SSE 在多 worker 下口径一致 |
 | 状态 | Postgres 承载 users / runs / state（各存储走同协议适配器，如 `IdentityStore`）+ checkpointer；单文件 JSON 形态只属开发机 |
 | 产物 | deliver「云端不储存」：per-run outbox 在架 → bundle zip 拉取 → ACK/TTL 即焚；上传走专用上传面 + 路径白名单（不收裸本地路径） |
 | 限流配额 | per-user 限流（入口/反代层）+ 磁盘配额 + 队列长度上限 |

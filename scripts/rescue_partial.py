@@ -45,6 +45,10 @@ from video2md.graph import resolve_run  # noqa: E402
 from video2md.resolve import normalize_url  # noqa: E402
 from video2md.util import load_state  # noqa: E402
 
+if (runs.ENV.get("V2MD_RUNS_STORE") or "").strip().lower() == "postgres":
+    sys.exit("本工具面向 JSON 文件档的停机抢救；V2MD_RUNS_STORE=postgres 下跨进程写入安全，"
+             "重发同 URL 走幂等续跑即可（state.json 幂等 + 图内阶段跳过），无需本脚本")
+
 _CP_CLOSER = None  # checkpointer 关闭句柄（drive_and_wait 首次建时写入）
 
 

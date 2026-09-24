@@ -11,12 +11,23 @@ from fastapi import (
 )
 
 from acctkit import AuthEngine, AuthError, Identity, NoCredentials, Principal, build_from_env  # noqa: F401
-from acctkit.store import JsonFileStore
+from acctkit.store import IdentityStore, JsonFileStore  # noqa: F401
 
 from ..config import ENV, USERS_FILE
 
+
+def _build_store() -> IdentityStore:
+    """users 存储分派（P3）：缺省 JsonFileStore（现状零变化）；
+    V2MD_USERS_STORE=postgres 且 V2MD_PG_DSN 在 → PostgresIdentityStore（协议同缝）。"""
+    if (ENV.get("V2MD_USERS_STORE") or "").strip().lower() == "postgres":
+        from ..pg import shared_pool
+        from .pg_store import PostgresIdentityStore
+        return PostgresIdentityStore(shared_pool())
+    return JsonFileStore(USERS_FILE)
+
+
 # 单例：模块 import 时装配一次（off/google 语义见 acctkit.build_from_env）
-engine: AuthEngine = build_from_env(ENV, "V2MD_", store=JsonFileStore(USERS_FILE))
+engine: AuthEngine = build_from_env(ENV, "V2MD_", store=_build_store())
 
 
 async def current_identity(request: Request) -> Identity:

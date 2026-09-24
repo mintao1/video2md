@@ -72,7 +72,29 @@ STAGES = ("download", "transcribe", "frames", "ocr", "select", "clips", "note")
 
 
 
+# ------------------------------------------------------- 存储后端分派（P3：json|postgres）
+# 缺省 json = 文件档逐字节照旧（全部既有测试/工具即回归证明）；V2MD_RUNS_STORE=postgres
+# 且 V2MD_PG_DSN 在 → _load_runs/_runs_merge 委托 PostgresRunsStore（行级原子，锁内化），
+# _runs_file_lock 变 no-op——调用方「with lock: merge」的成对纪律零改动。
+_RUNS_PG = None            # PostgresRunsStore | None（测试可直改本属性切档）
+_runs_pg_resolved = False
+
+
+def _runs_backend():
+    global _RUNS_PG, _runs_pg_resolved
+    if not _runs_pg_resolved:
+        _runs_pg_resolved = True
+        if (ENV.get("V2MD_RUNS_STORE") or "").strip().lower() == "postgres":
+            from . import pg, pgstore
+            _RUNS_PG = pgstore.PostgresRunsStore(pg.shared_pool())
+    return _RUNS_PG
+
+
+
 def _load_runs() -> dict:
+    be = _runs_backend()
+    if be is not None:
+        return be.load()
     if RUNS_FILE.exists():
         try:
             return json.loads(RUNS_FILE.read_text())
@@ -84,13 +106,18 @@ def _load_runs() -> dict:
 
 @contextlib.contextmanager
 def _runs_file_lock():
-    """跨进程互斥 + 读写整段原子。
+    """跨进程互斥 + 读写整段原子（json 档）。
 
     现役写方是 api 单进程（POST /runs 建 run、阶段结束落盘）；但 `__stage` 手动排障
     与 graph-run CLI 可能与 api 并发跑，跨进程语义保留。线程锁只管得住同进程；固定
     `.json.tmp` 路径下两个进程会互相截断——先 rename 的那个把对方写了一半的空文件
     发布出去，读方拿到 {} 后下一次 merge 就只写自己那一个 key，其余的 run 全丢。
+
+    PG 档：merge 是行级原子，锁语义内化到数据库——no-op 上下文。
     """
+    if _runs_backend() is not None:
+        yield
+        return
     with _RUNS_LOCK:
         with _RUNS_LOCKFILE.open("a+") as fh:
             fcntl.flock(fh, fcntl.LOCK_EX)
@@ -102,6 +129,10 @@ def _runs_file_lock():
 
 
 def _save_runs(runs: dict) -> None:
+    """全表替换（json 档专用）。PG 档禁用——多实例下 save_all 会覆盖他进程写入，
+    逐条 _runs_merge。"""
+    if _runs_backend() is not None:
+        raise RuntimeError("PG 档 runs 存储无全表替换：逐条调用 _runs_merge")
     tmp = RUNS_FILE.with_name(f"{RUNS_FILE.name}.tmp.{os.getpid()}")  # 按 pid 命名：rename 不打架
     tmp.write_text(json.dumps(runs, ensure_ascii=False, indent=1))
     tmp.replace(RUNS_FILE)
@@ -109,7 +140,12 @@ def _save_runs(runs: dict) -> None:
 
 
 def _runs_merge(run: dict) -> dict:
-    """读-改-写 runs.json（调用方须持有 _runs_file_lock，见 _run_stage）。"""
+    """读-改-写 runs.json（json 档调用方须持有 _runs_file_lock，见 _run_stage；
+    PG 档行级原子无需外层锁）。"""
+    be = _runs_backend()
+    if be is not None:
+        be.merge(run)
+        return {run["run_id"]: run}
     runs = _load_runs()
     runs[run["run_id"]] = run
     _save_runs(runs)

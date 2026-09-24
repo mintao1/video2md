@@ -85,7 +85,7 @@ from .models import (
     RunStatusOut,
     UploadOut,
 )
-from .runs import _load_runs, _runs_file_lock, _runs_merge, _save_runs
+from .runs import _load_runs, _runs_file_lock, _runs_merge
 from .util import redact, sanitize_filename
 
 # ---------------------------------------------------------------- 运维函数（原 serve.py）
@@ -149,27 +149,26 @@ def _cleanup_stale_runs(max_age_days: int = 30, idle_hours: float = 24.0) -> Non
     - 超龄（>30 天）——历史保险丝
     - 闲置 >24h——阶段失败后 tmp 无人清理（一个合集能占几百 MB）；「闲置」按最近阶段
       落盘时间算，正常批次阶段间隔以分钟计，撞不上
+
+    落盘逐条 merge（json 档=锁内读改写循环，与原 save_all 等价；PG 档=行级原子，
+    save_all 在多实例下会覆盖他进程写入故禁用）。
     """
-    with _runs_file_lock():
-        runs = _load_runs()
-        now = time.time()
-        changed = False
-        for rid, r in list(runs.items()):
-            if r.get("tmp_cleaned"):
-                continue
-            try:
-                age = now - datetime.fromisoformat(r.get("created", "2000-01-01")).timestamp()
-                last = max((datetime.fromisoformat(s["ts"]).timestamp()
-                            for s in r.get("stages", {}).values() if s.get("ts")), default=0.0)
-                idle = now - last if last else age
-            except (ValueError, TypeError):
-                age, idle = 1e9, 1e9
-            if age > max_age_days * 86400 or idle > idle_hours * 3600:
-                shutil.rmtree(r.get("tmp", ""), ignore_errors=True)
-                r["tmp_cleaned"] = True
-                changed = True
-        if changed:
-            _save_runs(runs)
+    now = time.time()
+    for rid, r in list(_load_runs().items()):
+        if r.get("tmp_cleaned"):
+            continue
+        try:
+            age = now - datetime.fromisoformat(r.get("created", "2000-01-01")).timestamp()
+            last = max((datetime.fromisoformat(s["ts"]).timestamp()
+                        for s in r.get("stages", {}).values() if s.get("ts")), default=0.0)
+            idle = now - last if last else age
+        except (ValueError, TypeError):
+            age, idle = 1e9, 1e9
+        if age > max_age_days * 86400 or idle > idle_hours * 3600:
+            shutil.rmtree(r.get("tmp", ""), ignore_errors=True)
+            r["tmp_cleaned"] = True
+            with _runs_file_lock():
+                _runs_merge(r)
 
 
 
@@ -204,25 +203,21 @@ def _sweep_outbox() -> int:
     """
     n = 0
     now = datetime.now()
-    with _runs_file_lock():
-        runs = _load_runs()
-        changed = False
-        for r in runs.values():
-            ob = r.get("outbox")
-            if not ob or r.get("artifacts_burned"):
-                continue
-            try:
-                expired = datetime.fromisoformat(r.get("artifacts_expire", "2000-01-01")) <= now
-            except (ValueError, TypeError):
-                expired = True  # 到期时间缺失/非法（脏数据）：宁可烧也不永久 shelving
-            if expired or not Path(ob).is_dir():
-                shutil.rmtree(ob, ignore_errors=True)
-                r["artifacts_burned"] = True
-                r["burned_reason"] = "ttl" if expired else "missing"
-                changed = True
-                n += 1
-        if changed:
-            _save_runs(runs)
+    for r in list(_load_runs().values()):
+        ob = r.get("outbox")
+        if not ob or r.get("artifacts_burned"):
+            continue
+        try:
+            expired = datetime.fromisoformat(r.get("artifacts_expire", "2000-01-01")) <= now
+        except (ValueError, TypeError):
+            expired = True  # 到期时间缺失/非法（脏数据）：宁可烧也不永久 shelving
+        if expired or not Path(ob).is_dir():
+            shutil.rmtree(ob, ignore_errors=True)
+            r["artifacts_burned"] = True
+            r["burned_reason"] = "ttl" if expired else "missing"
+            with _runs_file_lock():
+                _runs_merge(r)  # 逐条落盘：PG 档行级原子，多实例安全
+            n += 1
     if n:
         print(f"🔥 outbox 清扫：焚毁 {n} 个 run 的产物（TTL {artsink.outbox_ttl_h():.0f}h 到期/盘上已丢）")
     return n
@@ -535,10 +530,14 @@ async def _lifespan(app: FastAPI):
     uploads_sw.cancel()
     if sweeper:
         sweeper.cancel()
-    try:  # 释放 checkpointer 资源（PG 分支关池；sqlite 是 no-op）
+    try:  # 释放 checkpointer 资源（sqlite no-op；postgres 池归 pg 模块统一关）
         _ck_closer()
     except Exception as exc:
         print(f"⚠ checkpointer 关闭异常（退出流程不拦）：{exc}")
+    events.shutdown()  # 停 PG LISTEN 泵线程（local 档 no-op）
+    from . import pg
+    if pg.pg_enabled():
+        pg.close_shared_pool()  # 三存储/checkpointer/事件扇出共用的进程级池
 
 
 app = FastAPI(title="video2md", version=VERSION, lifespan=_lifespan,

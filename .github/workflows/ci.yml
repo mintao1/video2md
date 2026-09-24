@@ -11,6 +11,23 @@ jobs:
   # 注：test_e2e.sh（say 合成语音 + Vision OCR）是 Mac 开发机专属验收，不进 Linux CI
   test:
     runs-on: ubuntu-latest
+    services:
+      # P3 PG 档真库测试（test_pg_stores.py 无 DSN 自动 skip，服务在则跑）
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: v2md
+          POSTGRES_PASSWORD: v2md
+          POSTGRES_DB: v2md
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U v2md"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 12
+    env:
+      V2MD_TEST_PG_DSN: postgresql://v2md:v2md@127.0.0.1:5432/v2md
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
@@ -36,6 +53,8 @@ jobs:
             echo "=== $t ==="
             uv run python3 "$t.py"
           done
+      - name: PG 档真库测试（三存储适配器 + events 扇出；无 DSN 自动 skip）
+        run: uv run python3 test_pg_stores.py
       - name: e2e（进程级 mockpool 冒烟：testsrc2 夹具 + 假 LLM，零 token，跨平台）
         run: bash scripts/smoke_ci.sh
       - name: 告警配置校验（promtool/amtool；规则结构由 test_alert_rules.py 覆盖）

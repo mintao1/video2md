@@ -14,7 +14,7 @@ from datetime import date, datetime
 from pathlib import Path
 
 from . import events  # 进程内 SSE 总线（_write 的第三下游；events 无本地依赖，不成环）
-from .config import LOG_DIR, STATE_FILE
+from .config import ENV, LOG_DIR, STATE_FILE
 
 
 # ---------------------------------------------------------------- utils
@@ -50,7 +50,27 @@ def video_fingerprint(video: Path) -> str:
 
 
 
+# ------------------------------------------------------- 存储后端分派（P3：json|postgres）
+# 缺省 json 逐字节照旧；V2MD_STATE_STORE=postgres 且 V2MD_PG_DSN 在 → 委托
+# PostgresStateStore（逐 fp upsert），state_file_lock 变 no-op（行级原子）。
+_STATE_PG = None            # PostgresStateStore | None（测试可直改本属性切档）
+_state_pg_resolved = False
+
+
+def _state_backend():
+    global _STATE_PG, _state_pg_resolved
+    if not _state_pg_resolved:
+        _state_pg_resolved = True
+        if (ENV.get("V2MD_STATE_STORE") or "").strip().lower() == "postgres":
+            from . import pg, pgstore
+            _STATE_PG = pgstore.PostgresStateStore(pg.shared_pool())
+    return _STATE_PG
+
+
 def load_state() -> dict:
+    be = _state_backend()
+    if be is not None:
+        return be.load()
     if STATE_FILE.exists():
         try:
             return json.loads(STATE_FILE.read_text())
@@ -60,11 +80,16 @@ def load_state() -> dict:
 
 
 
-_STATE_LOCK = threading.RLock()  # state.json 读改写串行化（RLock：锁内可再调 save_state）
+_STATE_LOCK = threading.RLock()  # json 档：state.json 读改写串行化（RLock：锁内可再调 save_state）
 
 
 def save_state(s: dict) -> None:
-    """原子写（per-thread tmp + rename，锁内串行）——并发 run 下不撕裂、不互相截断。"""
+    """json 档：原子写（per-thread tmp + rename，锁内串行）——并发 run 下不撕裂。
+    PG 档：逐 fp upsert（键只增不删 → 与全量替换语义等价）。"""
+    be = _state_backend()
+    if be is not None:
+        be.save(s)
+        return
     with _STATE_LOCK:
         tmp = STATE_FILE.parent / f"{STATE_FILE.name}.tmp.{threading.get_ident()}"
         tmp.write_text(json.dumps(s, ensure_ascii=False, indent=2))
@@ -73,7 +98,11 @@ def save_state(s: dict) -> None:
 
 @contextlib.contextmanager
 def state_file_lock():
-    """「load → 改 → save」整段持锁（node_note_entry 的幂等落盘），防并发丢更新。"""
+    """「load → 改 → save」整段持锁（node_note_entry 的幂等落盘）。PG 档 no-op：
+    同 fp 并发落盘是「最后写赢」的幂等记录，不同 fp 天然无冲突。"""
+    if _state_backend() is not None:
+        yield
+        return
     with _STATE_LOCK:
         yield
 

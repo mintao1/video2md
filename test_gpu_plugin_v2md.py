@@ -161,6 +161,79 @@ idx = client.get("/").json()
 check("GET / 服务名片带 v2md 插件与能力",
       idx.get("plugins") == ["v2md"] and set(idx.get("capabilities", {})) == {"asr", "clips", "ocr"})
 
+# ================================================================ 异步端点
+print("== 异步端点（submit → /jobs 轮询 → inline/检索）==")
+check("名片带 async_capabilities", idx.get("async_capabilities") == ["asr", "clips", "ocr"])
+
+resp = client.post("/transcribe/async",
+                   files={"audio": ("in.m4a", b"audio-bytes", "audio/mp4")},
+                   data={"model": "turbo", "language": "zh"})
+acc = resp.json()
+check("POST /transcribe/async → 202 带 job_id/inline",
+      resp.status_code == 202 and acc["result"] == "inline"
+      and acc["status_url"] == f"/jobs/{acc['job_id']}")
+snap = r.jobs.wait(acc["job_id"], timeout=5)
+check("inline 结果经 /jobs/{id} 直读（业务原样 + provider 独立字段）",
+      snap["status"] == "done" and snap["result"] == {"segments": [], "model": "turbo"}
+      and snap["provider"] == "modal")
+
+resp = client.post("/ocr/async", files=[("images", ("g_001.jpg", b"jpg", "image/jpeg"))])
+acc = resp.json()
+snap = r.jobs.wait(acc["job_id"], timeout=5)
+check("POST /ocr/async → done（inline 为业务原样，未经端点名还原）",
+      resp.status_code == 202 and snap["status"] == "done"
+      and snap["result"][0]["text"] == "你好")
+
+resp = client.post("/clips/async", data={
+    "spec": json.dumps({"clips": [{"out": "a-c01-0000.mp4", "s0": 0, "s1": 2}]}),
+    "direct_url": "https://cdn.example.com/x.mp4"})
+acc = resp.json()
+check("POST /clips/async → 202 带 result_url",
+      resp.status_code == 202 and acc["result"] == "retrieval"
+      and acc["result_url"] == f"/jobs/{acc['job_id']}/result")
+r.jobs.wait(acc["job_id"], timeout=5)
+resp = client.get(f"/jobs/{acc['job_id']}/result")
+ok_tar = False
+if resp.status_code == 200:
+    with tarfile.open(fileobj=io.BytesIO(resp.content)) as tf:
+        names = tf.getnames()
+        result_meta = json.loads(tf.extractfile("_result.json").read())
+        ok_tar = ("a-c01-0000.mp4" in names and "_result.json" in names
+                  and result_meta.get("_provider") == "modal")
+check("GET /jobs/{id}/result 重打包 tar（mp4 + _result.json 带 _provider）", ok_tar)
+
+resp = client.post("/clips/async", data={
+    "spec": json.dumps({"clips": [{"out": "../evil.mp4", "s0": 0, "s1": 2}]}),
+    "direct_url": "https://cdn.example.com/x.mp4"})
+check("异步 /clips/async 校验对齐同步版（路径注入 400）", resp.status_code == 400)
+resp = client.post("/clips/async", data={"spec": json.dumps({"clips": []})})
+check("异步校验：空 clips 400", resp.status_code == 400)
+check("GET /jobs/{未知}/result → 404",
+      client.get("/jobs/ghost/result").status_code == 404)
+
+# 未终态 → 409：把唯一 provider 换成慢实现占住 worker
+_orig_cut = hp.cut_clips
+
+
+def _slow_cut(*a, **k):
+    time.sleep(0.3)
+    return {"a-c01-0000.mp4": True}, _TMP
+
+
+try:
+    hp.cut_clips = _slow_cut
+    resp = client.post("/clips/async", data={
+        "spec": json.dumps({"clips": [{"out": "a-c01-0000.mp4", "s0": 0, "s1": 2}]}),
+        "direct_url": "https://cdn.example.com/x.mp4"})
+    acc = resp.json()
+    early = client.get(f"/jobs/{acc['job_id']}/result")
+    check("未终态取结果 → 409 带 status",
+          early.status_code == 409 and "status" in early.json()["detail"])
+    r.jobs.wait(acc["job_id"], timeout=5)
+    check("终态后再取 → 200", client.get(f"/jobs/{acc['job_id']}/result").status_code == 200)
+finally:
+    hp.cut_clips = _orig_cut
+
 # ================================================================ 全灭 502
 print("== 全灭 502 ==")
 # 有插件但唯一 provider 健康探测失败 → 端点在、转发全灭 → 502
