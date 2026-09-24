@@ -1,0 +1,160 @@
+# 02 · 运行拓扑与部署形态
+
+- 最后核对：2026-09-24 ｜ 基准：HEAD=f6a4a0e
+- 批判参照：① 入口层/发布层；② 可用性/可运维性
+
+## 进程与容器视图
+
+```
+云服务器（≥2C4G，无 GPU）
+├─ 反代 TLS（nginx/caddy）:443 ── 唯一公网入口          ⚠ 配置实体待入仓（ROADMAP P0-4）
+│    └─→ 127.0.0.1:8790
+├─ docker compose 栈（network_mode: host）
+│    ├─ video2md 容器      uvicorn 单进程，V2MD_HOST=127.0.0.1:8790
+│    │    ├─ asyncio 信号量闸门（V2MD_MAX_CONCURRENT_RUNS，默认 1）
+│    │    ├─ 工作线程跑同步 graph（asyncio.to_thread）
+│    │    ├─ 常驻周期任务：watchdog 巡检 / outbox sweeper / uploads sweeper
+│    │    └─ events PG 泵线程（V2MD_EVENTS=pg 时，LISTEN v2md_events+v2md_cmds）
+│    ├─ gpu_router 容器    :9700（无认证面，安全组兜底——见已知限制）
+│    └─ postgres:17-alpine  profile=["pg"] 默认不起；127.0.0.1:5432
+├─ docker compose 观测栈（docker-compose.obs.yml）
+│    ├─ otel-collector :4318 → Langfuse Cloud / prometheus exporter :8889
+│    ├─ prometheus :9090 → grafana :3000（匿名 Viewer，仅回环+隧道）
+│    └─ alertmanager → feishu-webhook :9760 → 飞书
+└─ 卷：v2md-data（state/runs/users/checkpoints/logs/outbox/uploads）
+       vault（vault 模式产物）、gpu-router-logs、v2md-pg
+```
+
+## 网络口径
+
+| 端口 | 绑定 | 公网可达 | 说明 |
+|---|---|---|---|
+| 443 | 反代 | ✅ 唯一入口 | TLS 终结；SSE 关缓冲；`/docs` `/openapi.json` deny（P0-4 后机制化） |
+| 8790 | 127.0.0.1 | ❌ | api；`ssh -L 8790:127.0.0.1:8790` 隧道调试 |
+| 9700 | 全接口 | ❌（安全组不放行） | gpu_router **无认证**（`docker-compose.yml:25-26` 自述） |
+| 3000/9090/4318/8889/9760 | 127.0.0.1 | ❌ | 观测栈 |
+| 5432 | 127.0.0.1 | ❌ | PG（compose 内置时）；外部托管 PG 走 DSN |
+
+安全组：只放行 80/443。⚠ 此口径当前是**文档纪律**——仓内无 IaC/防火墙脚本承载（批判①入口层）。
+
+## 出网与风控（硬约束）
+
+- 境外源（YouTube/Colab/Kaggle/HF/Langfuse）：`V2MD_PROXY` 只作用于 yt-dlp 等子进程；进程内 httpx（LLM）直连。gpu_router 侧代理走 `secrets/gpu_router.env`。
+- 国内站（B站/抖音/小红书）对机房 IP 风控：需 `V2MD_PROXY_DOMESTIC=1` 且代理侧有**大陆住宅类出口**——部署前必须先验证，否则下载阶段必炸。
+
+## 部署前提与步骤（自 README 部署章迁入）
+
+前提（厂商中立——任意云 VM / 自托管皆可）：
+- Docker + Compose（≥2C4G 起步；GPU 全在远端算力池，服务器本身不需 GPU）
+- 一个域名 + TLS 证书（Google 登录回调要求 https；Caddy 可全自动签续）
+- LLM 端点凭证（openai-compatible 三键）
+- 至少一家 GPU provider 凭证（colab-cli token / kaggle.json / …，缺了对应 provider 自动冷却）
+- Google OAuth「Web」客户端 client_id（后端只验签不持 secret）；插件/CLI 无浏览器登录另备「TV 与 Limited Input」型 client（设备流，需 client_secret）
+- 两仓库同级放 `~/stack/{video2md,gpu_router}`（别处则设 `GPU_ROUTER_DIR`）
+
+**1. 代码与凭证**（secrets 0600，只放服务器，不进 git）：
+
+```bash
+git clone <本仓库地址> ~/stack/video2md
+git clone <gpu_router 地址>  ~/stack/gpu_router
+# secrets/ 目录：
+#   secrets/video2md.env   ← LLM 三键 + 多用户生产档键 + V2MD_DEADMAN_PING_URL（可选）
+#   secrets/gpu_router.env ← 出网代理 env（HTTP_PROXY 等，可选但强烈建议）
+#   secrets/obs.env        ← LANGFUSE_BASIC / GF_SECURITY_ADMIN_PASSWORD（观测栈，可选）
+#   secrets/colab-cli/token.json、secrets/kaggle/kaggle.json（可选）
+```
+
+`secrets/video2md.env` 多用户生产档（完整键义见 `.env.example`）：
+
+```ini
+V2MD_AUTH=google                            # 必须非 off（P0-1 后由启动防呆机制保证）
+V2MD_AUTH_PROVIDERS=google,google_device    # 接微信扫码改 google,wechat
+V2MD_ARTIFACT_MODE=deliver                  # 云端不储存：outbox + ACK/TTL 即焚
+V2MD_CORS_ORIGINS=https://app.example.com   # GUI 前端 origin 白名单
+V2MD_ENV=production                         # 遥测环境标签（compose 已默认）
+GOOGLE_CLIENT_ID=xxxxx.apps.googleusercontent.com
+# GOOGLE_CLIENT_SECRET=…     # 仅设备流需要（TV/Limited-Input 型 client）
+# WECHAT_APP_ID / WECHAT_APP_SECRET=…        # 微信扫码（可选）
+# V2MD_PG_DSN=postgresql://… # Postgres 可选档：checkpointer + 存储三件
+#                            # + V2MD_EVENTS=pg + V2MD_TASKS_STORE=postgres（04 篇）
+```
+
+**2. 构建 + 起栈 + 体检**（国内服务器可 `PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple` 加速）：
+
+```bash
+cd ~/stack/video2md
+docker compose -f docker-compose.yml -f docker-compose.obs.yml build
+docker compose -f docker-compose.yml -f docker-compose.obs.yml up -d
+curl -s localhost:8790/healthz && curl -s localhost:8790/preflight && \
+  curl -s "localhost:9700/status?refresh=true"
+# 观测栈验证：curl -s 127.0.0.1:9090/-/healthy（prometheus）· curl -s 127.0.0.1:3000/api/health（grafana）
+```
+
+**3. 反代 TLS**——api 只绑回环，公网流量全部经反代终结 TLS。参考配置（⚠ 示例资产待 P0-4 入仓机制化，当前照抄后自行维护）：
+
+```nginx
+server {
+    listen 443 ssl http2;
+    server_name api.example.com;
+    ssl_certificate     /etc/letsencrypt/live/api.example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/api.example.com/privkey.pem;
+    location / {
+        proxy_pass http://127.0.0.1:8790;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_buffering off;         # SSE 必需
+        proxy_read_timeout 3600s;    # bundle 大包 / SSE 长连接
+        client_max_body_size 512m;
+    }
+    # P0-4 后标配：location = /docs { deny all; }  location = /openapi.json { deny all; }
+}
+```
+
+Caddy 等价（自动 TLS）：`api.example.com { reverse_proxy 127.0.0.1:8790 { flush_interval -1 } }`（flush_interval -1 = SSE 不缓冲）。
+
+**4. 上线检查清单**：见 [05-security.md](05-security.md#公网上线检查清单p0-清偿后逐项打勾)。
+
+## 部署/发布/回滚
+
+```bash
+git tag v0.x.y && git push origin v0.x.y        # CI release job → GHCR 不可变 tag
+scripts/deploy.sh v0.x.y --host user@server     # 目标机 checkout tag → compose build → up -d → 体检
+scripts/deploy.sh <上一个 tag> --host …          # 回滚 = 部署旧 tag
+```
+
+**当前形态的真实口径**（批判① E6 修订后）：
+- 部署 = **目标机现场构建**（`scripts/deploy.sh:49`），非 pull GHCR 镜像；CI 构建产物与部署产物不保证逐字节一致（uv.lock 收敛大部分漂移）。
+- GHCR 镜像是**手动灾备存档**（`deploy.sh:12-13`：git 不可用时 `docker pull` 手动顶上），不在脚本主路径。
+- `compose up -d` 同容器替换 = **有停机窗口**（秒级，在跑 run 靠 lifespan 恢复重投）。
+
+## 恢复语义
+
+进程重启 → lifespan（`api.py:558-595`）：runs 表里 `running` 的 run 重新入队（tmp 已清的翻 error 不重跑）；PG 档走 `FOR UPDATE SKIP LOCKED` 认领，并发起的副本只有一份拿到候选集（`pgstore.py:214-238`）。error 的 run 不自动重跑（避免双份产物）。
+
+watchdog `V2MD_WATCHDOG_ACTION=exit`（compose 生产已配）：判定卡死 → 标 error → `os._exit(70)` → compose `restart: unless-stopped` 拉起（`watchdog.py:299-309`）。⚠ 裸跑/systemd 形态无对应资产（ROADMAP P2-1）。
+
+## 运行面开关速查（自 README「运行面要点」迁入）
+
+| 开关 | 口径 |
+|---|---|
+| `V2MD_MAX_CONCURRENT_RUNS` | 执行并发闸门（默认 1=单 worker）；调大前 checkpointer 切 postgres；vault 自托管保持 1 |
+| `V2MD_QUEUE_MAX` / `V2MD_USER_QUEUE_MAX` / `V2MD_USER_SUBMIT_PER_MIN` | 三道提交闸（0=不设限）；PG 档跨副本一致，json 档进程内 |
+| `V2MD_UPLOAD_*` | 上传面：单文件 2GB / 每用户 5GB / TTL 24h（`data/uploads/<uid>/`） |
+| `V2MD_RUNS/STATE/USERS_STORE` `V2MD_TASKS_STORE` `V2MD_EVENTS` | 存储分派与事件扇出档位（详见 [04 篇](04-data-and-consistency.md)）；切换前先 `scripts/migrate_json_to_pg.py` 导存量 |
+| `V2MD_CHECKPOINTER=postgres` + `V2MD_PG_DSN` | 两行进 `secrets/video2md.env`；compose PG 挂 `profiles:["pg"]` 默认不起：`docker compose --profile pg up -d postgres`（PG 未就绪 api fail-fast，restart 自拉起）；checkpoint 易失无存量迁移 |
+| `V2MD_ARTIFACT_MODE=deliver` + `V2MD_OUTBOX_DIR/TTL_H` | 产物不落 vault、bundle+ACK/TTL 即焚（03 篇） |
+
+存量 run 收编（迁移到多用户归属）：`python scripts/migrate_run_owner.py --to <uid> [--status done] [--dry-run]`。
+
+## 已知限制
+
+1. 反代配置不在仓（P0-4）；「安全组只放 80/443」无机制承载。
+2. gpu_router :9700 无认证，信任模型 = 网络位置；colab quick tunnel 是无鉴权公网 URL（批判② S8）。
+3. 单副本 + 单 PG，均为 SPOF；多副本读侧就绪、写路径与验证闭环见 ROADMAP P1-1/P1-4。
+4. compose PG 默认口令 `v2md-loopback-only` 仅回环兜底（`docker-compose.yml:98`）；DSN 指外部库时必须显式覆盖。
+
+## 演进方向
+
+P0-4 反代实体化 → P1-1/P1-4 多副本闭环 → P2-1 多 worker 形态声明 → P2-3 蓝绿发布。
