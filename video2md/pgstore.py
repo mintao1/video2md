@@ -148,11 +148,39 @@ class PostgresTaskStore:
     # ---------------------------------------------------------------- 心跳 / 活性
 
     def heartbeat(self, run_id: str) -> bool:
-        """阶段循环头打点：刷新 updated 作跨进程活性信号。终态不续（返回 False）。"""
+        """阶段循环头打点：刷新 updated 作跨进程活性信号。终态不续（返回 False）。
+
+        P1-1：queued 态也续——排队等待信号量期间由 api._queue_hb_loop 周期打点，
+        「排队久」（健康）与「无主停滞」（属主死）靠 updated 新鲜度区分。
+        """
         with self.pool.connection() as conn:
             row = conn.execute(
                 "UPDATE v2md_runs SET updated=now() WHERE run_id=%s "
-                "AND status='running' RETURNING 1", (run_id,)).fetchone()
+                "AND status IN ('queued','running') RETURNING 1", (run_id,)).fetchone()
+        return row is not None
+
+    def mark_queued(self, run_id: str, proc: str) -> bool:
+        """入队即落库+钉名（P1-1）：status created→queued、claimed_by 空则钉（已有主不动）。
+
+        直接 UPDATE 不走 merge——merge 整行覆盖会把 claimed_by 刷回默认 ''。
+        返回是否命中（行不存在/已 running/终态 → False，调用方忽略）。
+        """
+        with self.pool.connection() as conn:
+            row = conn.execute("""
+                UPDATE v2md_runs
+                   SET status='queued', updated=now(),
+                       claimed_by = CASE WHEN claimed_by='' THEN %(proc)s ELSE claimed_by END
+                 WHERE run_id=%(rid)s AND status IN ('created','queued')
+                RETURNING 1""", {"proc": proc, "rid": run_id}).fetchone()
+        return row is not None
+
+    def still_mine(self, run_id: str, proc: str) -> bool:
+        """持有权复核（P1-1「不重」半边）：_drive 拿到信号量后先问——租约被大盘
+        watchdog 划给别人（或已终态）则 False，调用方静默让位不驱动。"""
+        with self.pool.connection() as conn:
+            row = conn.execute(
+                "SELECT 1 FROM v2md_runs WHERE run_id=%s AND claimed_by=%s "
+                "AND status IN ('queued','running')", (run_id, proc)).fetchone()
         return row is not None
 
     def note_claimed_by(self, run_id: str, proc: str) -> None:
@@ -169,12 +197,13 @@ class PostgresTaskStore:
         """崩溃残档接管入口：无主或租约过期才钉名，抢到即持行锁窗口内复核。
 
         条件 UPDATE 自带互斥：别的副本正在接管（claimed_by=它且租约未过期）→ 抢不到返 None。
+        P1-1：扩到 queued——排队项无在途工作，接管无损（调用方重投而非标 error）。
         """
         with self.pool.connection() as conn:
             row = conn.execute("""
                 UPDATE v2md_runs
                    SET claimed_by=%(proc)s, updated=now()
-                 WHERE run_id=%(rid)s AND status='running'
+                 WHERE run_id=%(rid)s AND status IN ('queued','running')
                    AND (claimed_by='' OR EXTRACT(EPOCH FROM (now()-updated)) > %(lease)s)
                 RETURNING record""",
                 {"proc": proc, "rid": run_id, "lease": lease_s}).fetchone()
@@ -230,6 +259,23 @@ class PostgresTaskStore:
                          EXTRACT(EPOCH FROM updated)) < %(cut)s""",
                 {"cut": cutoff}).fetchall()
         cols = ("run_id", "started", "claimed_by", "last_active_epoch")
+        return [dict(zip(cols, r)) for r in rows]
+
+    def stale_queued(self, lease_s: float) -> list[dict]:
+        """排队项无主停滞候选（P1-1 大盘巡检 queued 段）。
+
+        排队项无阶段记录，活性只看 updated——由 _queue_hb_loop 每 WATCHDOG_PERIOD_S
+        刷新，故用短租约（3×period）即足以区分「排队久（健康，心跳在续）」与
+        「属主死（updated 停滞）」。本进程自己持有的排队项由调用方再甄别。
+        """
+        with self.pool.connection() as conn:
+            rows = conn.execute("""
+                SELECT run_id, record, claimed_by
+                  FROM v2md_runs
+                 WHERE status='queued'
+                   AND EXTRACT(EPOCH FROM (now()-updated)) > %(lease)s""",
+                {"lease": lease_s}).fetchall()
+        cols = ("run_id", "record", "claimed_by")
         return [dict(zip(cols, r)) for r in rows]
 
     def recheck_age(self, run_id: str) -> float:

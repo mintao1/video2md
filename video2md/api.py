@@ -530,15 +530,25 @@ async def _outbox_sweeper(period_s: float = 600.0) -> None:
 
 async def _drive(run_id: str, url: str, part_items: str, force: bool,
                  review: bool, max_frames: int, owner: str = "") -> None:
-    """排队等信号量 → 线程里跑同步 graph（stage 函数全是同步阻塞，不能堵事件循环）。"""
+    """排队等信号量 → 线程里跑同步 graph（stage 函数全是同步阻塞，不能堵事件循环）。
+
+    P1-1：①拿到信号量先 still_mine 复核——排队期间租约被大盘 watchdog 划给别的副本
+    时静默让位（接管方重投驱动，本进程不双跑）；②created/queued 皆翻 running
+    （排队接管路径 DB 态是 queued，原 created→running 翻转对它不命中）。
+    """
     async with _SEMA:
+        be = _tasks_backend()
+        if be is not None and not be.still_mine(run_id, _PROC_ID):
+            _TASKS.pop(run_id, None)   # 已被他副本接管：本进程视图让位，DB 真相由接管者续写
+            watchdog.forget(run_id)
+            print(f"↪ run {run_id} 排队期间租约被其他副本接管，本进程让位不驱动")
+            return
         _TASKS[run_id].update(status="running", started=_now())
-        run = _load_runs().get(run_id)  # created → running（启动恢复只认 running）
-        if run and run.get("status") == "created":
+        run = _load_runs().get(run_id)  # created/queued → running（启动恢复与排队接管都汇到这）
+        if run and run.get("status") in ("created", "queued"):
             run["status"] = "running"
             with _runs_file_lock():
                 _runs_merge(run)
-        be = _tasks_backend()
         if be is not None:
             be.note_claimed_by(run_id, _PROC_ID)  # 大盘 watchdog 据此区分本进程/他进程残档
         try:
@@ -568,8 +578,31 @@ def _enqueue(url: str, part_items: str, force: bool, review: bool,
                       key=lambda k: _TASKS[k]["finished"])
         for k in done[: len(_TASKS) - _TASKS_KEEP]:
             _TASKS.pop(k, None)
+    be = _tasks_backend()
+    if be is not None:
+        # P1-1：入队即落库+钉名——PG 档配额闸/判活/queue gauge/大盘接管从此看得见排队项
+        # （此前 queued 只在内存 _TASKS，DB 停在 created：跨副本双投、重启丢排队 run）
+        be.mark_queued(run_id, _PROC_ID)
     asyncio.create_task(_drive(run_id, url, part_items, force, review, max_frames, owner))
     return {"run_id": run_id, "status": "queued"}
+
+
+async def _queue_hb_loop() -> None:
+    """排队项心跳（P1-1）：每 WATCHDOG_PERIOD_S 扫内存 queued 项打点。
+
+    单一常驻任务（非 per-run tasker）：生命周期随 lifespan、零泄漏。touch 的 DB 段
+    是同步 SQL → to_thread 不堵事件循环。json 档 touch 退化为本地打点（无 DB/广播），
+    整循环无害。心跳让「排队久」（信号量前排长队，健康）与「无主停滞」（属主死）
+    靠 updated 新鲜度可区分——大盘 watchdog 用短租约（3×period）接管后者。
+    """
+    while True:
+        await asyncio.sleep(WATCHDOG_PERIOD_S)
+        try:
+            for rid, task in list(_TASKS.items()):
+                if task.get("status") == "queued":
+                    await asyncio.to_thread(watchdog.touch, rid)
+        except Exception as exc:  # 心跳循环绝不反压主管线
+            print(f"⚠ 排队心跳异常（下轮重试）：{redact(str(exc))[:160]}")
 
 
 # ---------------------------------------------------------------- app
@@ -645,8 +678,10 @@ async def _lifespan(app: FastAPI):
     # run 卡死看门狗：周期扫内存任务表，心跳超时按 V2MD_WATCHDOG_ACTION 处置
     # （mark=标 error 等人工；exit=进程退出靠容器重启自愈，见 watchdog.py 模块注释）
     wd = asyncio.create_task(watchdog.loop(_TASKS, WATCHDOG_PERIOD_S))
+    qhb = asyncio.create_task(_queue_hb_loop())  # 排队项心跳（P1-1）：大盘接管判据的续约源
     yield
     wd.cancel()
+    qhb.cancel()
     uploads_sw.cancel()
     if sweeper:
         sweeper.cancel()

@@ -30,7 +30,7 @@ import time
 from datetime import datetime
 
 from . import deadman, observability
-from .config import WATCHDOG_ACTION, WATCHDOG_TIMEOUT_S
+from .config import WATCHDOG_ACTION, WATCHDOG_PERIOD_S, WATCHDOG_TIMEOUT_S
 from .util import redact
 
 # run_id → 最近心跳（time.monotonic()）。工作线程写、asyncio 循环读，GIL 下 dict 读写原子。
@@ -219,6 +219,10 @@ def check_cluster(*, timeout_s: float | None = None,
     与 check_run 同口径：宁可放过不误杀。本进程有活条目 → 既有 trip 语义；
     他进程/无主残档 → steal_if_unclaimed 持锁窗口内复核（cmd 通知刚到的不冤枉杀），
     确认卡死翻 error + 告警；抢到后交 _STEALER 重新入队驱动（图内幂等重入）。
+
+    P1-1 排队项段：queued 行超短租约（3×period，_queue_hb_loop 每分钟续约）→ 无主
+    停滞 → steal 接管直接 _STEALER 重投（**不标 error**——排队项无在途工作，接管无损；
+    区别于 running 段的卡死判定）。本进程自己持有的排队项跳过（在等信号量，健康）。
     """
     be = _tasks_backend_safe()
     if be is None:
@@ -231,7 +235,7 @@ def check_cluster(*, timeout_s: float | None = None,
         rows = be.stale_running(timeout)
     except Exception as exc:
         _note(f"stale_running 查询异常：{redact(str(exc))[:120]}")
-        return []
+        rows = []
     for row in rows:
         rid = str(row.get("run_id") or "")
         if not rid:
@@ -288,6 +292,33 @@ def check_cluster(*, timeout_s: float | None = None,
                     _note(f"steal 重驱异常：{redact(str(exc))[:160]}")
         except Exception as exc:
             _note(f"cluster run {rid} 处置异常：{redact(str(exc))[:160]}")
+    # ---- P1-1：排队项无主停滞 → 短租约接管重投（不标 error，无在途工作可无损接管）
+    qlease = max(3 * WATCHDOG_PERIOD_S, 180.0)
+    try:
+        qrows = be.stale_queued(qlease)
+    except Exception as exc:
+        _note(f"stale_queued 查询异常：{redact(str(exc))[:120]}")
+        qrows = []
+    for row in qrows:
+        rid = str(row.get("run_id") or "")
+        if not rid:
+            continue
+        try:
+            if row.get("claimed_by") == _PROC_ID and rid in _TASKS \
+                    and _TASKS[rid].get("status") == "queued":
+                continue  # 本进程排队项（等信号量中，心跳循环在续）：不动
+            rec = be.steal_if_unclaimed(rid, qlease, _PROC_ID)
+            if rec is None:
+                continue  # 他副本正在接管，或心跳刚续上：跳过
+            print(f"🐕 大盘看门狗：排队项 {rid} 无主停滞（原 claimed_by="
+                  f"{row.get('claimed_by') or '无主'}），接管重投")
+            if _STEALER is not None:
+                try:
+                    _STEALER(rec)  # 重投排队（接管副本的信号队列），DB 态仍 queued
+                except Exception as exc:
+                    _note(f"queued 接管重投异常：{redact(str(exc))[:160]}")
+        except Exception as exc:
+            _note(f"cluster queued {rid} 处置异常：{redact(str(exc))[:160]}")
     return tripped
 
 

@@ -334,5 +334,85 @@ assert n_win == [1, 2, 3, 4], n_win
 assert tasks.submit_window_count("u_y") == 1  # 独立 uid 互不影响
 print("✅ PostgresTaskStore（队列视图/心跳/认领恢复/steal 租约/stale 巡检/滑窗）")
 
+
+# ---- 6. P1-1：queued 落库钉名 / 排队心跳 / 大盘接管 -----------------------------------
+# 背景：queued 此前只在内存 _TASKS（DB 停在 created）——配额闸/判活/gauge 看不见排队项，
+# 跨副本双投、重启丢排队 run。本节钉住：入队落库+钉名、heartbeat 续 queued、
+# stale_queued 短租约、steal 扩 queued、still_mine 让位、大盘接管走查（不标 error）。
+_truncate("v2md_runs", "v2md_submit_log")
+st_runs.merge({"run_id": "p1", "owner": "u", "status": "created", "created": "",
+               "url": "http://x/p1"})
+assert tasks.mark_queued("p1", "procA") is True
+with pool.connection() as conn:
+    st, cb = conn.execute("SELECT status, claimed_by FROM v2md_runs WHERE run_id='p1'").fetchone()
+assert (st, cb) == ("queued", "procA"), (st, cb)        # created→queued + 钉名
+assert tasks.mark_queued("p1", "procB") is True          # 幂等重入队：已有主不动
+with pool.connection() as conn:
+    cb = conn.execute("SELECT claimed_by FROM v2md_runs WHERE run_id='p1'").fetchone()[0]
+assert cb == "procA", "钉名后他人 mark_queued 不得抢注"
+assert tasks.counts()["queued"] == 1                     # 配额闸/gauge 从此看得见排队项
+assert tasks.heartbeat("p1") is True                     # 排队期心跳续 updated（P1-1 放宽）
+st_runs.merge({"run_id": "p_term", "owner": "u", "status": "done", "created": ""})
+assert tasks.mark_queued("p_term", "procA") is False     # 终态不翻
+
+# stale_queued：新鲜不入、停滞入（短租约由调用方传）
+assert not tasks.stale_queued(180)                       # p1 刚 heartbeat 过
+st_runs.merge({"run_id": "p2", "owner": "u", "status": "created", "created": "",
+               "url": "http://x/p2"})
+tasks.mark_queued("p2", "procA")
+with pool.connection() as conn:
+    conn.execute("UPDATE v2md_runs SET updated=now()-interval '600 seconds' WHERE run_id='p2'")
+assert {r["run_id"] for r in tasks.stale_queued(180)} == {"p2"}
+
+# steal_if_unclaimed 扩 queued：他主租约内拒抢、过期抢到（排队项同款语义）
+assert tasks.steal_if_unclaimed("p2", 3600, "procB") is None
+rec = tasks.steal_if_unclaimed("p2", 180, "procB")
+assert rec and rec["run_id"] == "p2"
+with pool.connection() as conn:
+    st, cb = conn.execute("SELECT status, claimed_by FROM v2md_runs WHERE run_id='p2'").fetchone()
+assert (st, cb) == ("queued", "procB"), "排队项接管后态仍 queued，属主换人"
+
+# still_mine：_drive 让位判据（「不重」半边）
+assert tasks.still_mine("p2", "procB") is True           # 我是持有者
+assert tasks.still_mine("p2", "procA") is False          # 已被划走 → 静默让位
+assert tasks.still_mine("p_term", "procB") is False      # 终态不驱动
+
+# 大盘接管走查（watchdog 集成）：无主停滞 queued → steal + _STEALER 重投，不标 error
+import video2md.api as vapi  # noqa: E402
+from video2md import watchdog as vwd  # noqa: E402
+
+vwd._reset_for_tests()
+vapi._TASKS.clear()
+vapi._TASKS_PG = tasks            # _tasks_backend() 直答本节实例（不重新构造）
+vapi._tasks_pg_resolved = True
+adopted: list[dict] = []
+vwd.set_stealer(lambda r: adopted.append(r))
+st_runs.merge({"run_id": "p3", "owner": "u", "status": "created", "created": "",
+               "url": "http://x/p3"})
+tasks.mark_queued("p3", "dead-proc")
+with pool.connection() as conn:   # 属主死：updated 停滞 > 短租约
+    conn.execute("UPDATE v2md_runs SET updated=now()-interval '600 seconds' WHERE run_id='p3'")
+# 本进程自己持有的排队项（updated 也停滞）必须跳过——等信号量是健康态
+st_runs.merge({"run_id": "p4", "owner": "u", "status": "created", "created": "",
+               "url": "http://x/p4"})
+tasks.mark_queued("p4", vapi._PROC_ID)
+with pool.connection() as conn:
+    conn.execute("UPDATE v2md_runs SET updated=now()-interval '600 seconds' WHERE run_id='p4'")
+vapi._TASKS["p4"] = {"status": "queued", "url": "http://x/p4"}
+
+assert vwd.check_cluster() == []                  # 排队接管不计 tripped（不是卡死）
+assert [r["run_id"] for r in adopted] == ["p3"], adopted   # 只接管无主项，自己的不动
+with pool.connection() as conn:
+    st3, cb3 = conn.execute(
+        "SELECT status, claimed_by FROM v2md_runs WHERE run_id='p3'").fetchone()
+    cb4 = conn.execute("SELECT claimed_by FROM v2md_runs WHERE run_id='p4'").fetchone()[0]
+assert (st3, cb3) == ("queued", vapi._PROC_ID), "接管重投：态仍 queued、属主换接管者"
+assert cb4 == vapi._PROC_ID, "本进程排队项不得被自己大盘误接管"
+vwd._reset_for_tests()
+vapi._TASKS.clear()
+vapi._TASKS_PG = None
+vapi._tasks_pg_resolved = False
+print("✅ P1-1 排队租约（落库钉名/心跳/短租约接管/让位判据/大盘走查）")
+
 pool.close()
 print("✅ test_pg_stores.py 全部通过")
