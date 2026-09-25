@@ -19,6 +19,7 @@
 | GET /runs/{id}/events | owner | SSE：connected 快照 → 事件流 → 终态关流；15s `: ping` 保活 | `api.py:966` |
 | POST /auth/device/code | **匿名+IP 限流** | Google 设备流第一步（P0-2：30/min/IP 滑窗，429 RATE_LIMITED；与 token 共享桶） | `api.py` |
 | POST /auth/device/token | **匿名+IP 限流** | device_code → id_token（轮询与 code 共享限流桶——同一次登录的两半） | `api.py` |
+| GET /cost | owner | 本人本月成本归因（P2-2）：spend/usage/单价回显/预算余量；超预算 POST /runs → 429 `BUDGET_EXCEEDED`；明细导出 `python -m video2md cost --uid X` |
 | GET /queue | **匿名** | `{queue_len, running, limits}`（gpu_router 看门狗回读） | `api.py:1008` |
 | GET /healthz | **匿名** | 存活 + version（Docker healthcheck） | `api.py:1029` |
 | GET /preflight | **匿名** | 环境体检（ffmpeg/磁盘/vault|outbox/算力池） | `api.py:1035` |

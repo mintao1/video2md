@@ -73,3 +73,14 @@ otel-collector（memory_limiter → batch）
 ## 演进方向
 
 P1-5 SLO 化告警（错误预算燃烧率）→ P2-5 采样 + 日志结构化。
+
+
+## 成本看板（P2-2 例行化口径）
+
+- **run 记录是成本真相源**：`usage`（llm_in_tok/llm_out_tok/gpu_s 原始凭据）+ `cost_usd`
+  （结算时刻单价 × usage）随 run 落盘；预算闸（`V2MD_BUDGET_MONTH_USD`）与 GET /cost 读它。
+- **Langfuse 侧**：llm span 已带 usage/generation 全文（`_llm_observed` 收口）——Langfuse
+  的成本页可直接按 model 建价目表出报表，与 run 记录口径互为对照（Langfuse=调用量视角，
+  run 记录=账单视角）。GPU 成本不进 Langfuse（无 span 级单价），以 run 记录为准。
+- 单价表在仓内 config（`V2MD_PRICE_*`），改价=改 env 重启；历史 run 不追溯重算
+  （usage 凭据在，可离线重估价）。

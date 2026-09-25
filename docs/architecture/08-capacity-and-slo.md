@@ -63,3 +63,17 @@ Langfuse 按 uid 归因 token/成本（`observability.py:203-215`）；gpu_route
 ## 已知限制
 
 本篇全部实测数字缺位（批判②维度 3 定为 H 的原因）——在 P1-6 清偿前，任何「能接多少用户」的回答都是猜测。
+
+
+## 成本模型与预算闸（P2-2）
+
+| 键 | 语义 | 缺省 |
+|---|---|---|
+| `V2MD_PRICE_LLM_IN_MTOK` / `V2MD_PRICE_LLM_OUT_MTOK` | LLM 单价（USD/1M tokens，in/out 分列） | 0（不定价） |
+| `V2MD_PRICE_GPU_MIN` | GPU 单价（USD/远程调用分钟） | 0 |
+| `V2MD_BUDGET_MONTH_USD` | 每用户月度预算（USD；超限 POST /runs → 429） | 0（不设闸） |
+
+口径三条（诚实记账）：① GPU 按**远程调用墙钟时长**记（含传输/排队，上界非占用真值——
+与 P1-6 测量上界纪律同款）；② 崩溃丢未结算 usage（恢复重投重新累计，不重复计费）；
+③ 终态幂等结算（记录已有 cost_usd 不重算——重投/续跑不双计）。单价全 0 时 usage 照记、
+金额恒 0：先记账后定价，历史可离线重估。
