@@ -640,6 +640,92 @@ async def _queue_hb_loop() -> None:
             print(f"⚠ 排队心跳异常（下轮重试）：{redact(str(exc))[:160]}")
 
 
+async def _proc_hb_loop() -> None:
+    """进程心跳（P1-4）：周期广播 phb——他副本启动恢复的属主甄别依据。
+
+    无条件广播（run 级 hb 只在有活 run 时发，空闲副本也得可被甄别为活）。
+    json 档 publish_cmd 为本地 no-op，整循环无害。
+    """
+    while True:
+        await asyncio.sleep(watchdog.PHB_PERIOD_S)
+        try:
+            await asyncio.to_thread(events.publish_cmd, "phb", "")
+        except Exception as exc:
+            print(f"⚠ 进程心跳广播异常（下轮重试）：{redact(str(exc))[:160]}")
+
+
+def _tmp_missing_run(rec: dict) -> bool:
+    return bool(rec.get("tmp")) and not Path(str(rec["tmp"])).exists() \
+        and not rec.get("tmp_cleaned")
+
+
+async def _recover_interrupted(be) -> int:
+    """PG 档启动恢复（P1-4 属主甄别版，后台任务——甄别窗不拖 boot）。
+
+    语义（替代旧 recover_candidates 全量 SKIP LOCKED 抢占，批判补遗②）：
+    - tmp 缺失 → mark_stuck_error 翻 error（记录级事实，与属主无关）；
+    - 无主（claimed_by=''）→ claim_dead 原子认领重投；
+    - 有主且属主活着（phb 注册表闻声）→ 跳过：**B 重启不抢 A 的活 run**；
+    - 有主但持续无声 → 甄别窗（≤PHB_ALIVE_S）后 claim_dead 认领重投——单副本重启
+      自愈走此径（旧属主已死必无声；活属主的下一次 phb ≤PHB_PERIOD_S 必达窗内）。
+    并发竞争由 claim_dead 条件 UPDATE 原子互斥（claimed_by 仍=预期值才翻）。
+    """
+    from . import watchdog as wd
+
+    def _requeue(rec: dict) -> None:
+        _enqueue(rec["url"], rec.get("part_items", ""), bool(rec.get("force")), False, 60,
+                 run_id=rec["run_id"], owner=rec.get("owner", ""))
+
+    resumed = 0
+    try:
+        rows = await asyncio.to_thread(be.recovery_scan)
+    except Exception as exc:
+        print(f"⚠ 启动恢复扫描失败（按无恢复处理）：{redact(str(exc))[:160]}")
+        return 0
+    orphans: list[tuple[str, dict]] = []
+    for row in rows:
+        rid = str(row.get("run_id") or "")
+        rec = row.get("record") or {}
+        if not rid or not rec.get("url"):
+            continue
+        if _tmp_missing_run(rec):
+            try:
+                await asyncio.to_thread(
+                    be.mark_stuck_error, rid, "临时目录已被清理，无法续跑（重发同 URL 新建 run）")
+            except Exception as exc:
+                print(f"⚠ 恢复翻 error 失败 {rid}：{redact(str(exc))[:120]}")
+            continue
+        owner = str(row.get("claimed_by") or "")
+        if not owner:
+            got = None
+            try:
+                got = await asyncio.to_thread(be.claim_dead, rid, "", _PROC_ID)
+            except Exception as exc:
+                print(f"⚠ 无主认领失败 {rid}：{redact(str(exc))[:120]}")
+            if got:
+                _requeue(got)
+                resumed += 1
+        elif not wd.proc_alive(owner):
+            orphans.append((owner, rec))  # 属主甄别窗内二次确认
+    # 甄别窗：等活属主的 phb（≤PHB_ALIVE_S），窗外仍无声 → 认领重投
+    deadline = time.monotonic() + watchdog.PHB_ALIVE_S
+    for owner, rec in orphans:
+        while time.monotonic() < deadline and not wd.proc_alive(owner):
+            await asyncio.sleep(1.0)
+        if wd.proc_alive(owner):
+            continue  # 属主活着（窗内闻声）：不抢
+        got = None
+        try:
+            got = await asyncio.to_thread(be.claim_dead, rec["run_id"], owner, _PROC_ID)
+        except Exception as exc:
+            print(f"⚠ 死属主认领失败 {rec.get('run_id')}：{redact(str(exc))[:120]}")
+        if got:
+            print(f"♻️ 认领死属主 {owner} 的中断 run {rec['run_id']}")
+            _requeue(got)
+            resumed += 1
+    return resumed
+
+
 # ---------------------------------------------------------------- app
 
 @asynccontextmanager
@@ -669,31 +755,23 @@ async def _lifespan(app: FastAPI):
     # 恢复中断的 run（对齐旧 _load_jobs 的语义；error 的不自动重跑，避免双份产物）。
     # tmp 已没了的 run 不可恢复（产物文件随目录一起没了，续跑只会拿空产物硬跑）：
     # 标记 error 收场，不占用执行信号量。
-    # PG 档（多副本）走认领制：FOR UPDATE SKIP LOCKED——并发起的副本只有一份拿到候选集，
-    # 败者跳过（他进程正持有行锁在恢复），tmp 缺失的直接 DB 翻 error。
+    # PG 档（P1-4 属主甄别版）：无主即领、有主过 phb 甄别窗——B 重启不抢 A 的活 run
+    # （批判补遗②），死属主（单副本重启自愈）窗后认领。后台任务执行，甄别窗不拖 boot。
     be = _tasks_backend()
     resumed = 0
     if be is not None:
-        def _tmp_missing(rec: dict) -> bool:
-            return bool(rec.get("tmp")) and not Path(str(rec["tmp"])).exists() \
-                and not rec.get("tmp_cleaned")
-        try:
-            cands = be.recover_candidates(_tmp_missing,
-                                          "临时目录已被清理，无法续跑（重发同 URL 新建 run）")
-        except Exception as exc:
-            print(f"⚠ 启动恢复认领失败（按无恢复处理）：{redact(str(exc))[:160]}")
-            cands = []
-        for r in cands:
-            if not r.get("url"):
-                continue
-            _enqueue(r["url"], r.get("part_items", ""), bool(r.get("force")), False, 60,
-                     run_id=r["run_id"], owner=r.get("owner", ""))
-            resumed += 1
+        def _report_resumed(t) -> None:
+            if t.cancelled() or t.exception() is not None:
+                return  # 取消（重启）/异常：恢复静默放弃，异常已在任务内打印过
+            if t.result():
+                print(f"♻️ 恢复 {t.result()} 个中断 run（属主甄别后认领）")
+        rec_task = asyncio.create_task(_recover_interrupted(be))
+        rec_task.add_done_callback(_report_resumed)
     else:
         for r in _load_runs().values():
             if r.get("status") != "running" or not r.get("url"):
                 continue
-            if r.get("tmp") and not Path(r["tmp"]).exists() and not r.get("tmp_cleaned"):
+            if _tmp_missing_run(r):
                 r["status"] = "error"
                 r["errors"] = [*(r.get("errors") or []), "临时目录已被清理，无法续跑（重发同 URL 新建 run）"]
                 with _runs_file_lock():
@@ -702,8 +780,8 @@ async def _lifespan(app: FastAPI):
             _enqueue(r["url"], r.get("part_items", ""), bool(r.get("force")), False, 60,
                      run_id=r["run_id"], owner=r.get("owner", ""))
             resumed += 1
-    if resumed:
-        print(f"♻️ 恢复 {resumed} 个中断 run（上次服务退出前未跑完）")
+        if resumed:
+            print(f"♻️ 恢复 {resumed} 个中断 run（上次服务退出前未跑完）")
     watchdog.set_stealer(lambda rec: _enqueue(
         rec["url"], rec.get("part_items", ""), bool(rec.get("force")), False, 60,
         run_id=rec["run_id"], owner=rec.get("owner", "")))
@@ -714,9 +792,11 @@ async def _lifespan(app: FastAPI):
     # （mark=标 error 等人工；exit=进程退出靠容器重启自愈，见 watchdog.py 模块注释）
     wd = asyncio.create_task(watchdog.loop(_TASKS, WATCHDOG_PERIOD_S))
     qhb = asyncio.create_task(_queue_hb_loop())  # 排队项心跳（P1-1）：大盘接管判据的续约源
+    phb = asyncio.create_task(_proc_hb_loop())   # 进程心跳（P1-4）：他副本属主甄别依据
     yield
     wd.cancel()
     qhb.cancel()
+    phb.cancel()
     uploads_sw.cancel()
     if sweeper:
         sweeper.cancel()
@@ -990,6 +1070,7 @@ def get_run(run_id: str, ident: Identity = Depends(current_identity)) -> dict:
             })
         out.update(url=run.get("url"), status=run.get("status"), total=run.get("total"),
                    stages=run.get("stages"), partial_failures=run.get("partial_failures"),
+                   errors=run.get("errors"),
                    entries=entries)
     if run and artsink.current_mode() == "deliver":
         path, exp = _outbox_live(run)  # 客户端凭它知道拉取窗口（present=false 即已焚）
@@ -1098,6 +1179,8 @@ def cancel_run(run_id: str, ident: Identity = Depends(current_identity)) -> dict
     local = (task or {}).get("status")
     if local in ("queued", "running"):
         request_cancel(run_id)
+        _req_log("POST", f"/runs/{run_id}/cancel", 200, run_id=run_id, user=ident.uid,
+                 local=local)
         if local == "queued":
             _flip_cancelled(run_id, "用户取消（cancelled）：排队期间撤销")
             # 不清取消标志：挂起的 _drive 醒来按标志/终态静默退场（标志归其 finally 清）。
@@ -1113,6 +1196,8 @@ def cancel_run(run_id: str, ident: Identity = Depends(current_identity)) -> dict
         except Exception:
             st = None
         if st in ("queued", "running"):
+            _req_log("POST", f"/runs/{run_id}/cancel", 200, run_id=run_id, user=ident.uid,
+                     remote=True)
             events.publish_cmd("cancel", run_id)  # 目标副本 _on_cmd → 本地驱动才落标志
             return {"run_id": run_id, "status": "cancelling", "remote": True}
     raise HTTPException(409, f"run {run_id} 无可取消的进行中任务"

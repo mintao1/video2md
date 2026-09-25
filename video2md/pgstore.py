@@ -13,23 +13,32 @@ owner/status/created 提取列供 PostgresTaskStore 的队列查询（P4b）与�
 """
 from __future__ import annotations
 
-import time
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING
 
 from psycopg.types.json import Json
 
 if TYPE_CHECKING:
     from psycopg_pool import ConnectionPool
 
-# watchdog 巡检 SQL：每行现算「最近活动 epoch」= GREATEST(阶段 ts 最大值, updated)。
-# 阶段 ts 是 record->'stages' 各对象 .ts 的 ISO→epoch（缺键按 0）；updated 被驱动进程
-# 每次 merge / 心跳 UPDATE 刷新，天然活性信号。
-_AGE_SQL = """
-GREATEST(
-    COALESCE((SELECT max(EXTRACT(EPOCH FROM ((s.value)->>'ts')::timestamptz))
-              FROM jsonb_each(record->'stages') AS s), 0.0),
-    EXTRACT(EPOCH FROM updated)) AS last_active_epoch
-"""
+# watchdog 巡检时钟域纪律（P1-4 踩坑实证）：record 里的阶段 ts 是应用写的**无时区本地
+# 时间串**，PG（容器会话常为 UTC）cast 成 timestamptz 会偏到未来数小时——SQL 侧任何
+# GREATEST(阶段ts, ...) 判超龄对带阶段戳的行恒假（running 残档检测整体静默失效）。
+# 故 DB 侧只按 **DB 自己写的 updated** 过滤；阶段 ts 回应用侧解析（_stage_ts_epoch）。
+from datetime import datetime as _dt
+
+
+def _stage_ts_epoch(record: dict) -> float:
+    """record->'stages' 各 .ts（应用侧 naive 本地串）的最大 epoch；无阶段返 0。"""
+    last = 0.0
+    for s in (record.get("stages") or {}).values():
+        ts = (s or {}).get("ts")
+        if not ts:
+            continue
+        try:
+            last = max(last, _dt.fromisoformat(str(ts)).timestamp())
+        except (ValueError, TypeError, OverflowError):
+            continue
+    return last
 
 
 class PostgresRunsStore:
@@ -211,55 +220,59 @@ class PostgresTaskStore:
 
     # ---------------------------------------------------------------- 启动恢复认领
 
-    def recover_candidates(self, tmp_missing: Callable[[dict], bool],
-                           error_note: str) -> list[dict]:
-        """重启中断 run 的认领式恢复（替代 json 档 lifespan 的全表扫）。
-
-        FOR UPDATE SKIP LOCKED：并发起的多副本只有一份拿到候选集，败者跳过。
-        tmp 已没的不可续跑：直接翻 error（record+status 同语句迁移，留痕对齐 ≤20 条纪律）；
-        其余返回 record dict 供调用方 _enqueue 重投（图内幂等重入）。
+    def recovery_scan(self) -> list[dict]:
+        """启动恢复候选（P1-4 重设计）：全盘 running 无锁扫描——属主甄别交调用方
+        （进程存活表是进程内状态，SQL 无从 join），认领走 claim_dead 条件 UPDATE
+        （原子互斥，替代旧 FOR UPDATE SKIP LOCKED 全量抢占——批判补遗②：那会偷走
+        稳态健康副本的活 run）。tmp 缺失翻 error 用 mark_stuck_error（条件 running）。
         """
-        out: list[dict] = []
         with self.pool.connection() as conn:
-            with conn.transaction():
-                rows = conn.execute(
-                    "SELECT run_id, record FROM v2md_runs "
-                    "WHERE status='running' FOR UPDATE SKIP LOCKED").fetchall()
-                for rid, rec in rows:
-                    if tmp_missing(rec):
-                        rec["status"] = "error"
-                        rec["errors"] = [*(rec.get("errors") or []), error_note][-20:]
-                        conn.execute("""
-                            UPDATE v2md_runs SET record=%(rec)s, status='error',
-                                                  claimed_by='', updated=now()
-                             WHERE run_id=%(rid)s""", {"rec": Json(rec), "rid": rid})
-                        continue
-                    out.append(rec)
-        return out
+            rows = conn.execute(
+                "SELECT run_id, record, claimed_by FROM v2md_runs "
+                "WHERE status='running'").fetchall()
+        cols = ("run_id", "record", "claimed_by")
+        return [dict(zip(cols, r)) for r in rows]
+
+    def claim_dead(self, run_id: str, expect_proc: str, new_proc: str) -> dict | None:
+        """原子认领：行仍被 expect_proc 持有（''=无主）才翻 new_proc，抢到返回 record。
+
+        条件 UPDATE 自带互斥：并发恢复/接管的两副本只有一个把 claimed_by 从旧值翻走，
+        输家返回 None 安全让位。区别于 steal_if_unclaimed（不要求 updated 租约过期——
+        调用方已通过进程存活甄别确认属主死，鲜死属主的 updated 可能还很新鲜）。
+        """
+        with self.pool.connection() as conn:
+            row = conn.execute("""
+                UPDATE v2md_runs
+                   SET claimed_by=%(new)s, updated=now()
+                 WHERE run_id=%(rid)s AND status='running' AND claimed_by=%(old)s
+                RETURNING record""",
+                {"new": new_proc, "rid": run_id, "old": expect_proc}).fetchone()
+        return row[0] if row else None
 
     # ---------------------------------------------------------------- watchdog 巡检
 
     def stale_running(self, timeout_s: float) -> list[dict]:
-        """全盘 running 中「DB 侧最近活动超时」的候选行（watchdog DB 段用）。
+        """全盘 running 中「DB 侧 updated 超龄」的候选行（watchdog DB 段用）。
 
-        SQL 只按 GREATEST(阶段 ts, updated) 粗筛——updated 被 cmd 心跳通知刷新的行不出现；
-        本进程 _LOCAL_HB 更年轻的活由 check_once 叠加复核。每行带 started（record->>'started'）
-        供三层信号与 steal 持锁后复算。
+        候选过滤只看 updated（DB 自己写、时钟域干净）；阶段 ts 在应用侧解析成
+        last_active_epoch 再叠加复核（_stage_ts_epoch——见模块头时钟域纪律）。
+        SQL 只按 updated 粗筛——updated 被驱动进程心跳持续刷新，天然活性信号。
         """
-        cutoff = time.time() - timeout_s
         with self.pool.connection() as conn:
-            rows = conn.execute(f"""
-                SELECT run_id, record->>'started' AS started, claimed_by,
-                       {_AGE_SQL}
+            rows = conn.execute("""
+                SELECT run_id, record, claimed_by,
+                       record->>'started' AS started,
+                       EXTRACT(EPOCH FROM updated) AS updated_epoch
                   FROM v2md_runs
                  WHERE status='running'
-                   AND GREATEST(
-                         COALESCE((SELECT max(EXTRACT(EPOCH FROM ((s.value)->>'ts')::timestamptz))
-                                   FROM jsonb_each(record->'stages') AS s), 0.0),
-                         EXTRACT(EPOCH FROM updated)) < %(cut)s""",
-                {"cut": cutoff}).fetchall()
-        cols = ("run_id", "started", "claimed_by", "last_active_epoch")
-        return [dict(zip(cols, r)) for r in rows]
+                   AND EXTRACT(EPOCH FROM (now() - updated)) > %(cut)s""",
+                {"cut": timeout_s}).fetchall()
+        out: list[dict] = []
+        for rid, rec, claimed, started, upd in rows:
+            lae = max(_stage_ts_epoch(rec or {}), float(upd or 0.0))
+            out.append({"run_id": rid, "record": rec, "claimed_by": claimed,
+                        "started": started, "last_active_epoch": lae})
+        return out
 
     def stale_queued(self, lease_s: float) -> list[dict]:
         """排队项无主停滞候选（P1-1 大盘巡检 queued 段）。
@@ -279,11 +292,16 @@ class PostgresTaskStore:
         return [dict(zip(cols, r)) for r in rows]
 
     def recheck_age(self, run_id: str) -> float:
-        """steal 持锁后复核：当前 last_active_epoch（无行返 0=已被别处处置）。"""
+        """steal 持锁后复核：最近阶段落盘 epoch（应用侧解析，无行/无阶段返 0）。
+
+        只看 stages[*].ts，刻意不含 updated——steal_if_unclaimed 自身会刷 updated，
+        若复核含 updated 则永远「新鲜」、接管永不生效（P4b 潜 bug 修复）。ts 解析走
+        应用时钟域（_stage_ts_epoch）：SQL cast naive 串会跨时区偏移（见模块头纪律）。
+        """
         with self.pool.connection() as conn:
             row = conn.execute(
-                f"SELECT {_AGE_SQL} FROM v2md_runs WHERE run_id=%s", (run_id,)).fetchone()
-        return float(row[0]) if row and row[0] is not None else 0.0
+                "SELECT record FROM v2md_runs WHERE run_id=%s", (run_id,)).fetchone()
+        return _stage_ts_epoch(row[0] or {}) if row else 0.0
 
     def mark_stuck_error(self, run_id: str, msg: str) -> bool:
         """大盘 watchdog 翻 error：record+status 同事务迁移（仍 running 才动，防竞态）。"""

@@ -24,7 +24,8 @@ os.environ.update({
     "V2MD_UPLOADS_DIR": str(Path(_TMP) / "uploads"),
     "V2MD_SECRETS_FILE": str(Path(_TMP) / "nonexistent.env"),
     "OBSIDIAN_VAULT": str(Path(_TMP) / "vault"),
-    "V2MD_REMOTE": "",
+    "V2MD_REMOTE": "off",  # 空串会被 load_env 丢弃→仓库 .env 真值渗入（隔离缺口，
+                           # 实证 9700 下线时 preflight gpu_pool 打红）；"off" 非 http 前缀 → 不做算力池体检
     "V2MD_CORS_ORIGINS": "",
     "V2MD_USER_SUBMIT_PER_MIN": "1000",  # 套件整体抬高滑窗，配额行为由专测 monkeypatch 收紧
     "V2MD_FAKE_LLM": "1",  # 兜底：任何意外真驱动也不烧 token

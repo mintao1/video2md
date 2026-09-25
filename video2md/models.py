@@ -72,6 +72,7 @@ class RunStatusOut(BaseModel):
     total: int | None = None
     stages: dict[str, Any] | None = None
     partial_failures: dict[str, Any] | None = None
+    errors: list[str] | None = None   # 记录级留痕（P1-4：跨副本可见——task.errors 只在驱动进程）
     entries: list[EntryStatus] | None = None
     artifacts: ArtifactsInfo | None = None
 

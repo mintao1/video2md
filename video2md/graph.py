@@ -140,6 +140,14 @@ def _stage_node(stage: str, args_of=None):
         except (SystemExit, Exception) as exc:  # 熔断/全灭/环境炸 → 显式失败（DSL 的 if_ok 闸门）
             msg = redact(str(exc))[-300:]
             print(f"❌ 阶段 {stage} 失败：{msg}")
+            # 留痕落 run 记录（P1-4）：errors 此前只进 LangGraph state + 驱动进程 _TASKS，
+            # 跨副本/重启后 GET 看不到失败原因——record jsonb 是状态唯一真相，这里补写
+            # （含 cancel 的「用户取消（cancelled）」、熔断与全灭消息，≤20 条对齐留痕纪律）。
+            line = f"阶段 {stage}: {msg}"
+            prev = run.get("errors") or []
+            if not prev or prev[-1] != line:  # fail/finalize 路径可能同消息双写，尾去重
+                run["errors"] = [*prev, line][-20:]
+                _persist(run)
             return {"run": run, "status": "error",
                     "errors": [*state.get("errors", []), f"阶段 {stage}: {msg}"]}
         return {"run": run}

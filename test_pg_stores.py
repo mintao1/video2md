@@ -255,7 +255,8 @@ assert tasks.get_status_url("t_r") == ("running", "http://x/t_r")
 assert tasks.heartbeat("t_r") is True
 assert tasks.heartbeat("t_d") is False
 
-# recover_candidates：tmp 缺失直接翻 error；认领窗口内候选只归一份（SKIP LOCKED）
+# 启动恢复（P1-4 属主甄别版）：recovery_scan 无锁全查 + mark_stuck_error 翻 tmp 缺失 +
+# claim_dead 原子认领（expect 匹配才翻——替代旧 SKIP LOCKED 全量抢占，批判补遗②）
 missing = {"run_id": "rec_miss", "owner": "u", "status": "running", "created": "",
            "url": "http://x/m", "tmp": "/nonexistent-v2md-tmp", "tmp_cleaned": False}
 alive_run = {"run_id": "rec_ok", "owner": "u", "status": "running", "created": "",
@@ -265,36 +266,26 @@ for rid in ("t_q", "t_r", "t_d"):  # 清场：只留 rec_* 两行 running，断�
         conn.execute("DELETE FROM v2md_runs WHERE run_id=%s", (rid,))
 st_runs.merge(missing)
 st_runs.merge(alive_run)
-_tmp_missing = lambda r: bool(r.get("tmp")) and not Path(str(r["tmp"])).exists()
-first = tasks.recover_candidates(_tmp_missing, "临时目录已被清理")
-assert {r["run_id"] for r in first} == {"rec_ok"}, f"存活中断 run 必须进候选：{first}"
-loaded = st_runs.load()
-assert loaded["rec_miss"]["status"] == "error", loaded["rec_miss"]
+rows = tasks.recovery_scan()
+assert {r["run_id"] for r in rows} == {"rec_miss", "rec_ok"}, rows
+assert all(r["claimed_by"] == "" for r in rows)  # merge 新行无主（merge 不写 claimed_by 列）
+assert tasks.mark_stuck_error("rec_miss", "临时目录已被清理，无法续跑（重发同 URL 新建 run）")
+assert st_runs.load()["rec_miss"]["status"] == "error"
 with pool.connection() as conn:
     col = conn.execute("SELECT status, claimed_by FROM v2md_runs WHERE run_id='rec_miss'").fetchone()
 assert col[0] == "error" and col[1] == ""  # 提取列同步翻转
 
-# SKIP LOCKED 互斥：持锁事务未提交期间，另一连接的认领扫描拿不到任何候选。
-# （生产里 recover 返回即 _enqueue→_drive merge 翻 queued/running，行离开 running 态——
-#  不存在「提交后仍被重复捡」的窗口；这里用 holder 事务模拟该保护窗口。）
-pool2 = pg.make_pool(DSN)  # 模拟第二副本的连接池
-try:
-    with pool.connection() as claimer:
-        claimer.execute("BEGIN")
-        rows = claimer.execute(
-            "SELECT run_id FROM v2md_runs WHERE status='running' FOR UPDATE SKIP LOCKED"
-        ).fetchall()
-        assert [r[0] for r in rows] == ["rec_ok"], rows  # 唯一存活的 running 行
-        with pool2.connection() as other:
-            other.execute("BEGIN")
-            blocked = other.execute(
-                "SELECT run_id FROM v2md_runs WHERE status='running' FOR UPDATE SKIP LOCKED"
-            ).fetchall()
-            assert blocked == [], f"他副本正持锁恢复时本副本应拿到空集：{blocked}"
-            other.execute("COMMIT")
-        claimer.execute("COMMIT")
-finally:
-    pool2.close()
+# claim_dead：无主认领 / expect 不匹配拒（并发互斥）/ 匹配即翻（死属主路径）/ 终态不可领
+got = tasks.claim_dead("rec_ok", "", "procB")
+assert got and got["run_id"] == "rec_ok"
+with pool.connection() as conn:
+    cb = conn.execute("SELECT claimed_by FROM v2md_runs WHERE run_id='rec_ok'").fetchone()[0]
+assert cb == "procB"
+assert tasks.claim_dead("rec_ok", "", "procC") is None      # 已非无主：第二个恢复方让位
+assert tasks.claim_dead("rec_ok", "other", "procC") is None  # 属主不是预期值：让位
+assert tasks.claim_dead("rec_ok", "procB", "procC") is not None  # expect 匹配 → 原子翻走
+st_runs.merge({"run_id": "rec_done", "owner": "u", "status": "done", "created": ""})
+assert tasks.claim_dead("rec_done", "", "procX") is None    # 终态不可认领
 
 # steal_if_unclaimed：租约内拒抢、无主可钉、过期可抢。
 # 注意 merge 整行覆盖会把 claimed_by 刷回默认 ''——钉名必须走直接 UPDATE。
@@ -452,6 +443,109 @@ vapi._TASKS.clear()
 vapi._TASKS_PG = None
 vapi._tasks_pg_resolved = False
 print("✅ P1-2 cmd 取消通道（本地驱动落标志/外部 run 不泄漏）")
+
+
+# ---- 8. P1-4：属主甄别恢复（活属主不抢 / 死属主窗后认领）------------------------------
+vwd._reset_for_tests()
+vapi._TASKS.clear()
+vapi._TASKS_PG = tasks
+vapi._tasks_pg_resolved = True
+driven: list[str] = []
+_orig_graph = vapi.run_graph
+
+
+def _fake_rg(url, *, part_items="", force=False, review=False, max_frames=60,
+             run_id="", checkpointer=None, owner=""):
+    driven.append(run_id)
+    return {"status": "done", "run_id": run_id}
+
+
+vapi.run_graph = _fake_rg
+vwd.PHB_ALIVE_S = 2.0  # 甄别窗测试档（生产 30s；api._recover_interrupted 动态读）
+
+
+async def _recover_once() -> int:
+    n = await vapi._recover_interrupted(tasks)
+    await asyncio.sleep(0.3)  # 给 _requeue 的 _drive 留跑完窗口
+    return n
+
+
+# 场景 1：活属主（phb 闻声）→ 不抢、不驱动，行属主不变
+_truncate("v2md_runs", "v2md_submit_log")
+st_runs.merge({"run_id": "rc_a", "owner": "u", "status": "running", "created": "",
+               "url": "http://x/a", "tmp": ""})
+assert tasks.claim_dead("rc_a", "", "procA")
+vwd.note_proc_alive("procA")
+assert asyncio.run(_recover_once()) == 0
+assert "rc_a" not in driven
+with pool.connection() as conn:
+    cb = conn.execute("SELECT claimed_by FROM v2md_runs WHERE run_id='rc_a'").fetchone()[0]
+assert cb == "procA", "活属主的行不得被抢（批判补遗②验收）"
+
+# 场景 2：死属主（甄别窗内无声）→ 窗后认领重投（单副本重启自愈路径）
+vwd._LOCAL_PROCS.clear()
+_truncate("v2md_runs", "v2md_submit_log")
+st_runs.merge({"run_id": "rc_d", "owner": "u", "status": "running", "created": "",
+               "url": "http://x/d", "tmp": ""})
+assert tasks.claim_dead("rc_d", "", "procOld")
+assert asyncio.run(_recover_once()) == 1
+assert "rc_d" in driven
+with pool.connection() as conn:
+    cb = conn.execute("SELECT claimed_by FROM v2md_runs WHERE run_id='rc_d'").fetchone()[0]
+assert cb == vapi._PROC_ID
+
+# 场景 3：无主即领（不经甄别窗）
+_truncate("v2md_runs", "v2md_submit_log")
+st_runs.merge({"run_id": "rc_u", "owner": "u", "status": "running", "created": "",
+               "url": "http://x/u", "tmp": ""})
+assert asyncio.run(_recover_once()) == 1
+assert "rc_u" in driven
+
+vapi.run_graph = _orig_graph
+vwd.PHB_ALIVE_S = 2 * vwd.PHB_PERIOD_S
+vwd._reset_for_tests()
+vapi._TASKS.clear()
+vapi._TASKS_PG = None
+vapi._tasks_pg_resolved = False
+print("✅ P1-4 属主甄别恢复（活属主不抢/死属主窗后认领/无主即领）")
+
+
+# ---- 9. running 残档接管回归（P4b 修复：steal 后复核不被 steal 自刷的 updated 欺骗）----
+from datetime import datetime, timedelta  # noqa: E402
+
+vwd._reset_for_tests()
+vapi._TASKS.clear()
+vapi._TASKS_PG = tasks
+vapi._tasks_pg_resolved = True
+taken: list[dict] = []
+vwd.set_stealer(lambda r: taken.append(r))
+_truncate("v2md_runs", "v2md_submit_log")
+# 死属主残档：running、属主 dead-proc、updated 停滞 2h、阶段戳为 2h 前的本地 naive 串——
+# 时钟域回归钉（P1-4 实证 bug）：旧 SQL 把该串 cast 成 timestamptz 落在未来 → GREATEST
+# 判超龄恒假 → 残档永不入候选。新口径：DB 只滤 updated（超龄 ✓），阶段龄应用侧解析（旧 ✓）。
+_O = (datetime.now() - timedelta(hours=2)).isoformat(timespec="seconds")
+st_runs.merge({"run_id": "rk_dead", "owner": "u", "status": "running", "created": "",
+               "url": "http://x/rkd", "tmp": "",
+               "stages": {"download": {"ts": _O}, "transcribe": {"ts": _O}}})
+assert tasks.claim_dead("rk_dead", "", "dead-proc")
+with pool.connection() as conn:
+    conn.execute("UPDATE v2md_runs SET updated=now()-interval '7200 seconds' WHERE run_id='rk_dead'")
+tripped = vwd.check_cluster(timeout_s=3600)
+assert "rk_dead" in tripped, tripped                     # 卡死判定生效（不再被自刷 updated 空转）
+assert [r["run_id"] for r in taken] == ["rk_dead"], taken  # 抢到即重投（STEALER）
+assert st_runs.load()["rk_dead"]["status"] == "error"    # 翻 error 留痕
+# 复核仍认活：阶段 ts 刚推进过的行不被误抢（stages 新鲜 → stale_running 不入候选即可）
+st_runs.merge({"run_id": "rk_live", "owner": "u", "status": "running", "created": "",
+               "url": "http://x/rkl", "tmp": "",
+               "stages": {"download": {"ts": datetime.now().isoformat(timespec="seconds")}}})
+tasks.claim_dead("rk_live", "", "live-proc")
+tripped2 = vwd.check_cluster(timeout_s=3600)
+assert "rk_live" not in tripped2 and not taken[1:], (tripped2, taken)
+vwd._reset_for_tests()
+vapi._TASKS.clear()
+vapi._TASKS_PG = None
+vapi._tasks_pg_resolved = False
+print("✅ running 残档接管回归（死属主标错重投/阶段新鲜不误抢）")
 
 pool.close()
 print("✅ test_pg_stores.py 全部通过")

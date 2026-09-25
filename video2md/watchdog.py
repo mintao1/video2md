@@ -41,7 +41,30 @@ _HEARTBEATS: dict[str, float] = {}
 # 第一层由此跨进程可用；steal 持锁后复核也读它（刚收到通知的行不冤枉杀）。
 _LOCAL_HB: dict[str, float] = {}
 
+# P1-4 进程存活注册表（proc_id → time.time() 秒）：别的副本 broadcast("phb") 时落这里。
+# 启动恢复的属主甄别依据——恢复只认领「无主」或「属主持续无声」的行，活属主的行不抢
+# （批判补遗②：旧 recover_candidates 全量 SKIP LOCKED 抢占，B 重启会偷走健康 A 的活）。
+_LOCAL_PROCS: dict[str, float] = {}
+PHB_PERIOD_S = 15.0   # phb 广播周期（api._proc_hb_loop）
+PHB_ALIVE_S = 2 * PHB_PERIOD_S  # 存活窗：窗内闻声即活；窗外视为死属主可认领
+
 _NOTED = False  # 看门狗自身异常只 stderr 一次，后续静默
+
+
+def note_proc_alive(proc_id: str) -> None:
+    """cmd 泵调用：他副本进程心跳 → 本地注册表。永不抛。"""
+    try:
+        if proc_id:
+            _LOCAL_PROCS[proc_id] = time.time()
+    except Exception:
+        pass
+
+
+def proc_alive(proc_id: str, *, max_age_s: float = PHB_ALIVE_S) -> bool:
+    """属主甄别：注册表内且最近闻声。自身与从未闻声的进程一律 False（恢复方等待窗口
+    兜底——活属主的下一次 phb ≤ PHB_PERIOD_S 必达）。"""
+    ts = _LOCAL_PROCS.get(proc_id or "")
+    return ts is not None and (time.time() - ts) <= max_age_s
 
 
 def heartbeat_local(run_id: str) -> None:
@@ -293,7 +316,8 @@ def check_cluster(*, timeout_s: float | None = None,
         except Exception as exc:
             _note(f"cluster run {rid} 处置异常：{redact(str(exc))[:160]}")
     # ---- P1-1：排队项无主停滞 → 短租约接管重投（不标 error，无在途工作可无损接管）
-    qlease = max(3 * WATCHDOG_PERIOD_S, 180.0)
+    # 下限 30s：防极小 WATCHDOG_PERIOD_S 配置产生一触即发的误抢（缺省 3×60=180 不变）
+    qlease = max(3 * WATCHDOG_PERIOD_S, 30.0)
     try:
         qrows = be.stale_queued(qlease)
     except Exception as exc:
@@ -359,9 +383,10 @@ async def loop(tasks: dict, period_s: float, *, load_runs=None) -> None:
 
 
 def _reset_for_tests() -> None:
-    """测试隔离：重置模块级状态（心跳表/跨进程心跳缓存/大盘接管器/静默标志）。"""
+    """测试隔离：重置模块级状态（心跳表/跨进程心跳缓存/进程注册表/大盘接管器/静默标志）。"""
     global _NOTED, _STEALER
     _HEARTBEATS.clear()
     _LOCAL_HB.clear()
+    _LOCAL_PROCS.clear()
     _STEALER = None
     _NOTED = False

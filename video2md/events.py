@@ -201,6 +201,9 @@ def _on_cmd(payload: str) -> None:
         if msg.get("action") == "hb":
             from . import watchdog
             watchdog.heartbeat_local(str(msg.get("run_id") or ""))
+        elif msg.get("action") == "phb":
+            from . import watchdog
+            watchdog.note_proc_alive(str(msg.get("src") or ""))  # 进程心跳（P1-4 属主甄别）
         elif msg.get("action") == "cancel":
             rid = str(msg.get("run_id") or "")
             from . import api, runs  # 惰性：泵线程，防 import 环（api 顶导 events）
