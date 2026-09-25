@@ -54,7 +54,9 @@ jobs:
             uv run python3 "$t.py"
           done
       - name: PG 档真库测试（三存储适配器 + events 扇出；无 DSN 自动 skip）
-        run: uv run python3 test_pg_stores.py
+        run: |
+          uv run python3 test_pg_stores.py
+          uv run python3 test_rescue_pg.py
       - name: e2e（进程级 mockpool 冒烟：testsrc2 夹具 + 假 LLM，零 token，跨平台）
         run: bash scripts/smoke_ci.sh
       - name: 双副本冒烟（P1-4：可见性/属主甄别不抢/跨副本 SSE·取消/杀副本接管；复用本 job 的 PG service）

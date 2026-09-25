@@ -8,12 +8,18 @@ run 按 part_items 逐条补跑，tmp 里的视频文件直接搬进新 run 复�
 tmp 并预置 art["video"]（_stage_download 见已有产物即「⏭ 已下载，跳过」，管线从
 transcribe 续起）→ 经 api._enqueue 在**本进程**驱动整张图。
 
-为什么必须停 API 再跑：worker 串行信号量只活在 API 进程里，跨进程无法互斥——API
-活着时双进程并发写同一个 vault 笔记文件会互相覆盖。所以流程是 docker stop api →
-本脚本逐条跑完 → docker start api。产物按服务器当前 artifact_mode 正常落
-vault/outbox。state.json 幂等：已出笔记的条目 resolve 时自动标 skipped。
+存储档（P1-3）：env 自动分派——脚本全程走 runs._load_runs/_runs_merge 分派层，
+json/PG 两档同缝工作（tmp 保护改逐行 merge：PG 档 _save_runs 全表替换被禁用）。
+PG 档「重发同 URL 幂等续跑」只能跳过 state 已完成的条目，**旧 tmp 已下载视频会全部
+重新下载**——本工具的复用价值正在于此（17 集熔断在 15 集时省 15 次下载）。
 
-用法（容器内跑，环境变量沿用 compose：V2MD_RUNS_FILE/V2MD_STATE_FILE/OBSIDIAN_VAULT）:
+为什么必须停 API 再跑：worker 串行信号量只活在 API 进程里，跨进程无法互斥——API
+活着时双进程并发写同一个 vault 笔记文件会互相覆盖（PG 档行级写入安全，但 vault
+笔记文件是文件系统资源，互斥问题与存储档无关）。所以流程是 docker stop api →
+本脚本逐条跑完 → docker start api。产物按服务器当前 artifact_mode 正常落
+vault/outbox。state 幂等：已出笔记的条目 resolve 时自动标 skipped。
+
+用法（容器内跑，环境变量沿用 compose：V2MD_RUNS_STORE/V2MD_PG_DSN/V2MD_STATE_FILE/OBSIDIAN_VAULT）:
   docker stop video2md-video2md-1
   docker exec video2md-video2md-1 python scripts/rescue_partial.py <run_id> [--dry-run] [--max-entries N]
   docker start video2md-video2md-1
@@ -26,6 +32,7 @@ restart 开着」的容器在 exec 间隙立即拉起（实测踩过），API �
 """
 import argparse
 import json
+import os
 import shutil
 import sys
 import time
@@ -45,10 +52,6 @@ from video2md.graph import resolve_run  # noqa: E402
 from video2md.resolve import normalize_url  # noqa: E402
 from video2md.util import load_state  # noqa: E402
 
-if (runs.ENV.get("V2MD_RUNS_STORE") or "").strip().lower() == "postgres":
-    sys.exit("本工具面向 JSON 文件档的停机抢救；V2MD_RUNS_STORE=postgres 下跨进程写入安全，"
-             "重发同 URL 走幂等续跑即可（state.json 幂等 + 图内阶段跳过），无需本脚本")
-
 _CP_CLOSER = None  # checkpointer 关闭句柄（drive_and_wait 首次建时写入）
 
 
@@ -66,12 +69,14 @@ def main() -> int:
 
     # 前置：API 必须已停——worker 串行信号量只活在 API 进程里，双进程并发写同一
     # vault 笔记文件会互相覆盖。healthz 可达即拒绝开跑（--force-running 可跳过）。
+    # 探测端口取 V2MD_PORT（与 api 实际监听同源；缺省 8790）。
     if not a.force_running:
         import urllib.error
         import urllib.request
+        _port = os.environ.get("V2MD_PORT", "8790")
         try:
-            with urllib.request.urlopen("http://127.0.0.1:8790/healthz", timeout=3):
-                print("❌ API 还在服务 healthz——先 docker stop video2md-video2md-1 再跑"
+            with urllib.request.urlopen(f"http://127.0.0.1:{_port}/healthz", timeout=3):
+                print(f"❌ API 还在服务 healthz（:{_port}）——先 docker stop video2md-video2md-1 再跑"
                       "（确认要并行加 --force-running）")
                 return 2
         except (urllib.error.URLError, OSError):
@@ -88,17 +93,17 @@ def main() -> int:
     # tmp_cleaned=True 让 _cleanup_stale_runs/_prune_orphan_tmps/lifespan 恢复扫描三处
     # 全部跳过这些目录——tmp 文件原地保留，只是该轮不自动续跑（下次重发同链驱动）。
     # ⚠ 副作用：finalize 也认这个标志不清理本 run 的 tmp——抢救对象自己别带 running。
+    # PG 档逐行 _runs_merge（_save_runs 全表替换在 PG 档禁用——多副本覆盖他进程写入）。
     if a.tmp_guard:
-        with runs._runs_file_lock():
-            db2 = runs._load_runs()
-            n_guard = 0
-            for r in db2.values():
-                if r.get("status") == "running" and not r.get("tmp_cleaned"):
-                    r["tmp_cleaned"] = True
-                    n_guard += 1
-            if n_guard:
-                runs._save_runs(db2)
-                print(f"🛡 已给 {n_guard} 个 running run 上 tmp 保护（防 API 复活抢跑）")
+        n_guard = 0
+        for r in runs._load_runs().values():
+            if r.get("status") == "running" and not r.get("tmp_cleaned"):
+                r["tmp_cleaned"] = True
+                with runs._runs_file_lock():
+                    runs._runs_merge(r)
+                n_guard += 1
+        if n_guard:
+            print(f"🛡 已给 {n_guard} 个 running run 上 tmp 保护（防 API 复活抢跑）")
     url = old.get("url", "")
     entries = old.get("entries", [])
     arts = old.get("artifacts", {})
@@ -157,7 +162,7 @@ def main() -> int:
             print(f"  ⚠ 旧视频 {src} 已被清理，退化为重新下载")
         # 3) 本进程驱动整张图（api._enqueue + 事件循环里跑 _drive），轮询到该条目出
         #    note。逐条串行：上一条不落地不投下一条，state.json 落盘后天然幂等。
-        done = drive_and_wait(url, rid, idx, api_owner, dst, old_art)
+        done = drive_and_wait(url, rid, _u, api_owner, dst, old_art, entry_index=idx)
         if done:
             ok_n += 1
             print(f"  ✅ #{idx} 用时 {time.time() - t0:.0f}s")
@@ -171,23 +176,23 @@ def main() -> int:
     return 0 if fail_n == 0 else 1
 
 
-def drive_and_wait(url: str, rid: str, idx: int, owner: str,
-                   dst: Path | None, old_art: dict) -> bool:
+def drive_and_wait(url: str, rid: str, entry_url: str, owner: str,
+                   dst: Path | None, old_art: dict, entry_index: int = 0) -> bool:
     """入队驱动 rid 并轮询到该条目出 note；colab 类熔断 error 冷却后重投一次。
 
     走 api._enqueue 而不是 POST /runs：本进程即执行体，不依赖 API 活着。_drive→
     run_graph(run_id=rid) 里 resolve 节点 dedup 命中我们预建的 created run（同
     url+part_items+owner），随后逐阶段续跑；搬好的视频经 runs.json 被 _stage_node
     的 _reload 读回（artifacts dict 引用同一对象，_run_stage 原地更新无覆盖问题）。
+    完成判定按**条目 URL** 匹配（playlist 条目 url≠合集 url；单视频条目
+    playlist_index=None，按 index 匹配的 None==0 永假会 4h 空等——P1-3 实证）。
     """
     import asyncio
 
     from video2md import api as v2api
 
     def _entry_done(d: dict) -> bool:
-        art = (d.get("artifacts") or {}).get(next(
-            (e["url"] for e in (d.get("entries") or []) if e.get("playlist_index") == idx), ""), {})
-        return bool(art.get("note"))
+        return bool((d.get("artifacts") or {}).get(entry_url, {}).get("note"))
 
     def _patch() -> None:
         # 搬视频须在入队之前：_run_stage 每阶段从 runs.json reload，先入队可能把
@@ -225,7 +230,7 @@ def drive_and_wait(url: str, rid: str, idx: int, owner: str,
             _CP_CLOSER = closer
             v2api._CHECKPOINTER = cp
         _patch()
-        v2api._enqueue(url, str(idx), False, False, 60, run_id=rid, owner=owner)
+        v2api._enqueue(url, str(entry_index), False, False, 60, run_id=rid, owner=owner)
 
     async def _wait(max_wait_s: int) -> tuple[str, dict]:
         """轮询到 note 出现 / 任务终态 / 超时。返回 ('ok'|'terminal'|'timeout', d)。"""
@@ -235,7 +240,7 @@ def drive_and_wait(url: str, rid: str, idx: int, owner: str,
             await asyncio.sleep(20)
             d = runs._load_runs().get(rid, {})
             st = (v2api._TASKS.get(rid) or {}).get("status") or d.get("status")
-            line = f"  …#{idx} {st} {int((time.time() - t0) // 60)}min"
+            line = f"  …#{entry_index} {st} {int((time.time() - t0) // 60)}min"
             if line != last:
                 print(line, flush=True)
                 last = line
@@ -254,7 +259,7 @@ def drive_and_wait(url: str, rid: str, idx: int, owner: str,
             if outcome == "ok":
                 return True
             if outcome == "timeout":
-                print(f"  ⏰ #{idx} 等待超时（4h）")
+                print(f"  ⏰ #{entry_index} 等待超时（4h）")
                 return False
             errs = json.dumps({"t": (v2api._TASKS.get(rid) or {}).get("errors"),
                                "s": {k: v.get("breaker")

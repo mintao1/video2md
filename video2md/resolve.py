@@ -542,7 +542,9 @@ def _part_selected(index: int | None, spec: str) -> bool:
                 a, b = (int(x) for x in token.split("-", 1))
                 if a <= (index or 0) <= b:
                     return True
-            elif int(token) == index:
+            elif int(token) == (index or 0):
+                # 与 range 分支同口径（index or 0）：单视频条目 playlist_index=None——
+                # 严格 == 会让 "0" 永假（rescue 单视频补跑实证踩坑），口径必须一致
                 return True
     except ValueError:
         raise ValueError("--part-items 格式应为 1,3-5")
