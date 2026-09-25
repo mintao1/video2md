@@ -55,7 +55,7 @@ json 档跳过）。全部迁移幂等（IF NOT EXISTS）——存量库重跑 n
 | | json 档（缺省） | postgres 档（`V2MD_TASKS_STORE=postgres`） |
 |---|---|---|
 | 写路径 | `_TASKS` 进程内 dict | **进程内实时视图 + 关键态落库**（P1-1）：`_enqueue` 即 `mark_queued` 翻 queued+钉名 claimed_by；`_drive` 起跑 `still_mine` 复核，被划走静默让位 |
-| 读侧 | 进程内视图 | **PG 真相源**：`/queue` 计数、配额三闸、dedup 判活、watchdog 大盘巡检（running 卡死 2h 判定标 error + queued 短租约 3×period 接管重投）、启动恢复认领（`FOR UPDATE SKIP LOCKED`）全走 `v2md_runs` |
+| 读侧 | 进程内视图 | **PG 真相源**：`/queue` 计数、配额三闸、dedup 判活、watchdog 大盘巡检（running 卡死 2h 判定标 error + queued 短租约 3×period 接管重投）、启动恢复（属主甄别：`recovery_scan`+`claim_dead`+phb 进程心跳——B 重启不抢 A 活 run，死属主窗后认领）全走 `v2md_runs` |
 | 跨副本 | 各自为战 | 各副本看到同一队列（读侧含排队项）；`GET /runs/{id}` 的 `task` 段仍只读本进程（`api.py:852-856`） |
 | 滑窗限流 | 进程内 deque | `v2md_submit_log` 单语句 upsert，跨进程一致 |
 

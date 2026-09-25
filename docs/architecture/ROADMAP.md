@@ -94,12 +94,20 @@
 - **验收**：PG 档环境下 rescue 能捞出 partial run；迁移脚本可重复跑幂等
 - **工作量**：M ｜ **阻塞**：无
 
-### P1-4 多副本冒烟进 CI（出界项④）
+### P1-4 多副本冒烟进 CI（出界项④）✅
 - **动机**：批判① E4——跨进程语义只经单进程双实例模拟验证
 - **内容**：`docker-compose.smoke.yml` 加 `video2md` 副本 2（或 scale）+ 真 PG，断言：A 提交 B 可见 /queue、A 死 B 接管（running 与 queued 两态）、SSE 跨副本关流；进 CI 或夜间 job。
   **含批判补遗②（2026-09-25）**：`recover_candidates` 不看 claimed_by——稳态副本 B 重启会把健康 A 的 running 行整批抢走重投（双驱动）；冒烟须断言「B 重启不抢 A 活 run」，修复需进程级存活信号（cmd 通道 proc 心跳），与本项同窗落地
 - **验收**：CI 真双进程冒烟绿（含 B 重启不抢活）；批判① E4 口径随之修订为已闭环
-- **工作量**：M ｜ **阻塞**：P1-1（✅ 已解封）
+- **工作量**：M ｜ **阻塞**：P1-1（✅）｜ **状态**：✅ 机制+冒烟全绿（见 commit）。落地口径与修订：
+  ①**进程级而非 compose 级**冒烟（`scripts/smoke_replicas.sh`，仿 smoke_ci——CI 复用 test job 的
+  PG service，零新基建；快租约档 period=5s/timeout=15s 让接管在时间预算内可观测）；②补遗②修复
+  = `recovery_scan`+`claim_dead`+phb 进程心跳甄别（`_recover_interrupted` 后台任务，甄别窗不拖
+  boot），五断言：可见性/甄别不抢/跨副本 SSE/跨副本取消/杀 A 接管（queued 认领+running 残档重投）；
+  ③落地另修两个实锤：**时钟域 bug**（naive 阶段 ts 经 PG UTC cast 落未来 → running 残档检测在
+  容器化部署静默失效；DB 侧只滤 updated、阶段 ts 应用侧解析）与 **P4b steal 复核自刷**（steal
+  刷 updated 而复核含 updated → 接管空转）；④跨副本可见性补齐：阶段失败 errors 落 run 记录
+  （record jsonb 唯一真相教义）+ `RunStatusOut.errors` 暴露。批判① E4 口径已闭环
 
 ### P1-5 SLO 定义 + 告警 SLO 化
 - **动机**：批判②维度 3/7——告警事件式非 SLO 式
