@@ -30,10 +30,29 @@ def pg_enabled() -> bool:
     return bool(pg_dsn())
 
 
+def pg_timeout_s() -> float:
+    """PG 超时预算（P1-8，单一键三处生效：connect / 池获取 / 语句超时）。
+
+    批判② R1「池获取无超时 = 故障放大器」在 P1-1/P1-4 后加重——PG 已是任务表真相源，
+    check_cluster 等在事件循环上同步打 PG：无语句超时的锁等待会无限占住连接，池耗尽
+    把每轮巡检冻在默认 30s。预算钳 ≥1s 防误配成 0（等价禁用全部超时）。
+    """
+    try:
+        return max(float(ENV.get("V2MD_PG_TIMEOUT_S", "10") or 10), 1.0)
+    except ValueError:
+        return 10.0
+
+
 def make_pool(dsn: str) -> ConnectionPool:
     from psycopg_pool import ConnectionPool
+    t = pg_timeout_s()
     return ConnectionPool(conninfo=dsn, min_size=1, max_size=5, open=True,
-                          kwargs={"autocommit": True, "prepare_threshold": 0})
+                          timeout=t,  # 池获取预算（默认 30s → 跟随统一预算）
+                          kwargs={"autocommit": True, "prepare_threshold": 0,
+                                  "connect_timeout": int(t),        # 建池/重连 TCP+auth 有界
+                                  "options": f"-c statement_timeout={int(t * 1000)}",
+                                  # 语句超时：锁等待/挂起查询被打断——池耗尽退化为瞬态
+                                  })
 
 
 def shared_pool() -> ConnectionPool:

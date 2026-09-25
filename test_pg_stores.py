@@ -547,5 +547,53 @@ vapi._TASKS_PG = None
 vapi._tasks_pg_resolved = False
 print("✅ running 残档接管回归（死属主标错重投/阶段新鲜不误抢）")
 
+# ---- 10. P1-8：PG 超时预算（单一键三处生效 + 挂起语句被打断）--------------------------
+from psycopg_pool import PoolTimeout  # noqa: E402
+
+# 池连接默认携带 statement_timeout（make_pool 统一预算，缺省 10s）
+with pool.connection() as conn:
+    st = conn.execute("SHOW statement_timeout").fetchone()[0]
+assert st in ("10s", "10000ms"), f"statement_timeout 未生效：{st}"
+
+# 挂起语句打断：连接 A 持 advisory lock，池连接 B（本会话收紧到 1.5s）抢同锁 →
+# QueryCanceled 在预算内（libpq 语句超时覆盖锁等待——池耗尽因此是瞬态而非永久）
+import psycopg.errors as _pgerr  # noqa: E402
+
+with pool.connection() as holder:
+    holder.execute("SELECT pg_advisory_lock(9201)")
+    t0 = time.time()
+    try:
+        with pool.connection() as waiter:
+            waiter.execute("SET statement_timeout='1500ms'")
+            waiter.execute("SELECT pg_advisory_lock(9201)")
+        raise AssertionError("挂起语句应被 statement_timeout 打断")
+    except _pgerr.QueryCanceled:
+        pass
+    dt = time.time() - t0
+assert 1.0 <= dt < 6, f"打断时延异常：{dt:.1f}s"
+holder.execute("SELECT pg_advisory_unlock(9201)")
+
+# 连接预算有界：黑洞地址——open=True 不阻塞（psycopg_pool 后台重连，实测 0.3s 返回），
+# 预算在首次 connection() 处生效（PoolTimeout 精确按预算；启动 fail-fast 由 shared_pool
+# 的 validate_schema 首连兜住，同样有界）
+ENV["V2MD_PG_TIMEOUT_S"] = "2"
+_bh = None
+try:
+    _bh = pg.make_pool("postgresql://v2md:v2md@10.255.255.1:5432/x")
+    t0 = time.time()
+    try:
+        with _bh.connection() as c:
+            c.execute("SELECT 1")
+        raise AssertionError("黑洞地址连接应超预算失败")
+    except PoolTimeout:
+        pass
+    dt = time.time() - t0
+    assert 1.0 <= dt < 6, f"连接失败时延超预算：{dt:.1f}s"
+finally:
+    if _bh is not None:
+        _bh.close()
+    ENV.pop("V2MD_PG_TIMEOUT_S", None)
+print("✅ P1-8 PG 超时预算（statement_timeout 生效/挂起打断/连接预算有界）")
+
 pool.close()
 print("✅ test_pg_stores.py 全部通过")

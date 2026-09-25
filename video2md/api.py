@@ -854,6 +854,24 @@ async def _on_validation_error(request: Request, exc: RequestValidationError) ->
     return _err(422, "请求校验失败", details=exc.errors())
 
 
+# PG 不可达/超预算 → 集中 503（P1-8：快速失败而非挂死；统一信封 PG_UNAVAILABLE）。
+# QueryCanceled 单列：语句超时既可能是 PG 病了也可能是本查询慢——两者对调用方都表现为
+# 「存储暂时不可用，稍后重试」。刻意不捕 DatabaseError 基类：UndefinedTable 等编程错误
+# 仍是 500 级（带栈排查），不许被 503 吞掉。
+async def _on_pg_unavailable(request: Request, exc: Exception) -> JSONResponse:
+    return _err(503, "存储暂时不可用（PG 超时/不可达），稍后重试", details="PG_UNAVAILABLE")
+
+
+def _register_pg_503() -> None:
+    import psycopg.errors as _pg_err
+    from psycopg_pool import PoolTimeout
+    for _cls in (PoolTimeout, _pg_err.OperationalError, _pg_err.QueryCanceled):
+        app.add_exception_handler(_cls, _on_pg_unavailable)  # 逐类精确注册（starlette 按 MRO 查表）
+
+
+_register_pg_503()
+
+
 # ---------------------------------------------------------------- 用户级端点（鉴权 + 归属）
 
 @app.post("/uploads", response_model=UploadOut,

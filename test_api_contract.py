@@ -818,6 +818,28 @@ def test_cancel_terminal_conflict_and_access(client):
     assert client.post("/runs/ghost/cancel", headers={"X-Test-Auth": "alice"}).status_code == 404
 
 
+def test_pg_unavailable_503_envelope(client, monkeypatch):
+    """P1-8：PG 超预算 → 快速 503（统一信封），不挂死不 500。"""
+    import video2md.api as _api
+    from psycopg_pool import PoolTimeout
+
+    class _DeadStore:
+        def total_active(self):
+            raise PoolTimeout("couldn't get a connection after 10.00 sec")
+
+    _api._TASKS_PG = _DeadStore()
+    _api._tasks_pg_resolved = True
+    try:
+        r = client.post("/runs", json={"url": "https://example.test/pg-dead"})
+        assert r.status_code == 503, r.text
+        assert r.json()["error"]["details"] == "PG_UNAVAILABLE"
+        # /queue 仪表既有兜底语义不受影响（gauge 不许炸，回退本进程视图）
+        assert client.get("/queue").status_code == 200
+    finally:
+        _api._TASKS_PG = None
+        _api._tasks_pg_resolved = False
+
+
 def test_stage_loop_head_cancel_gate():
     """真检查点直测：_run_stage_inner 条目循环头，标志在 → SystemExit(cancelled)；
     标志不在 → skipped-only 条目正常走完（不被误伤）。"""
