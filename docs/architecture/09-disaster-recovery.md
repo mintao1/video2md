@@ -1,6 +1,6 @@
 # 09 · 灾备 Runbook
 
-- 最后核对：2026-09-24 ｜ 基准：HEAD=f6a4a0e
+- 最后核对：2026-09-25 ｜ 基准：P1-7 落地（演练制度化 + 首次实测归档）
 - 批判参照：① 数据安全层（🟡）；② 可运维性（🟡）
 - **RTO/RPO 目标值为本篇新立（此前全仓无定义），P1-7 演练校准后修订。**
 
@@ -9,7 +9,7 @@
 | 指标 | 目标 | 依据 |
 |---|---|---|
 | RPO（数据丢失容忍） | ≤ 24h | `backup.sh` daily cron 频率 |
-| RTO（恢复时间容忍） | ≤ 2h | 单容器重建 + 卷恢复的人工流程估上限；首次演练后修订 |
+| RTO（恢复时间容忍） | ≤ 2h | 整机窗口（含环境重建/镜像/网络）。2026-09-25 首次实测：恢复本质路径（校验+回灌+起栈+验证）4s（合成种子，数据层+进程级）——本质路径有 3 个量级余量，2h 预算保留覆盖整机人工环节 |
 | 异地副本 | 必配 | `V2MD_BACKUP_REMOTE`（rclone → B2/S3/OSS）；只落本地的备份防不了整机损失 |
 
 ## 备份面（现状，`scripts/backup.sh`）
@@ -24,7 +24,7 @@
 
 | 盲区 | 处置 |
 |---|---|
-| `secrets/`（video2md.env / obs.env / colab / kaggle token）不在卷里 | **当前**：手工入密码管理器（逐键登记清单如下）。**P1-7**：二选一制度化——加密归档进备份卷，或每季度核对密码管理器清单 |
+| `secrets/`（video2md.env / obs.env / colab / kaggle token）不在卷里 | **已裁定（P1-7）**：季度核对密码管理器清单制——随季度演练执行，`drill_restore.sh --secrets-checked` 记录入档。弃加密归档进备份卷方案：备份密钥本身又是 secret（鸡生蛋），单操作者现状零新机制即闭环。清单见下 |
 | 反代配置/TLS 证书 | P0-4 入仓后由 git 承载；证书由 Caddy/lego 自动重签 |
 | 镜像 | GHCR 不可变 tag（`docker pull ghcr.io/…:<tag>` 手动顶上） |
 
@@ -42,19 +42,25 @@ secrets 登记清单（密码管理器逐条）：`LLM_API_KEY`、`LLM_BASE_URL`
 5. 核对：最近 run 记录在场（GET /runs 需登录）、告警链自测
 ```
 
-## 演练制度（P1-7 落实，本节为预案）
+## 演练制度（P1-7 ✅ 已落地）
 
-- **频率**：每季度一次（日历化；CI 定时 job 干跑 restore 到临时卷可作为月度轻量校验）。
-- **验收**：恢复到临时 dst 后 ① manifest 校验过 ② api 起栈 healthz/preflight 绿 ③ 随机抽 3 个历史 run 记录可读 ④ 实测 RTO 记录归档。
-- **记录模板**：
+- **月度轻量校验（自动）**：GitHub scheduled workflow `drill`（`.github/workflows/drill.yml`，
+  每月 1 号 + 手动 dispatch）跑 `scripts/drill_restore.sh`——干跑全链，不触碰任何真实卷/栈。
+- **季度整演练（人工）**：跑 `scripts/drill_restore.sh --record docs/architecture/drills/<日期>-Q<n>-<序>.md
+  --secrets-checked`（含密码管理器清单逐条核对），记录归档 `docs/architecture/drills/`。
+- **演练面（脚本内建验收）**：① manifest 自算自比校验 ② data/vault 归档恢复 + 与种子逐字节
+  diff ③ PG dump→库重建→回灌断言 ④ 恢复后服务可用（healthz + 3 个历史 run + 留痕可读）
+  ⑤ RTO 计时与目标比对。实测记录：2026-09-25 RTO 4s（首份已归档）。
+- **记录模板**（脚本自动渲染，`--record` 落盘）：
 
 ```
 日期：  ｜ 操作人：  ｜ 备份点：  ｜ 实测 RTO：  ｜ RPO 符合：Y/N
+manifest/diff/PG/服务验证：  ｜ secrets 清单核对：Y/N
 发现问题：  ｜ 跟进项（入 ROADMAP/批判）：
 ```
 
 ## 已知限制
 
-1. 演练当前非制度（README 原文为「建议」）——P1-7 前无保障。
+1. ~~演练当前非制度~~（P1-7 ✅：月度 CI 干跑 + 季度人工整演练 + 记录归档）。
 2. 恢复后**在跑 run 的口径**：备份点之后的 running run 会在启动时被重投（幂等重入）；deliver 在架产物若在备份点之后 ACK/焚毁，恢复后重新出现在架（窗口期双份风险可接受：产物幂等，客户端按 run_id 去重）。
 3. PG 与 json 档混用场景（迁移窗口期）的恢复顺序未固化——先恢复 PG dump 再恢复卷。

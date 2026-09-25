@@ -1,0 +1,20 @@
+# P1-7 灾备干跑（月度轻量校验）：备份→恢复全链自证，未触碰任何真实卷/栈。
+# 季度人工整演练（含 secrets 清单核对 + 记录归档 docs/architecture/drills/）见 09 篇。
+name: drill
+on:
+  schedule:
+    - cron: "0 20 1 * *"   # 每月 1 号 UTC 20:00（北京 04:00）
+  workflow_dispatch:
+
+jobs:
+  restore-drill:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+          enable-cache: true
+      - run: uv sync --frozen
+      - name: 恢复演练（manifest 校验/data·vault 往返/PG dump 回灌/服务可用性/RTO 计时）
+        run: bash scripts/drill_restore.sh

@@ -64,6 +64,8 @@
 
 ## P1：上量前必须（9 项）
 
+> **进度**：✅ 9/9 全清（P1-1..P1-9，见各条 commit 锚点）——「可上量」里程碑达成。
+
 ### P1-1 claimed_by 租约认领（出界项①）✅
 - **动机**：批判② R3——queued 态 run 无属主，多副本下「谁驱动队列里的活」未定
 - **内容**：queued 态也心跳 + 租约字段；watchdog 大盘巡检覆盖 queued 超龄（不只 running）；steal 语义扩到 queued
@@ -138,11 +140,16 @@
   语义无恙）；③测量工具沙箱纪律（首轮 A 节点漏钉三件套读写真实数据——已修 + 起前清场 +
   崩溃安全清理）
 
-### P1-7 灾备演练制度化
+### P1-7 灾备演练制度化 ✅
 - **动机**：批判①数据安全层——演练是建议非制度；secrets 在备份机制外
 - **内容**：`09-disaster-recovery.md` 定 RTO/RPO 目标；季度演练日历化（cron 提醒或 CI 定时 job 干跑 restore 到临时卷）；演练记录模板；secrets 备份方案二选一落实（密码管理器登记清单 / 加密后进备份卷）
 - **验收**：第一次演练记录归档；RTO 实测值 ≤ 目标值
-- **工作量**：S ｜ **阻塞**：无
+- **工作量**：S ｜ **阻塞**：无 ｜ **状态**：✅（见 commit）。落地口径：`scripts/drill_restore.sh`
+  自含干跑（合成种子→backup 同口径打包→manifest 自算自比→恢复 diff→PG dump 往返→进程级
+  起栈验证 3 历史run），**不触碰生产卷/栈**；月度 CI 干跑（`.github/workflows/drill.yml`，
+  schedule+dispatch）+ 季度人工整演练 `--record --secrets-checked` 归档
+  `docs/architecture/drills/`。secrets 二选一**裁定清单核对制**（弃加密归档：备份密钥鸡生蛋）。
+  首次实测 RTO 4s（本质路径口径，整机 2h 预算保留），记录已归档 2026-09-25-Q3-01
 
 ### P1-8 PG 池超时/重试参数化 ✅
 - **动机**：批判② R1——池获取无超时 = 故障放大器
