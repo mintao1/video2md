@@ -5,7 +5,7 @@
 
 ## 方向与边界
 
-**加载方向是反的**：`gpu_plugins/v2md` 不主动连主服务，而是被外部 [gpu_router](https://github.com/mintao1/gpu-router) 项目经 `plugins.py` 协议装载（`gpu_router.json` 配 `"plugins": ["v2md"]` + `plugin_paths`）。主服务（api）只是 HTTP 客户端：`V2MD_REMOTE`/`V2MD_OCR_REMOTE`/`V2MD_CLIPS_REMOTE` → `http://127.0.0.1:9700`。
+**关系（ADR-0001 口径）**：gpu_router 为本项目提供 API——主服务（api）是纯 HTTP 客户端：`V2MD_REMOTE`/`V2MD_OCR_REMOTE`/`V2MD_CLIPS_REMOTE` → `http://127.0.0.1:9700`。历史上的第二条通道（`gpu_plugins/v2md` 经 `plugins.py` 协议被 gpu_router 装载声明能力）已进入**退役**：节点实现迁 gpu_router 仓收编为 gpu-node-agent（`gpu_router/node_agent.py`，commit a483d9c），本仓 gpu_plugins/ 冻结停止演进；gpu_router 的插件装载过渡期维持（存量部署零破坏），移除由其 ADR-0008 后续 PR 完成。
 
 **归属口径**：负载语义、参考服务端、Colab 会话机械是 video2md 的业务 → 住在本仓；gpu_router 侧 provider 类是纯平台壳，业务方法全部经 `PROVIDER_IMPL` 装载。
 
