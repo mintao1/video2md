@@ -91,7 +91,7 @@ json 档跳过）。全部迁移幂等（IF NOT EXISTS）——存量库重跑 n
 
 1. ~~无 schema 版本化迁移~~（P0-5 ✅ 已闭环：migrations/ + v2md_schema_version + 建池校验拒起）。
 2. **PG 池无超时参数化**（P1-8）：PG 挂起时池获取无限阻塞，故障放大为 API 全挂。
-3. rescue/migrate 工具只认 json 档（P1-3）。
+3. ~~rescue/migrate 工具只认 json 档~~（P1-3 ✅：env 自动分派双档同缝，E2E 见 test_rescue_pg.py）。
 4. `runs.json` 无界增长（完成 run 永不删记录，只有 tmp 清理）——长期膨胀未治理（随 P1-6 容量实测定价）。
 
 ## 演进方向

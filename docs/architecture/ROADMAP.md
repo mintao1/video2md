@@ -88,11 +88,20 @@
   先于挂起 _drive 醒来 → 已撤销 run 被复活驱动——标志生命周期改归 _drive finally。长单阶段
   内无取消点为已知限制（按处方「阶段循环头」）。真双进程 cancel 验收随 P1-4 冒烟
 
-### P1-3 rescue/migrate 工具 PG 档适配（出界项③）
+### P1-3 rescue/migrate 工具 PG 档适配（出界项③）✅
 - **动机**：批判② R3——`scripts/rescue_partial.py`、`migrate_json_to_pg.py` 只认 json 档
 - **内容**：两工具加 `--store postgres`（或按 env 自动分派），走 pgstore 适配器
 - **验收**：PG 档环境下 rescue 能捞出 partial run；迁移脚本可重复跑幂等
-- **工作量**：M ｜ **阻塞**：无
+- **工作量**：M ｜ **阻塞**：无 ｜ **状态**：✅（见 commit）。落地口径：**env 自动分派**（非
+  --store 旗标——脚本全程走 runs._load_runs/_runs_merge 分派层，本就 90% 存储无关）。
+  rescue 去除 PG 禁令（批判②「重发同 URL 幂等即可」的口径漏了本工具核心价值：**旧 tmp
+  已下载视频复用**——17 集熔断在 15 集时省 15 次下载；重发同 URL 只跳 state 已完成条目，
+  其余全部重新下载）；tmp_guard 改逐行 merge（PG 档 _save_runs 禁用）；healthz 防护读
+  V2MD_PORT。顺带修两处脚本级实锘：`_part_selected` 单值分支与 range 分支口径不一致
+  （None 严格 == 永假 → 单视频 part_items="0" 恒空）；rescue 完成判定改按条目 URL 匹配
+  （按 playlist_index 的 None==0 永假会 4h 空等）。migrate 半边：P0-5 已接迁移基线 + 幂等
+  upsert（本项内闭环）。验收 E2E：test_rescue_pg.py（真 PG + mockpool + 熔断残局种子 →
+  复用视频 → done + 笔记），CI test job 已挂
 
 ### P1-4 多副本冒烟进 CI（出界项④）✅
 - **动机**：批判① E4——跨进程语义只经单进程双实例模拟验证

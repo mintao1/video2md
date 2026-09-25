@@ -58,7 +58,7 @@
 |---|---|---|
 | 1 | `claimed_by` 租约认领（queued 态心跳 → 跨副本工作窃取） | P1-1 |
 | 2 | 跨进程 cancel 端点（cmd 通道转发） | P1-2 |
-| 3 | rescue/migrate 工具 PG 档适配 | P1-3 |
+| 3 | rescue/migrate 工具 PG 档适配 | P1-3 ✅（env 自动分派；E2E test_rescue_pg.py） |
 | 4 | 多副本真双进程冒烟进 CI（现为单进程双实例模拟 + 一次性脚本） | P1-4 |
 
 > 口径勘误（2026-09-24 批判① E4）：提交 3f7bb1a/f6a4a0e 所称「双进程冒烟全绿」实为**真库 + 单进程双实例模拟**（`test_pg_stores.py:159-211`，`_simulate_other_proc` 手工 NOTIFY 注入）。跨进程语义的端到端验证闭环待 P1-4。
