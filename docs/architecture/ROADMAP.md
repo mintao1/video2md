@@ -136,11 +136,18 @@
 - **验收**：第一次演练记录归档；RTO 实测值 ≤ 目标值
 - **工作量**：S ｜ **阻塞**：无
 
-### P1-8 PG 池超时/重试参数化
+### P1-8 PG 池超时/重试参数化 ✅
 - **动机**：批判② R1——池获取无超时 = 故障放大器
 - **内容**：`pg.py` 增 `connect_timeout`、池获取 `timeout`、`options` 语句超时（env 可调，如 `V2MD_PG_TIMEOUT_S`）；池耗尽时请求快速 503 而非挂死
 - **验收**：测试模拟 PG 挂起 → API 在超时预算内 503，不无限阻塞
-- **工作量**：S ｜ **阻塞**：无
+- **工作量**：S ｜ **阻塞**：无 ｜ **状态**：✅（见 commit）。单一预算键 `V2MD_PG_TIMEOUT_S`
+  （缺省 10s，钳 ≥1s）三处同值：connect_timeout / 池获取 / statement_timeout（锁等待也
+  被打断——池耗尽从永久变瞬态）。PG 不可达/超预算 → 集中 503 `PG_UNAVAILABLE` 信封
+  （逐类精确注册 PoolTimeout/OperationalError/QueryCanceled；刻意不捕 DatabaseError 基类，
+  编程错误仍 500 带栈）。实证修正预设：psycopg_pool open=True 并不阻塞建池（后台重连），
+  预算在首次 connection() 生效——启动 fail-fast 由 shared_pool 的 validate_schema 首连
+  兜住，同样有界。遗留（登记）：check_cluster 在事件循环上同步打 PG，池耗尽时单轮巡检
+  仍可能冻结循环至预算上限（10s）——异步化留 P2 观测/巡检收口
 
 ### P1-9 config 集中 schema 校验收口
 - **动机**：批判②可演进性次级缺口——手写 int() 散落、import 期加载
