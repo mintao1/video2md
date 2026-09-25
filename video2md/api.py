@@ -1237,6 +1237,7 @@ async def run_events(run_id: str, request: Request,
     q = events.subscribe(run_id)
 
     async def gen():
+        _t0: float | None = time.monotonic()  # SLI 起点：connected→首个业务事件（None=已记）
         try:
             st, url = _run_current_status(run_id)
             yield _sse({"event": "connected", "run_id": run_id, "status": st, "url": url})
@@ -1248,6 +1249,9 @@ async def run_events(run_id: str, request: Request,
                 except asyncio.TimeoutError:
                     yield ": ping\n\n"  # 注释行保活，穿透反代空闲超时
                     continue
+                if _t0 is not None:  # SLI（P1-5）：connected→首个业务事件延迟，SLO p95<3s
+                    observability.metric_sse_first_event(time.monotonic() - _t0)
+                    _t0 = None
                 yield _sse(rec)
                 if events.is_terminal(rec):
                     break

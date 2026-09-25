@@ -79,3 +79,31 @@ groups:
           severity: critical
         annotations:
           summary: "collector prometheus exporter 抓取失败 ≥2m（otel-collector 挂了？）"
+
+      # ---- SLO 错误预算燃烧率（P1-5，08 篇口径；多窗多燃率：长短窗同燃才报，防毛刺）----
+      # SLI：7d run 成功率 ≥99%（预算 1%）。分母=全部终态（done|partial|error），分子=error。
+      # 14.4×/1h = 1h 烧掉 2% 预算（14.4×0.01×1h ÷ 7d 预算 1.68h）；6×/6h = 6h 烧 5%。
+      # 分母守卫：无终态流量（合法空闲）比率无定义 → 不报（「无指标≠故障」）。
+      # ⚠ 个人规模流量注：比率在小样本下呈 0/1 跳变，燃烧告警语义弱化为「窗口内
+      # 全错」——RunFailed/RunPartial 事件告警仍是主力，本组是 SLO 问责口径的成文锚点。
+      - alert: RunSLOBudgetFastBurn
+        expr: >-
+          (increase(v2md_runs_total{status="error"}[1h]) / clamp_min(increase(v2md_runs_total[1h]), 1e-9) > 0.144)
+          and (increase(v2md_runs_total{status="error"}[5m]) / clamp_min(increase(v2md_runs_total[5m]), 1e-9) > 0.144)
+          and increase(v2md_runs_total[1h]) > 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "run 成功率 SLO 快燃：1h 错误率 >14.4%（2% 预算/小时烧速）——冻结非修复性发布"
+
+      - alert: RunSLOBudgetSlowBurn
+        expr: >-
+          (increase(v2md_runs_total{status="error"}[6h]) / clamp_min(increase(v2md_runs_total[6h]), 1e-9) > 0.06)
+          and (increase(v2md_runs_total{status="error"}[30m]) / clamp_min(increase(v2md_runs_total[30m]), 1e-9) > 0.06)
+          and increase(v2md_runs_total[6h]) > 3
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "run 成功率 SLO 慢燃：6h 错误率 >6%（5% 预算/6h 烧速）——查 RunFailed/熔断上下文"

@@ -49,6 +49,7 @@ from .config import ENV
 
 # 直方图桶（秒）：覆盖转录/OCR 的秒级到本地剪辑的近百分钟级
 _HISTOGRAM_BOUNDS_S = [1, 5, 15, 60, 300, 900, 1800, 3600, 7200]
+_SSE_FIRST_EVENT_BOUNDS_S = [0.1, 0.25, 0.5, 1, 2, 3, 5, 10]  # SLO p95<3s 的判读桶（P1-5）
 
 # rec 里的控制字段（不进 attributes）；usage/model 由 LLM 映射单独处理
 _CONTROL_KEYS = {"ts", "run_id", "event", "spanId", "parentSpanId", "status",
@@ -132,7 +133,9 @@ def init(*, endpoint: str = "", headers: dict | None = None,
             views = [View(instrument_name="v2md_stage_seconds",
                           aggregation=ExplicitBucketHistogramAggregation(_HISTOGRAM_BOUNDS_S)),
                      View(instrument_name="v2md_llm_seconds",
-                          aggregation=ExplicitBucketHistogramAggregation(_HISTOGRAM_BOUNDS_S))]
+                          aggregation=ExplicitBucketHistogramAggregation(_HISTOGRAM_BOUNDS_S)),
+                     View(instrument_name="v2md_sse_first_event_seconds",
+                          aggregation=ExplicitBucketHistogramAggregation(_SSE_FIRST_EVENT_BOUNDS_S))]
             readers = [metric_reader] if metric_reader is not None else None
             if readers is None:
                 from opentelemetry.exporter.otlp.proto.http.metric_exporter import OTLPMetricExporter
@@ -156,6 +159,9 @@ def _make_instruments(meter) -> None:
     _M["llm_requests"] = meter.create_counter("v2md_llm_requests", description="LLM 调用（按任务/终态）")
     _M["llm_tokens"] = meter.create_counter("v2md_llm_tokens", description="LLM token（按任务/in|out）")
     _M["stage_seconds"] = meter.create_histogram("v2md_stage_seconds", description="阶段耗时（秒）")
+    _M["sse_first"] = meter.create_histogram(
+        "v2md_sse_first_event_seconds",
+        description="SSE connected→首个业务事件延迟（秒；SLO p95<3s，P1-5）")
     _M["llm_seconds"] = meter.create_histogram("v2md_llm_seconds", description="LLM 调用耗时（秒）")
 
     def _queued(_options):
@@ -379,6 +385,12 @@ def metric_watchdog() -> None:
     """看门狗卡死判定次数（watchdog.trip；告警规则 WatchdogTripped 消费）。"""
     if _M:
         _M["watchdog"].add(1)
+
+
+def metric_sse_first_event(seconds: float) -> None:
+    """SSL/SLI：connected→首个业务事件的延迟（08 篇 SLO 草案 p95<3s 的测量源，P1-5）。"""
+    if _M:
+        _M["sse_first"].record(seconds)
 
 
 def metric_llm(task: str, status: str, seconds: float,
