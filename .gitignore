@@ -24,3 +24,5 @@ users.json.tmp.*
 obsidian-plugin/node_modules/
 obsidian-plugin/main.js
 obsidian-plugin/main.js.map
+deploy/certs/
+.smoke-proxy-*

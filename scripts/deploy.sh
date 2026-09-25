@@ -55,6 +55,15 @@ remote "cd $DIR && $COMPOSE up -d"
 echo "── schema 迁移（幂等；json 档部署自动跳过）"
 remote "cd $DIR && $COMPOSE run --rm --no-deps video2md python -m video2md migrate"
 
+echo "── 反代面验证（P0-4：/docs 必须被网关拦下）"
+if [[ $DRY_RUN -eq 0 ]]; then
+  DOC_CODE=$(ssh "$HOST" "curl -s -o /dev/null -w '%{http_code}' http://localhost/docs")
+  PROXY_HZ=$(ssh "$HOST" "curl -s -o /dev/null -w '%{http_code}' http://localhost/healthz")
+  [[ "$DOC_CODE" == "403" ]] || { echo "✗ 反代未拦 /docs（HTTP $DOC_CODE）——查 deploy/nginx.conf 是否挂载/生效" >&2; exit 1; }
+  [[ "$PROXY_HZ" == "200" ]] || { echo "✗ 反代 healthz 不通（HTTP $PROXY_HZ）" >&2; exit 1; }
+  echo "✓ /docs → 403 ｜ healthz 经反代 → 200"
+fi
+
 echo "── 体检（healthz / preflight）"
 HEALTH_OK=0
 if [[ $DRY_RUN -eq 0 ]]; then

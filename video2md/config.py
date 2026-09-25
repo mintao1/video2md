@@ -112,6 +112,12 @@ _SPEC: dict[str, tuple] = {
     "V2MD_TASKS_STORE":     ("enum", "json", ("json", "postgres")),
     # 本地路径输入策略（auto/allow/deny 语义见 _validate_run_url）
     "V2MD_LOCAL_PATHS":     ("enum", "auto", ("auto", "allow", "deny")),
+    # 匿名面限流（P0-2）：设备流两端点按 IP 共享滑窗（0=不设限）。缺省 30/min 而非
+    # ROADMAP 示例的 10——token 端点按 Google 建议间隔（~5s）轮询，合法单用户登录
+    # 就要 12 次/min，10 会误伤正常轮询。V2MD_TRUST_XFF=on 时客户端 IP 取
+    # X-Forwarded-For 末位（单层反代拓扑：api 绑回环、唯一入口=仓内 nginx，尾位即真实客户端）
+    "V2MD_DEVICE_RATE_PER_MIN": ("int", 30, ("min", 0)),
+    "V2MD_TRUST_XFF":           ("enum", "off", ("off", "on")),
 }
 
 
@@ -247,6 +253,11 @@ TASKS_STORE: str = _PARSED["V2MD_TASKS_STORE"]
 # 本地路径输入策略（POST /runs 的 url 收非 http 时）：auto = AUTH=off 放行（开发/
 # 自托管），AUTH≠off 只认本人 uploads 白名单内路径；allow/deny 显式覆盖。
 LOCAL_PATHS: str = _PARSED["V2MD_LOCAL_PATHS"]
+
+# 匿名面限流（P0-2）：设备流两端点按 IP 共享滑窗；TRUST_XFF=on 取 XFF 末位作客户端 IP
+# （仅仓内反代拓扑下开——api 绑回环时唯一入口是 nginx，尾位可信；直连开发档保持 off）
+DEVICE_RATE_PER_MIN: int = _PARSED["V2MD_DEVICE_RATE_PER_MIN"]
+TRUST_XFF: str = _PARSED["V2MD_TRUST_XFF"]
 
 # 版本单源：dist metadata（已安装时）→ pyproject.toml（源码/镜像直跑，Dockerfile 有 COPY）
 # → "0.0.0"。FastAPI version 与 /healthz 都读这里，不手工双写。

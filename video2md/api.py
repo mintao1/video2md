@@ -57,12 +57,14 @@ from . import artsink, events, observability, watchdog
 from .auth import AuthError, Identity, current_identity, optional_identity
 from .config import (
     CORS_ORIGINS,
+    DEVICE_RATE_PER_MIN,
     ENV,
     LOCAL_PATHS,
     LOG_DIR,
     MAX_CONCURRENT_RUNS,
     OUT_DIR,
     QUEUE_MAX,
+    TRUST_XFF,
     UPLOAD_MAX_GB,
     UPLOAD_QUOTA_GB,
     UPLOADS_DIR,
@@ -317,6 +319,45 @@ def _require_run_access(run_id: str, ident: Identity) -> dict | None:
 # ---------------------------------------------------------------- 配额闸（终局布局·限流配额）
 
 _USER_SUBMIT_TS: dict[str, deque] = {}  # uid → 60s 滑窗提交时间戳（monotonic）
+
+# 匿名面滑窗（P0-2）：IP → 60s 时间戳。设备流两端点共享一桶（code 发起 + token 轮询
+# 是同一次登录的两半）。进程内记账起步（多副本时各副本独立桶——nginx limit_req 是
+# 跨副本兜底层，见 deploy/nginx.conf）。
+_DEVICE_WIN: dict[str, deque] = {}
+
+
+def _client_ip(request: Request) -> str:
+    """客户端 IP：TRUST_XFF=on 取 X-Forwarded-For 末位，否则 socket 对端。
+
+    末位语义=单层反代（仓内 nginx）append 的 $remote_addr——客户端伪造前置链也
+    尾位可信。仅 api 绑回环（唯一入口=本机反代）拓扑下开 TRUST_XFF，直连开发档
+    保持 off（socket 直读，伪造 XFF 无效）。
+    """
+    if TRUST_XFF == "on":
+        xff = (request.headers.get("x-forwarded-for") or "").strip()
+        if xff:
+            return xff.split(",")[-1].strip()
+    return (request.client.host if request.client else "") or "unknown"
+
+
+def _admit_device(request: Request) -> str:
+    """设备流两端点的 IP 滑窗闸（P0-2）：匿名零频控可刷 OAuth 配额/被 Google 封 client_id。
+
+    打在调 Google 之前（护的是出网配额）；0 = 不设限。返回客户端 IP 供审计日志。
+    """
+    ip = _client_ip(request)
+    if not DEVICE_RATE_PER_MIN:
+        return ip
+    now = time.monotonic()
+    dq = _DEVICE_WIN.setdefault(ip, deque())
+    while dq and now - dq[0] > 60:
+        dq.popleft()
+    if len(dq) >= DEVICE_RATE_PER_MIN:
+        _req_log("POST", "/auth/device/*", 429, user=f"(anon:{ip})")
+        raise HTTPException(429, f"请求过频（限 {DEVICE_RATE_PER_MIN} 次/分钟/IP），稍后重试",
+                            headers={"X-Error": "RATE_LIMITED"})
+    dq.append(now)
+    return ip
 
 
 def _admit_submission(uid: str) -> None:
@@ -923,19 +964,21 @@ _GOOGLE_DEVICE_CODE_URL = "https://oauth2.googleapis.com/device/code"
 
 @app.post("/auth/device/code", response_model=DeviceCodeOut,
           summary="设备流登录第一步：向 Google 申请 device_code/user_code")
-async def auth_device_code() -> dict:
+async def auth_device_code(request: Request) -> dict:
     """给没有浏览器重定向能力的客户端（Obsidian 插件、CLI）用：服务端桥。"""
+    ip = _admit_device(request)  # P0-2：IP 滑窗闸在调 Google 之前（护出网配额）
     d = await _google_device_code()
-    _req_log("POST", "/auth/device/code", 200, user="(anon)")
+    _req_log("POST", "/auth/device/code", 200, user=f"(anon:{ip})")
     return d
 
 
 @app.post("/auth/device/token", response_model=DeviceTokenOut,
           summary="设备流轮询：device_code → id_token（用户授权前 401 pending）")
-async def auth_device_token(body: DeviceTokenBody) -> dict:
+async def auth_device_token(body: DeviceTokenBody, request: Request) -> dict:
     """acctkit 的 authenticate 是 headers 入参契约，换票逻辑复用其私有 _exchange；
     成功即回 id_token——插件此后所有请求带 `Authorization: Bearer <id_token>`，
     与网页端同一条 GoogleProvider 验签路径（external_id=sub 归并同一 uid）。"""
+    ip = _admit_device(request)  # P0-2：轮询也过闸（与 code 共享一桶=同一次登录的两半）
     from acctkit.providers import GoogleDeviceProvider
 
     cid = ENV.get("GOOGLE_CLIENT_ID", "").strip()
@@ -951,7 +994,7 @@ async def auth_device_token(body: DeviceTokenBody) -> dict:
     idt = str(tok.get("id_token") or "")
     if not idt:
         raise HTTPException(401, "Google 设备流未返回 id_token")
-    _req_log("POST", "/auth/device/token", 200, user="(anon)")
+    _req_log("POST", "/auth/device/token", 200, user=f"(anon:{ip})")
     return {"id_token": idt}
 
 

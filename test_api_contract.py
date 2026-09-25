@@ -736,6 +736,61 @@ def test_sweep_uploads_ttl(client, monkeypatch):
     assert _api._sweep_uploads() == 0  # 幂等
 
 
+# ---------------------------------------------------------------- 匿名面限流（P0-2）
+
+def test_device_rate_limit_and_xff(client, monkeypatch):
+    import video2md.api as _api
+
+    async def _fake_google_code():
+        return {"device_code": "dc", "user_code": "uc", "expires_in": 1800,
+                "interval": 5, "verification_url": "https://example.test/verify"}
+
+    monkeypatch.setattr(_api, "_google_device_code", _fake_google_code)
+    monkeypatch.setattr(_api, "DEVICE_RATE_PER_MIN", 3)
+
+    _api._DEVICE_WIN.clear()
+    # 同 IP 连打 3 次过、第 4 次 429 RATE_LIMITED（信封 details 符号码）
+    for _ in range(3):
+        assert client.post("/auth/device/code").status_code == 200
+    r = client.post("/auth/device/code")
+    assert r.status_code == 429 and r.json()["error"]["details"] == "RATE_LIMITED", r.text
+    # token 端点同桶（同一次登录的两半）：code 打满后 token 也拒——且拒在调 Google 之前
+    t = client.post("/auth/device/token", json={"device_code": "dc"})
+    assert t.status_code == 429 and t.json()["error"]["details"] == "RATE_LIMITED"
+    # 桶独立：换 IP（TRUST_XFF=on + XFF 末位）立即恢复
+    monkeypatch.setattr(_api, "TRUST_XFF", "on")
+    _api._DEVICE_WIN.clear()
+    for _ in range(3):
+        assert client.post("/auth/device/code",
+                           headers={"X-Forwarded-For": "198.51.100.7"}).status_code == 200
+    assert client.post("/auth/device/code",
+                       headers={"X-Forwarded-For": "198.51.100.7"}).status_code == 429
+    assert client.post("/auth/device/code",
+                       headers={"X-Forwarded-For": "203.0.113.9"}).status_code == 200
+    # 尾位语义：客户端伪造前置链，末位（反代 append 的真实 IP）才是记账键——
+    # 同尾位不同伪造前缀共享同一桶（打满即 429），换尾位即新桶
+    for _ in range(2):
+        assert client.post("/auth/device/code",
+                           headers={"X-Forwarded-For": f"9.9.9.{_}, 203.0.113.9"}).status_code == 200
+    assert client.post("/auth/device/code",
+                       headers={"X-Forwarded-For": "1.2.3.4, 203.0.113.9"}).status_code == 429
+    assert client.post("/auth/device/code",
+                       headers={"X-Forwarded-For": "5.5.5.5, 203.0.113.8"}).status_code == 200
+    # 伪造对 TRUST_XFF=off 无效：socket 对端（testclient）记账
+    monkeypatch.setattr(_api, "TRUST_XFF", "off")
+    _api._DEVICE_WIN.clear()
+    assert client.post("/auth/device/code",
+                       headers={"X-Forwarded-For": "6.6.6.6"}).status_code == 200
+    assert client.post("/auth/device/code",
+                       headers={"X-Forwarded-For": "7.7.7.7"}).status_code == 200
+    # 0 = 不设限
+    monkeypatch.setattr(_api, "DEVICE_RATE_PER_MIN", 0)
+    _api._DEVICE_WIN.clear()
+    for _ in range(10):
+        assert client.post("/auth/device/code").status_code == 200
+    monkeypatch.setattr(_api, "DEVICE_RATE_PER_MIN", 30)
+
+
 # ---------------------------------------------------------------- 协作式取消（P1-2）
 
 def _cancel_stubs(monkeypatch, graph_fn):
