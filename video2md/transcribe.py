@@ -15,7 +15,7 @@ from pathlib import Path
 
 import httpx
 
-from .util import fmt_hms, redact, run
+from .util import fmt_hms, pool_headers, redact, run
 
 _MIGRATION_HINT = (
     "V2MD_REMOTE=colab 已抽离（2026-09-21）：Colab 归 GPU 算力池统一接管。"
@@ -35,6 +35,7 @@ def remote_transcribe(video: Path, tmp: Path, base: str, model: str, language: s
     r = httpx.post(f"{base.rstrip('/')}/transcribe",
                    files={"audio": (audio.name, audio.read_bytes(), "audio/mp4")},
                    data={"model": model, "language": language},
+                   headers=pool_headers(),
                    timeout=httpx.Timeout(20, read=900.0))
     from .runs import bump_usage  # P2-2：远程调用墙钟（上界口径，含传输/排队）
     bump_usage(gpu_s=_time.monotonic() - _t0)

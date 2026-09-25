@@ -18,6 +18,16 @@ from .config import ENV, LOG_DIR, STATE_FILE
 
 
 # ---------------------------------------------------------------- utils
+def pool_headers() -> dict[str, str]:
+    """GPU 算力池调用的 Bearer 头（per-consumer 身份，gpu_router §0.6）。
+
+    V2MD_POOL_TOKEN 未设/空 = 不带鉴权头（本地裸池/回环无鉴权形态，向后兼容）；
+    池侧启 GPU_ROUTER_TOKENS 后必设——三个远端调用点（transcribe/ocr/clips）统一经此。
+    """
+    tok = (ENV.get("V2MD_POOL_TOKEN") or "").strip()
+    return {"Authorization": f"Bearer {tok}"} if tok else {}
+
+
 def run(cmd: list[str], **kw) -> subprocess.CompletedProcess:
     p = subprocess.run(cmd, capture_output=True, text=True, **kw)
     if p.returncode != 0:

@@ -16,6 +16,7 @@ from pathlib import Path
 
 from . import artsink
 from .config import CLIP_SPAN, ENV
+from .util import pool_headers
 
 
 def _clip_window(t: float, dur: float, segs: list[dict] | None) -> tuple[float, float]:
@@ -86,12 +87,13 @@ def remote_cut_clips(published: list, video: Path, dur: float,
         _t0 = _time.monotonic()
         if prefer_remote:
             print("    ☁️ 源片由远端直连 CDN 下载（省本地上行）…")
-            r = http.post(url, data=data)
+            r = http.post(url, data=data, headers=pool_headers())
         else:
             size_mb = video.stat().st_size / 1e6
             with video.open("rb") as fh:
                 r = http.post(url, data=data,
                               files={"video": (video.name, fh, "video/mp4")},
+                              headers=pool_headers(),
                               timeout=httpx.Timeout(30.0, read=3600.0,
                                                     write=max(600.0, size_mb * 8)))
         from .runs import bump_usage  # P2-2：远程调用墙钟（上界口径）

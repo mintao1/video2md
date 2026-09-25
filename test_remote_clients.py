@@ -100,6 +100,35 @@ items, _raw2 = frames_mod.ocr_candidates([(1.0, _TMP / "g_001.jpg")], "remote",
                                          base="http://r", client=mc2)
 check("ocr_candidates remote 分支 + LOW_CONF 过滤", items == [(1.0, "要点一", 0.92)])
 
+# ---- Bearer 头传播（V2MD_POOL_TOKEN → 三个池调用点统一带 Authorization）
+from video2md import util as util_mod
+
+_seen: dict[str, str] = {}
+def auth_handler(req: httpx.Request) -> httpx.Response:
+    _seen["auth"] = req.headers.get("authorization") or ""
+    if req.url.path == "/clips":
+        return httpx.Response(200, content=_tar_bytes())
+    if req.url.path == "/ocr":
+        return httpx.Response(200, json={"results": []})
+    return httpx.Response(404)
+
+auth_client = httpx.Client(transport=httpx.MockTransport(auth_handler), base_url="http://r")
+_orig_env = util_mod.ENV
+try:
+    util_mod.ENV = {**_orig_env, "V2MD_POOL_TOKEN": "tok-abc"}
+    clips_mod.remote_cut_clips([("c-f01-0002.jpg", "00:02")], _TMP / "fake.mp4",
+                               120.0, [], _TMP, "http://r", client=auth_client)
+    check("V2MD_POOL_TOKEN 设定 → clips 调用带 Bearer", _seen["auth"] == "Bearer tok-abc")
+    frames_mod.ocr_remote([(1.0, _TMP / "g_001.jpg")], "http://r", client=auth_client)
+    check("V2MD_POOL_TOKEN 设定 → ocr 调用带 Bearer", _seen["auth"] == "Bearer tok-abc")
+    util_mod.ENV = {k: v for k, v in _orig_env.items() if k != "V2MD_POOL_TOKEN"}
+    clips_mod.remote_cut_clips([("d-f01-0003.jpg", "00:03")], _TMP / "fake.mp4",
+                               120.0, [], _TMP, "http://r", client=auth_client)
+    check("V2MD_POOL_TOKEN 未设 → 不带鉴权头（回环裸池向后兼容）", _seen["auth"] == "")
+finally:
+    util_mod.ENV = _orig_env
+    auth_client.close()
+
 print()
 if FAILED:
     print(f"❌ {len(FAILED)} 项失败：" + "; ".join(FAILED))

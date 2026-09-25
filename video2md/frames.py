@@ -10,7 +10,7 @@ from pathlib import Path
 
 from . import artsink
 from .config import BLUR_SHARP_MIN, ENV, FRAME_DEDUP_EPS, FRAME_MAE_MAX, LOW_CONF
-from .util import fmt_ts
+from .util import fmt_ts, pool_headers
 
 
 # ---------------------------------------------------------------- ②b frames
@@ -291,7 +291,8 @@ def ocr_remote(frames: list[tuple[float, Path]], base: str, client=None) -> list
         print(f"  ☁️ 远端 GPU OCR → {base.rsplit('//', 1)[-1]}（{len(frames)} 帧一批）")
         import time as _time
         _t0 = _time.monotonic()
-        r = http.post(f"{base.rstrip('/')}/ocr", files=files)
+        r = http.post(f"{base.rstrip('/')}/ocr", files=files,
+                      headers=pool_headers())
         from .runs import bump_usage  # P2-2：远程调用墙钟（上界口径）
         bump_usage(gpu_s=_time.monotonic() - _t0)
         if r.status_code != 200:
