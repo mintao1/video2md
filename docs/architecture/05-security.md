@@ -11,8 +11,8 @@
 | 假冒（S） | 用户身份 | Google JWKS 验签 / 微信 code 换 unionid；设备流桥；production+off 启动拒起（P0-1 ✅） | 低 |
 | 篡改（T） | run 记录/产物 | owner 隔离 403；原子写；行级 upsert | 低 |
 | 抵赖（R） | 操作痕迹 | `logs/api-requests.jsonl` 请求审计；run jsonl | 无签名/不可抵赖需求（当前规模可接受） |
-| 信息泄露（I） | 路径/配额/基础设施画像 | `/preflight` 匿名面 detail 剥除（P0-3 ✅） | `/docs` 开放（S4，待 P0-4 反代 deny） |
-| 拒绝服务（DoS） | OAuth 配额/队列/磁盘 | 认证提交三闸；上传魔数校验（P0-6 ✅） | **匿名端点零频控**（S2，待 P0-2） |
+| 信息泄露（I） | 路径/配额/基础设施画像 | `/preflight` 匿名面 detail 剥除（P0-3 ✅）；OpenAPI 面网关 deny（P0-4 ✅） | 低 |
+| 拒绝服务（DoS） | OAuth 配额/队列/磁盘 | 认证提交三闸；上传魔数校验（P0-6 ✅）；设备流 IP 滑窗 30/min + nginx 双层兜底（P0-2 ✅） | 低 |
 | 提权（E） | uid 越权 | `_require_run_access` 403 | 低（有契约测试钉住） |
 
 ## 防线现状（已落地）
@@ -30,9 +30,9 @@
 | # | 缺口 | 评级 | ROADMAP |
 |---|---|---|---|
 | S1 | ~~production + AUTH=off 可共存，启动不抗议~~ | ✅ | P0-1（dc0184d） |
-| S2 | `/auth/device/*` 匿名零频控（可刷 OAuth 配额） | 🔴 | P0-2 |
+| S2 | ~~`/auth/device/*` 匿名零频控（可刷 OAuth 配额）~~ | ✅ | P0-2（见 commit） |
 | S3 | ~~`/preflight` 匿名暴露路径/磁盘/provider 清单~~ | ✅ | P0-3（63bfe84） |
-| S4 | `/docs` `/openapi.json` 开放，关闭靠人工反代纪律 | 🔴 | P0-4 |
+| S4 | ~~`/docs` `/openapi.json` 开放，关闭靠人工反代纪律~~ | ✅ | P0-4（见 commit） |
 | S5 | ~~上传无 magic number 内容校验~~ | ✅ | P0-6（7ae5b7b） |
 | S6 | 日志脱敏只盖 `sk-`/`app-`/`dataset-` 三前缀（`util.py:112-118`） | 🟡 | 随 P2-5 日志收口一并治 |
 | S7 | compose PG 默认口令仅回环兜底 | 🟢 | DSN 外指时必须覆盖（部署清单） |
@@ -43,15 +43,15 @@
 | 项 | 达标口径 |
 |---|---|
 | P0-1 ✅ dc0184d | 启动防呆（production+off import 期拒起，组合测试钉住） |
-| P0-2 | 匿名端点 IP 限流（待清偿） |
+| P0-2 ✅ | 设备流两端点 IP 滑窗（30/min 共享桶，XFF 尾位信任锚=回环拓扑） |
 | P0-3 ✅ 63bfe84 | preflight 匿名面 detail 剥除（回环/真实认证可见完整版） |
-| P0-4 | 反代实体 + `/docs` deny 验证（待清偿） |
+| P0-4 ✅ | 仓内 deploy/nginx.conf + compose nginx 服务 + smoke_proxy.sh CI 验证 + deploy.sh 断言 |
 | P0-6 ✅ 7ae5b7b | 上传魔数校验（文本改名 422 即删） |
 | `V2MD_AUTH` | `google`（或含 google/wechat 的组合），**机制保证**（P0-1 ✅ fail-fast 已落地） |
 | `V2MD_ARTIFACT_MODE` | `deliver`（多用户「云端不储存」） |
 | `V2MD_CORS_ORIGINS` | 只列真实前端 origin |
 | `V2MD_ENV` | `production`（Langfuse 分项目 + 生产档位防呆开关） |
-| 反代 | 仓内配置（P0-4）：SSE 关缓冲、`/docs` `/openapi.json` deny、`limit_req` |
+| 反代 | ✅ 仓内配置（P0-4）：SSE 关缓冲、OpenAPI 面 deny、`limit_req` 双 zone、body 2g；TLS 证书部署期接 `deploy/certs/` |
 | 安全组 | 只放 80/443（02 篇网络口径逐项核对） |
 | 密钥 | `secrets/` 0600 + 已入密码管理器/备份方案（09 篇） |
 | 观测 | 告警链自测（触发一条 warning 看飞书卡片）；死人开关 URL 已配 |

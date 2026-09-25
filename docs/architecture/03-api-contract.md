@@ -17,12 +17,12 @@
 | DELETE /runs/{id}/artifacts | owner+deliver | ACK 即焚（rmtree 物理销毁），再删 410 | `api.py:940` |
 | POST /runs/{id}/cancel | owner | 撤销进行中 run（P1-2）：排队立即 error(cancelled) 留痕；运行中协作式（条目循环头 SystemExit，长单阶段内无取消点）；他副本驱动走 cmd 广播回 cancelling；终态 409 `NOT_CANCELLABLE` | `api.py` cancel_run |
 | GET /runs/{id}/events | owner | SSE：connected 快照 → 事件流 → 终态关流；15s `: ping` 保活 | `api.py:966` |
-| POST /auth/device/code | **匿名** | Google 设备流第一步 | `api.py:708` |
-| POST /auth/device/token | **匿名** | device_code → id_token | `api.py:717` |
+| POST /auth/device/code | **匿名+IP 限流** | Google 设备流第一步（P0-2：30/min/IP 滑窗，429 RATE_LIMITED；与 token 共享桶） | `api.py` |
+| POST /auth/device/token | **匿名+IP 限流** | device_code → id_token（轮询与 code 共享限流桶——同一次登录的两半） | `api.py` |
 | GET /queue | **匿名** | `{queue_len, running, limits}`（gpu_router 看门狗回读） | `api.py:1008` |
 | GET /healthz | **匿名** | 存活 + version（Docker healthcheck） | `api.py:1029` |
 | GET /preflight | **匿名** | 环境体检（ffmpeg/磁盘/vault|outbox/算力池） | `api.py:1035` |
-| GET /docs, /openapi.json | **匿名** | OpenAPI（反代层 deny，见 P0-4） | `api.py:620-621` |
+| GET /docs, /openapi.json | **匿名**（直连回环） | OpenAPI——公网经仓内 nginx 一律 403（P0-4 ✅，smoke_proxy.sh 钉住） | `api.py` |
 
 ### POST /runs 请求字段
 

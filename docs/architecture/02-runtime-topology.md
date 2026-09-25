@@ -7,7 +7,7 @@
 
 ```
 云服务器（≥2C4G，无 GPU）
-├─ 反代 TLS（nginx/caddy）:443 ── 唯一公网入口          ⚠ 配置实体待入仓（ROADMAP P0-4）
+├─ nginx（仓内 deploy/nginx.conf）:80(/443 模板) ── 唯一公网入口（P0-4 ✅）
 │    └─→ 127.0.0.1:8790
 ├─ docker compose 栈（network_mode: host）
 │    ├─ video2md 容器      uvicorn 单进程，V2MD_HOST=127.0.0.1:8790
@@ -29,7 +29,7 @@
 
 | 端口 | 绑定 | 公网可达 | 说明 |
 |---|---|---|---|
-| 443 | 反代 | ✅ 唯一入口 | TLS 终结；SSE 关缓冲；`/docs` `/openapi.json` deny（P0-4 后机制化） |
+| 80/443 | 反代 | ✅ 唯一入口 | 仓内 nginx（P0-4 ✅）：SSE 关缓冲；`/docs`/`/openapi.json`/`/redoc` deny；匿名双层限流；body 上限 2g。TLS 证书部署期接 `deploy/certs/`（模板见 conf 尾） |
 | 8790 | 127.0.0.1 | ❌ | api；`ssh -L 8790:127.0.0.1:8790` 隧道调试 |
 | 9700 | 全接口 | ❌（安全组不放行） | gpu_router **无认证**（`docker-compose.yml:25-26` 自述） |
 | 3000/9090/4318/8889/9760 | 127.0.0.1 | ❌ | 观测栈 |
@@ -90,7 +90,11 @@ curl -s localhost:8790/healthz && curl -s localhost:8790/preflight && \
 # 观测栈验证：curl -s 127.0.0.1:9090/-/healthy（prometheus）· curl -s 127.0.0.1:3000/api/health（grafana）
 ```
 
-**3. 反代 TLS**——api 只绑回环，公网流量全部经反代终结 TLS。参考配置（⚠ 示例资产待 P0-4 入仓机制化，当前照抄后自行维护）：
+**3. 反代 TLS**——api 只绑回环，公网流量全部经反代终结 TLS。**配置实体已入仓（P0-4 ✅）**：
+`deploy/nginx.conf`（compose 的 nginx 服务挂载，host 网络）——SSE 关缓冲、OpenAPI 面 deny、
+`limit_req` 双 zone（通用 120r/m + 设备流 30r/m 对齐应用层）、`client_max_body_size 2g`。
+`scripts/smoke_proxy.sh` 在 CI 逐面验证。TLS 证书部署期放 `deploy/certs/`（gitignore，模板见
+conf 尾注释；lego/certbot DNS-01 或前置 Caddy 自动 ACME）。历史参考配置：
 
 ```nginx
 server {
@@ -150,7 +154,7 @@ watchdog `V2MD_WATCHDOG_ACTION=exit`（compose 生产已配）：判定卡死 �
 
 ## 已知限制
 
-1. 反代配置不在仓（P0-4）；「安全组只放 80/443」无机制承载。
+1. ~~反代配置不在仓~~（P0-4 ✅：deploy/nginx.conf + compose nginx 服务 + smoke_proxy.sh CI 验证 + deploy.sh 起栈后 /docs→403 断言）。「安全组只放 80/443」由仓内拓扑承载。
 2. gpu_router :9700 无认证，信任模型 = 网络位置；colab quick tunnel 是无鉴权公网 URL（批判② S8）。
 3. 单副本 + 单 PG，均为 SPOF；多副本读侧就绪、写路径与验证闭环见 ROADMAP P1-1/P1-4。
 4. compose PG 默认口令 `v2md-loopback-only` 仅回环兜底（`docker-compose.yml:98`）；DSN 指外部库时必须显式覆盖。

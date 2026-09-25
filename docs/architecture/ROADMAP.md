@@ -12,7 +12,7 @@
 
 ## P0：上公网前必须（7 项）
 
-> **进度**：✅ 6/7（P0-1 dc0184d · P0-3 63bfe84 · P0-5 a3056e4 · P0-6 7ae5b7b · P0-7 9e834a2）；余 P0-2（依赖 P0-4 的 XFF 信任锚）、P0-4（需域名/TLS 决策）。
+> **进度**：✅ 7/7 全清（P0-1 dc0184d · P0-2 见本批 · P0-3 63bfe84 · P0-4 见本批 · P0-5 a3056e4 · P0-6 7ae5b7b · P0-7 9e834a2）——「可上公网」里程碑达成（生产接线仅剩：域名 DNS + TLS 证书放 deploy/certs/ + 安全组放 80/443）。
 
 ### P0-1 AUTH=off 生产防呆 🔒
 - **动机**：批判② S1——`V2MD_ENV=production` + `V2MD_AUTH=off` 共存即裸奔；config.py 已有 fail-fast 先例（`config.py:113-115`）
@@ -20,11 +20,15 @@
 - **验收**：compose 注释掉 AUTH 起栈 → 进程非零退出 + stderr 一行指明缺哪个键；测试断言该组合 raise
 - **工作量**：S ｜ **阻塞**：无 ｜ **状态**：✅ dc0184d（DEPLOY_ENV 升格一等配置；组合测试子进程隔离 ×4）
 
-### P0-2 匿名端点限流 🔒
+### P0-2 匿名端点限流 🔒 ✅
 - **动机**：批判② S2 + 批判①限流层——`/auth/device/code|token` 匿名零频控可刷 OAuth 配额
 - **内容**：设备流两端点加 IP 滑窗限流（如 10 次/分/IP，进程内 dict 起步；PG 档可复用 `v2md_submit_log` 模式按 IP 记账）；429 走统一信封
 - **验收**：测试连续打 N 次 → 第 N+1 次 429 `RATE_LIMITED`；README/03 篇匿名面清单更新
-- **工作量**：M ｜ **阻塞**：无
+- **工作量**：M ｜ **阻塞**：无 ｜ **状态**：✅（见 commit）。落地口径：进程内滑窗（多副本由 nginx
+  limit_req 兜底跨副本语义）；两端点**共享桶**（code+token 是同一次登录的两半）；**缺省 30/min
+  而非示例的 10**——token 端点按 Google 建议间隔（~5s）轮询，合法单用户登录就要 12 次/min，
+  10 会误伤正常轮询（批判修正）。XFF 信任锚=回环拓扑（api 绑 127.0.0.1 唯一入口=仓内 nginx，
+  XFF 尾位=真实客户端；`V2MD_TRUST_XFF` 缺省 off，compose 生产档置 on）——P0-4 落地后依赖消解
 
 ### P0-3 /preflight 信息收敛 🔒
 - **动机**：批判② S3——匿名暴露内部路径、磁盘余量、算力池 provider 清单
@@ -32,11 +36,17 @@
 - **验收**：公网形态请求 `/preflight` 无绝对路径/provider 名；`docker-compose` healthcheck 不受影响
 - **工作量**：S ｜ **阻塞**：无 ｜ **状态**：✅ 63bfe84（off 档非回环亦脱敏——严于原方案；smoke grep 与 deploy.sh 回环体检不受影响）
 
-### P0-4 反代配置实体化 🔒
+### P0-4 反代配置实体化 🔒 ✅
 - **动机**：批判①入口层 + E5——「网关侧关闭 /docs」无资产承载
 - **内容**：`deploy/nginx.conf`（或 `Caddyfile`）入仓：SSE 关缓冲、`/docs` `/openapi.json` deny、`limit_req` zone（兜底 P0-2 的通用 HTTP 限流）、`client_max_body_size`；`deploy.sh` 起栈后自动验证 `/docs` 返回 403/404
 - **验收**：`smoke_compose.sh` 或新增 smoke 走反代路径断言 `/docs` 被拦；README 部署章改指仓内配置
-- **工作量**：M ｜ **阻塞**：无（P2-3 蓝绿依赖此项）
+- **工作量**：M ｜ **阻塞**：无（P2-3 蓝绿依赖此项）｜ **状态**：✅（见 commit）。落地口径：
+  `deploy/nginx.conf`（选 nginx 弃 Caddy：limit_req 原生 + api 的 X-Accel-Buffering 头本就指向
+  nginx）+ compose `nginx` 服务（host 网络，挂载仓内配置与 `deploy/certs/`）+ `deploy.sh` 起栈后
+  断言 `/docs`→403、healthz 经反代→200 + `scripts/smoke_proxy.sh`（sed 只换 upstream 验证同源
+  配置：deny×3 / 透传 / SSE 即时性 / 200 连发 136 个 429 的 limit_req 实证）进 CI test job。
+  TLS 证书=部署期人工接线（conf 尾模板 + certs/ gitignore）——域名/TLS 决策不影响资产与验证，
+  原判定的「外部依赖阻塞」只作用于生产接线一步
 
 ### P0-5 schema 迁移纪律 🔧 ✅
 - **动机**：批判②可演进性 H——DDL 散在构造函数，`claimed_by` 靠 ALTER 补丁（`pgstore.py:127`）
