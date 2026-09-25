@@ -1,49 +1,17 @@
-# video2md + gpu_router 生产编排（云服务器 · 多用户）。
-# 目录约定：两仓库同级（默认 ../gpu_router；可用 GPU_ROUTER_DIR 环境变量覆盖，
-# 如 Mac 上 GPU_ROUTER_DIR=~/Desktop/开发项目/gpu_router）。
+# video2md 生产编排（云服务器 · 多用户）。GPU 算力池已解耦独立成栈（2026-09-26
+# ADR-0012）：gpu_router 以自有 compose 运行于 ../gpu_router（deploy/cloud/），
+# 本栈只作回环消费者（V2MD_*_REMOTE=127.0.0.1:9700 + V2MD_POOL_TOKEN Bearer）。
 # 凭证：secrets/ 目录（gitignore，部署时手工放）：
 #   secrets/video2md.env      → LLM_BASE_URL/LLM_API_KEY/LLM_MODEL（挂进容器由 V2MD_SECRETS_FILE 读）
-#   secrets/gpu_router.env    → 代理 env（HTTP_PROXY/HTTPS_PROXY/ALL_PROXY/NO_PROXY，可选但强烈建议）
-#   secrets/colab-cli/token.json、secrets/kaggle/kaggle.json（可选，缺了对应 provider 自动冷却）
+#   （colab-cli/kaggle/gpu_router.env 已随算力池解耦迁至 gpu_router 栈 secrets/，ADR-0012）
 name: video2md
 
 volumes:
   v2md-data: {}        # state.json / runs.json / checkpoints.sqlite / logs
   vault: {}            # vault 模式产物卷（deliver 多用户形态不用此卷）
-  gpu-router-logs: {}  # provider 冷却/用量记账
   v2md-pg: {}          # Postgres checkpointer 数据（仅 --profile pg 时用到）
 
 services:
-  gpu_router:
-    build:
-      context: ${GPU_ROUTER_DIR:-../gpu_router}
-      args:
-        PIP_INDEX_URL: ${PIP_INDEX_URL:-}   # 国内机构建传清华镜像，见 README 部署章
-    image: video2md-gpu-router
-    restart: unless-stopped
-    # host 网络：出网代理常驻宿主回环（桥接网络够不到），host 直连；代理地址按服务器实际
-    # 进 secrets/gpu_router.env。9700 监听全接口但安全组不放行（无认证不暴露公网；
-    # 公网唯一入口 = api 侧反代 TLS，见 README 部署章）
-    network_mode: host
-    volumes:
-      - ${GPU_ROUTER_DIR:-../gpu_router}/gpu_router.docker.json:/app/gpu_router.json:ro
-      - gpu-router-logs:/app/logs
-      - ./secrets/colab-cli:/root/.config/colab-cli   # rw：OAuth token 刷新要回写 token.json
-      - ./secrets/kaggle:/root/.kaggle:ro
-    env_file:
-      - path: ./secrets/gpu_router.env   # HTTP_PROXY=http://127.0.0.1:<回环代理端口> 等
-        required: false
-
-  # 公网唯一入口（P0-4）：host 网络 nginx 绑 80（443 见 deploy/nginx.conf TLS 模板）。
-  # 安全组只放 80/443——api 绑回环不经此不可达，这份「不可直达」即 XFF 的信任锚。
-  # SSE 关缓冲 / OpenAPI 面 deny / 匿名双层限流 / body 上限都在仓内配置里，改动走 git。
-  nginx:
-    image: nginx:1.27-alpine
-    restart: unless-stopped
-    network_mode: host
-    volumes:
-      - ./deploy/nginx.conf:/etc/nginx/conf.d/default.conf:ro
-      - ./deploy/certs:/etc/nginx/certs:ro   # TLS 部署期放证书（.gitignore）
 
   video2md:
     build:
@@ -52,9 +20,6 @@ services:
         PIP_INDEX_URL: ${PIP_INDEX_URL:-}
     image: video2md
     restart: unless-stopped
-    depends_on:
-      gpu_router:
-        condition: service_started
     # host 网络：① 算力池/队列都在宿主回环（127.0.0.1:9700 / :8790）；② yt-dlp 子进程
     # 走 V2MD_PROXY 绕国内站对机房 IP 的风控（代理侧需大陆住宅出口，见 README「出网与风控」）。
     # api 绑定 V2MD_HOST=127.0.0.1 只露回环——公网唯一入口 = 反代 TLS（见 README 部署章）；
