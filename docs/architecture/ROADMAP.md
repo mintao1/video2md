@@ -124,11 +124,19 @@
 - **验收**：SLO 文档评审通过；至少 1 条燃烧率告警进 `deploy/prometheus-rules.yml` 并过 promtool
 - **工作量**：S-M ｜ **阻塞**：无
 
-### P1-6 容量规划实测
+### P1-6 容量规划实测 ✅
 - **动机**：批判②维度 3 H——无容量模型
 - **内容**：负载测试脚本（N 并发 POST /runs + mockpool 假算力）；产出基线：单 worker 吞吐、runs.json/jsonb 膨胀率、uploads/outbox 磁盘增长曲线；数字回填 `08-capacity-and-slo.md`（`⏳ P1 待测` 占位处）
 - **验收**：08 篇所有占位符替换为实测值 + 测试方法可复跑
-- **工作量**：M ｜ **阻塞**：无
+- **工作量**：M ｜ **阻塞**：无 ｜ **状态**：✅（见 commit）。`scripts/loadtest.py` 四场景自旋栈
+  （复跑一条命令，含 PG 对照组）；08 篇六个 ⏳ 全部回填实测值。**口径纪律**：mock 算力测的是
+  管线开销上限（json 0.1–0.3s/run、PG 全链 0.8s/run、SSE 20/20 无丢、runs.json ~1KB/run、
+  PG ~32KB/run 小样本含索引固定页、1h tmp 外推 ~1.2GB），真实 GPU 延迟归 gpu_router EMA 账本
+  域——不冒充生产吞吐。**过程挖出三个实锤**（补遗 2026-09-25-loadtest-findings.md）：
+  ①state.json 历史异构值（{"k2":49}）打穿 POST 全路 → create_run 加 isinstance 设防（已修）；
+  ②配额闸 admit TOCTOU——并发突发互不可见在途计数，滑窗才是突发兜底（登记在册未修，单用户
+  语义无恙）；③测量工具沙箱纪律（首轮 A 节点漏钉三件套读写真实数据——已修 + 起前清场 +
+  崩溃安全清理）
 
 ### P1-7 灾备演练制度化
 - **动机**：批判①数据安全层——演练是建议非制度；secrets 在备份机制外
