@@ -1,4 +1,13 @@
-"""配置与基座：项目 .env（非机密）+ 凭证文件（机密）+ 路径常量。"""
+"""配置与基座：项目 .env（非机密）+ 凭证文件（机密）+ 路径常量。
+
+P1-9 起配置是**契约**：键/类型/默认/校验器集中登记于 _SPEC 一表——新键=加一行，
+别处零改动；启动期统一解析，非法值**一次性汇总报错**（非首错即停，运维一次改对）。
+
+合并优先级：项目 .env（非机密兜底）< 凭证文件 < 真实环境变量。真实环境变量
+**含空串**参与覆盖：空串 = 显式清空该键（回落表内默认）——修掉旧「空串被丢弃
+→ .env 真值渗入」的隔离缺口（test_api_contract 实证踩坑：V2MD_REMOTE="" 打不住
+.env 的 9700）。消费者侧 `ENV.get(k, d) or d` 的 or 兜底语义不变。
+"""
 from __future__ import annotations
 
 import os
@@ -23,7 +32,6 @@ FRAME_DEDUP_EPS = 0.4   # 候选帧微去重（秒）：网格/场景两路同�
 
 
 
-
 CLIP_SPAN = 10        # 视频节段：帧时间戳 ±10s 剪 20s 可播片段（对齐参考笔记的内嵌 mp4）
 
 
@@ -45,43 +53,129 @@ def _read_env_file(p: Path) -> dict[str, str]:
     return out
 
 
-
 # 机密凭证 SSOT：~/.config/video2md.env（0600；LLM_API_KEY 等）。
 # Dify 抽离（2026-09-21）后不再经 dify_kit 注入 dify-zcode.env。
 SECRETS_FILE = Path(ENV_SECRETS_OVERRIDE) if (ENV_SECRETS_OVERRIDE := os.environ.get("V2MD_SECRETS_FILE")) \
     else Path.home() / ".config" / "video2md.env"
 
 
-
 def load_env() -> dict[str, str]:
-    """合并优先级：项目 .env（非机密兜底）< 凭证文件 < 真实环境变量。"""
+    """合并优先级：项目 .env（非机密兜底）< 凭证文件 < 真实环境变量。
+
+    真实环境变量含空串一并覆盖（= 显式清空 → 解析回落默认）；.env/凭证文件里的
+    空串同样按「未设值」处理（_spec 解析统一口径）。
+    """
     env = _read_env_file(PROJ / ".env")
     env.update(_read_env_file(SECRETS_FILE))
-    env.update({k: v for k, v in os.environ.items() if v})  # 真实环境变量优先
+    env.update(dict(os.environ))
     return env
-
 
 
 ENV = load_env()
 
 
-# 运行档位（P0-1 生产防呆）：V2MD_ENV 此前只是遥测标签（observability.py 读），自此处
-# 升格为一等配置——production 档强制鉴权，裸奔组合 import 期即 fail-fast（compose 生产
-# 编排设 V2MD_ENV: production，V2MD_AUTH 走 secrets 文件亦经 load_env 合入，此闸可见）。
-DEPLOY_ENV = (ENV.get("V2MD_ENV") or "development").strip().lower()
-if DEPLOY_ENV == "production" and (ENV.get("V2MD_AUTH") or "off").strip().lower() in ("", "off"):
-    raise RuntimeError(
-        "V2MD_ENV=production 但 V2MD_AUTH=off（或未配置）：生产档禁止无鉴权裸奔。"
-        "修法：secrets/video2md.env 设 V2MD_AUTH=google（+ GOOGLE_CLIENT_ID）；"
-        "非生产环境勿设 V2MD_ENV=production。检查清单见 docs/architecture/05-security.md")
+# ---------------------------------------------------------------- 配置契约表（P1-9）
+# 行 = (类型, 默认, 约束/校验)。类型：path/str/int/float/enum/csv。
+# 新键加一行即可；解析在 import 期完成（fail-fast 启动闸）——「import 期加载」的
+# 原批判点在散落与静默，不在时机：启动期一次性全量报错正是要的语义。
+_SPEC: dict[str, tuple] = {
+    # 运行档位
+    "V2MD_ENV":             ("str", "development", None),
+    # 持久化/身份/凭证（容器里指 data 卷；凭证文件只在此处定位）
+    "V2MD_STATE_FILE":      ("path", str(PROJ / "state.json"), None),
+    "V2MD_RUNS_FILE":       ("path", str(PROJ / "runs.json"), None),
+    "V2MD_USERS_FILE":      ("path", str(PROJ / "users.json"), None),
+    "V2MD_LOG_DIR":         ("path", str(PROJ / "logs"), None),
+    "V2MD_SECRETS_FILE":    ("path", str(SECRETS_FILE), None),
+    "OBSIDIAN_VAULT":       ("path", str(Path.home() / "Documents/Obsidian Vault"), None),
+    # 鉴权/CORS（V2MD_AUTH 语义在 acctkit.build_from_env，此处不镜像——接线 auth/__init__.py）
+    "V2MD_CORS_ORIGINS":    ("csv", [], None),
+    # 产物落点
+    "V2MD_ARTIFACT_MODE":   ("enum", "vault", ("vault", "deliver")),
+    "V2MD_OUTBOX_DIR":      ("path", str(PROJ / "data" / "outbox"), None),
+    "V2MD_OUTBOX_TTL_H":    ("float", 24.0, ("gt", 0.0)),
+    # run 卡死看门狗
+    "V2MD_WATCHDOG_TIMEOUT_S": ("float", 7200.0, ("gt", 0.0)),
+    "V2MD_WATCHDOG_PERIOD_S":  ("float", 60.0, ("gt", 0.0)),
+    "V2MD_WATCHDOG_ACTION":    ("enum", "mark", ("mark", "exit")),
+    # 执行层并发与配额（0 = 该项不设限）
+    "V2MD_MAX_CONCURRENT_RUNS": ("int", 1, ("min", 1)),
+    "V2MD_QUEUE_MAX":           ("int", 100, ("min", 0)),
+    "V2MD_USER_QUEUE_MAX":      ("int", 5, ("min", 0)),
+    "V2MD_USER_SUBMIT_PER_MIN": ("int", 30, ("min", 0)),
+    # 上传面
+    "V2MD_UPLOADS_DIR":     ("path", str(PROJ / "data" / "uploads"), None),
+    "V2MD_UPLOAD_MAX_GB":   ("float", 2.0, ("gt", 0.0)),
+    "V2MD_UPLOAD_QUOTA_GB": ("float", 5.0, ("gt", 0.0)),
+    "V2MD_UPLOADS_TTL_H":   ("float", 24.0, ("gt", 0.0)),
+    # 任务表真相源（P4b·多副本档）
+    "V2MD_TASKS_STORE":     ("enum", "json", ("json", "postgres")),
+    # 本地路径输入策略（auto/allow/deny 语义见 _validate_run_url）
+    "V2MD_LOCAL_PATHS":     ("enum", "auto", ("auto", "allow", "deny")),
+}
 
+
+def _parse_spec(env: dict[str, str]) -> tuple[dict, list[str]]:
+    """按 _SPEC 全量解析：返回 (键→终值, 错误清单)。错误攒齐不首停（P1-9 验收口径）。"""
+    out: dict = {}
+    errs: list[str] = []
+    for key, (typ, default, rule) in _SPEC.items():
+        raw = env.get(key)
+        if raw is None or str(raw).strip() == "":     # 未设/空串=显式清空 → 默认
+            out[key] = Path(default) if (typ == "path" and not isinstance(default, Path)) else default
+            continue
+        raw = str(raw).strip()
+        try:
+            if typ == "path":
+                out[key] = Path(raw)
+            elif typ == "str":
+                out[key] = raw.lower()
+            elif typ == "int":
+                out[key] = int(raw)
+            elif typ == "float":
+                out[key] = float(raw)
+            elif typ == "enum":
+                v = raw.lower()
+                allowed = rule or ()
+                if v not in allowed:
+                    errs.append(f"{key}={raw!r} 未知（支持 {'|'.join(allowed)}）")
+                    out[key] = default
+                    continue
+                out[key] = v
+            elif typ == "csv":
+                out[key] = [o.strip() for o in raw.split(",") if o.strip()]
+        except ValueError:
+            errs.append(f"{key}={raw!r} 不是合法 {typ}")
+            out[key] = default
+            continue
+        if rule and typ in ("int", "float") and isinstance(rule, tuple):
+            kind, bound = rule
+            val = out[key]
+            if (kind == "gt" and not val > bound) or (kind == "min" and not val >= bound):
+                errs.append(f"{key}={raw!r} 越界（要求 {kind} {bound}）")
+    return out, errs
+
+
+_PARSED, _ERRS = _parse_spec(ENV)
+
+# 生产防呆（P0-1）：production 档禁无鉴权裸奔。与表错误一并汇总（一次报全）。
+if _PARSED.get("V2MD_ENV") == "production" \
+        and (ENV.get("V2MD_AUTH") or "off").strip().lower() in ("", "off", "none"):
+    _ERRS.append("V2MD_ENV=production 但 V2MD_AUTH=off（或未配置）：生产档禁止无鉴权裸奔——"
+                 "secrets/video2md.env 设 V2MD_AUTH=google（+ GOOGLE_CLIENT_ID）")
+
+if _ERRS:
+    raise RuntimeError("配置错误（共 {} 处，一次改全）：\n  - ".format(len(_ERRS))
+                       + "\n  - ".join(_ERRS))
+
+
+# ---------------------------------------------------------------- 解析产物（消费面零改动）
+DEPLOY_ENV: str = _PARSED["V2MD_ENV"]
 
 # 持久化文件位置：容器里由 compose 指到 data 卷（/app/data/…），本机默认项目根
-STATE_FILE = Path(ENV.get("V2MD_STATE_FILE", str(PROJ / "state.json")))
-
-
-LOG_DIR = Path(ENV.get("V2MD_LOG_DIR", str(PROJ / "logs")))
-
+STATE_FILE: Path = _PARSED["V2MD_STATE_FILE"]
+RUNS_FILE: Path = _PARSED["V2MD_RUNS_FILE"]
+LOG_DIR: Path = _PARSED["V2MD_LOG_DIR"]
 
 # 代理键透传给子进程/httpx（YouTube 等境外源下载；国内站代码层强制直连）。
 # 真实环境变量优先，.env 只作兜底。
@@ -93,26 +187,22 @@ for _pk in ("HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "NO_PROXY",
 
 
 # 身份表（多用户鉴权：(provider, external_id) → 稳定内部 uid）：容器里指到 data 卷
-USERS_FILE = Path(ENV.get("V2MD_USERS_FILE", str(PROJ / "users.json")))
+USERS_FILE: Path = _PARSED["V2MD_USERS_FILE"]
 
 # 鉴权配置解析已收进 acctkit.build_from_env（V2MD_AUTH / V2MD_AUTH_PROVIDERS /
 # GOOGLE_CLIENT_ID 语义见 acctkit/engine.py 与 README「acctkit」节；off 缺省保证
 # e2e/batch 无 token 也能跑），接线在 video2md/auth/__init__.py，此处不再镜像一份。
 # CORS 放行 origin（逗号分隔；GUI 前端域名）。空=不加 CORS 中间件（同源/隧道开发够用）
-CORS_ORIGINS = [o.strip() for o in (ENV.get("V2MD_CORS_ORIGINS", "") or "").split(",") if o.strip()]
+CORS_ORIGINS: list[str] = _PARSED["V2MD_CORS_ORIGINS"]
 
-
-VAULT = Path(ENV.get("OBSIDIAN_VAULT", str(Path.home() / "Documents/Obsidian Vault")))
-
+VAULT: Path = _PARSED["OBSIDIAN_VAULT"]
 
 OUT_DIR = VAULT / "资料库" / "视频笔记"
 
 
 INDEX_FILE = OUT_DIR / "索引.md"
 
-
 ATTACH_DIR = OUT_DIR / "attachments"      # 嵌入帧（![[attachments/...]] 按文件名全库可解析）
-
 
 TRANSCRIPT_DIR = OUT_DIR / "transcripts"  # 转录本 SSOT（info callout wikilink）
 
@@ -121,50 +211,42 @@ TRANSCRIPT_DIR = OUT_DIR / "transcripts"  # 转录本 SSOT（info callout wikili
 #   vault（默认）= 直写 vault 卷 + Syncthing 同步（现状逐字节不变）
 #   deliver      = 多用户「云端不储存」：产物进 per-run outbox，终态后搬到 OUTBOX_DIR，
 #                  只经 bundle/ACK HTTP 端点发送到用户端，TTL 到期/确认收完即焚（api.py）
-ARTIFACT_MODE = (ENV.get("V2MD_ARTIFACT_MODE") or "vault").strip().lower()
-if ARTIFACT_MODE not in ("vault", "deliver"):
-    raise RuntimeError(f"未知 V2MD_ARTIFACT_MODE：{ARTIFACT_MODE}（支持 vault|deliver）")
+ARTIFACT_MODE: str = _PARSED["V2MD_ARTIFACT_MODE"]
 
 # deliver 在架根（容器指 data 卷）与保留窗口（小时，到期自动烧）
-OUTBOX_DIR = Path(ENV.get("V2MD_OUTBOX_DIR", str(PROJ / "data" / "outbox")))
-OUTBOX_TTL_H = float(ENV.get("V2MD_OUTBOX_TTL_H", "24") or 24)
+OUTBOX_DIR: Path = _PARSED["V2MD_OUTBOX_DIR"]
+OUTBOX_TTL_H: float = _PARSED["V2MD_OUTBOX_TTL_H"]
 
 
 # run 卡死看门狗（watchdog.py）：心跳超时判定。单条 3h 转录属正常，默认 2h 无任何活动才判。
-WATCHDOG_TIMEOUT_S = float(ENV.get("V2MD_WATCHDOG_TIMEOUT_S", "7200") or 7200)
-WATCHDOG_PERIOD_S = float(ENV.get("V2MD_WATCHDOG_PERIOD_S", "60") or 60)
-WATCHDOG_ACTION = (ENV.get("V2MD_WATCHDOG_ACTION") or "mark").strip().lower()
-if WATCHDOG_ACTION not in ("mark", "exit"):
-    raise RuntimeError(f"未知 V2MD_WATCHDOG_ACTION：{WATCHDOG_ACTION}（支持 mark|exit）")
+WATCHDOG_TIMEOUT_S: float = _PARSED["V2MD_WATCHDOG_TIMEOUT_S"]
+WATCHDOG_PERIOD_S: float = _PARSED["V2MD_WATCHDOG_PERIOD_S"]
+WATCHDOG_ACTION: str = _PARSED["V2MD_WATCHDOG_ACTION"]
 
 # 执行层并发与配额（终局布局·执行层/限流配额的进程内落地）：
 #   并发闸门默认 1 = 单 worker 语义；生产多用户调大——并发>1 时 checkpointer 建议
 #   切 postgres（sqlite 单连接弱）、vault 自托管姿势建议保持 1。三个上限 0 = 不设限；
 #   提交限流按 uid 60s 滑窗（入队前闸，429 信封）。
-MAX_CONCURRENT_RUNS = max(1, int(ENV.get("V2MD_MAX_CONCURRENT_RUNS", "1") or 1))
-QUEUE_MAX = int(ENV.get("V2MD_QUEUE_MAX", "100") or 0)
-USER_QUEUE_MAX = int(ENV.get("V2MD_USER_QUEUE_MAX", "5") or 0)
-USER_SUBMIT_PER_MIN = int(ENV.get("V2MD_USER_SUBMIT_PER_MIN", "30") or 0)
+MAX_CONCURRENT_RUNS: int = _PARSED["V2MD_MAX_CONCURRENT_RUNS"]
+QUEUE_MAX: int = _PARSED["V2MD_QUEUE_MAX"]
+USER_QUEUE_MAX: int = _PARSED["V2MD_USER_QUEUE_MAX"]
+USER_SUBMIT_PER_MIN: int = _PARSED["V2MD_USER_SUBMIT_PER_MIN"]
 
 # 上传面（多用户专用 POST /uploads）：落地根/单文件上限/每用户配额/TTL 惰性清扫。
 # 容器里 UPLOADS_DIR 指到 data 卷；TTL 到期物理删——「云端不储存」口径。
-UPLOADS_DIR = Path(ENV.get("V2MD_UPLOADS_DIR", str(PROJ / "data" / "uploads")))
-UPLOAD_MAX_GB = float(ENV.get("V2MD_UPLOAD_MAX_GB", "2") or 2)
-UPLOAD_QUOTA_GB = float(ENV.get("V2MD_UPLOAD_QUOTA_GB", "5") or 5)
-UPLOADS_TTL_H = float(ENV.get("V2MD_UPLOADS_TTL_H", "24") or 24)
+UPLOADS_DIR: Path = _PARSED["V2MD_UPLOADS_DIR"]
+UPLOAD_MAX_GB: float = _PARSED["V2MD_UPLOAD_MAX_GB"]
+UPLOAD_QUOTA_GB: float = _PARSED["V2MD_UPLOAD_QUOTA_GB"]
+UPLOADS_TTL_H: float = _PARSED["V2MD_UPLOADS_TTL_H"]
 
 # 任务表真相源（P4b·多副本档）：json 缺省 = _TASKS 进程内视图即现状零变化；
 # postgres = /queue、配额闸、dedup 判活、watchdog 巡检、启动恢复认领读 v2md_runs
 # 提取列（record jsonb 仍是状态唯一真相，status 列是其可查镜像）。需先切 RUNS_STORE。
-TASKS_STORE = (ENV.get("V2MD_TASKS_STORE") or "json").strip().lower()
-if TASKS_STORE not in ("json", "postgres"):
-    raise RuntimeError(f"未知 V2MD_TASKS_STORE：{TASKS_STORE}（支持 json|postgres）")
+TASKS_STORE: str = _PARSED["V2MD_TASKS_STORE"]
 
 # 本地路径输入策略（POST /runs 的 url 收非 http 时）：auto = AUTH=off 放行（开发/
 # 自托管），AUTH≠off 只认本人 uploads 白名单内路径；allow/deny 显式覆盖。
-LOCAL_PATHS = (ENV.get("V2MD_LOCAL_PATHS") or "auto").strip().lower()
-if LOCAL_PATHS not in ("auto", "allow", "deny"):
-    raise RuntimeError(f"未知 V2MD_LOCAL_PATHS：{LOCAL_PATHS}（支持 auto|allow|deny）")
+LOCAL_PATHS: str = _PARSED["V2MD_LOCAL_PATHS"]
 
 # 版本单源：dist metadata（已安装时）→ pyproject.toml（源码/镜像直跑，Dockerfile 有 COPY）
 # → "0.0.0"。FastAPI version 与 /healthz 都读这里，不手工双写。
@@ -185,3 +267,5 @@ except PackageNotFoundError:
 # ---------------------------------------------------------------- fin
 # dify_kit / DIFY_* / dataset_api 已随 Dify 抽离（2026-09-21）摘除：
 # 知识库入库（kb 阶段）取消；LLM 凭证由 SECRETS_FILE 提供（LLM_BASE_URL/LLM_API_KEY/LLM_MODEL）。
+# PG 域键（V2MD_PG_DSN/V2MD_PG_TIMEOUT_S）在 pg.py 调用期读取（测试运行时可变），
+# 校验复用本表口径——集中收编随下一批存储键迁移时并入。

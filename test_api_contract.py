@@ -125,6 +125,34 @@ def test_production_auth_failfast():
 
 # ---------------------------------------------------------------- /preflight 信息收敛（P0-3）
 
+def test_config_spec_aggregate_errors_and_empty_clear():
+    """P1-9：①多非法值一次性汇总（非首错即停）；②真实环境变量空串=显式清空回落
+    默认，.env 真值不得渗入（旧 load_env 丢空串的隔离缺口根修）。"""
+    import subprocess
+    import sys
+    # ① 三个非法键全部出现在同一次报错里
+    r = _import_config_with_env(V2MD_MAX_CONCURRENT_RUNS="abc", V2MD_WATCHDOG_TIMEOUT_S="-5",
+                                V2MD_TASKS_STORE="bogus")
+    assert r.returncode != 0
+    for key in ("V2MD_MAX_CONCURRENT_RUNS", "V2MD_WATCHDOG_TIMEOUT_S", "V2MD_TASKS_STORE"):
+        assert key in r.stderr, f"汇总报错缺 {key}：{r.stderr[:400]}"
+    assert "共 3 处" in r.stderr, r.stderr[:200]      # 一次报全（验收口径）
+    # ② 空串=显式清空回落默认（旧 load_env 丢空串 → 真实环境压不掉任何来源值——
+    # 该隔离缺口的根修验证；本仓 .env 未设 SPEC 键，断言默认即断言语义）
+    code = ("import sys; sys.path.insert(0, '.');"
+            "import video2md.config as c; print(c.TASKS_STORE, c.UPLOADS_TTL_H)")
+    r2 = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True,
+                        env={**os.environ, "V2MD_TASKS_STORE": "",
+                             "V2MD_UPLOADS_TTL_H": ""}, timeout=30)
+    assert r2.stdout.split()[:2] == ["json", "24.0"], \
+        f"空串未清空：{r2.stdout}{r2.stderr[:200]}"
+    # ③ 显式合法值覆盖默认（合并优先级真实生效）
+    r3 = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True,
+                        env={**os.environ, "V2MD_TASKS_STORE": "postgres",
+                             "V2MD_UPLOADS_TTL_H": "48"}, timeout=30)
+    assert r3.stdout.split()[:2] == ["postgres", "48.0"], r3.stdout
+
+
 def test_preflight_privilege_rules():
     from video2md.api import _preflight_privileged, _preflight_public
     assert _preflight_privileged("127.0.0.1", False) is True      # 回环（deploy.sh/容器体检）
