@@ -30,10 +30,14 @@ def remote_transcribe(video: Path, tmp: Path, base: str, model: str, language: s
     audio = tmp / "remote-audio.m4a"
     run(["ffmpeg", "-y", "-i", str(video), "-vn", "-c:a", "aac", "-b:a", "64k", str(audio)])
     print(f"  ☁️ 远程 GPU 转录 → {redact(base)}")
+    import time as _time
+    _t0 = _time.monotonic()
     r = httpx.post(f"{base.rstrip('/')}/transcribe",
                    files={"audio": (audio.name, audio.read_bytes(), "audio/mp4")},
                    data={"model": model, "language": language},
                    timeout=httpx.Timeout(20, read=900.0))
+    from .runs import bump_usage  # P2-2：远程调用墙钟（上界口径，含传输/排队）
+    bump_usage(gpu_s=_time.monotonic() - _t0)
     if r.status_code != 200:
         raise RuntimeError(f"远程转录失败 HTTP {r.status_code}: {r.text[:300]}")
     return r.json()

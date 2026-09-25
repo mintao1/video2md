@@ -147,6 +147,17 @@ class QueueOut(BaseModel):
         None, description="执行层档位（max_concurrent/queue_max/user_queue_max；0=不设限）")
 
 
+class CostOut(BaseModel):
+    """GET /cost：本人本月成本归因（P2-2）。spend 为已结算 cost_usd 之和；prices 回显
+    当前单价表（USD）；budget 0=未设闸。GPU 口径=远程调用墙钟上界（见 08 篇）。"""
+    uid: str
+    month: str = Field(description="统计月起（ISO，本地时区）")
+    spend_usd: float
+    budget_usd: float
+    usage: dict[str, Any] = Field(description="llm_in_tok/llm_out_tok/gpu_s/runs_n 月度合计")
+    prices: dict[str, float] = Field(description="llm_in_mtok/llm_out_mtok/gpu_min 当前单价")
+
+
 class HealthOut(BaseModel):
     ok: bool
     ts: str

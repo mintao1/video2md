@@ -595,5 +595,34 @@ finally:
     ENV.pop("V2MD_PG_TIMEOUT_S", None)
 print("✅ P1-8 PG 超时预算（statement_timeout 生效/挂起打断/连接预算有界）")
 
+# ---- 10. P2-2 成本归因（PG 档月度查询/预算闸读数）------------------------------------
+from datetime import datetime as _dt  # noqa: E402
+
+_truncate("v2md_runs", "v2md_submit_log")
+now = _dt.now()
+since = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0).isoformat(timespec="seconds")
+last_mo = (now.replace(day=1) - __import__("datetime").timedelta(days=1)).strftime("%Y-%m")
+for rid, owner, created, cost, usage in [
+        ("cm1", "u_c", now.strftime("%Y-%m") + "-05T00:00:00", 2.5,
+         {"llm_in_tok": 500, "llm_out_tok": 700, "gpu_s": 120.0}),
+        ("cm2", "u_c", now.strftime("%Y-%m") + "-10T00:00:00", 1.5,
+         {"llm_in_tok": 100, "llm_out_tok": 300, "gpu_s": 60.0}),
+        ("cold", "u_c", last_mo + "-01T00:00:00", 999.0,
+         {"llm_in_tok": 1, "llm_out_tok": 1, "gpu_s": 1.0}),
+        ("cother", "u_x", now.strftime("%Y-%m") + "-06T00:00:00", 7.0,
+         {"llm_in_tok": 9, "llm_out_tok": 9, "gpu_s": 9.0})]:
+    st_runs.merge({"run_id": rid, "owner": owner, "status": "done", "created": created,
+                   "url": "http://x/" + rid, "tmp": "", "cost_usd": cost, "usage": usage})
+# 无成本行（未结算）不计 spend 但计入 rollup 的 usage/runs_n
+st_runs.merge({"run_id": "cnoc", "owner": "u_c", "status": "done",
+               "created": now.strftime("%Y-%m") + "-20T00:00:00", "url": "http://x/cnoc",
+               "tmp": "", "usage": {"llm_in_tok": 10, "llm_out_tok": 0, "gpu_s": 0.0}})
+assert tasks.month_spend("u_c", since) == 4.0            # 本月已结算 2.5+1.5；上月/他家/未结算不计
+ro = tasks.month_rollup("u_c", since)
+assert ro["spend_usd"] == 4.0 and ro["runs_n"] == 3      # 含未结算行
+assert ro["llm_in_tok"] == 610 and ro["llm_out_tok"] == 1000 and ro["gpu_s"] == 180.0
+assert tasks.month_spend("u_none", since) == 0.0
+print("✅ P2-2 成本归因（month_spend 预算读数/month_rollup 汇总口径）")
+
 pool.close()
 print("✅ test_pg_stores.py 全部通过")

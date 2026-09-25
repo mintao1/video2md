@@ -134,6 +134,12 @@ def bind_current_run(run_id: str) -> None:
     _CURRENT_RUN_ID.set(run_id)
 
 
+def current_run_id() -> str:
+    """当前执行上下文绑定的 run_id（run_graph 入口 set；未绑定返回 ""——CLI/测试
+    直调深层函数时据此跳过用量归因，不记账也不报错）。"""
+    return _CURRENT_RUN_ID.get()
+
+
 def current_log() -> "RunLog | None":
     """当前活跃的阶段 RunLog：并发多 run 时按 ContextVar 的 run_id 取本 run 的 log；
     未绑定（__stage 子进程入口/旧单跑路径）回退「dict 第一个」。"""

@@ -178,6 +178,9 @@ def _llm_observed(task: str, status: str, t0: float, attempts: int, meta: dict,
         }
     from . import observability
     observability.metric_llm(task, status, secs, in_tok, out_tok)
+    if in_tok or out_tok:  # P2-2 用量归因：run 上下文内累计（CLI/测试直调不记）
+        from .runs import bump_usage
+        bump_usage(llm_in_tok=in_tok, llm_out_tok=out_tok)
 
 
 

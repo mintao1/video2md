@@ -21,6 +21,7 @@ SSE 实时进度（GET /runs/{id}/events）与轮询并存。核心 run_graph �
   DELETE /runs/{id}/artifacts deliver 模式 ACK 即焚：客户端确认收完，云端立刻销毁产物
   POST /runs/{id}/cancel 撤销进行中 run（P1-2）：排队立即 error(cancelled)；运行中协作式
                         （循环头拦截）；他副本驱动走 cmd 广播；终态 409
+  GET  /cost            本人本月成本归因（P2-2：usage/单价/预算；预算超限 POST /runs 429 BUDGET_EXCEEDED）
   GET  /queue           {queue_len, running, limits}——gpu_router 的 colab 看门狗回读这里（运维探针，不鉴权）
   GET  /healthz         存活探针（Docker healthcheck，不鉴权）
   GET  /preflight       开跑前体检（ffmpeg/磁盘/vault 或 outbox/算力池；匿名面 detail 脱敏，P0-3）
@@ -56,6 +57,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from . import artsink, events, observability, watchdog
 from .auth import AuthError, Identity, current_identity, optional_identity
 from .config import (
+    BUDGET_MONTH_USD,
     CORS_ORIGINS,
     DEVICE_RATE_PER_MIN,
     ENV,
@@ -63,6 +65,9 @@ from .config import (
     LOG_DIR,
     MAX_CONCURRENT_RUNS,
     OUT_DIR,
+    PRICE_GPU_MIN,
+    PRICE_LLM_IN_MTOK,
+    PRICE_LLM_OUT_MTOK,
     QUEUE_MAX,
     TRUST_XFF,
     UPLOAD_MAX_GB,
@@ -78,6 +83,7 @@ from .graph import make_checkpointer_from_env, run_graph
 from .models import (
     ArtifactsAckOut,
     CancelOut,
+    CostOut,
     DeviceCodeOut,
     DeviceTokenBody,
     DeviceTokenOut,
@@ -91,7 +97,16 @@ from .models import (
     RunStatusOut,
     UploadOut,
 )
-from .runs import _load_runs, _runs_file_lock, _runs_merge, cancel_requested, forget_cancel, request_cancel
+from .runs import (
+    _load_runs,
+    _runs_file_lock,
+    _runs_merge,
+    cancel_requested,
+    forget_cancel,
+    month_rollup,
+    request_cancel,
+    settle_cost,
+)
 from .util import redact, sanitize_filename
 
 # ---------------------------------------------------------------- 运维函数（原 serve.py）
@@ -360,14 +375,34 @@ def _admit_device(request: Request) -> str:
     return ip
 
 
+def _month_start_iso() -> str:
+    return datetime.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0) \
+        .isoformat(timespec="seconds")
+
+
+def _budget_spend(uid: str, be) -> float:
+    """uid 本月已结算成本（PG 档 SQL 求和 / json 档全表扫——与 runs.month_rollup 同源）。"""
+    since = _month_start_iso()
+    if be is not None:
+        return be.month_spend(uid, since)
+    return month_rollup(uid, since)["spend_usd"]
+
+
 def _admit_submission(uid: str) -> None:
-    """POST /runs 入队前的配额闸：总队列 / 每用户在途 / 滑窗提交频率。
+    """POST /runs 入队前的配额闸：总队列 / 每用户在途 / 滑窗提交频率 / 月度预算（P2-2）。
 
     超限一律 429 + X-Error 符号码（错误信封统一转译）；0 = 该项不设限。
-    PG 档（V2MD_TASKS_STORE=postgres，多副本）三道闸全读 DB 真相源——各副本计数一致、
+    PG 档（V2MD_TASKS_STORE=postgres，多副本）各闸全读 DB 真相源——各副本计数一致、
     滑窗跨进程不丢；json 档逐字节现状（进程内视图）。
     """
     be = _tasks_backend()
+    if BUDGET_MONTH_USD:
+        spent = _budget_spend(uid, be)
+        if spent >= BUDGET_MONTH_USD:
+            raise HTTPException(
+                429, f"本月预算已用尽（${spent:.2f}/${BUDGET_MONTH_USD:.2f}），"
+                     f"下月自动重置或联系管理员调整 V2MD_BUDGET_MONTH_USD",
+                headers={"X-Error": "BUDGET_EXCEEDED"})
     if be is not None:
         if QUEUE_MAX:
             n = be.total_active()
@@ -629,6 +664,10 @@ async def _drive(run_id: str, url: str, part_items: str, force: bool,
             observability.flush()
             watchdog.forget(run_id)  # 终态清心跳（_HEARTBEATS 不随 run 数增长）
             forget_cancel(run_id)    # P1-2：清取消标志（同款防增长纪律）
+            try:
+                settle_cost(run_id)  # P2-2：终态结算 usage×单价 → cost_usd 落记录
+            except Exception as exc:  # 结算绝不影响终态语义
+                print(f"⚠ 成本结算异常（忽略）：{redact(str(exc))[:120]}")
 
 
 
@@ -1311,6 +1350,18 @@ async def run_events(run_id: str, request: Request,
 
 
 # ---------------------------------------------------------------- 运维探针（不鉴权：容器 healthcheck / gpu_router 看门狗）
+
+@app.get("/cost", response_model=CostOut,
+          summary="本人本月成本归因（P2-2：usage/单价/预算余量；明细导出走 CLI cost）")
+def get_cost(ident: Identity = Depends(current_identity)) -> dict:
+    be = _tasks_backend()
+    since = _month_start_iso()
+    u = be.month_rollup(ident.uid, since) if be is not None else month_rollup(ident.uid, since)
+    return {"uid": ident.uid, "month": since, "spend_usd": u["spend_usd"],
+            "budget_usd": BUDGET_MONTH_USD, "usage": u,
+            "prices": {"llm_in_mtok": PRICE_LLM_IN_MTOK, "llm_out_mtok": PRICE_LLM_OUT_MTOK,
+                       "gpu_min": PRICE_GPU_MIN}}
+
 
 @app.get("/queue", response_model=QueueOut)
 def get_queue() -> dict:

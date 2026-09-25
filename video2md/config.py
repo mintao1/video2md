@@ -118,6 +118,13 @@ _SPEC: dict[str, tuple] = {
     # X-Forwarded-For 末位（单层反代拓扑：api 绑回环、唯一入口=仓内 nginx，尾位即真实客户端）
     "V2MD_DEVICE_RATE_PER_MIN": ("int", 30, ("min", 0)),
     "V2MD_TRUST_XFF":           ("enum", "off", ("off", "on")),
+    # 成本归因→预算闸（P2-2）：单价表全 0 = 不定价（cost_usd 恒 0，只记 usage 不计钱）；
+    # 预算 0 = 不设闸。操作者按真实账单填价（参考行见 08 篇），口径：
+    #   LLM 单价 = USD/1M tokens（in/out 分列）；GPU 单价 = USD/远程调用分钟（时长上界口径）
+    "V2MD_BUDGET_MONTH_USD":     ("float", 0.0, ("min", 0.0)),
+    "V2MD_PRICE_LLM_IN_MTOK":    ("float", 0.0, ("min", 0.0)),
+    "V2MD_PRICE_LLM_OUT_MTOK":   ("float", 0.0, ("min", 0.0)),
+    "V2MD_PRICE_GPU_MIN":        ("float", 0.0, ("min", 0.0)),
 }
 
 
@@ -258,6 +265,12 @@ LOCAL_PATHS: str = _PARSED["V2MD_LOCAL_PATHS"]
 # （仅仓内反代拓扑下开——api 绑回环时唯一入口是 nginx，尾位可信；直连开发档保持 off）
 DEVICE_RATE_PER_MIN: int = _PARSED["V2MD_DEVICE_RATE_PER_MIN"]
 TRUST_XFF: str = _PARSED["V2MD_TRUST_XFF"]
+
+# 成本归因→预算闸（P2-2）
+BUDGET_MONTH_USD: float = _PARSED["V2MD_BUDGET_MONTH_USD"]
+PRICE_LLM_IN_MTOK: float = _PARSED["V2MD_PRICE_LLM_IN_MTOK"]
+PRICE_LLM_OUT_MTOK: float = _PARSED["V2MD_PRICE_LLM_OUT_MTOK"]
+PRICE_GPU_MIN: float = _PARSED["V2MD_PRICE_GPU_MIN"]
 
 # 版本单源：dist metadata（已安装时）→ pyproject.toml（源码/镜像直跑，Dockerfile 有 COPY）
 # → "0.0.0"。FastAPI version 与 /healthz 都读这里，不手工双写。

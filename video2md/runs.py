@@ -47,6 +47,7 @@ from .util import (
     _STAGE_LOGS,
     RunLog,
     current_log,
+    current_run_id,
     fmt_hms,
     load_state,
     probe,
@@ -301,6 +302,67 @@ def _run_stage(run: dict, stage: str, args: dict) -> None:
         _STAGE_LOGS.pop(run["run_id"], None)
         observability.close_run(run["run_id"])
         observability.flush()  # __stage 子进程短命，退出前排空 sink 队列
+
+
+# ---------------------------------------------------------------- P2-2 成本归因
+# run_id → 用量累计 {"llm_in_tok", "llm_out_tok", "gpu_s"}。内存累计、终态一次性结算
+# 落记录（_drive finally → settle_cost）——阶段 merge 不逐次带出（省写放大）。
+# 诚实口径：①崩溃丢未结算 usage（恢复重投会重新累计，不重复计费）；②GPU 按「远程调用
+# 墙钟时长」记（含传输/排队，是上界不是 GPU 占用真值——P1-6 同款上界纪律）；
+# ③重投/续跑幂等：记录已有 cost_usd 不重算。
+from .config import PRICE_GPU_MIN, PRICE_LLM_IN_MTOK, PRICE_LLM_OUT_MTOK  # noqa: E402（结算单价，模块级可测）
+
+_USAGE: dict[str, dict] = {}
+
+
+def bump_usage(*, llm_in_tok: int = 0, llm_out_tok: int = 0, gpu_s: float = 0.0) -> None:
+    """当前 run 的用量累计（ContextVar 定位 run；未绑定=CLI/测试直调，静默跳过）。"""
+    rid = current_run_id()
+    if not rid:
+        return
+    u = _USAGE.setdefault(rid, {"llm_in_tok": 0, "llm_out_tok": 0, "gpu_s": 0.0})
+    u["llm_in_tok"] += int(llm_in_tok)
+    u["llm_out_tok"] += int(llm_out_tok)
+    u["gpu_s"] = round(u["gpu_s"] + float(gpu_s), 3)
+
+
+def settle_cost(run_id: str) -> dict | None:
+    """终态结算：usage × 单价表 → cost_usd + usage 随 run 记录落盘（幂等）。
+
+    单价读 config 常量（结算时刻的价）；全 0 时 cost_usd=0 但 usage 仍落——
+    先记账后定价，历史 run 可离线重估价（usage 是原始凭据）。
+    """
+    u = _USAGE.pop(run_id, None)
+    if not u or not any(u.values()):
+        return None
+    with _runs_file_lock():
+        run = _load_runs().get(run_id)
+        if not run or run.get("cost_usd") is not None:
+            return run  # 幂等：重投/已结算不重复计费
+        run["usage"] = u
+        run["cost_usd"] = round(
+            u["llm_in_tok"] / 1e6 * PRICE_LLM_IN_MTOK
+            + u["llm_out_tok"] / 1e6 * PRICE_LLM_OUT_MTOK
+            + u["gpu_s"] / 60 * PRICE_GPU_MIN, 6)
+        _runs_merge(run)
+        return run
+
+
+def month_rollup(uid: str, since_iso: str) -> dict:
+    """json 档月度汇总（PG 档走 pgstore.month_rollup 同形）。created 为本地时区 ISO，
+    同格式字典序比较即时间比较。"""
+    out = {"spend_usd": 0.0, "llm_in_tok": 0, "llm_out_tok": 0, "gpu_s": 0.0, "runs_n": 0}
+    for r in _load_runs().values():
+        if r.get("owner") != uid or (r.get("created") or "") < since_iso:
+            continue
+        u = r.get("usage") or {}
+        out["spend_usd"] += float(r.get("cost_usd") or 0)
+        out["llm_in_tok"] += int(u.get("llm_in_tok") or 0)
+        out["llm_out_tok"] += int(u.get("llm_out_tok") or 0)
+        out["gpu_s"] += float(u.get("gpu_s") or 0)
+        out["runs_n"] += 1
+    out["spend_usd"] = round(out["spend_usd"], 6)
+    return out
 
 
 # ---------------------------------------------------------------- P1-2 协作式取消

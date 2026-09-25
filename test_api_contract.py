@@ -736,6 +736,113 @@ def test_sweep_uploads_ttl(client, monkeypatch):
     assert _api._sweep_uploads() == 0  # 幂等
 
 
+# ---------------------------------------------------------------- 成本归因→预算闸（P2-2）
+
+def test_budget_gate_and_cost_endpoint(client, monkeypatch):
+    import video2md.api as _api
+    import video2md.runs as _runs_mod
+    put_identity("test", "alice", "uid_alice")
+    # 本月已结算 $5 的 run（json 档：created 用本月真实日期保证进统计窗）
+    month_now = datetime.now().strftime("%Y-%m")
+    rec = _seed_run("costy", "uid_alice")
+    rec["created"] = f"{month_now}-15T00:00:00"
+    rec["cost_usd"] = 5.0
+    rec["usage"] = {"llm_in_tok": 1000, "llm_out_tok": 2000, "gpu_s": 60.0}
+    with _runs_mod._runs_file_lock():
+        _runs_mod._runs_merge(rec)
+
+    _stub_resolve(monkeypatch)
+    # 预算 $4 < 已花 $5 → POST /runs 429 BUDGET_EXCEEDED（信封 details 符号码）
+    monkeypatch.setattr(_api, "BUDGET_MONTH_USD", 4.0)
+    r = client.post("/runs", json={"url": "https://example.test/c1", "resolve_only": True},
+                     headers={"X-Test-Auth": "alice"})
+    assert r.status_code == 429 and r.json()["error"]["details"] == "BUDGET_EXCEEDED", r.text
+    assert "5.00" in r.json()["error"]["message"] and "4.00" in r.json()["error"]["message"]
+    # 预算 $10 > $5 → 放行；预算 0 = 不设闸
+    monkeypatch.setattr(_api, "BUDGET_MONTH_USD", 10.0)
+    assert client.post("/runs", json={"url": "https://example.test/c2", "resolve_only": True},
+                       headers={"X-Test-Auth": "alice"}).status_code == 200
+    monkeypatch.setattr(_api, "BUDGET_MONTH_USD", 0.0)
+    assert client.post("/runs", json={"url": "https://example.test/c3", "resolve_only": True},
+                       headers={"X-Test-Auth": "alice"}).status_code == 200
+    # 上月消费不入本月预算（月度重置语义）
+    old = _seed_run("oldmo", "uid_alice")
+    old["created"] = "2020-01-15T00:00:00"
+    old["cost_usd"] = 999.0
+    with _runs_mod._runs_file_lock():
+        _runs_mod._runs_merge(old)
+    monkeypatch.setattr(_api, "BUDGET_MONTH_USD", 4.0)
+    assert client.post("/runs", json={"url": "https://example.test/c4", "resolve_only": True},
+                       headers={"X-Test-Auth": "alice"}).status_code == 429  # 本月 $5 仍超
+
+    # GET /cost：本人月度归因（spend/usage/单价回显/budget）
+    monkeypatch.setattr(_api, "BUDGET_MONTH_USD", 10.0)
+    c = client.get("/cost", headers={"X-Test-Auth": "alice"})
+    assert c.status_code == 200, c.text
+    body = c.json()
+    assert body["spend_usd"] == 5.0 and body["budget_usd"] == 10.0
+    assert body["usage"]["llm_in_tok"] == 1000 and body["usage"]["gpu_s"] == 60.0
+    assert set(body["prices"]) == {"llm_in_mtok", "llm_out_mtok", "gpu_min"}
+    assert "prices" in body and body["month"].startswith(month_now)
+
+
+def test_usage_accumulate_and_settle(monkeypatch, tmp_path):
+    """归因链路单测：ContextVar 绑定→bump 累计→settle 按单价结算落记录（幂等）。"""
+    import video2md.runs as _runs_mod
+    import video2md.util as _util
+    from video2md import llm as _llm
+    _runs_mod.RUNS_FILE = tmp_path / "runs.json"
+    _runs_mod._RUNS_LOCKFILE = _runs_mod.RUNS_FILE.with_suffix(".lock")
+
+    rid = "usetest"
+    with _runs_mod._runs_file_lock():
+        _runs_mod._runs_merge({"run_id": rid, "owner": "u", "status": "done",
+                               "created": "2026-01-01", "artifacts": {}, "entries": []})
+    # 未绑定 run：bump 静默跳过（CLI/测试直调不记账）
+    _runs_mod.bump_usage(llm_in_tok=111)
+    assert not _runs_mod._USAGE
+    # 绑定后：llm 观测钩子与 GPU 钩子都累计
+    _util.bind_current_run(rid)
+    _llm._llm_observed("note", "completed", 0.0, 1, {"usage": {"prompt_tokens": 100,
+                                   "completion_tokens": 50}}, None, "s", "u", "text")
+    _runs_mod.bump_usage(gpu_s=90.0)
+    assert _runs_mod._USAGE[rid]["llm_in_tok"] == 100 and _runs_mod._USAGE[rid]["gpu_s"] == 90.0
+    # 结算：单价 in=2 / out=4 USD/MTok，GPU=0.03 USD/min → 100/1e6*2 + 50/1e6*4 + 1.5min*0.03
+    monkeypatch.setattr(_runs_mod, "PRICE_LLM_IN_MTOK", 2.0)
+    monkeypatch.setattr(_runs_mod, "PRICE_LLM_OUT_MTOK", 4.0)
+    monkeypatch.setattr(_runs_mod, "PRICE_GPU_MIN", 0.03)
+    settled = _runs_mod.settle_cost(rid)
+    assert settled["cost_usd"] == round(100 / 1e6 * 2 + 50 / 1e6 * 4 + 1.5 * 0.03, 6)
+    assert settled["usage"]["gpu_s"] == 90.0
+    # 幂等：终态已结算的记录，后续 usage 不再入账、不重复计费
+    _runs_mod.bump_usage(llm_in_tok=999)
+    again = _runs_mod.settle_cost(rid)
+    assert again["cost_usd"] == settled["cost_usd"]
+    assert _runs_mod._load_runs()[rid]["usage"]["llm_in_tok"] == 100  # 999 未覆盖落盘值
+
+
+def test_cost_cli_export(client, monkeypatch, capsys):
+    import video2md.runs as _runs_mod
+    put_identity("test", "alice", "uid_alice")
+    month_now = datetime.now().strftime("%Y-%m")
+    rec = _seed_run("exp1", "uid_alice")
+    rec["created"] = f"{month_now}-02T00:00:00"
+    rec["cost_usd"] = 1.25
+    rec["usage"] = {"llm_in_tok": 10, "llm_out_tok": 20, "gpu_s": 30.0}
+    with _runs_mod._runs_file_lock():
+        _runs_mod._runs_merge(rec)
+    import video2md.__main__ as main_mod
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr("sys.argv", ["video2md", "cost", "--uid", "uid_alice"])
+        main_mod.main()
+    out = capsys.readouterr().out.strip().splitlines()
+    rows = [json.loads(l) for l in out]
+    detail = [r for r in rows if not r.get("summary")]
+    summary = [r for r in rows if r.get("summary")][0]
+    assert any(r["run_id"] == "exp1" and r["cost_usd"] == 1.25 for r in detail)
+    assert summary["spend_usd"] == 1.25 and summary["runs_n"] == 1 and summary["llm_in_tok"] == 10
+
+
 # ---------------------------------------------------------------- 匿名面限流（P0-2）
 
 def test_device_rate_limit_and_xff(client, monkeypatch):

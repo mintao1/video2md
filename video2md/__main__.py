@@ -4,9 +4,10 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from datetime import datetime
 
 from .config import ENV
-from .runs import _load_runs, cmd_stage
+from .runs import cmd_stage
 
 
 def main() -> None:
@@ -65,6 +66,34 @@ def main() -> None:
         ap.add_argument("args_json", default="{}", nargs="?")
         a = ap.parse_args(sys.argv[2:])
         cmd_stage(a.run_id, a.stage, a.args_json)
+        return
+    if len(sys.argv) > 1 and sys.argv[1] == "cost":
+        # 成本报表导出（P2-2 验收：按 uid 导出）：`video2md cost [--uid X] [--month YYYY-MM]`
+        # 逐 run 一行 JSON（run_id/created/status/cost_usd/usage）+ 末行汇总；uid 缺省=全用户。
+        from .runs import _load_runs
+        ap = argparse.ArgumentParser(prog="video2md cost")
+        ap.add_argument("--uid", default="")
+        ap.add_argument("--month", default=datetime.now().strftime("%Y-%m"))
+        a = ap.parse_args(sys.argv[2:])
+        since = f"{a.month}-01T00:00:00"
+        rows = [r for r in _load_runs().values()
+                if (not a.uid or r.get("owner") == a.uid)
+                and (r.get("created") or "") >= since]
+        rows.sort(key=lambda r: r.get("created") or "")
+        agg = {"llm_in_tok": 0, "llm_out_tok": 0, "gpu_s": 0.0, "spend_usd": 0.0, "runs_n": 0}
+        for r in rows:
+            u = r.get("usage") or {}
+            agg["llm_in_tok"] += int(u.get("llm_in_tok") or 0)
+            agg["llm_out_tok"] += int(u.get("llm_out_tok") or 0)
+            agg["gpu_s"] += float(u.get("gpu_s") or 0)
+            agg["spend_usd"] += float(r.get("cost_usd") or 0)
+            agg["runs_n"] += 1
+            print(json.dumps({"run_id": r.get("run_id"), "created": r.get("created"),
+                              "status": r.get("status"), "cost_usd": r.get("cost_usd"),
+                              "usage": u}, ensure_ascii=False))
+        agg["spend_usd"] = round(agg["spend_usd"], 6)
+        print(json.dumps({"summary": True, "uid": a.uid or "(all)", "month": a.month, **agg},
+                         ensure_ascii=False))
         return
     if len(sys.argv) > 1 and sys.argv[1] == "runs":
         # 排障工具：runs [run_id] 查看 run 状态

@@ -82,6 +82,8 @@ def remote_cut_clips(published: list, video: Path, dur: float,
         own = True
     try:
         url = f"{base.rstrip('/')}/clips"
+        import time as _time
+        _t0 = _time.monotonic()
         if prefer_remote:
             print("    ☁️ 源片由远端直连 CDN 下载（省本地上行）…")
             r = http.post(url, data=data)
@@ -92,6 +94,8 @@ def remote_cut_clips(published: list, video: Path, dur: float,
                               files={"video": (video.name, fh, "video/mp4")},
                               timeout=httpx.Timeout(30.0, read=3600.0,
                                                     write=max(600.0, size_mb * 8)))
+        from .runs import bump_usage  # P2-2：远程调用墙钟（上界口径）
+        bump_usage(gpu_s=_time.monotonic() - _t0)
         if r.status_code != 200:
             raise RuntimeError(f"远程剪辑失败 HTTP {r.status_code}: {r.text[:300]}")
     finally:

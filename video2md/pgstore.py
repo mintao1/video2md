@@ -321,6 +321,34 @@ class PostgresTaskStore:
                      WHERE run_id=%(rid)s""", {"rec": Json(rec), "rid": run_id})
         return True
 
+    # ---------------------------------------------------------------- P2-2 成本归因
+
+    def month_spend(self, uid: str, since_iso: str) -> float:
+        """uid 自 since_iso（含）起的已结算成本（预算闸读数；created 为 ISO 文本，
+        同格式字典序=时间序）。"""
+        with self.pool.connection() as conn:
+            row = conn.execute(
+                "SELECT COALESCE(SUM((record->>'cost_usd')::numeric), 0) FROM v2md_runs "
+                "WHERE owner=%s AND created >= %s AND record ? 'cost_usd'",
+                (uid, since_iso)).fetchone()
+        return float(row[0]) if row else 0.0
+
+    def month_rollup(self, uid: str, since_iso: str) -> dict:
+        """uid 月度汇总（/cost 与 CLI 导出同形：json 档 runs.month_rollup）。"""
+        with self.pool.connection() as conn:
+            row = conn.execute("""
+                SELECT COALESCE(SUM((record->>'cost_usd')::numeric), 0),
+                       COALESCE(SUM((record->'usage'->>'llm_in_tok')::bigint), 0),
+                       COALESCE(SUM((record->'usage'->>'llm_out_tok')::bigint), 0),
+                       COALESCE(SUM((record->'usage'->>'gpu_s')::numeric), 0),
+                       count(*)
+                  FROM v2md_runs
+                 WHERE owner=%s AND created >= %s""", (uid, since_iso)).fetchone()
+        row = row or (0, 0, 0, 0, 0)
+        return {"spend_usd": round(float(row[0]), 6), "llm_in_tok": int(row[1]),
+                "llm_out_tok": int(row[2]), "gpu_s": float(row[3]),
+                "runs_n": int(row[4])}
+
     # ---------------------------------------------------------------- 滑窗限流
 
     def submit_window_count(self, uid: str) -> int:
