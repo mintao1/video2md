@@ -47,9 +47,10 @@ jobs:
             echo "=== $t ==="
             uv run python3 "$t.py"
           done
-      - name: 运维三件套测试（看门狗/告警配置/备份脚本，全离线）
+      - name: 运维三件套测试（看门狗/备份脚本，全离线；obs 族 2026-09-27 随 M1 收口退役——
+          告警规则校验归平台栈哨兵 platform-obs/test_alert_rules.py）
         run: |
-          for t in test_watchdog test_alert_rules test_backup_scripts; do
+          for t in test_watchdog test_backup_scripts; do
             echo "=== $t ==="
             uv run python3 "$t.py"
           done
@@ -63,12 +64,8 @@ jobs:
         run: bash scripts/smoke_proxy.sh
       - name: 双副本冒烟（P1-4：可见性/属主甄别不抢/跨副本 SSE·取消/杀副本接管；复用本 job 的 PG service）
         run: bash scripts/smoke_replicas.sh
-      - name: 告警配置校验（promtool/amtool；规则结构由 test_alert_rules.py 覆盖）
-        run: |
-          docker run --rm -v "$PWD/deploy:/deploy:ro" --entrypoint promtool \
-            prom/prometheus:v3.5.0 check rules /deploy/prometheus-rules.yml
-          docker run --rm -v "$PWD/deploy:/deploy:ro" --entrypoint amtool \
-            prom/alertmanager:v0.28.1 check-config /deploy/alertmanager.yml
+      # 告警配置校验（promtool/amtool）2026-09-27 随 obs 资产族退役删除：
+      # 规则/AM 配置归 platform-obs 统一栈（其哨兵 platform-obs/test_alert_rules.py 承接结构校验）
 
   # 静态门禁：lint + 类型检查（配置在 pyproject.toml [tool.ruff]/[tool.mypy]）
   lint:
