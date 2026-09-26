@@ -143,9 +143,14 @@ def _preflight() -> dict:
     elif remote.startswith(("http://", "https://")):
         # GPU 算力池/远程转录服务：/status（池子）或 /ping（裸参考服务端）二选一认
         base = remote.rstrip("/")
+        # 池子 token 闸门在产（gpu_router B4a）：裸调 /status 得 401 JSON——providers
+        # 解析为空列表造成「可用 provider: 无」假阴性（2026-09-27 实测入册；
+        # token 未设/空 = 不带头，本地裸池向后兼容，同 util 池客户端口径）
+        _tok = (ENV.get("V2MD_POOL_TOKEN") or "").strip()
+        _hdr = {"Authorization": f"Bearer {_tok}"} if _tok else {}
         ok, detail = False, ""
         try:
-            d = httpx.get(f"{base}/status", timeout=4).json()
+            d = httpx.get(f"{base}/status", timeout=4, headers=_hdr).json()
             ok = bool(d.get("ok"))
             usable = [p["name"] for p in d.get("providers", [])
                       if p.get("enabled") and p.get("healthy")
