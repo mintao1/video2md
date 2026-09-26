@@ -29,7 +29,9 @@ spec:
       terminationGracePeriodSeconds: 120   # 在途视频 run 的收尾余量（watchdog 自愈口径）
       containers:
         - name: api
-          image: video2md:0.1.0
+          # registry 全名（D2 预构建收官）：制品=CI tag 构建产物（GHCR 灾备副本同 ID）。
+          # 服务器落地流：gh run download artifact → gunzip | ctr import（无 packages 凭证通道）。
+          image: ghcr.io/mintao1/video2md:0.1.1
           imagePullPolicy: IfNotPresent
           env:
             - name: TZ
