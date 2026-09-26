@@ -40,6 +40,9 @@ services:
       V2MD_OCR_REMOTE: http://127.0.0.1:9700
       V2MD_CLIPS_REMOTE: http://127.0.0.1:9700
       V2MD_CLIPS_SOURCE: remote
+      # 遥测出口=平台统一观测栈 collector（PLATFORM-ROADMAP Phase 1.1/M1，2026-09-26 双栈
+      # 合并后从 docker-compose.obs.yml override 平移至此——栈不启时 OTLP 推送失败仅无指标）
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://127.0.0.1:4318
       V2MD_PROXY: http://127.0.0.1:17898
       V2MD_PROXY_DOMESTIC: "1"
       # run 卡死看门狗：生产配 exit——标 error 后进程退出（码 70），restart 自愈并恢复队列；
