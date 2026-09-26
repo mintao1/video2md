@@ -198,6 +198,13 @@
 > 真实）。届时 P2-1 的三选一评估应把「k3s replicas」纳入选项；P2-3 的反代双
 > upstream 权重切换可由 `kubectl rollout` 原生替代；PG（profile pg 回环 5432）
 > 状态面去留按平台册 §2.2 裁决逻辑单判。
+>
+> **模块简并注（2026-09-26 M 轴）**：本仓是平台运维资产的谱系源头（acctkit/
+> 运维三件套/observability 定稿 → bookserve/gpu_router 移植复刻，头注链在册）——
+> acctkit 内核共享归 **M2**（gate=bookserve 或本仓下次触碰 acctkit 时）、run 引擎
+> 底层五件（util/events/watchdog/deadman/observability）归 **M3**、本仓
+> FastAPI 版 feishu_webhook 与 obs 配置族归 **M1**（并入 Phase 1.1 运行时合并，
+> 过渡首步=bookserve 的 httpcheck/health_check 增强回流本仓）。同上平台册 M 轴。
 
 ### P2-1 多 worker 形态声明与资产
 - **动机**：批判②可用性 M——单副本 SPOF；watchdog exit 依赖 compose
