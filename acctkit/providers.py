@@ -122,7 +122,12 @@ class GoogleDeviceProvider(GoogleProvider):
         return await self._principal_from_idt(idt)
 
     def _exchange(self, device_code: str) -> dict:
-        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+        # googleapis 在墙内部署须经代理出墙（env HTTPS_PROXY；4C mihomo 实测直连
+        # Errno101）。ProxyHandler({}) 显式禁代理是 2026-09-27 生产照出的坑——改
+        # getproxies() 尊重环境：无代理环境行为不变（空表=直连同旧），有代理则走。
+        # WeChat 的 _get_json 保持直连（api.weixin 国内可达，不走此径）。
+        opener = urllib.request.build_opener(
+            urllib.request.ProxyHandler(urllib.request.getproxies()))
         req = urllib.request.Request(
             self._token_url,
             data=urlencode({"client_id": self.client_id, "client_secret": self.client_secret,
