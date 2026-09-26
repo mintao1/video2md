@@ -310,7 +310,8 @@ def _run_stage(run: dict, stage: str, args: dict) -> None:
 # 诚实口径：①崩溃丢未结算 usage（恢复重投会重新累计，不重复计费）；②GPU 按「远程调用
 # 墙钟时长」记（含传输/排队，是上界不是 GPU 占用真值——P1-6 同款上界纪律）；
 # ③重投/续跑幂等：记录已有 cost_usd 不重算。
-from .config import PRICE_GPU_MIN, PRICE_LLM_IN_MTOK, PRICE_LLM_OUT_MTOK  # noqa: E402（结算单价，模块级可测）
+# 结算单价，模块级可测（import 位置在函数定义之后——E402 已豁免）
+from .config import PRICE_GPU_MIN, PRICE_LLM_IN_MTOK, PRICE_LLM_OUT_MTOK  # noqa: E402
 
 _USAGE: dict[str, dict] = {}
 
