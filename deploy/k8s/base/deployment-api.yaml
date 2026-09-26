@@ -1,0 +1,106 @@
+# video2md API（hostNetwork 平移形态——与 compose 容器等位替换）
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: video2md-api
+  namespace: video2md
+  labels:
+    app.kubernetes.io/name: video2md
+    app.kubernetes.io/component: api
+spec:
+  # 串行信号量（V2MD_MAX_CONCURRENT_RUNS 默认 1）单写者语义——多副本前置=PG 状态面
+  # （P2-1：RUNS/STATE/USERS/STORE=postgres + EVENTS=pg），不偷跑
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: video2md
+      app.kubernetes.io/component: api
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: video2md
+        app.kubernetes.io/component: api
+    spec:
+      hostNetwork: true   # 消费 gpu_router(127.0.0.1:9700)/obs(4318)/代理(17898) 全回环
+      dnsPolicy: ClusterFirstWithHostNet
+      enableServiceLinks: false
+      terminationGracePeriodSeconds: 120   # 在途视频 run 的收尾余量（watchdog 自愈口径）
+      containers:
+        - name: api
+          image: video2md:0.1.0
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: TZ
+              value: Asia/Shanghai
+            - name: V2MD_HOST
+              value: 0.0.0.0        # kubelet 探针可达；公网面=iptables 8790 白名单（同 gpu_router 9700 模式）
+            - name: V2MD_TRUST_XFF
+              value: "on"
+            - name: V2MD_ENV
+              value: production
+            - name: V2MD_SECRETS_FILE
+              value: /run/video2md.env
+            - name: V2MD_REMOTE
+              value: http://127.0.0.1:9700
+            - name: V2MD_OCR_REMOTE
+              value: http://127.0.0.1:9700
+            - name: V2MD_CLIPS_REMOTE
+              value: http://127.0.0.1:9700
+            - name: V2MD_CLIPS_SOURCE
+              value: remote
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: http://127.0.0.1:4318   # 平台统一观测栈
+            - name: V2MD_PROXY
+              value: http://127.0.0.1:17898
+            - name: V2MD_PROXY_DOMESTIC
+              value: "1"
+            - name: V2MD_WATCHDOG_ACTION
+              value: exit   # 标 error 后退出（码 70），重启自愈并恢复队列
+            - name: OBSIDIAN_VAULT
+              value: /vault
+          ports:
+            - name: http
+              containerPort: 8790
+          volumeMounts:
+            - name: data   # state.json/runs.json/checkpoints.sqlite/logs（docker 卷原位）
+              mountPath: /app/data
+            - name: vault   # vault 模式产物卷
+              mountPath: /vault
+            - name: secrets
+              mountPath: /run/video2md.env
+              subPath: video2md.env
+              readOnly: true
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8790
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8790
+            initialDelaySeconds: 30
+            periodSeconds: 30
+      volumes:
+        - name: data
+          hostPath:
+            path: /var/lib/docker/volumes/video2md_v2md-data/_data
+            type: Directory
+        - name: vault
+          hostPath:
+            path: /var/lib/docker/volumes/video2md_vault/_data
+            type: Directory
+        - name: secrets
+          hostPath:
+            path: /home/ubuntu/stack/video2md/secrets
+            type: Directory

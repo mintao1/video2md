@@ -1,0 +1,15 @@
+# video2md on k3s（平台 Phase 4 · P2 接力；2026-09-27）
+#
+# 形态裁决（gpu_router 同款 additive 模式）：
+#   - hostNetwork + V2MD_HOST=0.0.0.0 + iptables 8790 白名单（ACCEPT 回环/节点/podCIDR
+#     + DROP 其余 + @reboot 持久化）——nginx 上游 127.0.0.1:8790 零改动
+#   - 数据原位零迁移：hostPath 直挂 docker 卷真实路径（v2md-data/vault）+ secrets 文件
+#   - 单副本 Recreate（串行信号量语义不变——多副本=PG 状态面，归 P2-1 后续项）
+#   - 无 Service（边缘走回环 8790；多副本/集群内发现出现时再立 Service）
+# 回滚：kubectl delete -k deploy/k8s/base && docker compose start video2md（原容器原地保留）
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: video2md
+  labels:
+    app.kubernetes.io/name: video2md
