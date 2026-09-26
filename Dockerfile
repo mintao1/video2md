@@ -23,8 +23,11 @@ RUN sed -i 's|deb.debian.org|mirrors.tuna.tsinghua.edu.cn|g' /etc/apt/sources.li
 # 构建参数 PIP_INDEX_URL：服务器上传清华镜像（https://pypi.tuna.tsinghua.edu.cn/simple），
 # uv 装包走同一镜像（UV_INDEX_URL 跟随）。
 ARG PIP_INDEX_URL=""
+# UV_HTTP_TIMEOUT=300：tuna 大 wheel（regex/greenlet 级）实测超缺省 30s——
+# 2026-09-27 服务器构建两次同因超时后入册
 ENV PIP_INDEX_URL="${PIP_INDEX_URL}" \
-    UV_INDEX_URL="${PIP_INDEX_URL}"
+    UV_INDEX_URL="${PIP_INDEX_URL}" \
+    UV_HTTP_TIMEOUT=300
 RUN pip install --no-cache-dir uv
 
 WORKDIR /app
