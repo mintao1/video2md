@@ -107,6 +107,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: docker build -t video2md:ci .
+      # 部署制品归档（D2：CI 产物=部署产物逐字节一致）：tag 构建把镜像以 GHCR 全名
+      # 归档为 run artifact——服务器无 packages 凭证流（gh token 无 read:packages
+      # scope 实测 403），artifact 通道只需 repo 读权限即可 `gh run download`。
+      # 服务器落地：gunzip | sudo k3s ctr images import -（名字与 GHCR 灾备副本一致，
+      # manifests 直接引用 registry 全名，无需 retag）。
+      - name: 镜像 tar 归档（tag 版本）
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          VER="${GITHUB_REF_NAME#v}"
+          docker tag video2md:ci "ghcr.io/mintao1/video2md:${VER}"
+          docker save "ghcr.io/mintao1/video2md:${VER}" | gzip > "video2md-image-${VER}.tar.gz"
+      - uses: actions/upload-artifact@v4
+        if: startsWith(github.ref, 'refs/tags/v')
+        with:
+          name: "video2md-image-${{ github.ref_name }}"
+          path: "video2md-image-*.tar.gz"
+          retention-days: 30
+          compression-level: 0   # 已是 gzip，upload 侧不再重复压缩
 
   # 发布（终局布局·发布层）：打 v* tag → 镜像 push GHCR，不可变 tag 锚 git sha + semver。
   # 服务器部署/回滚走 scripts/deploy.sh <tag>；GHCR 镜像同时是灾备存档。
