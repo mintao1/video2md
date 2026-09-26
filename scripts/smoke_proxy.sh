@@ -14,7 +14,15 @@ API_PORT=8797; PROXY_PORT=8843
 API="http://127.0.0.1:$API_PORT"; PROXY="http://127.0.0.1:$PROXY_PORT"
 TMP=$(mktemp -d "$(pwd)/.smoke-proxy-XXXXXX")   # 仓库内：macOS Docker 不共享 /tmp 的 bind-mount
 API_PID=""; NGX_CID=""
-fail() { echo "❌ $1"; tail -20 "$TMP/api.log" 2>/dev/null; docker logs "$NGX_CID" 2>&1 | tail -10 || true; exit 1; }
+fail() {
+  echo "❌ $1"
+  echo "── api.log（tail 20；空=进程秒死零输出——多半 OOM/解释器级）──"
+  tail -20 "$TMP/api.log" 2>/dev/null
+  echo "── api.log 大小：$(wc -c < "$TMP/api.log" 2>/dev/null || echo 0) 字节；进程表：──"
+  pgrep -af "video2md api" || echo "（无 api 进程）"
+  docker logs "$NGX_CID" 2>&1 | tail -10 || true
+  exit 1
+}
 cleanup() {
   pkill -9 -f "video2md api --port $API_PORT" 2>/dev/null || true
   [ -n "${API_PID}" ] && wait "${API_PID}" 2>/dev/null || true

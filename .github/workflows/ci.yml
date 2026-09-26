@@ -5,6 +5,7 @@ on:
     branches: [main]
     tags: ['v*']   # 打 tag 触发 release（镜像发布 GHCR；test/lint/plugin 对 tag 同样把关）
   pull_request:
+  workflow_dispatch: {}   # 手动触发（CI 侧环境性失败的隔离调试面——2026-09-27 反代冒烟连败排查用）
 
 jobs:
   # 离线测试：pytest 契约测试 + 8 个脚本式测试 + 进程级 mockpool 全链冒烟（假 LLM 档，零 token）
