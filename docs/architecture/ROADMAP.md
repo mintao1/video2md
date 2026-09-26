@@ -192,6 +192,13 @@
 
 ## P2：规模化增强（5 项）
 
+> **平台相位注（2026-09-26 建册）**：P2-1（多 worker）/ P2-3（蓝绿）/ P2-4（水平
+> 扩容前提）与平台级 k8s 解耦路线天然接力——`../../../PLATFORM-ROADMAP.md`
+> **Phase 4**（video2md 入 k3s；gate=平台 Phase 2 sing-train 验收过 + 本 P2 需求
+> 真实）。届时 P2-1 的三选一评估应把「k3s replicas」纳入选项；P2-3 的反代双
+> upstream 权重切换可由 `kubectl rollout` 原生替代；PG（profile pg 回环 5432）
+> 状态面去留按平台册 §2.2 裁决逻辑单判。
+
 ### P2-1 多 worker 形态声明与资产
 - **动机**：批判②可用性 M——单副本 SPOF；watchdog exit 依赖 compose
 - **内容**：评估三选一：gunicorn 多 worker（需先 P1-1 闭环跨副本语义）/ compose `deploy.replicas` + 反代负载 / 显式声明「单副本 + 快速自愈」为正式形态并补 systemd unit；产出写入 `02-runtime-topology.md`
