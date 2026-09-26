@@ -34,8 +34,14 @@ cleanup() {
 trap cleanup EXIT
 command -v docker >/dev/null || fail "缺 docker（本冒烟需要 nginx 容器）"
 
-# —— 1. 进程级 api（回环；TRUST_XFF 保持 off——socket 直连冒烟，伪造 XFF 无效口径）——
-env V2MD_AUTH=off V2MD_USERS_FILE="$TMP/users.json" V2MD_RUNS_FILE="$TMP/runs.json" \
+# —— 1. 进程级 api（TRUST_XFF 保持 off——socket 直连冒烟，伪造 XFF 无效口径）——
+# V2MD_HOST=0.0.0.0（2026-09-27 CI 四连败根修）：nginx 容器经 host-gateway 打宿主
+# docker0 地址（Linux=172.17.0.1），127.0.0.1 绑定的 socket 够不到——connection
+# refused → healthz 502。Mac Docker Desktop 的 host.docker.internal 有回环转发
+# 所以本地绿、Linux CI 从未绿（本步入库 09-25 16:31 晚于最后绿 CI 09-24 13:46，
+# 首跑即挂）。0.0.0.0 仅限冒烟环境：runner 端口随机短命 + api.py 注释本就注明
+# 「容器内设 0.0.0.0」语义。被测面（deny/SSE/限流）与 bind 地址无关。
+env V2MD_HOST=0.0.0.0 V2MD_AUTH=off V2MD_USERS_FILE="$TMP/users.json" V2MD_RUNS_FILE="$TMP/runs.json" \
   V2MD_STATE_FILE="$TMP/state.json" V2MD_LOG_DIR="$TMP/logs" V2MD_REMOTE="" \
   V2MD_CORS_ORIGINS="" LANGFUSE_PK="" LANGFUSE_SK="" OTEL_EXPORTER_OTLP_ENDPOINT="" \
   PYTHONUNBUFFERED=1 \
