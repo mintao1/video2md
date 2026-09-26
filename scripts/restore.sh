@@ -18,9 +18,9 @@ DST_DIR="$REPO_DIR/backups"
 STAMP=""
 ONLY="data,vault,pg"
 ASSUME_YES=0
-# 双文件：观测栈（prometheus/alertmanager 等）与主栈同 project——只带主文件的话 down 会
-# 连带删掉 obs 容器而 up 又不拉回，恢复后告警链静默消失
-COMPOSE="docker compose -f $REPO_DIR/docker-compose.yml -f $REPO_DIR/docker-compose.obs.yml"
+# 2026-09-26 obs 合并（平台 Phase 1.1/M1）后单文件：观测归 platform-obs 独立 project
+# （~/stack/platform-obs），与本栈容器不再同 project——恢复脚本无需（也不能）连带其容器。
+COMPOSE="docker compose -f $REPO_DIR/docker-compose.yml"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in

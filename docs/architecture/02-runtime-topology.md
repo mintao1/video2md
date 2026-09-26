@@ -17,10 +17,11 @@
 │    │    └─ events PG 泵线程（V2MD_EVENTS=pg 时，LISTEN v2md_events+v2md_cmds）
 │    ├─ gpu_router 容器    :9700（无认证面，安全组兜底——见已知限制）
 │    └─ postgres:17-alpine  profile=["pg"] 默认不起；127.0.0.1:5432
-├─ docker compose 观测栈（docker-compose.obs.yml）
-│    ├─ otel-collector :4318 → Langfuse Cloud / prometheus exporter :8889
+├─ 平台统一观测栈（~/stack/platform-obs，2026-09-26 obs 双栈合并——平台 Phase 1.1/M1；
+│    本仓自有 docker-compose.obs.yml 退役为本地预览资产，服务器不再使用）
+│    ├─ otel-collector :4318 → traces 按 service.name 路由各自 Langfuse 项目 / prometheus exporter :8889
 │    ├─ prometheus :9090 → grafana :3000（匿名 Viewer，仅回环+隧道）
-│    └─ alertmanager → feishu-webhook :9760 → 飞书
+│    └─ alertmanager :9093 → feishu-webhook :9760（v2md 群）/9761（book 群）→ 飞书
 └─ 卷：v2md-data（state/runs/users/checkpoints/logs/outbox/uploads）
        vault（vault 模式产物）、gpu-router-logs、v2md-pg
 ```
@@ -31,8 +32,8 @@
 |---|---|---|---|
 | 80/443 | 反代 | ✅ 唯一入口 | 仓内 nginx（P0-4 ✅）：SSE 关缓冲；`/docs`/`/openapi.json`/`/redoc` deny；匿名双层限流；body 上限 2g。TLS 证书部署期接 `deploy/certs/`（模板见 conf 尾） |
 | 8790 | 127.0.0.1 | ❌ | api；`ssh -L 8790:127.0.0.1:8790` 隧道调试 |
-| 9700 | 全接口 | ❌（安全组不放行） | gpu_router **无认证**（`docker-compose.yml:25-26` 自述） |
-| 3000/9090/4318/8889/9760 | 127.0.0.1 | ❌ | 观测栈 |
+| 9700 | 全接口 | ❌（安全组+iptables 不放行） | gpu_router **无认证**（`docker-compose.yml:25-26` 自述） |
+| 3000/9090/4318/8889/9760 | 127.0.0.1 | ❌ | 平台统一观测栈（platform-obs） |
 | 5432 | 127.0.0.1 | ❌ | PG（compose 内置时）；外部托管 PG 走 DSN |
 
 安全组：只放行 80/443。⚠ 此口径当前是**文档纪律**——仓内无 IaC/防火墙脚本承载（批判①入口层）。
@@ -83,11 +84,12 @@ GOOGLE_CLIENT_ID=xxxxx.apps.googleusercontent.com
 
 ```bash
 cd ~/stack/video2md
-docker compose -f docker-compose.yml -f docker-compose.obs.yml build
-docker compose -f docker-compose.yml -f docker-compose.obs.yml up -d
+docker compose -f docker-compose.yml build
+docker compose -f docker-compose.yml up -d
 curl -s localhost:8790/healthz && curl -s localhost:8790/preflight && \
   curl -s "localhost:9700/status?refresh=true"
-# 观测栈验证：curl -s 127.0.0.1:9090/-/healthy（prometheus）· curl -s 127.0.0.1:3000/api/health（grafana）
+# 观测面归平台统一栈（~/stack/platform-obs）：curl -s 127.0.0.1:9090/-/healthy · curl -s 127.0.0.1:13133/health
+# （2026-09-26 obs 双栈合并后本栈不再叠 docker-compose.obs.yml——叠了会与平台栈抢端口）
 ```
 
 **3. 反代 TLS**——api 只绑回环，公网流量全部经反代终结 TLS。**配置实体已入仓（P0-4 ✅）**：

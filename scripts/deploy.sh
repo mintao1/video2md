@@ -20,7 +20,10 @@ TAG=""
 HOST="${V2MD_DEPLOY_HOST:-}"
 DIR="$HOME/stack/video2md"
 DRY_RUN=0
-COMPOSE="docker compose -f docker-compose.yml -f docker-compose.obs.yml"
+# 2026-09-26 obs 双栈合并（平台 Phase 1.1/M1）：观测归 ~/stack/platform-obs 统一栈，
+# 发版不再叠 docker-compose.obs.yml（叠了会与平台栈抢 4318/9090/9093/3000/9760 端口）；
+# OTEL 出口已入主 compose environment。
+COMPOSE="docker compose -f docker-compose.yml"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
