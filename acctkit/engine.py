@@ -16,6 +16,13 @@ from .models import AuthError, Identity, NoCredentials
 from .providers import AuthProvider, make_provider
 from .store import IdentityStore, JsonFileStore
 
+# BOOK_AUTH 模式 → 默认 provider 链（AUTH_PROVIDERS 显式配置优先）
+_MODE_PROVIDERS = {
+    "token": "token",                    # 单/多静态 token（接入方）
+    "wechat": "wxsession,token",         # 双轨：小程序 session + 接入方静态 token
+    "google": "google",
+}
+
 
 class AuthEngine:
     def __init__(self, providers: Sequence[AuthProvider], store: IdentityStore):
@@ -44,16 +51,22 @@ def build_from_env(env: Mapping[str, str], prefix: str = "V2MD_",
     """按环境映射装配引擎（键：{prefix}AUTH / {prefix}AUTH_PROVIDERS /
     {prefix}USERS_FILE / GOOGLE_CLIENT_ID）；宿主项目换前缀即复用同一套配置策略。
 
-    {prefix}AUTH=off|''|none → providers=[fake, dev]（不校验兜底）；
-    否则 {prefix}AUTH_PROVIDERS 逗号列表按序实例化（provider 工厂注册表见
-    providers.register_provider）。store 不传则建 {prefix}USERS_FILE 的 JsonFileStore。
+    {prefix}AUTH=off|''|none → providers=[fake, dev]（不校验兜底）；其余模式
+    {prefix}AUTH_PROVIDERS 显式列表优先，未给则按模式查 _MODE_PROVIDERS（token→token、
+    wechat→wxsession,token 双轨、google→google）；未收录的模式启动即 500
+    （fail-fast，替代旧默认 google 的静默错配）。store 不传则建
+    {prefix}USERS_FILE 的 JsonFileStore。
     """
     mode = (env.get(prefix + "AUTH", "off") or "off").strip().lower()
     if mode in ("off", "", "none"):
         names = ["fake", "dev"]
     else:
-        names = [p.strip() for p in (env.get(prefix + "AUTH_PROVIDERS", "google") or "").split(",")
-                 if p.strip()]
+        raw = (env.get(prefix + "AUTH_PROVIDERS", "") or "").strip() \
+            or _MODE_PROVIDERS.get(mode, "")
+        if not raw:
+            raise AuthError(f"未知鉴权模式 {mode}（off|token|wechat|google，或显式 "
+                            f"{prefix}AUTH_PROVIDERS 逗号列表）", status=500)
+        names = [p.strip() for p in raw.split(",") if p.strip()]
     providers = [make_provider(n, env) for n in names]
     if store is None:
         store = JsonFileStore(Path(env.get(prefix + "USERS_FILE") or "users.json"))
