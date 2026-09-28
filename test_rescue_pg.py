@@ -19,8 +19,8 @@ from pathlib import Path
 
 DSN = os.environ.get("V2MD_TEST_PG_DSN") or ""
 if not DSN:
-    print("SKIP：未配 V2MD_TEST_PG_DSN（rescue PG E2E 只在有库的环境跑）")
-    raise SystemExit(0)
+    import pytest
+    pytest.skip("未配 V2MD_TEST_PG_DSN（rescue PG E2E 只在有库的环境跑）", allow_module_level=True)
 
 REPO = Path(__file__).resolve().parent
 TMP = Path(tempfile.mkdtemp(prefix="v2md-rescue-pg-"))

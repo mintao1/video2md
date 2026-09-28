@@ -27,8 +27,8 @@ from pathlib import Path
 
 DSN = os.environ.get("V2MD_TEST_PG_DSN") or ""
 if not DSN:
-    print("SKIP：未配 V2MD_TEST_PG_DSN（PG 真库测试只在有库的环境跑）")
-    raise SystemExit(0)
+    import pytest
+    pytest.skip("未配 V2MD_TEST_PG_DSN（PG 真库测试只在有库的环境跑）", allow_module_level=True)
 
 # 在 import video2md 之前定档：config.ENV 是 import 时快照
 os.environ.update({
