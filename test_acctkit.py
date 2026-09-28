@@ -205,7 +205,7 @@ def test_build_from_env_google_device_wiring():
 
 
 class _StubWeChat(WeChatProvider):
-    """打桩 HTTP 层（_get_json）：真实 _exchange/_userinfo 的错误映射照跑，
+    """打桩 HTTP 层（_get_json_direct，实例覆写内核打桩缝）：真实 _exchange/_userinfo 的错误映射照跑，
     只是不联网。resp/user 由测试摆好；user 给异常 = 模拟资料接口挂掉。"""
     resp = {"access_token": "at-1", "expires_in": 7200, "scope": "snsapi_login",
             "openid": "wx-open-1", "unionid": "uni-1"}
@@ -214,7 +214,7 @@ class _StubWeChat(WeChatProvider):
     def __init__(self, app_id: str = "wx-app-id", app_secret: str = "wx-app-secret"):
         super().__init__(app_id, app_secret)
 
-    def _get_json(self, url: str) -> dict:
+    def _get_json_direct(self, url: str) -> dict:
         if "oauth2/access_token" in url:
             assert "code=good-code" in url and "appid=wx-app-id" in url \
                 and "secret=wx-app-secret" in url and "grant_type=authorization_code" in url
