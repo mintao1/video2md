@@ -1,0 +1,30 @@
+# video2md NetworkPolicy（平台基线：默认拒绝 + 白名单）
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: video2md-default-deny
+  namespace: video2md
+spec:
+  podSelector: {}
+  policyTypes: ["Ingress"]
+  ingress:
+    # 同 ns 内通信
+    - from:
+        - podSelector: {}
+    # 平台观测组件
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              app.kubernetes.io/part-of: lcode-platform
+      ports:
+        - protocol: TCP
+          port: 8790
+    # 宿主回环
+    - from:
+        - ipBlock:
+            cidr: 127.0.0.1/32
+        - ipBlock:
+            cidr: 10.42.0.0/16
+      ports:
+        - protocol: TCP
+          port: 8790

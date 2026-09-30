@@ -25,6 +25,7 @@ spec:
     spec:
       hostNetwork: true   # 消费 gpu_router(127.0.0.1:9700)/obs(4318)/代理(17898) 全回环
       dnsPolicy: ClusterFirstWithHostNet
+      serviceAccountName: video2md
       enableServiceLinks: false
       terminationGracePeriodSeconds: 120   # 在途视频 run 的收尾余量（watchdog 自愈口径）
       containers:

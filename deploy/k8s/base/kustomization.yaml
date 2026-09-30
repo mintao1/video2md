@@ -5,5 +5,7 @@ namespace: video2md
 
 resources:
   - namespace.yaml
+  - rbac.yaml
   - deployment-api.yaml
+  - networkpolicy.yaml
   - resourcequota.yaml
