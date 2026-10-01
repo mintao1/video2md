@@ -13,6 +13,9 @@ kind: Role
 metadata:
   name: video2md
   namespace: video2md
+  labels:
+    app.kubernetes.io/name: video2md
+    app.kubernetes.io/part-of: lcode-platform
 rules:
   - apiGroups: [""]
     resources: ["configmaps", "secrets"]
@@ -29,6 +32,9 @@ kind: RoleBinding
 metadata:
   name: video2md
   namespace: video2md
+  labels:
+    app.kubernetes.io/name: video2md
+    app.kubernetes.io/part-of: lcode-platform
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role

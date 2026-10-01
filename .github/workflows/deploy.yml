@@ -1,0 +1,78 @@
+# video2md Deploy workflow — SSH → k3s 部署 + 冒烟 + 回滚
+# 模板来源：templates/ci/deploy.yml
+name: Deploy
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '版本号（如 v0.3.0）'
+        required: true
+      environment:
+        description: '目标环境'
+        required: true
+        type: choice
+        options: [dev, prod]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy to k3s
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            set -euo pipefail
+
+            PRODUCT="video2md"
+            VERSION="${{ inputs.version }}"
+            NS="video2md"
+            KUSTOMIZE_DIR="~/stack/${PRODUCT}/deploy/k8s/base"
+
+            echo "── 部署 ${PRODUCT}:${VERSION} → ${NS}"
+
+            # 1. 拉取/导入镜像
+            echo "  拉取镜像..."
+            docker pull "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${VERSION}" || {
+              echo "  GHCR 拉取失败，尝试本地构建..."
+              cd ~/stack/${PRODUCT}
+              docker build \
+                --build-arg PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple \
+                --build-arg VERSION=${VERSION} \
+                -t ${PRODUCT}:${VERSION} .
+            }
+            docker save ${PRODUCT}:${VERSION} | sudo k3s ctr images import - 2>/dev/null || \
+              docker save "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${VERSION}" | sudo k3s ctr images import -
+
+            # 2. 更新 kustomization tag
+            cd ${KUSTOMIZE_DIR}
+            sed -i "s/newTag: .*/newTag: \"${VERSION}\"/" kustomization.yaml
+
+            # 3. Apply
+            sudo k3s kubectl apply -k .
+            sudo k3s kubectl -n ${NS} rollout status deploy/${PRODUCT}-api --timeout=180s
+
+            # 4. 冒烟
+            CODE=$(curl -s -o /dev/null -w '%{http_code}' -m 10 http://127.0.0.1:8790/healthz || echo "000")
+            echo "  冒烟 http://127.0.0.1:8790/healthz → ${CODE}"
+            [[ "${CODE}" == "200" ]] || {
+              echo "✗ 冒烟失败，执行回滚"
+              sudo k3s kubectl -n ${NS} rollout undo deploy/${PRODUCT}-api
+              exit 1
+            }
+
+            echo "✓ ${PRODUCT}:${VERSION} 部署成功"
+
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "::error::部署 video2md:${{ inputs.version }} 失败，请检查服务器日志"

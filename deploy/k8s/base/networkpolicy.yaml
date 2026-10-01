@@ -4,6 +4,9 @@ kind: NetworkPolicy
 metadata:
   name: video2md-default-deny
   namespace: video2md
+  labels:
+    app.kubernetes.io/name: video2md
+    app.kubernetes.io/part-of: lcode-platform
 spec:
   podSelector: {}
   policyTypes: ["Ingress"]

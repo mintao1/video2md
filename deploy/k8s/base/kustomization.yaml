@@ -7,5 +7,6 @@ resources:
   - namespace.yaml
   - rbac.yaml
   - deployment-api.yaml
+  - service.yaml
   - networkpolicy.yaml
   - resourcequota.yaml

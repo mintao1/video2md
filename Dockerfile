@@ -10,7 +10,8 @@ ARG GIT_SHA=""
 LABEL org.opencontainers.image.title="video2md" \
       org.opencontainers.image.version="${VERSION}" \
       org.opencontainers.image.revision="${GIT_SHA}" \
-      org.opencontainers.image.source="https://github.com/mintao1/video2md"
+      org.opencontainers.image.source="https://github.com/mintao1/video2md" \
+      org.opencontainers.image.vendor="lcode-platform"
 
 # Debian 源换清华镜像（国内服务器从 deb.debian.org 拉 ffmpeg 依赖龟速实测 ~60KB/s；
 # Mac/海外构建也无害——tuna 全球可达）
@@ -50,6 +51,11 @@ ENV PATH="/app/.venv/bin:$PATH" \
 
 VOLUME ["/app/data", "/vault"]
 EXPOSE 8790
+
+# 非 root 运行（平台基线 L0：ADR-0020）
+RUN useradd -u 10001 -m -d /home/appuser appuser \
+    && mkdir -p /app/data && chown -R appuser:appuser /home/appuser /app/data /vault
+USER 10001
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s \
   CMD ["python", "-c", "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8790/healthz', timeout=4)"]
