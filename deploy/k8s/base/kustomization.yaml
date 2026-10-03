@@ -1,3 +1,4 @@
+# Phase 6: 引用平台 shared components，消灭 RBAC/NetworkPolicy/ResourceQuota 拷贝
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
@@ -5,8 +6,44 @@ namespace: video2md
 
 resources:
   - namespace.yaml
-  - rbac.yaml
   - deployment-api.yaml
   - service.yaml
-  - networkpolicy.yaml
-  - resourcequota.yaml
+
+components:
+  - ../../../../templates/k8s-base/components/security-baseline
+  - ../../../../templates/k8s-base/components/rbac
+  - ../../../../templates/k8s-base/components/networking
+  - ../../../../templates/k8s-base/components/common-config
+  - ../../../../templates/k8s-base/components/resourcequota
+
+# RBAC replacements: namespace resource → NAMEHOLDER
+replacements:
+  - source:
+      kind: Namespace
+      name: video2md
+      fieldPath: metadata.name
+    targets:
+      - select:
+          kind: ServiceAccount
+        fieldPaths:
+          - metadata.name
+          - metadata.namespace
+      - select:
+          kind: Role
+        fieldPaths:
+          - metadata.name
+          - metadata.namespace
+      - select:
+          kind: RoleBinding
+        fieldPaths:
+          - metadata.name
+          - metadata.namespace
+          - roleRef.name
+          - subjects.0.name
+          - subjects.0.namespace
+
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: lcode-platform
+      app.kubernetes.io/name: video2md
+    includeSelectors: true
