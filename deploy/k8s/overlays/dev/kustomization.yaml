@@ -34,4 +34,14 @@ patches:
 labels:
   - pairs:
       app.kubernetes.io/environment: dev
-    includeSelectors: true
+    # ⚠️ 不要加回 includeSelectors: true（2026-10-06 删）。
+    # 该项会把 environment 注入 spec.selector.matchLabels，而 Deployment
+    # 的 spec.selector 是 immutable 字段——一旦线上对象的 selector 与它不同，
+    # kubectl apply 一律被 API server 拒：
+    #   Deployment.apps "X" is invalid: spec.selector: field is immutable
+    # 后果不是「这次 apply 失败」，而是**该负载此后再也无法更新**——本轮所有
+    # seccomp / SecurityContext 改动都因此落不下去。
+    # 线上 14 个工作负载的 selector 无一含 environment（部署早于该标签），
+    # 故去掉该项后 git selector 与线上一致，apply 恢复可用。
+    # labels 仍写入 metadata.labels 与 Pod 模板标签（按标签选 Pod 的
+    # Service / NetworkPolicy 不受影响——已核对全平台无一按 environment 选 Pod）。

@@ -45,5 +45,9 @@ replacements:
 labels:
   - pairs:
       app.kubernetes.io/part-of: lcode-platform
-      app.kubernetes.io/name: video2md
-    includeSelectors: true
+      # ⚠️ 删掉 app.kubernetes.io/name 与 includeSelectors（2026-10-06）。
+      # includeSelectors 把标签注入 spec.selector.matchLabels，而 selector 是
+      # immutable 字段；线上本负载的 selector 不含 part-of（部署早于该标签），
+      # 注入即造成永久性 apply 失败。去掉后 selector 回到 base 文件自己的
+      # {component: api, name: video2md}，与线上一致，apply 恢复可用。
+      # labels 仍写入 metadata.labels 与 Pod 模板标签，不影响任何选 Pod 逻辑。

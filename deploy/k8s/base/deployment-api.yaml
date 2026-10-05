@@ -28,12 +28,21 @@ spec:
       serviceAccountName: video2md
       enableServiceLinks: false
       terminationGracePeriodSeconds: 120   # 在途视频 run 的收尾余量（watchdog 自愈口径）
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
       containers:
         - name: api
           # registry 全名（D2 预构建收官）：制品=CI tag 构建产物（GHCR 灾备副本同 ID）。
           # 服务器落地流：gh run download artifact → gunzip | ctr import（无 packages 凭证通道）。
           image: ghcr.io/mintao1/video2md:0.1.2
           imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
           env:
             - name: TZ
               value: Asia/Shanghai
@@ -58,6 +67,8 @@ spec:
               value: remote
             - name: OTEL_EXPORTER_OTLP_ENDPOINT
               value: http://127.0.0.1:4318   # 平台统一观测栈
+            - name: OTEL_SERVICE_NAME
+              value: video2md
             - name: V2MD_PROXY
               value: http://127.0.0.1:17898
             - name: V2MD_PROXY_DOMESTIC
@@ -78,6 +89,8 @@ spec:
               mountPath: /run/video2md.env
               subPath: video2md.env
               readOnly: true
+            - name: tmp
+              mountPath: /tmp
           resources:
             requests:
               cpu: 100m
@@ -97,6 +110,12 @@ spec:
               port: 8790
             initialDelaySeconds: 30
             periodSeconds: 30
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: 8790
+            periodSeconds: 5
+            failureThreshold: 30    # 150s 启动窗口
       volumes:
         - name: data
           hostPath:
@@ -110,3 +129,5 @@ spec:
           hostPath:
             path: /home/ubuntu/stack/video2md/secrets
             type: Directory
+        - name: tmp
+          emptyDir: {}
