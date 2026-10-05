@@ -8,11 +8,16 @@ resources:
   - namespace.yaml
   - deployment-api.yaml
   - service.yaml
+  - networkpolicy.yaml
 
 components:
   - ../../../../templates/k8s-base/components/security-baseline
   - ../../../../templates/k8s-base/components/rbac
-  - ../../../../templates/k8s-base/components/networking
+  # - ../../../../templates/k8s-base/components/networking
+  # ⚠️ 上面那行故意注释掉（2026-10-06）。共享 component 的 nginx 边缘那条规则
+  # 还带 ipBlock: 10.42.0.0/16（放行整个节点网段），而线上没有——照它 apply 会
+  # 顺手放宽入站面。本轮只做 selector/quota 对齐，故本产品自带
+  # networkpolicy.yaml（见上方 resources），规则逐条抄自线上。
   - ../../../../templates/k8s-base/components/common-config
   - ../../../../templates/k8s-base/components/resourcequota
 
