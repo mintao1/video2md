@@ -6,6 +6,13 @@
 #   - 数据原位零迁移：hostPath 直挂 docker 卷真实路径（v2md-data/vault）+ secrets 文件
 #   - 单副本 Recreate（串行信号量语义不变——多副本=PG 状态面，归 P2-1 后续项）
 #   - 无 Service（边缘走回环 8790；多副本/集群内发现出现时再立 Service）
+#
+# PSA（2026-10-06 更正）：enforce 由 baseline 改为 privileged。本 ns 的 Pod
+# 用 hostNetwork 消费 gpu_router(127.0.0.1:9700)/obs(4318)/代理(17898)，
+# 而 PSS baseline 明令禁止 host namespaces——两者直接冲突。PSA 豁免只有
+# namespace/username/runtimeClass 三种粒度，无 per-workload 豁免，故 ns 级降级。
+# warn/audit=restricted 零风险（官方定义二者 otherwise allowed，永不拒绝）。
+# 回收路径见 templates/k8s-base/namespace.yaml 头注（四步）。
 # 回滚：kubectl delete -k deploy/k8s/base && docker compose start video2md（原容器原地保留）
 apiVersion: v1
 kind: Namespace
@@ -14,7 +21,7 @@ metadata:
   labels:
     app.kubernetes.io/part-of: lcode-platform
     app.kubernetes.io/name: video2md
-    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/enforce: privileged
     pod-security.kubernetes.io/enforce-version: latest
     pod-security.kubernetes.io/warn: restricted
     pod-security.kubernetes.io/warn-version: latest
