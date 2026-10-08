@@ -21,7 +21,7 @@ if not DSN:
     import pytest
     pytest.skip("未配 V2MD_TEST_PG_DSN（rescue PG E2E 只在有库的环境跑）", allow_module_level=True)
 
-REPO = Path(__file__).resolve().parent
+REPO = Path(__file__).resolve().parents[2]  # 仓根（deploy/ scripts/ 留根）
 TMP = Path(tempfile.mkdtemp(prefix="v2md-rescue-pg-"))
 VAULT = TMP / "vault"
 POOL_PORT = 9799
@@ -34,7 +34,7 @@ os.environ.update({
     "V2MD_LOG_DIR": str(TMP / "logs"), "V2MD_SECRETS_FILE": str(TMP / "nonexistent.env"),
     "V2MD_AUTH": "off", "V2MD_FAKE_LLM": "1", "V2MD_REMOTE": "", "OBSIDIAN_VAULT": str(VAULT),
 })
-sys.path.insert(0, str(REPO))
+sys.path.insert(0, str(REPO / "backend"))
 
 from video2md import pg, pgmigrate, pgstore  # noqa: E402
 

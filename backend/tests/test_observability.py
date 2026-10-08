@@ -13,7 +13,7 @@ import tempfile
 from pathlib import Path
 from unittest import mock
 
-sys.path.insert(0, str(Path(__file__).parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # backend/（包根）
 
 # 隔离：日志进临时目录；显式空串关掉任何真实端点（防开发机 secrets 文件串台——
 # os.environ 显式设置优先于 config.ENV，见 observability._env）
@@ -23,6 +23,7 @@ for k in ("OTEL_EXPORTER_OTLP_ENDPOINT", "LANGFUSE_PK", "LANGFUSE_SK", "LANGFUSE
 
 from opentelemetry.sdk.metrics.export import InMemoryMetricReader
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
+from platform_otel_sdk import _otel as _sdk  # _TRACER_PROVIDER 随 otel 迁移入 SDK（033ae72）
 
 from video2md import deadman, observability
 from video2md.util import RunLog
@@ -53,7 +54,7 @@ with log.span("stage:download"):
     log.info("artifacts", stage="download", n=1)
 observability.close_run("offcase")
 observability.flush()  # 不炸即过
-assert observability._M == {} and observability._TRACER_PROVIDER is None
+assert observability._M == {} and _sdk._TRACER_PROVIDER is None
 
 
 # ---- InMemory：span 树 / 属性 / gen_ai 映射 ----------------------------------
@@ -81,9 +82,10 @@ except RuntimeError:
 observability.close_run("r1")
 
 tree = {s.name: s for s in spans.get_finished_spans()}
-root, stage, entry = tree["video2md-run"], tree["stage:download"], tree["entry 1/2 download"]
+root, stage, entry = tree["video2md-serve-run"], tree["stage:download"], tree["entry 1/2 download"]
 # trace 名常量化（低基数原则：名字是 API，URL 是数据进 input）
-assert root.attributes["langfuse.trace.name"] == "video2md-run"
+# 现状命名=f"{service_name}-run"（otel 迁移后 SDK 生成；465b53c 兼容锚）
+assert root.attributes["langfuse.trace.name"] == "video2md-serve-run"
 assert root.attributes["run_id"] == "r1"
 # Langfuse OTel 映射：metadata 带 langfuse.trace.metadata.* 前缀才可过滤
 assert root.attributes["langfuse.trace.metadata.stage"] == "download"

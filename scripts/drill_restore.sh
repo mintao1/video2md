@@ -17,6 +17,7 @@
 #                                               # 人工季度演练：实测记录归档 + secrets 清单核对位
 set -euo pipefail
 cd "$(dirname "$0")/.."
+export PYTHONPATH="$PWD/backend"   # package=false：python -m video2md 靠包根上 path
 
 RECORD=""; SECRETS_CHECKED="N"; SKIP_PG=0
 while [[ $# -gt 0 ]]; do
@@ -53,7 +54,7 @@ mkdir -p "$TMP/probe"
 env V2MD_AUTH=off V2MD_USERS_FILE="$TMP/probe/users.json" V2MD_RUNS_FILE="$TMP/probe/runs.json" \
   V2MD_STATE_FILE="$TMP/probe/state.json" V2MD_LOG_DIR="$TMP/probe/logs" \
   V2MD_REMOTE="" V2MD_CORS_ORIGINS="" LANGFUSE_PK="" LANGFUSE_SK="" OTEL_EXPORTER_OTLP_ENDPOINT="" \
-  uv run python -m video2md api --port "$PORT" > "$TMP/probe/api.log" 2>&1 &
+  uv run --project backend python -m video2md api --port "$PORT" > "$TMP/probe/api.log" 2>&1 &
 API_PID=$!
 for _ in $(seq 1 30); do curl -s -m 2 "http://127.0.0.1:$PORT/healthz" >/dev/null 2>&1 && break; sleep 1; done
 curl -s -m 2 "http://127.0.0.1:$PORT/healthz" >/dev/null || { cat "$TMP/probe/api.log"; fail "探针 api 未起"; }
@@ -117,7 +118,7 @@ if [[ $SKIP_PG -ne 1 ]] && command -v docker >/dev/null 2>&1 && docker ps >/dev/
     -e POSTGRES_PASSWORD=v2md -e POSTGRES_DB=v2md postgres:17-alpine)
   for _ in $(seq 1 30); do docker exec "$PG_CID" pg_isready -U v2md -d v2md >/dev/null 2>&1 && break; sleep 1; done
   DSN="postgresql://v2md:v2md@127.0.0.1:55436/v2md"
-  V2MD_PG_DSN="$DSN" uv run python -m video2md migrate >/dev/null || fail "③ 演练库 migrate 失败"
+  V2MD_PG_DSN="$DSN" uv run --project backend python -m video2md migrate >/dev/null || fail "③ 演练库 migrate 失败"
   docker exec "$PG_CID" psql -U v2md -d v2md -Atc \
     "INSERT INTO v2md_runs (run_id, owner, status, created, record) VALUES
      ('pgd1', 'u_drill', 'done', '2026-01-01', '{\"run_id\": \"pgd1\", \"status\": \"done\"}'),
@@ -139,7 +140,7 @@ env V2MD_AUTH=off V2MD_USERS_FILE="$TMP/restore-data/users.json" \
   V2MD_RUNS_FILE="$TMP/restore-data/runs.json" V2MD_STATE_FILE="$TMP/restore-data/state.json" \
   V2MD_LOG_DIR="$TMP/restore-data/logs" OBSIDIAN_VAULT="$TMP/restore-vault" \
   V2MD_REMOTE="" V2MD_CORS_ORIGINS="" LANGFUSE_PK="" LANGFUSE_SK="" OTEL_EXPORTER_OTLP_ENDPOINT="" \
-  uv run python -m video2md api --port "$PORT" > "$TMP/api-restore.log" 2>&1 &
+  uv run --project backend python -m video2md api --port "$PORT" > "$TMP/api-restore.log" 2>&1 &
 API_PID=$!
 for _ in $(seq 1 30); do curl -s -m 2 "http://127.0.0.1:$PORT/healthz" >/dev/null 2>&1 && break; sleep 1; done
 curl -s -m 2 "http://127.0.0.1:$PORT/healthz" >/dev/null || { cat "$TMP/api-restore.log"; fail "④ 恢复后 api 未起"; }

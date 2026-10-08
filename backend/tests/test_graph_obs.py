@@ -19,7 +19,7 @@ from pathlib import Path
 os.environ["LANGFUSE_PK"] = os.environ["LANGFUSE_SK"] = ""  # 观测 sink 强制静默
 os.environ["OTEL_EXPORTER_OTLP_ENDPOINT"] = ""
 
-sys.path.insert(0, str(Path(__file__).parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # backend/（包根）
 
 from video2md import graph, graph_obs, observability, runs, util
 from video2md.util import RunLog

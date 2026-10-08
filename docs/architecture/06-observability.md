@@ -35,7 +35,7 @@ otel-collector（memory_limiter → batch）
 ## 追踪口径
 
 - 每 run 一条 trace：`trace_id = sha256("video2md-"+run_id)`（确定性；evals 据此回挂分数。2026-09-22 前为 `serve-` 前缀，历史 233 条回放 trace 用旧前缀）。
-- trace 名常量 `video2md-run`（低基数）；URL 进 root input；`langfuse.user.id`=uid（成本按用户归因）；tags=`video2md`,`mode:vault|deliver`；environment=`V2MD_ENV`。
+- trace 名常量 `video2md-serve-run`（低基数，=f"{service_name}-run"，SDK 现状命名 465b53c）；URL 进 root input；`langfuse.user.id`=uid（成本按用户归因）；tags=`video2md`,`mode:vault|deliver`；environment=`V2MD_ENV`。
 - LLM 调用渲染为 generation（gen_ai semconv：model/usage/TTFT + prompt/completion 全文经 `_otel` 旁路上云，不落 jsonl/SSE）。
 - 图编排插桩：`GraphObsHandler` 挂 `run_graph` 的 callbacks（`graph:node/state/route/start|end` 零时长点事件；`test_graph_obs.py` 钉字段口径）。
 - **Langfuse 只收生产**：开发机不配 OTEL/LANGFUSE 端点，保持纯本地 jsonl；开发/生产分 Langfuse 项目。

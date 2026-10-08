@@ -2290,6 +2290,26 @@ wheels = [
 ]
 
 [[package]]
+name = "platform-otel-sdk"
+version = "0.1.0"
+source = { editable = "../../platform/otel-sdk" }
+dependencies = [
+    { name = "opentelemetry-api" },
+    { name = "opentelemetry-exporter-otlp-proto-http" },
+    { name = "opentelemetry-sdk" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "opentelemetry-api", specifier = ">=1.34.0,<2.0.0" },
+    { name = "opentelemetry-exporter-otlp-proto-http", specifier = ">=1.34.0,<2.0.0" },
+    { name = "opentelemetry-sdk", specifier = ">=1.34.0,<2.0.0" },
+    { name = "opentelemetry-test-utils", marker = "extra == 'dev'", specifier = ">=0.55b0" },
+    { name = "pytest", marker = "extra == 'dev'" },
+]
+provides-extras = ["dev"]
+
+[[package]]
 name = "pluggy"
 version = "1.6.0"
 source = { registry = "https://pypi.org/simple" }
@@ -3623,9 +3643,8 @@ dependencies = [
     { name = "langgraph" },
     { name = "langgraph-checkpoint-postgres" },
     { name = "langgraph-checkpoint-sqlite" },
-    { name = "opentelemetry-exporter-otlp-proto-http" },
-    { name = "opentelemetry-sdk" },
     { name = "pillow" },
+    { name = "platform-otel-sdk" },
     { name = "psycopg", extra = ["binary", "pool"] },
     { name = "python-multipart" },
     { name = "pyyaml" },
@@ -3664,9 +3683,8 @@ requires-dist = [
     { name = "langgraph", specifier = ">=1.2" },
     { name = "langgraph-checkpoint-postgres", specifier = ">=3.1.2" },
     { name = "langgraph-checkpoint-sqlite", specifier = ">=3.1" },
-    { name = "opentelemetry-exporter-otlp-proto-http", specifier = ">=1.27" },
-    { name = "opentelemetry-sdk", specifier = ">=1.27" },
     { name = "pillow", specifier = ">=10.4" },
+    { name = "platform-otel-sdk", editable = "../../platform/otel-sdk" },
     { name = "psycopg", extras = ["binary", "pool"], specifier = ">=3.3.6" },
     { name = "pyobjc-framework-cocoa", marker = "extra == 'mac'", specifier = ">=10.3" },
     { name = "pyobjc-framework-vision", marker = "extra == 'mac'", specifier = ">=10.3" },

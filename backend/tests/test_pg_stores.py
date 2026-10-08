@@ -39,7 +39,7 @@ os.environ.update({
     "V2MD_SECRETS_FILE": "/nonexistent",  # 隔离宿主凭证文件
     "V2MD_FAKE_LLM": "1",
 })
-sys.path.insert(0, str(Path(__file__).parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # backend/（包根）
 
 from acctkit.models import Principal  # noqa: E402
 from video2md import events, pg, pgstore, runs, util, watchdog  # noqa: E402

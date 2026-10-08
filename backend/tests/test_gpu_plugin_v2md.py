@@ -15,8 +15,8 @@ from pathlib import Path
 
 import httpx
 
-V2MD_ROOT = Path(__file__).resolve().parent
-GPU_ROUTER_ROOT = (V2MD_ROOT.parent / "gpu-router").resolve()
+V2MD_ROOT = Path(__file__).resolve().parent.parent          # backend/
+GPU_ROUTER_ROOT = (V2MD_ROOT.parent.parent / "gpu-router").resolve()  # 平台工作区兄弟仓
 sys.path.insert(0, str(GPU_ROUTER_ROOT))
 
 from fastapi.testclient import TestClient

@@ -44,7 +44,7 @@ from collections import OrderedDict
 from datetime import datetime
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "backend"))
 
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
@@ -57,8 +57,9 @@ from opentelemetry.trace import (
     TraceFlags,
     set_span_in_context,
 )
+from platform_otel_sdk._otel import _endpoint  # _endpoint 随 otel 迁移入 SDK（033ae72）
 
-from video2md.observability import _endpoint, _scalar_attrs
+from video2md.observability import _scalar_attrs
 
 PROJ = Path(__file__).resolve().parent.parent
 

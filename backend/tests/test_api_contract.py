@@ -108,7 +108,7 @@ def _import_config_with_env(**overrides):
     env = {**os.environ, **overrides}
     return subprocess.run([sys.executable, "-c", "import video2md.config"],
                           capture_output=True, text=True, env=env,
-                          cwd=str(Path(__file__).resolve().parent), timeout=60)
+                          cwd=str(Path(__file__).resolve().parent.parent), timeout=60)
 
 
 def test_production_auth_failfast():

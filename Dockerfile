@@ -34,12 +34,12 @@ RUN pip install --no-cache-dir uv
 WORKDIR /app
 # 依赖层先行：源码变动不击穿缓存。package=false 项目，uv sync 只装依赖
 # --extra evals：离线评测旁路（scripts/eval_notes.py）在容器内可跑（deepeval/ragas/langfuse SDK）
-COPY pyproject.toml uv.lock ./
+COPY backend/pyproject.toml backend/uv.lock ./
 RUN uv sync --frozen --no-dev --extra evals
 # 无 mac extra：pyobjc 是 macOS 专属，Linux 镜像天然不含
 
-COPY video2md/ ./video2md/
-COPY acctkit/ ./acctkit/
+COPY backend/video2md/ ./video2md/
+COPY backend/acctkit/ ./acctkit/
 COPY README.md ./
 
 ENV PATH="/app/.venv/bin:$PATH" \

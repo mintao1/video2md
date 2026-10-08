@@ -14,7 +14,7 @@ from datetime import datetime
 from pathlib import Path
 from unittest import mock
 
-sys.path.insert(0, str(Path(__file__).parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # backend/（包根）
 
 _TMP = tempfile.mkdtemp(prefix="v2md-test-wd-")
 # —— 必须在 import video2md.config 之前设好（config 在 import 时读 env）——

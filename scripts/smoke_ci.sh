@@ -7,6 +7,7 @@
 #   KEEP_UP=1 scripts/smoke_ci.sh    # 跑完不杀 api（排查用）
 set -euo pipefail
 cd "$(dirname "$0")/.."
+export PYTHONPATH="$PWD/backend"   # package=false：python -m video2md 靠包根上 path
 
 PORT="${SMOKE_PORT:-8795}"
 API="http://127.0.0.1:$PORT"
@@ -33,7 +34,7 @@ ffmpeg -y -hide_banner -loglevel error -f lavfi -i "testsrc2=duration=15:size=12
 echo "夹具就绪: $TMP/smoke.mp4"
 
 # —— 2. 进程级 mockpool（deploy/mock_pool.py 原样复用，compose 冒烟同款契约）——
-uv run uvicorn --app-dir deploy mock_pool:app --host 127.0.0.1 --port 9795 \
+uv run --project backend uvicorn --app-dir deploy mock_pool:app --host 127.0.0.1 --port 9795 \
   > "$TMP/pool.log" 2>&1 &
 POOL_PID=$!
 for _ in $(seq 1 20); do curl -s -m 2 "$POOL/ping" >/dev/null 2>&1 && break; sleep 0.5; done
@@ -48,7 +49,7 @@ V2MD_CLIPS_SOURCE=remote \
 OBSIDIAN_VAULT="$VAULT" \
 V2MD_STATE_FILE="$TMP/state.json" V2MD_RUNS_FILE="$TMP/runs.json" \
 V2MD_LOG_DIR="$TMP/logs" LANGFUSE_PK="" LANGFUSE_SK="" OTEL_EXPORTER_OTLP_ENDPOINT="" \
-  uv run python -m video2md api --port "$PORT" > "$TMP/api.log" 2>&1 &
+  uv run --project backend python -m video2md api --port "$PORT" > "$TMP/api.log" 2>&1 &
 API_PID=$!
 for _ in $(seq 1 40); do curl -s -m 2 "$API/healthz" >/dev/null 2>&1 && break; sleep 1; done
 curl -s -m 2 "$API/healthz" >/dev/null || fail "api 未起"

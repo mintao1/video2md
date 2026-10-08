@@ -13,8 +13,8 @@ import sys
 import tempfile
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent))
-sys.path.insert(0, str(Path(__file__).parent / "scripts"))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))          # backend/（包根）
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts"))  # 仓根 scripts/
 
 # 隔离：日志进临时目录；显式空串关掉任何真实端点（防开发机 secrets 文件串台）
 import os

@@ -13,7 +13,7 @@ import tempfile
 import types
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # backend/（包根）
 
 os.environ["V2MD_LOG_DIR"] = tempfile.mkdtemp(prefix="v2md-test-logs-")
 for k in ("OTEL_EXPORTER_OTLP_ENDPOINT", "LANGFUSE_PK", "LANGFUSE_SK", "LANGFUSE_HOST"):

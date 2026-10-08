@@ -20,3 +20,7 @@ test_e2e.sh
 .DS_Store
 docker-compose*.yml
 deploy/
+# 布局分层后：镜像只 COPY backend/{video2md,acctkit}——前端与测试/插件运行时不进 context
+frontend/
+backend/tests/
+backend/gpu_plugins/

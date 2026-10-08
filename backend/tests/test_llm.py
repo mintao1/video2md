@@ -15,7 +15,7 @@ _mock_sdk._RunTrace = type("_RunTrace", (), {})
 _mock_sdk.get_tracer = lambda *a, **k: None
 sys.modules["platform_otel_sdk"] = _mock_sdk
 
-sys.path.insert(0, str(Path(__file__).parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # backend/（包根）
 
 import httpx
 

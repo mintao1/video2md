@@ -13,7 +13,7 @@ import subprocess
 import tempfile
 from pathlib import Path
 
-REPO = Path(__file__).parent
+REPO = Path(__file__).resolve().parents[2]  # 仓根（scripts/ 留根）
 BACKUP = REPO / "scripts" / "backup.sh"
 RESTORE = REPO / "scripts" / "restore.sh"
 

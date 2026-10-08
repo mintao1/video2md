@@ -42,7 +42,7 @@ evals = [
 package = false
 
 [tool.uv.sources]
-platform-otel-sdk = { path = "../platform/otel-sdk", editable = true }
+platform-otel-sdk = { path = "../../platform/otel-sdk", editable = true }
 
 [dependency-groups]
 dev = [

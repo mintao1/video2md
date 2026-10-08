@@ -10,6 +10,7 @@
 #   V2MD_FAKE_LLM=1 ./scripts/smoke_api_deliver.sh  # 零 token 纯通道冒烟
 set -euo pipefail
 cd "$(dirname "$0")/.."
+export PYTHONPATH="$PWD/backend"   # package=false：python -m video2md 靠包根上 path
 
 PORT="${SMOKE_PORT:-8793}"
 API="http://127.0.0.1:$PORT"
@@ -19,7 +20,7 @@ jqv() { python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get(sys.arg
 
 command -v ffmpeg >/dev/null || fail "缺 ffmpeg"
 command -v unzip >/dev/null || fail "缺 unzip"
-uv run python -c "import Vision" 2>/dev/null || echo "⚠ 无 mac extra：OCR 通道缺席（冒烟不拦截，run 可能 partial）"
+uv run --project backend python -c "import Vision" 2>/dev/null || echo "⚠ 无 mac extra：OCR 通道缺席（冒烟不拦截，run 可能 partial）"
 
 TMP=$(mktemp -d /tmp/v2md-smoked-XXXXXX)
 SHELF="$TMP/outbox-shelf"
@@ -39,7 +40,7 @@ sed -i '' -E 's/^(V2MD_REMOTE|V2MD_CLIPS_REMOTE|V2MD_CLIPS_SOURCE)=/# smoke 本�
 SENTS=("量子纠缠是粒子之间的奇妙关联" "时间管理的第一步是记录时间去向" "光合作用将光能转化为化学能")
 VOICE=$(say -v '?' | grep -E "^(Meijia|Tingting)" | head -1 | awk '{print $1}')
 [ -n "$VOICE" ] || VOICE=$(say -v '?' | grep zh_CN | head -1 | awk '{print $1}')
-uv run python - "$TMP" "${SENTS[*]}" <<'PYEOF'
+uv run --project backend python - "$TMP" "${SENTS[*]}" <<'PYEOF'
 import sys
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
@@ -78,7 +79,7 @@ ffmpeg -y -hide_banner -loglevel error "${INPUTS[@]}" -i "$TMP/all.wav" \
 touch "$STAMP"  # 真 vault 零写入的比较基准先落地
 V2MD_WHISPER_MODEL="${WHISPER_MODEL:-small}" V2MD_MIN_TRANSCRIPT_CHARS=5 \
 V2MD_ARTIFACT_MODE=deliver V2MD_OUTBOX_DIR="$SHELF" V2MD_OUTBOX_TTL_H=24 \
-  uv run python -m video2md api --port "$PORT" \
+  uv run --project backend python -m video2md api --port "$PORT" \
   > "$TMP/api.log" 2>&1 &
 API_PID=$!
 for _ in $(seq 1 40); do curl -s -m 2 "$API/healthz" >/dev/null 2>&1 && break; sleep 1; done

@@ -18,7 +18,7 @@ import json
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # 项目外跑（镜像 /app）兜底
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "backend"))  # 项目外跑（镜像 /app）兜底
 
 from video2md import pg  # noqa: E402
 from video2md.auth.pg_store import bulk_load  # noqa: E402

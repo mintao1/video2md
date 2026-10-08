@@ -29,7 +29,7 @@ import time
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(REPO))
+sys.path.insert(0, str(REPO / "backend"))
 
 import httpx  # noqa: E402
 
@@ -75,6 +75,7 @@ def _boot(port: int, extra_env: dict[str, str]) -> subprocess.Popen:
            "LANGFUSE_PK": "", "LANGFUSE_SK": "", "OTEL_EXPORTER_OTLP_ENDPOINT": "",
            "V2MD_REMOTE_ENV": "", **{k: v for k, v in extra_env.items() if v}}
     env.pop("V2MD_REMOTE_ENV", None)
+    env["PYTHONPATH"] = str(REPO / "backend")  # 子进程 python -m video2md（package=false）
     log = open(TMP / f"api-{port}.log", "w")
     proc = subprocess.Popen([sys.executable, "-m", "video2md", "api", "--port", str(port)],
                             env=env, stdout=log, stderr=subprocess.STDOUT, cwd=str(REPO))

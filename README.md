@@ -54,9 +54,9 @@ POST /runs（FastAPI 内嵌图，并发闸门 V2MD_MAX_CONCURRENT_RUNS，默认 
 
 | | 本地开发（Mac/任意开发机） | 云服务器（生产 · 多用户） |
 |---|---|---|
-| 入口 | `uv run python -m video2md api`（或 `graph-run` CLI） | docker compose（api + gpu_router [+ 观测栈]）+ 反代 TLS 域名 |
+| 入口 | `cd backend && uv run python -m video2md api`（或 `graph-run` CLI） | docker compose（api + gpu_router [+ 观测栈]）+ 反代 TLS 域名 |
 | 鉴权 | `V2MD_AUTH=off`（无 token 归同一 dev uid） | `V2MD_AUTH=google`（`Authorization: Bearer <id_token>`；设备流/微信可并列） |
-| OCR | macOS Vision（`uv sync --extra mac`）或远程池 | 远程池（Linux 无 Vision） |
+| OCR | macOS Vision（`uv sync --extra mac`，在 backend/ 下）或远程池 | 远程池（Linux 无 Vision） |
 | 转写/剪辑 | 本地 whisper/ffmpeg 或远程池 | 远程池（镜像不含 whisper/torch） |
 | 出网 | Clash 等本地出口（可选） | `V2MD_PROXY` 出网代理；国内站需大陆住宅类出口（风控，见「出网与风控」） |
 | 笔记落地 | vault 直写本地 Obsidian | deliver 模式：outbox 在架 → 客户端拉 bundle → ACK/TTL 即焚 |
@@ -91,12 +91,12 @@ POST /runs（FastAPI 内嵌图，并发闸门 V2MD_MAX_CONCURRENT_RUNS，默认 
 把「服务器产物 → 开发侧 vault」解耦成装在 Obsidian 里的独立插件：轮询本人名下 done run →
 拉 `GET /runs/{id}/bundle` zip → 解包写进 `资料库/视频笔记/`（索引按 wikilink 去重 append）→
 `DELETE artifacts` ACK 即焚。附带命令面板提交链接与 Google 设备流登录。工程在
-`obsidian-plugin/`（TypeScript + esbuild，CI 有独立 plugin job）。
+`frontend/obsidian-plugin/`（TypeScript + esbuild，CI 有独立 plugin job）。
 
 **前置**：服务器切 deliver 模式 + google_device 鉴权（生产档进 `secrets/video2md.env`：
 `V2MD_ARTIFACT_MODE=deliver`、`V2MD_AUTH_PROVIDERS=google,google_device`，
 另配 TV/Limited-Input 型 `GOOGLE_CLIENT_ID/SECRET`）；存量 run 收编用
-`python scripts/migrate_run_owner.py --to <uid> [--status done] [--dry-run]`。
+`uv run --project backend python scripts/migrate_run_owner.py --to <uid> [--status done] [--dry-run]`。
 
 **API 访问**——云服务器形态：按 [02 篇部署步骤](docs/architecture/02-runtime-topology.md)起反代 TLS 后，插件设置页填
 `https://api.example.com`，「登录」走 Google 设备流（浏览器输码授权）即可，无需任何
@@ -106,7 +106,7 @@ POST /runs（FastAPI 内嵌图，并发闸门 V2MD_MAX_CONCURRENT_RUNS，默认 
 **构建与安装**：
 
 ```bash
-cd obsidian-plugin && npm ci && npm run build
+cd frontend/obsidian-plugin && npm ci && npm run build
 mkdir -p "$HOME/Documents/Obsidian Vault/.obsidian/plugins/video2md-obsidian"
 cp main.js manifest.json "$HOME/Documents/Obsidian Vault/.obsidian/plugins/video2md-obsidian/"
 # Obsidian → 设置 → 第三方插件 → 启用 Video2MD Inbox → 设置页点「登录」（浏览器输码授权）
@@ -140,8 +140,8 @@ curl localhost:8790/preflight              # 开跑前体检（ffmpeg/磁盘/vau
 curl localhost:8790/queue                  # {queue_len, running}（gpu_router 看门狗回读）
 
 # 本地调试（不经 HTTP）
-uv run python -m video2md graph-run <url> [--force] [--review] [--max-frames 60]
-uv run python -m video2md runs [run_id]    # run 记录排障（只读）
+cd backend && uv run python -m video2md graph-run <url> [--force] [--review] [--max-frames 60]
+cd backend && uv run python -m video2md runs [run_id]    # run 记录排障（只读）
 
 # 批量
 python3 scripts/batch_csv.py [csv路径] [--limit N] [--force] [--api http://127.0.0.1:8790]
@@ -159,8 +159,8 @@ python3 scripts/rerun_failed.py [url...]
 
 ## HTTP 后端契约（多用户产品 · Phase 1/2）
 
-GUI 前端把本服务当正式后端：契约硬化在 `video2md/models.py`（Pydantic），契约测试
-`test_api_contract.py`。**端点清单、错误信封、鉴权 provider、产物双模式（vault/deliver）、
+GUI 前端把本服务当正式后端：契约硬化在 `backend/video2md/models.py`（Pydantic），契约测试
+`backend/tests/test_api_contract.py`。**端点清单、错误信封、鉴权 provider、产物双模式（vault/deliver）、
 匿名面清单全部迁入 [docs/architecture/03-api-contract.md](docs/architecture/03-api-contract.md)**。
 
 ## acctkit：可复用账号登录模块（顶层包）
@@ -199,36 +199,40 @@ GUI 前端把本服务当正式后端：契约硬化在 `video2md/models.py`（P
 push/PR 自动跑三个 job（`.github/workflows/ci.yml`）：**test**（pytest 契约 + 11 个脚本式测试（含运维三件套）+ `scripts/smoke_ci.sh` 进程级 mockpool 全链冒烟 + 告警配置 promtool/amtool 校验，全离线零 token）、
 **lint**（ruff + mypy）、**docker-build**（生产镜像构建路径）。CI 跑什么，本地就能跑什么：
 
+布局口径：pyproject 在 `backend/`——Python 侧 uv/pytest/脚本式测试在 `backend/` 下跑；
+冒烟/e2e 脚本在仓根或 backend/ 直接执行（脚本自己定位路径）。
+
 ```bash
-uv run ruff check video2md acctkit scripts   # lint（配置在 pyproject.toml [tool.ruff]）
-uv run mypy video2md acctkit                 # 类型检查（[tool.mypy]，check_untyped_defs）
-uv run pytest test_api_contract.py test_acctkit.py -q
-bash scripts/smoke_ci.sh                     # 进程级 mockpool 全链冒烟（跨平台，CI 同款）
+cd backend
+uv run ruff check video2md acctkit ../scripts   # lint（配置在 pyproject.toml [tool.ruff]）
+uv run mypy video2md acctkit                     # 类型检查（[tool.mypy]，check_untyped_defs）
+uv run pytest tests/test_api_contract.py tests/test_acctkit.py -q
+cd ..
+bash scripts/smoke_ci.sh                         # 进程级 mockpool 全链冒烟（跨平台，CI 同款）
 ```
 
-离线测试清单（与 CI 同款）：
+离线测试清单（与 CI 同款，均在 `backend/` 下 `uv run`）：
 
 ```bash
-python3 test_llm.py             # LLM 客户端：模板渲染/重试纪律/流式收集/usage 捕获/选帧解析（MockTransport 离线）
-python3 test_graph.py           # 图编排：节点序/失败路由/幂等短路/兜底/熔断/partial/checkpoint 裁剪
-                                # + checkpointer env 分派 + deliver artsink 缝/搬家剥正文（全打桩离线）
-python3 test_resolve.py         # URL 解析/条目展开/幂等键（离线）
-python3 test_remote_clients.py  # 算力池薄客户端 HTTP 契约（MockTransport 离线）
-python3 -m pytest test_api_contract.py  # HTTP 后端契约：鉴权/owner 403/422 错误形状/SSE 关流/OpenAPI
-                                        # + deliver 面（bundle zip/ACK 410/TTL 惰性焚/sweep/owner 收紧幂等）（TestClient 离线）
-python3 -m pytest test_acctkit.py       # acctkit 模块自身接口：provider 次序/Google+微信打桩/开户回填归并/前缀工厂（零宿主零网络）
-python3 test_observability.py   # OTel 桥：span 树/gen_ai 属性/traceId 确定性/指标仪表/deadman（InMemory 离线）
-python3 test_watchdog.py        # run 卡死看门狗：三层心跳判定/mark 翻转/exit 自愈/异常静默（离线）
-python3 test_alert_rules.py     # 告警配置：规则结构/指标名对齐/AM 路由/飞书卡片拼装（YAML 离线）
-python3 test_backup_scripts.py  # 备份脚本：dry-run 拼装/防重入锁/retention/manifest 校验（stub docker 离线）
-python3 test_otel_replay.py     # 历史回放：jsonl→span 树重建/悬空闭合/时间戳还原（InMemory 离线）
-python3 test_evals.py           # evals 旁路：指标编排/scores 三运输路径/回归对比（假 deepeval/ragas/langfuse）
-./test_e2e.sh                   # 端到端：合成视频 → 自起 api（假 LLM）→ 全断言（本地 whisper，不烧 token）
-MODE=deliver ./test_e2e.sh      #   deliver 形态分支：bundle 拉取解包跑同套断言 + vault 零写入 + ACK 即焚 410 链
+uv run python3 tests/test_llm.py             # LLM 客户端：模板渲染/重试纪律/流式收集/usage 捕获/选帧解析（MockTransport 离线）
+uv run python3 tests/test_graph.py           # 图编排：节点序/失败路由/幂等短路/兜底/熔断/partial/checkpoint 裁剪
+                                             # + checkpointer env 分派 + deliver artsink 缝/搬家剥正文（全打桩离线）
+uv run python3 tests/test_resolve.py         # URL 解析/条目展开/幂等键（离线）
+uv run python3 tests/test_remote_clients.py  # 算力池薄客户端 HTTP 契约（MockTransport 离线）
+uv run pytest tests/test_api_contract.py     # HTTP 后端契约：鉴权/owner 403/422 错误形状/SSE 关流/OpenAPI
+                                             # + deliver 面（bundle zip/ACK 410/TTL 惰性焚/sweep/owner 收紧幂等）（TestClient 离线）
+uv run pytest tests/test_acctkit.py          # acctkit 模块自身接口：provider 次序/Google+微信打桩/开户回填归并/前缀工厂（零宿主零网络）
+uv run python3 tests/test_observability.py   # OTel 桥：span 树/gen_ai 属性/traceId 确定性/指标仪表/deadman（InMemory 离线）
+uv run python3 tests/test_watchdog.py        # run 卡死看门狗：三层心跳判定/mark 翻转/exit 自愈/异常静默（离线）
+uv run python3 tests/test_backup_scripts.py  # 备份脚本：dry-run 拼装/防重入锁/retention/manifest 校验（stub docker 离线）
+uv run python3 tests/test_otel_replay.py     # 历史回放：jsonl→span 树重建/悬空闭合/时间戳还原（InMemory 离线）
+uv run python3 tests/test_evals.py           # evals 旁路：指标编排/scores 三运输路径/回归对比（假 deepeval/ragas/langfuse）
+./tests/test_e2e.sh                   # 端到端：合成视频 → 自起 api（假 LLM）→ 全断言（本地 whisper，不烧 token）
+MODE=deliver ./tests/test_e2e.sh      #   deliver 形态分支：bundle 拉取解包跑同套断言 + vault 零写入 + ACK 即焚 410 链
 ./scripts/smoke_api_vault.sh    # 解耦 API 路子冒烟（开发机）：POST+SSE+轮询+/note 纯 HTTP，产物进本机 vault（真 LLM 少量 token）
 ./scripts/smoke_api_deliver.sh  # deliver 形态真 LLM 冒烟：在架→bundle 投递→/note 一致性→ACK 即焚 410，产物不进开发机 vault
 scripts/smoke_compose.sh        # compose 全链路冒烟：mockpool 假算力 + 假 LLM（零 GPU 零 token）
-REAL_LLM=1 ./test_e2e.sh        # 烧真实 LLM 的端到端（用 ~/.config/video2md.env）
+REAL_LLM=1 ./tests/test_e2e.sh        # 烧真实 LLM 的端到端（用 ~/.config/video2md.env）
 # gpu_router 本体测试在 ../gpu_router/tests/
 ```
 

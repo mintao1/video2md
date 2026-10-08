@@ -9,6 +9,7 @@
 #   KEEP_UP=1 …                      # 保留现场排障
 set -euo pipefail
 cd "$(dirname "$0")/.."
+export PYTHONPATH="$PWD/backend"   # package=false：python -m video2md 靠包根上 path
 
 API_PORT=8797; PROXY_PORT=8843
 API="http://127.0.0.1:$API_PORT"; PROXY="http://127.0.0.1:$PROXY_PORT"
@@ -45,7 +46,7 @@ env V2MD_HOST=0.0.0.0 V2MD_AUTH=off V2MD_USERS_FILE="$TMP/users.json" V2MD_RUNS_
   V2MD_STATE_FILE="$TMP/state.json" V2MD_LOG_DIR="$TMP/logs" V2MD_REMOTE="" \
   V2MD_CORS_ORIGINS="" LANGFUSE_PK="" LANGFUSE_SK="" OTEL_EXPORTER_OTLP_ENDPOINT="" \
   PYTHONUNBUFFERED=1 \
-  uv run python -m video2md api --port "$API_PORT" > "$TMP/api.log" 2>&1 &
+  uv run --project backend python -m video2md api --port "$API_PORT" > "$TMP/api.log" 2>&1 &
 API_PID=$!
 for _ in $(seq 1 30); do curl -s -m 2 "$API/healthz" >/dev/null 2>&1 && break; sleep 1; done
 curl -s -m 2 "$API/healthz" >/dev/null || fail "api 未起"

@@ -78,7 +78,7 @@ def init(*, endpoint: str = "", headers: dict | None = None,
         service_name="video2md-serve",
         service_namespace="video2md",
         hash_prefix="video2md-",
-        trace_tags=["video2md"],
+        trace_tags=["video2md", f"mode:{_artifact_mode()}"],  # mode tag 迁移漏带，回补（06 篇口径）
         deployment_env=_env("V2MD_ENV", "development"),
         endpoint=endpoint,
         headers=headers,

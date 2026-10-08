@@ -12,6 +12,7 @@
 #   ⑤ 杀 A → B 接管：queued 项短租约认领重投 done；running 残档标错后重投 done（P1-1 验收）
 set -euo pipefail
 cd "$(dirname "$0")/.."
+export PYTHONPATH="$PWD/backend"   # package=false：python -m video2md 靠包根上 path
 
 PORT_A="${SMOKE_PORT_A:-8801}"
 PORT_B="${SMOKE_PORT_B:-8802}"
@@ -49,7 +50,7 @@ if [ -z "$DSN" ]; then
   for _ in $(seq 1 30); do docker exec "$PG_CID" pg_isready -U v2md -d v2md >/dev/null 2>&1 && break; sleep 1; done
   DSN="postgresql://v2md:v2md@127.0.0.1:55433/v2md"
 fi
-V2MD_PG_DSN="$DSN" uv run python -m video2md migrate >/dev/null || fail "migrate 未过"
+V2MD_PG_DSN="$DSN" uv run --project backend python -m video2md migrate >/dev/null || fail "migrate 未过"
 echo "PG 就绪 + schema 迁移完成"
 
 # —— 1. 夹具：长视频（run1 保活过甄别窗）+ 短视频（后续各阶段提速）——
@@ -62,7 +63,7 @@ ffmpeg -y -hide_banner -loglevel error -f lavfi -i "testsrc2=duration=8:size=128
 mkdir -p "$VAULT/资料库/视频笔记"
 
 # —— 2. mockpool + 双副本 api（PG 档：RUNS/TASKS/EVENTS；快租约）——
-uv run uvicorn --app-dir deploy mock_pool:app --host 127.0.0.1 --port 9796 \
+uv run --project backend uvicorn --app-dir deploy mock_pool:app --host 127.0.0.1 --port 9796 \
   > "$TMP/pool.log" 2>&1 &
 POOL_PID=$!
 for _ in $(seq 1 20); do curl -s -m 2 "$POOL/ping" >/dev/null 2>&1 && break; sleep 0.5; done
@@ -78,7 +79,7 @@ V2MD_LOG_DIR=$TMP/logs LANGFUSE_PK='' LANGFUSE_SK='' OTEL_EXPORTER_OTLP_ENDPOINT
 }
 start_a() {
   env $(node_env) V2MD_STATE_FILE="$TMP/state-a.json" \
-    uv run python -m video2md api --port "$PORT_A" > "$TMP/a.log" 2>&1 &
+    uv run --project backend python -m video2md api --port "$PORT_A" > "$TMP/a.log" 2>&1 &
   API_A_PID=$!
   for _ in $(seq 1 40); do curl -s -m 2 "$A/healthz" >/dev/null 2>&1 && break; sleep 1; done
   curl -s -m 2 "$A/healthz" >/dev/null || fail "api A 未起"
@@ -86,7 +87,7 @@ start_a() {
 }
 start_b() {
   env $(node_env) V2MD_STATE_FILE="$TMP/state-b.json" \
-    uv run python -m video2md api --port "$PORT_B" > "$TMP/b.log" 2>&1 &
+    uv run --project backend python -m video2md api --port "$PORT_B" > "$TMP/b.log" 2>&1 &
   API_B_PID=$!
   for _ in $(seq 1 40); do curl -s -m 2 "$B/healthz" >/dev/null 2>&1 && break; sleep 1; done
   curl -s -m 2 "$B/healthz" >/dev/null || fail "api B 未起"
