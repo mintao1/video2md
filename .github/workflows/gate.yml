@@ -1,0 +1,16 @@
+# HARD 约束门禁（HC-01/HC-02/HC-03；平台仓 SPEC §13）
+# 脚本与平台仓 scripts/gates/check-hard-constraints.sh 同源；模板变更后同步回各产品仓。
+name: Gate
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check hard constraints
+        run: bash scripts/gates/check-hard-constraints.sh
