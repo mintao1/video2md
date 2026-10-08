@@ -196,6 +196,32 @@ def test_owner_scoped_access(client):
     assert client.get("/runs/r_alice/note", headers={"X-Test-Auth": "bob"}).status_code == 403
 
 
+# ---------------------------------------------------------------- 会员/配额展示档（PG off 默认视图）
+
+def test_me_defaults(client):
+    # 本套件无 V2MD_PG_DSN（json 档）→ /me 回 free 默认视图：uid 回显、id_label 派生
+    put_identity("test", "carol", "u_carol123")
+    r = client.get("/me", headers={"X-Test-Auth": "carol"})
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["uid"] == "u_carol123"
+    assert body["plan"] == "free"
+    assert body["avatar_hue"] == 258
+    assert body["id_label"] == "ID: carol123"  # uid 去 u_ 前缀派生（对齐 mock 语义）
+    assert body["display_name"]  # name/display_name 至少回退到 uid，不为空
+
+
+def test_quota_defaults(client):
+    # PG off → /quota 全 0 但形状完整（前端 Quota 契约的 key 全在）
+    put_identity("test", "carol", "u_carol123")
+    r = client.get("/quota", headers={"X-Test-Auth": "carol"})
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["ai_hours_used"] == 0 and body["ai_hours_total"] == 0
+    assert body["storage_gb_used"] == 0 and body["storage_gb_total"] == 0
+    assert body["stats"] == {"books": 0, "knowledge_points": 0, "accuracy": 0}
+
+
 def test_no_token_dev_identity_is_stable(client):
     # AUTH=off 无头 → dev 身份；同一条无头 run 自起自取通（e2e/batch 语义）
     ident = _seed_run("r_dev", _dev_uid())

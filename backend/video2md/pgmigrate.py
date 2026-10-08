@@ -29,6 +29,7 @@ if TYPE_CHECKING:
 # 注册表：新迁移在尾部加行（号必须递增、不复用已发布号）
 MIGRATIONS: list[tuple[int, str]] = [
     (1, "0001_init.sql"),
+    (2, "0002_membership.sql"),
 ]
 SCHEMA_LATEST = MIGRATIONS[-1][0]
 

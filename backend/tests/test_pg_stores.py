@@ -65,19 +65,38 @@ try:
     raise AssertionError("裸库（无版本表）校验必须拒起并提示 migrate")
 except RuntimeError as e:
     assert "migrate" in str(e)
-assert pgmigrate.apply_migrations(pool) == [1]        # 首应用/存量库盖戳 = 全部注册版本
+assert pgmigrate.apply_migrations(pool) == list(range(1, pgmigrate.SCHEMA_LATEST + 1))  # 首应用/存量库盖戳 = 全部注册版本
 assert pgmigrate.apply_migrations(pool) == []          # 连跑两次幂等：已应用跳过、不重复记行
 pgmigrate.validate_schema(pool)
-with pool.connection() as conn:                        # 验收口径：手工把版本改低 → 拒起
-    conn.execute("UPDATE v2md_schema_version SET version = 0 WHERE version = 1")
+with pool.connection() as conn:                        # 验收口径：手工把版本整体改低 → 拒起
+    conn.execute("UPDATE v2md_schema_version SET version = version - 100")  # 保 PK 唯一整体降
 try:
     pgmigrate.validate_schema(pool)
     raise AssertionError("版本落后必须拒起")
 except RuntimeError:
     pass
-pgmigrate.apply_migrations(pool)                       # 重跑迁移自愈（0001 幂等 → 补记版本行）
+pgmigrate.apply_migrations(pool)                       # 重跑迁移自愈（各版幂等 → 补记版本行）
 pgmigrate.validate_schema(pool)
 print("✅ 迁移纪律（裸库拒起/首应用/幂等重跑/落后拒起/自愈恢复）")
+
+
+# ---- 0.5 PostgresMembershipStore（0002：web 个人页会员/配额展示档）------------------
+st_mem = pgstore.PostgresMembershipStore(pool)  # 表由 §0 迁移建好，构造只接线（P0-5）
+_truncate("v2md_membership")
+assert st_mem.get("u_nobody") is None              # miss 回 None（端点据此给 free/全 0 默认）
+st_mem.upsert({"uid": "u_mem1", "plan": "pro", "display_name": "林思齐 (Siyi Lin)",
+               "avatar_hue": 258, "ai_hours_used": 38, "ai_hours_total": 50,
+               "storage_gb_used": 4.2, "storage_gb_total": 20,
+               "stats_books": 47, "stats_knowledge_points": 182, "stats_accuracy": 94.8})
+got = st_mem.get("u_mem1")
+assert got is not None and got["plan"] == "pro" and got["display_name"] == "林思齐 (Siyi Lin)"
+assert got["ai_hours_used"] == 38 and got["ai_hours_total"] == 50
+assert got["storage_gb_used"] == 4.2 and got["storage_gb_total"] == 20
+assert (got["stats_books"], got["stats_knowledge_points"], got["stats_accuracy"]) == (47, 182, 94.8)
+st_mem.upsert({"uid": "u_mem1", "plan": "free", "ai_hours_used": 50})  # 重复 upsert 全列覆盖
+got2 = st_mem.get("u_mem1")
+assert got2["plan"] == "free" and got2["ai_hours_used"] == 50 and got2["display_name"] == ""
+print("✅ PostgresMembershipStore（miss→None / upsert 往返 / 重复 upsert 覆盖）")
 
 
 # ---- 1. PostgresRunsStore -----------------------------------------------------------

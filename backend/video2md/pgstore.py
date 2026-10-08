@@ -366,3 +366,65 @@ class PostgresTaskStore:
                                  THEN 1 ELSE v2md_submit_log.count + 1 END
                 RETURNING count""", {"uid": uid}).fetchone()
         return int(row[0]) if row else 0
+
+
+class PostgresMembershipStore:
+    """membership 表：uid PK 的会员/配额展示档（web 个人页 /me、/quota 的数据源）。
+
+    只读展示路径：get() 供端点读；upsert() 供种子/运维写（测试同款）。
+    不参与提交强制（_admit_submission 不读它——后续工作）。"""
+
+    def __init__(self, pool: ConnectionPool):
+        self.pool = pool  # v2md_membership 建表已上收 migrations/0002（P0-5），构造只接线
+
+    def get(self, uid: str) -> dict | None:
+        """单行读；无行回 None（端点据此给 free/全 0 默认视图）。"""
+        with self.pool.connection() as conn:
+            row = conn.execute("""
+                SELECT uid, plan, display_name, avatar_hue,
+                       ai_hours_used, ai_hours_total,
+                       storage_gb_used, storage_gb_total,
+                       stats_books, stats_knowledge_points, stats_accuracy
+                  FROM v2md_membership WHERE uid=%s""", (uid,)).fetchone()
+        if not row:
+            return None
+        cols = ("uid", "plan", "display_name", "avatar_hue",
+                "ai_hours_used", "ai_hours_total", "storage_gb_used", "storage_gb_total",
+                "stats_books", "stats_knowledge_points", "stats_accuracy")
+        return dict(zip(cols, row))
+
+    def upsert(self, data: dict) -> None:
+        """全列 upsert（幂等可重跑）；record 预留扩展位（签名/备注等不进列的字段）。"""
+        with self.pool.connection() as conn:
+            conn.execute("""
+                INSERT INTO v2md_membership
+                    (uid, plan, display_name, avatar_hue,
+                     ai_hours_used, ai_hours_total, storage_gb_used, storage_gb_total,
+                     stats_books, stats_knowledge_points, stats_accuracy, record)
+                VALUES (%(uid)s, %(plan)s, %(display_name)s, %(avatar_hue)s,
+                        %(ai_hours_used)s, %(ai_hours_total)s,
+                        %(storage_gb_used)s, %(storage_gb_total)s,
+                        %(stats_books)s, %(stats_knowledge_points)s, %(stats_accuracy)s,
+                        %(rec)s)
+                ON CONFLICT (uid) DO UPDATE SET
+                    plan = EXCLUDED.plan, display_name = EXCLUDED.display_name,
+                    avatar_hue = EXCLUDED.avatar_hue,
+                    ai_hours_used = EXCLUDED.ai_hours_used,
+                    ai_hours_total = EXCLUDED.ai_hours_total,
+                    storage_gb_used = EXCLUDED.storage_gb_used,
+                    storage_gb_total = EXCLUDED.storage_gb_total,
+                    stats_books = EXCLUDED.stats_books,
+                    stats_knowledge_points = EXCLUDED.stats_knowledge_points,
+                    stats_accuracy = EXCLUDED.stats_accuracy,
+                    record = EXCLUDED.record, updated = now()""",
+                {"uid": data["uid"], "plan": data.get("plan", "free"),
+                 "display_name": data.get("display_name", ""),
+                 "avatar_hue": int(data.get("avatar_hue", 258)),
+                 "ai_hours_used": float(data.get("ai_hours_used", 0)),
+                 "ai_hours_total": float(data.get("ai_hours_total", 0)),
+                 "storage_gb_used": float(data.get("storage_gb_used", 0)),
+                 "storage_gb_total": float(data.get("storage_gb_total", 0)),
+                 "stats_books": int(data.get("stats_books", 0)),
+                 "stats_knowledge_points": int(data.get("stats_knowledge_points", 0)),
+                 "stats_accuracy": float(data.get("stats_accuracy", 0)),
+                 "rec": Json(data.get("record") or {})})

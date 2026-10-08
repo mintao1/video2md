@@ -158,6 +158,34 @@ class CostOut(BaseModel):
     prices: dict[str, float] = Field(description="llm_in_mtok/llm_out_mtok/gpu_min 当前单价")
 
 
+class QuotaStats(BaseModel):
+    """GET /quota 的统计三格（web 个人页资料卡下排）。"""
+    books: int = 0
+    knowledge_points: int = 0
+    accuracy: float = 0
+
+
+class QuotaOut(BaseModel):
+    """GET /quota：本人会员配额与统计（展示档，来自 v2md_membership；不参与提交强制）。
+    PG 关（无 DSN）或无 membership 行 → 全 0 默认值。"""
+    ai_hours_used: float
+    ai_hours_total: float
+    storage_gb_used: float
+    storage_gb_total: float
+    stats: QuotaStats
+
+
+class MeOut(BaseModel):
+    """GET /me：本人资料卡。plan 取 membership 行（无行/PG 关 → free）；
+    id_label 由 uid 派生不落库。"""
+    uid: str
+    name: str
+    display_name: str
+    avatar_hue: int
+    plan: str = Field("free", description="free|pro|svip")
+    id_label: str
+
+
 class HealthOut(BaseModel):
     ok: bool
     ts: str

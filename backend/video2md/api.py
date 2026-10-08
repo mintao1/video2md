@@ -88,7 +88,9 @@ from .models import (
     DeviceTokenBody,
     DeviceTokenOut,
     HealthOut,
+    MeOut,
     PreflightOut,
+    QuotaOut,
     QueueOut,
     RunCreate,
     RunCreatedOut,
@@ -1366,6 +1368,53 @@ def get_cost(ident: Identity = Depends(current_identity)) -> dict:
             "budget_usd": BUDGET_MONTH_USD, "usage": u,
             "prices": {"llm_in_mtok": PRICE_LLM_IN_MTOK, "llm_out_mtok": PRICE_LLM_OUT_MTOK,
                        "gpu_min": PRICE_GPU_MIN}}
+
+
+# ---------------------------------------------------------------- 会员/配额展示档（web 个人页）
+
+_MEMBERSHIP_STORE = None
+_membership_resolved = False
+
+
+def _membership_row(uid: str) -> dict | None:
+    """v2md_membership 单行读（惰性分派仿 _tasks_backend）：PG 关（无 DSN）→ None，
+    端点据此回 free/全 0 默认视图；运行期 PG 异常由既有 503 处理器兜住。"""
+    global _MEMBERSHIP_STORE, _membership_resolved
+    if not _membership_resolved:
+        _membership_resolved = True
+        from . import pg, pgstore
+        if pg.pg_enabled():
+            _MEMBERSHIP_STORE = pgstore.PostgresMembershipStore(pg.shared_pool())
+    if _MEMBERSHIP_STORE is None:
+        return None
+    return _MEMBERSHIP_STORE.get(uid)
+
+
+@app.get("/me", response_model=MeOut,
+          summary="本人资料卡（web 个人页：plan/昵称/头像色；无 membership 行回 free 默认档）")
+def get_me(ident: Identity = Depends(current_identity)) -> dict:
+    row = _membership_row(ident.uid)
+    display = (row or {}).get("display_name") or ""
+    name = (ident.name or "").strip() or display or ident.uid
+    return {"uid": ident.uid,
+            "name": name,
+            "display_name": display or name,
+            "avatar_hue": int((row or {}).get("avatar_hue") or 258),
+            "plan": (row or {}).get("plan") or "free",
+            "id_label": f"ID: {ident.uid.removeprefix('u_')}"}
+
+
+@app.get("/quota", response_model=QuotaOut,
+          summary="本人会员配额与统计（展示档，来自 v2md_membership；不参与提交强制）")
+def get_quota(ident: Identity = Depends(current_identity)) -> dict:
+    row = _membership_row(ident.uid) or {}
+    return {"ai_hours_used": float(row.get("ai_hours_used") or 0),
+            "ai_hours_total": float(row.get("ai_hours_total") or 0),
+            "storage_gb_used": float(row.get("storage_gb_used") or 0),
+            "storage_gb_total": float(row.get("storage_gb_total") or 0),
+            "stats": {"books": int(row.get("stats_books") or 0),
+                      "knowledge_points": int(row.get("stats_knowledge_points") or 0),
+                      "accuracy": float(row.get("stats_accuracy") or 0)}}
 
 
 @app.get("/queue", response_model=QueueOut)
