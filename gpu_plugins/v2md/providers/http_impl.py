@@ -15,7 +15,6 @@ from pathlib import Path
 import httpx
 
 
-
 def transcribe(p, audio: Path, model: str, language: str, tmp: Path) -> dict:
     with audio.open("rb") as fh:
         r = p.client().post("/transcribe",

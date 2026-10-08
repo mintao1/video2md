@@ -13,10 +13,20 @@ from pathlib import Path
 
 import pytest
 
-from acctkit import (AuthEngine, AuthError, DevProvider, FakeProvider,
-                     GoogleDeviceProvider, GoogleProvider,
-                     JsonFileStore, MemoryStore, NoCredentials, Principal,
-                     WeChatProvider, build_from_env)
+from acctkit import (
+    AuthEngine,
+    AuthError,
+    DevProvider,
+    FakeProvider,
+    GoogleDeviceProvider,
+    GoogleProvider,
+    JsonFileStore,
+    MemoryStore,
+    NoCredentials,
+    Principal,
+    WeChatProvider,
+    build_from_env,
+)
 
 
 def _auth(engine: AuthEngine, headers: dict):

@@ -12,7 +12,6 @@ from pathlib import Path
 from . import colab_machinery as M
 
 
-
 def _bind(p) -> None:
     """装载钩子：provider.extra 透传给会话机械的模块级配置（gpu_router 无感知）。"""
     extra = getattr(p, "extra", None) or {}

@@ -34,8 +34,6 @@ from pathlib import Path
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import Response
 
-
-
 MODEL_NAME = os.environ.get("V2MD_REF_MODEL", "turbo")  # T4 16G：turbo float16 ≈3G 余量充足
 
 _WHISPER = None

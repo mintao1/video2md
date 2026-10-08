@@ -23,7 +23,12 @@ from pathlib import Path
 
 from .models import Identity, Principal
 
-_NOOP_SAVE: Callable[[dict], None] = lambda users: None
+
+def _noop_save(users: dict) -> None:
+    return None
+
+
+_NOOP_SAVE: Callable[[dict], None] = _noop_save
 
 
 def _key(provider: str, external_id: str) -> str:

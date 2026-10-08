@@ -169,6 +169,7 @@ print("✅ 3. 阶段失败 → fail 路由：decision=fail / status=error / 终�
 observability._reset_for_tests()
 from opentelemetry.sdk.metrics.export import InMemoryMetricReader
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
+
 spans, reader = InMemorySpanExporter(), InMemoryMetricReader()
 assert observability.init(span_exporter=spans, metric_reader=reader) is True
 _fresh()

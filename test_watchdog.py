@@ -275,6 +275,7 @@ task_live = _task(NOW_WALL - 999)
 local_tasks = {"r1": task_live}
 be = _FakeClusterStore([_row("r1", claimed_by="me")])
 import video2md.api as _api  # noqa: E402
+
 with mock.patch.object(watchdog, "_tasks_backend_safe", lambda: be), \
         mock.patch.object(_api, "_PROC_ID", "me"), \
         mock.patch.object(_api, "_TASKS", local_tasks), \

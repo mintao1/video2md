@@ -1,11 +1,23 @@
-# video2md Deploy workflow — SSH → k3s 部署 + 冒烟 + 回滚
-# 模板来源：templates/ci/deploy.yml
+# === 平台 CI 部署步骤模板 ===
+# GitHub Actions Release workflow 的 deploy job。
+# 流程：runner 渲染清单（kustomize build，monorepo 布局）→ ssh import 镜像到 k3s
+#       → 渲染结果管道给服务器 kubectl apply → rollout + smoke。
+# ⚠️ 不要在服务器上 apply -k：产品 components 引用平台仓相对路径，服务器副本解析不到。
+#
+# 前置条件：
+#   - 服务器 SSH key 配置在 GitHub Secrets (SSH_HOST, SSH_USER, SSH_KEY)
+#   - 产品 deploy/k8s/base/kustomization.yaml 已就绪
+#   - ghcr.io 可从服务器拉取（或走 docker save 本地导入）
+#   - 平台仓/产品仓为私有时另配 PLATFORM_REPO_TOKEN / PRODUCT_REPO_TOKEN（contents:read）
 name: Deploy
 on:
   workflow_dispatch:
     inputs:
+      product:
+        description: '产品名（如 gpu-router, video2md）'
+        required: true
       version:
-        description: '版本号（如 v0.3.0）'
+        description: '版本号（如 0.2.1）'
         required: true
       environment:
         description: '目标环境'
@@ -22,57 +34,99 @@ jobs:
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
     steps:
+      # ── 清单在 runner 渲染，不在服务器 ──────────────────────────────
+      # 产品 base 经 components: 引用平台仓 templates/k8s-base/components，
+      # 相对路径 ../../../../ 只在「平台仓根含各产品目录」的 monorepo 布局下成立。
+      # 服务器上产品目录是手工副本（~/templates 不存在），apply -k 必挂
+      # （accumulating components）；服务器 snap kustomize 自带的 git 也缺
+      # libpcre2，远程 URL 引用同样不可用。故 runner 里还原 monorepo 布局：
+      # 平台仓 checkout 到 workspace 根、产品仓 checkout 到子目录，
+      # 再 kustomize build → 渲染结果管道给服务器 kubectl apply。
+      # 服务器全程不需要 kustomize/git。
       - uses: actions/checkout@v4
-
-      - name: Deploy to k3s
-        uses: appleboy/ssh-action@v1
         with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_KEY }}
-          script: |
+          repository: mintao1/cloud-deploy-platform
+          token: ${{ secrets.PLATFORM_REPO_TOKEN || github.token }}
+
+      - uses: actions/checkout@v4
+        with:
+          repository: mintao1/${{ inputs.product }}
+          path: ${{ inputs.product }}
+          token: ${{ secrets.PRODUCT_REPO_TOKEN || github.token }}
+
+      # 钉死 kustomize 版本：runner 默认不带 kustomize；kubectl kustomize 将随
+      # KEP-4706 移除，不作依赖。
+      - name: Install kustomize
+        run: |
+          curl -sL "https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv5.4.3/kustomize_v5.4.3_linux_amd64.tar.gz" \
+            | tar xz -C /usr/local/bin kustomize
+          kustomize version
+
+      - name: Render manifests
+        run: |
+          PRODUCT="${{ inputs.product }}"
+          VERSION="${{ inputs.version }}"
+          cd "${PRODUCT}/deploy/k8s/base"
+          sed -i "s/newTag: .*/newTag: \"${VERSION}\"/" kustomization.yaml
+          kustomize build . > /tmp/rendered.yaml
+          echo "── 渲染 $(grep -c '^kind:' /tmp/rendered.yaml) 个资源 ──"
+
+      # 后面三步都走同一把 key（appleboy/ssh-action 的 key 注入不落到 runner ssh config）
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H "${{ secrets.SSH_HOST }}" >> ~/.ssh/known_hosts
+
+      # ── 服务器：导镜像 ──
+      - name: Import image to k3s
+        run: |
+          PRODUCT="${{ inputs.product }}"
+          VERSION="${{ inputs.version }}"
+          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "
             set -euo pipefail
-
-            PRODUCT="video2md"
-            VERSION="${{ inputs.version }}"
-            NS="video2md"
-            KUSTOMIZE_DIR="~/stack/${PRODUCT}/deploy/k8s/base"
-
-            echo "── 部署 ${PRODUCT}:${VERSION} → ${NS}"
-
-            # 1. 拉取/导入镜像
-            echo "  拉取镜像..."
-            docker pull "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${VERSION}" || {
-              echo "  GHCR 拉取失败，尝试本地构建..."
-              cd ~/stack/${PRODUCT}
+            docker pull ${REGISTRY}/${IMAGE_NAME}:${VERSION} || {
+              echo '  GHCR 拉取失败，尝试本地构建...'
+              cd ~/${PRODUCT}
               docker build \
                 --build-arg PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple \
                 --build-arg VERSION=${VERSION} \
                 -t ${PRODUCT}:${VERSION} .
             }
             docker save ${PRODUCT}:${VERSION} | sudo k3s ctr images import - 2>/dev/null || \
-              docker save "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${VERSION}" | sudo k3s ctr images import -
+              docker save ${REGISTRY}/${IMAGE_NAME}:${VERSION} | sudo k3s ctr images import -
+            echo '✓ ${PRODUCT}:${VERSION} 镜像就位'
+          "
 
-            # 2. 更新 kustomization tag
-            cd ${KUSTOMIZE_DIR}
-            sed -i "s/newTag: .*/newTag: \"${VERSION}\"/" kustomization.yaml
+      # ── 服务器：apply 渲染结果（清单来自 runner，不在服务器构建）──
+      - name: Apply rendered manifests
+        run: |
+          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
+            "sudo k3s kubectl apply -n ${{ inputs.product }} -f -" < /tmp/rendered.yaml
 
-            # 3. Apply
-            sudo k3s kubectl apply -k .
-            sudo k3s kubectl -n ${NS} rollout status deploy/${PRODUCT}-api --timeout=180s
-
-            # 4. 冒烟
-            CODE=$(curl -s -o /dev/null -w '%{http_code}' -m 10 http://127.0.0.1:8790/healthz || echo "000")
-            echo "  冒烟 http://127.0.0.1:8790/healthz → ${CODE}"
-            [[ "${CODE}" == "200" ]] || {
-              echo "✗ 冒烟失败，执行回滚"
-              sudo k3s kubectl -n ${NS} rollout undo deploy/${PRODUCT}-api
+      - name: Rollout status + smoke
+        run: |
+          NS="${{ inputs.product }}"
+          PRODUCT="${{ inputs.product }}"
+          VERSION="${{ inputs.version }}"
+          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "
+            set -euo pipefail
+            sudo k3s kubectl -n ${NS} rollout status deploy/${PRODUCT} --timeout=180s
+            PORT=\$(sudo k3s kubectl -n ${NS} get deploy/${PRODUCT} -o jsonpath='{.spec.template.spec.containers[0].ports[0].containerPort}')
+            CODE=\$(curl -s -o /dev/null -w '%{http_code}' -m 10 http://127.0.0.1:\${PORT}/healthz || echo '000')
+            echo '  冒烟 http://127.0.0.1:'\"\${PORT}\"'/healthz → '\${CODE}
+            if [ \"\${CODE}\" != '200' ]; then
+              echo '✗ 冒烟失败，执行回滚'
+              sudo k3s kubectl -n ${NS} rollout undo deploy/${PRODUCT}
               exit 1
-            }
+            fi
+            echo '✓ ${PRODUCT}:${VERSION} 部署成功'
+            echo '  回滚命令: sudo k3s kubectl -n ${NS} rollout undo deploy/${PRODUCT}'
+          "
 
-            echo "✓ ${PRODUCT}:${VERSION} 部署成功"
-
+      # ── 失败通知 ──
       - name: Notify on failure
         if: failure()
         run: |
-          echo "::error::部署 video2md:${{ inputs.version }} 失败，请检查服务器日志"
+          echo "::error::部署 ${{ inputs.product }}:${{ inputs.version }} 失败，请检查服务器日志"

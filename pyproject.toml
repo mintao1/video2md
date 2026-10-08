@@ -59,6 +59,13 @@ line-length = 110
 # 保守集：pyflakes + 关键 pycodestyle + isort；不动现有代码风格
 select = ["E4", "E7", "E9", "F", "I"]
 
+[tool.ruff.lint.per-file-ignores]
+# 分段脚本式测试：每段后 import 本段用的桩（直跑设计，同 gpu-router 先例）
+"test_*.py" = ["E402"]
+"tests/*" = ["E402"]
+# Colab 单文件参考：分步 pip install + 按需导入是有意的
+"gpu_plugins/v2md/reference/*" = ["E402"]
+
 [tool.mypy]
 python_version = "3.12"
 # langgraph/httpx 等无内联桩，缺桩不报错

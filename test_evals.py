@@ -140,6 +140,7 @@ assert sdk_calls[0]["name"] == "note_quality" and sdk_calls[0]["value"] == 0.91
 observability._reset_for_tests()
 spans = InMemorySpanExporter()
 from opentelemetry.sdk.metrics.export import InMemoryMetricReader
+
 observability.init(span_exporter=spans, metric_reader=InMemoryMetricReader())
 evals._SCORE_TRANSPORT = ""
 evals._verify_landed = lambda tid, name: False
@@ -179,6 +180,7 @@ print("✅ _load_json_lenient：围栏/前言后语/假对象/尾逗号/串内�
 
 # ---- _Judge.generate(prompt, schema)：强解析 + 重问修复 + 模型透传 -------------
 from video2md import llm as _llm_mod
+
 _real_chat = _llm_mod.chat
 
 

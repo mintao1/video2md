@@ -33,7 +33,6 @@ def _duration_for(audio_path: str, model_name: str, language: str) -> int:
 
 @spaces.GPU(duration=_duration_for)
 def transcribe(audio_path: str, model_name: str, language: str) -> dict:
-    import torch  # noqa: ZeroGPU 运行期内才有 cuda
     from faster_whisper import WhisperModel
 
     name = (model_name or "turbo").strip() or "turbo"

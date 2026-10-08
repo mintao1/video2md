@@ -9,7 +9,6 @@
 （CI 由 test job 的 PG service 提供；本地 8790 有服务在跑时 rescue 的 healthz 防护
 会按设计拒跑——先停本地 api 再跑本测试。）
 """
-import json
 import os
 import subprocess
 import sys

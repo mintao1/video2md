@@ -10,7 +10,6 @@ import os
 from pathlib import Path
 
 
-
 def transcribe(provider, audio: Path, model: str, language: str, tmp: Path) -> dict:
     from gradio_client import Client, handle_file
 

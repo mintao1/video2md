@@ -7,7 +7,6 @@
 运行：python3 test_observability.py（InMemory 导出器 + MockTransport，无网络）。
 """
 import hashlib
-import json
 import os
 import sys
 import tempfile
@@ -116,6 +115,7 @@ assert gen.attributes["langfuse.observation.output"] == "正文"
 assert "_otel" not in log.spans[-2], "span_log 摘要不得养 prompt 全文副本"
 
 from opentelemetry.trace import StatusCode
+
 assert tree["stage:frames"].status.status_code == StatusCode.ERROR
 assert "ffmpeg" in tree["stage:frames"].attributes["error"]
 

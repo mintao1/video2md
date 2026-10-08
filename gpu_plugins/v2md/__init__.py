@@ -85,9 +85,8 @@ def register_server(app, router) -> None:
 
     from fastapi import Form, HTTPException
     from fastapi.responses import FileResponse
-    from starlette.background import BackgroundTask
-
     from gpu_router.errors import AllProvidersFailed
+    from starlette.background import BackgroundTask
 
     def _fail(cap: str, exc: AllProvidersFailed) -> HTTPException:
         return HTTPException(status_code=502, detail={

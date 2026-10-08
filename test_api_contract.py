@@ -41,7 +41,6 @@ from video2md.auth import put_identity, resolve_principal  # noqa: E402  # acctk
 from video2md.graph import resolve_run  # noqa: E402
 from video2md.runs import create_run  # noqa: E402
 
-
 # ---------------------------------------------------------------- fixtures / helpers
 
 def _seed_run(run_id: str, owner: str, *, status: str = "done") -> dict:
@@ -510,7 +509,6 @@ def test_auth_device_code_requires_config(client, monkeypatch):
 
 
 def test_auth_device_code_proxies_google(client, monkeypatch):
-    import httpx
 
     import video2md.api as _api
     monkeypatch.setattr(_api, "ENV", {"GOOGLE_CLIENT_ID": "cid", "GOOGLE_CLIENT_SECRET": "sec"})
@@ -537,9 +535,8 @@ def test_auth_device_code_proxies_google(client, monkeypatch):
 
 
 def test_auth_device_token_pending_then_ok(client, monkeypatch):
-    from acctkit import providers as _p
-
     import video2md.api as _api
+    from acctkit import providers as _p
     monkeypatch.setattr(_api, "ENV", {"GOOGLE_CLIENT_ID": "cid", "GOOGLE_CLIENT_SECRET": "sec"})
 
     # 用户还没授权：Google 回 400 authorization_pending → 桥透传 401（客户端继续轮询）
@@ -836,7 +833,7 @@ def test_cost_cli_export(client, monkeypatch, capsys):
         mp.setattr("sys.argv", ["video2md", "cost", "--uid", "uid_alice"])
         main_mod.main()
     out = capsys.readouterr().out.strip().splitlines()
-    rows = [json.loads(l) for l in out]
+    rows = [json.loads(ln) for ln in out]
     detail = [r for r in rows if not r.get("summary")]
     summary = [r for r in rows if r.get("summary")][0]
     assert any(r["run_id"] == "exp1" and r["cost_usd"] == 1.25 for r in detail)
@@ -975,8 +972,6 @@ def test_cancel_queued_immediate(client, monkeypatch):
 
 
 def test_cancel_running_cooperative(client, monkeypatch):
-    import video2md.runs as _runs_mod
-
     def cooperative_graph(url, *, run_id=""):
         # 模拟条目循环头检查（真检查在 _run_stage_inner，另有直测）：标志到 → error 留痕
         deadline = time.monotonic() + 5
@@ -1010,8 +1005,9 @@ def test_cancel_terminal_conflict_and_access(client):
 
 def test_pg_unavailable_503_envelope(client, monkeypatch):
     """P1-8：PG 超预算 → 快速 503（统一信封），不挂死不 500。"""
-    import video2md.api as _api
     from psycopg_pool import PoolTimeout
+
+    import video2md.api as _api
 
     class _DeadStore:
         def total_active(self):
@@ -1235,8 +1231,8 @@ def test_tasks_pg_backend_readside(client, monkeypatch):
 
 def test_tasks_pg_dedup_alive(client, monkeypatch):
     """dedup 判活 PG 档：本进程 _TASKS 无活条目、DB is_alive=True → 不重投，回旧状态。"""
-    import video2md.graph as graph_mod
     import video2md.api as _api
+    import video2md.graph as graph_mod
 
     dup_rec = {"run_id": "dupx", "url": "https://example.test/dup", "part_items": "",
                "owner": _dev_uid(), "created": "2026-01-01T00:00:00", "tmp": "",
@@ -1255,14 +1251,14 @@ def test_tasks_pg_dedup_alive(client, monkeypatch):
     assert r.status_code == 200
     body = r.json()
     assert body.get("dedup") is True and body["status"] == "running"
-    assert f"is_alive:dupx" in fake.calls
+    assert "is_alive:dupx" in fake.calls
     assert "dupx" not in _api._TASKS  # 关键：不得重新入队驱动（他进程正跑）
 
 
 def test_tasks_pg_dead_dup_requeues(client, monkeypatch):
     """DB 判活=False（崩溃残档）→ 既有重驱路径不变。"""
-    import video2md.graph as graph_mod
     import video2md.api as _api
+    import video2md.graph as graph_mod
 
     dup_rec = {"run_id": "dead1", "url": "https://example.test/dead", "part_items": "",
                "owner": _dev_uid(), "created": "2026-01-01T00:00:00", "tmp": "",

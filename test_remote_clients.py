@@ -49,6 +49,7 @@ def _tar_bytes() -> bytes:
 # ---- clips 客户端
 # Phase 2 后 attach 落点走 artsink.attach_dir()（动态读 config），重定向打在 config 缝上
 from video2md import config as _cfg
+
 _cfg.ATTACH_DIR = _TMP / "attachments"  # 重定向：别碰真 vault
 _cfg.ATTACH_DIR.mkdir(exist_ok=True)
 clips_mod.ENV = {**clips_mod.ENV, "V2MD_CLIPS_SOURCE": ""}  # 钉死上传路径（与 .env 无关）

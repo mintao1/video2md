@@ -13,8 +13,7 @@ os.environ["LANGFUSE_PK"] = os.environ["LANGFUSE_SK"] = ""  # 观测 sink 强制
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from video2md import graph, runs, util
-from video2md import observability
+from video2md import graph, observability, runs, util
 
 _TMP = Path(tempfile.mkdtemp(prefix="video2md-test-graph-"))
 
@@ -192,8 +191,10 @@ print("✅ 7b. checkpointer env 分派（sqlite 默认；postgres 守卫在 impo
 from video2md import evals as _ev
 
 os.environ["V2MD_EVAL"] = "1"
-_note_md = _TMP / "笔记1.md"; _note_md.write_text("# 笔记\n正文" * 50, encoding="utf-8")
-_tr_md = _TMP / "t.md"; _tr_md.write_text("转录本" * 200, encoding="utf-8")
+_note_md = _TMP / "笔记1.md"
+_note_md.write_text("# 笔记\n正文" * 50, encoding="utf-8")
+_tr_md = _TMP / "t.md"
+_tr_md.write_text("转录本" * 200, encoding="utf-8")
 _orig_note_fn = runs._STAGE_FNS["note"]
 
 

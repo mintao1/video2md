@@ -21,8 +21,6 @@ from pathlib import Path
 
 import httpx
 
-
-
 # ---------------------------------------------------------------- 参数（provider extra 可覆盖）
 SESSION = "v2md-whisper"
 

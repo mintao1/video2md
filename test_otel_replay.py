@@ -11,7 +11,6 @@ gen_ai 属性映射（复用 _scalar_attrs）/ info 点挂最深开口 span /
 import hashlib
 import sys
 import tempfile
-from datetime import datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
@@ -19,6 +18,7 @@ sys.path.insert(0, str(Path(__file__).parent / "scripts"))
 
 # 隔离：日志进临时目录；显式空串关掉任何真实端点（防开发机 secrets 文件串台）
 import os
+
 os.environ["V2MD_LOG_DIR"] = tempfile.mkdtemp(prefix="v2md-replay-test-logs-")
 for k in ("OTEL_EXPORTER_OTLP_ENDPOINT", "LANGFUSE_PK", "LANGFUSE_SK", "LANGFUSE_HOST"):
     os.environ[k] = ""
@@ -27,7 +27,6 @@ from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 from opentelemetry.trace import StatusCode
-
 from otel_replay import _ns, group_by_run, replay_run
 
 

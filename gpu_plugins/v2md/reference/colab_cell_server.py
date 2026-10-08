@@ -13,7 +13,9 @@ video2md 远程 GPU 服务（ASR + 剪辑 + OCR）—— 粘贴到 Google Colab 
 """
 
 # 1) 依赖（faster-whisper 需 ≥1.1 才有 turbo；rapidocr 是 ONNX 中文 OCR；cloudflared 最新 linux-amd64）
-import subprocess, sys
+import subprocess
+import sys
+
 subprocess.run([sys.executable, "-m", "pip", "install", "-q",
                 "faster-whisper>=1.1", "rapidocr", "fastapi", "uvicorn",
                 "python-multipart", "nest-asyncio"], check=True)
@@ -24,18 +26,33 @@ subprocess.run("curl -sL -o /usr/local/bin/cloudflared "
 # 2) 模型（T4 显存 16G：turbo float16 ≈ 3G，余量充足；要更准改 "large-v3"）
 MODEL_NAME = "turbo"
 from faster_whisper import WhisperModel
+
 model = WhisperModel(MODEL_NAME, device="cuda", compute_type="float16")
 from rapidocr import RapidOCR
+
 ocr_engine = RapidOCR()
 print(f"✅ 模型就绪：{MODEL_NAME}（GPU）+ RapidOCR")
 
 # 3) 服务
-import glob, io, json, os, re, shutil, tarfile, tempfile, threading, urllib.request, uuid
+import glob
+import io
+import json
+import os
+import re
+import shutil
+import tarfile
+import tempfile
+import threading
+import urllib.request
+import uuid
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-import nest_asyncio, uvicorn
+
+import nest_asyncio
+import uvicorn
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import Response
+
 app = FastAPI()
 
 _OUT_NAME_RE = re.compile(r"^[\w.\-]+\.mp4$")

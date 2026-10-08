@@ -27,11 +27,10 @@ from __future__ import annotations
 
 import os
 
+import platform_otel_sdk as sdk
 from opentelemetry.metrics import Observation
 from opentelemetry.sdk.metrics.view import ExplicitBucketHistogramAggregation, View
 from opentelemetry.trace import Status, StatusCode, set_span_in_context
-
-import platform_otel_sdk as sdk
 from platform_otel_sdk import _RUNS, _RunTrace, get_tracer
 
 from .config import ENV
