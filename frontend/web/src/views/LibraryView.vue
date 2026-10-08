@@ -1,0 +1,216 @@
+<script setup lang="ts">
+import { computed, onMounted, ref } from 'vue'
+import { useLibraryStore } from '../stores/library'
+import { useToastStore } from '../stores/toast'
+import { getToc } from '../api'
+import type { Book } from '../types'
+import type { TocChapter } from '../api/mock/data'
+import AppHeader from '../components/common/AppHeader.vue'
+import BottomNav from '../components/common/BottomNav.vue'
+import FilterChips from '../components/common/FilterChips.vue'
+import EmptyState from '../components/common/EmptyState.vue'
+import BookCard from '../components/book/BookCard.vue'
+import BookGridItem from '../components/book/BookGridItem.vue'
+import ContinueReadingBanner from '../components/book/ContinueReadingBanner.vue'
+import TocSheet from '../components/book/TocSheet.vue'
+import ExportFormatModal from '../components/book/ExportFormatModal.vue'
+
+const lib = useLibraryStore()
+const toast = useToastStore()
+
+const tocOpen = ref(false)
+const exportOpen = ref(false)
+const activeBook = ref<Book | null>(null)
+const tocChapters = ref<TocChapter[]>([])
+
+const chips = computed(() => [
+  { key: 'all', label: '全部教材', icon: 'auto_stories', count: lib.books.length },
+  { key: 'ai', label: '计算机 / AI' },
+  { key: 'math', label: '数学基础' },
+  { key: 'econ', label: '商业管理' },
+  { key: 'lang', label: '语言学习' },
+  { key: 'fav', label: '收藏夹', icon: 'bookmark' },
+])
+
+onMounted(() => {
+  lib.load()
+})
+
+async function openToc(book: Book) {
+  activeBook.value = book
+  tocChapters.value = await getToc(book.id)
+  tocOpen.value = true
+}
+
+function openExport(book: Book) {
+  activeBook.value = book
+  exportOpen.value = true
+}
+
+function onRead(book: Book) {
+  toast.show(`正在加载并渲染《${book.title}》...`)
+}
+
+function onShare(book: Book) {
+  void book
+  toast.show('已复制教材分享链接到剪贴板！')
+}
+
+function onExport(format: string) {
+  toast.show(`正在封装并打包生成 ${format} 格式教材文件...`)
+}
+
+function onOpenChapter(ch: TocChapter) {
+  toast.show(`开始进入第 ${ch.no} 章：${ch.title}`)
+}
+
+function onClearSearch() {
+  lib.query = ''
+}
+</script>
+
+<template>
+  <div class="min-h-screen bg-surface">
+    <AppHeader subtitle="Textbook Library" @notifications="toast.show('暂无新通知')" />
+
+    <main class="flex flex-col relative w-full pt-16 pb-nav bg-surface min-h-screen">
+      <!-- 搜索 -->
+      <section class="px-margin pt-space-md flex flex-col gap-space-sm">
+        <div class="relative flex items-center w-full">
+          <span class="material-symbols-outlined absolute left-space-md text-outline pointer-events-none text-[20px]">
+            search
+          </span>
+          <input
+            v-model="lib.query"
+            class="w-full h-11 pl-11 pr-10 rounded-full bg-surface-container-low text-on-surface placeholder:text-outline font-body-md text-body-md shadow-sm focus:outline-none focus:bg-surface-container transition-all"
+            placeholder="搜索已生成的教材、科目或知识点..."
+            type="text"
+          />
+          <button
+            v-if="lib.query"
+            aria-label="清空搜索"
+            class="absolute right-space-sm w-7 h-7 rounded-full bg-surface-container text-on-surface-variant flex items-center justify-center transition-transform active:scale-90"
+            @click="onClearSearch"
+          >
+            <span class="material-symbols-outlined text-[16px]">close</span>
+          </button>
+        </div>
+
+        <!-- 分类筛选 -->
+        <FilterChips v-model="lib.category" :options="chips" />
+      </section>
+
+      <!-- 继续阅读横幅 -->
+      <ContinueReadingBanner
+        v-if="lib.featured && lib.category === 'all' && !lib.query"
+        :book="lib.featured"
+        @read="onRead"
+        @toc="openToc"
+      />
+
+      <!-- 书架标题 + 视图切换 -->
+      <section class="px-margin pt-space-lg flex items-center justify-between">
+        <div class="flex items-baseline gap-space-xs">
+          <h2 class="font-headline-lg-mobile text-headline-lg-mobile text-on-surface">智能教材架</h2>
+          <span class="font-label-sm text-label-sm text-outline">共 {{ lib.filtered.length }} 本</span>
+        </div>
+        <div class="flex items-center bg-surface-container-low rounded-lg p-0.5">
+          <button
+            aria-label="网格视图"
+            class="w-8 h-8 rounded flex items-center justify-center transition-all"
+            :class="
+              lib.viewMode === 'grid'
+                ? 'bg-surface-container-lowest shadow-sm text-primary font-semibold'
+                : 'text-on-surface-variant hover:text-on-surface'
+            "
+            @click="lib.setViewMode('grid')"
+          >
+            <span class="material-symbols-outlined text-[18px]">grid_view</span>
+          </button>
+          <button
+            aria-label="列表视图"
+            class="w-8 h-8 rounded flex items-center justify-center transition-all"
+            :class="
+              lib.viewMode === 'list'
+                ? 'bg-surface-container-lowest shadow-sm text-primary font-semibold'
+                : 'text-on-surface-variant hover:text-on-surface'
+            "
+            @click="lib.setViewMode('list')"
+          >
+            <span class="material-symbols-outlined text-[18px]">view_agenda</span>
+          </button>
+        </div>
+      </section>
+
+      <!-- 书列表 -->
+      <section
+        class="px-margin pt-space-sm"
+        :class="lib.viewMode === 'grid' ? 'grid grid-cols-3 gap-space-sm' : 'flex flex-col gap-space-md'"
+      >
+        <template v-if="lib.viewMode === 'list'">
+          <BookCard
+            v-for="b in lib.filtered"
+            :key="b.id"
+            :book="b"
+            @toggle-fav="(id) => lib.toggleFav(id)"
+            @read="onRead"
+            @toc="openToc"
+            @export="openExport"
+            @share="onShare"
+          />
+        </template>
+        <template v-else>
+          <BookGridItem
+            v-for="b in lib.filtered"
+            :key="b.id"
+            :book="b"
+            @toggle-fav="(id) => lib.toggleFav(id)"
+            @read="onRead"
+          />
+        </template>
+
+        <EmptyState
+          v-if="lib.filtered.length === 0 && !lib.loading"
+          title="未找到相关教材"
+          description="试试搜索其他关键词，或复制新视频链接生成专属教材吧。"
+          action-label="清除筛选条件"
+          @action="lib.resetFilters()"
+        />
+      </section>
+
+      <!-- 同步状态条 -->
+      <section class="px-margin pt-space-lg pb-space-md">
+        <div class="flex items-center justify-between p-space-sm px-space-md rounded-xl bg-surface-container-low">
+          <div class="flex items-center gap-2">
+            <span class="material-symbols-outlined text-primary text-[20px]">cloud_sync</span>
+            <div class="flex flex-col">
+              <span class="font-label-md text-label-md text-on-surface">全端书籍与笔记自动同步已开启</span>
+              <span class="font-label-sm text-label-sm text-outline">上次同步于 2 分钟前</span>
+            </div>
+          </div>
+          <button
+            class="text-primary font-label-md text-label-md flex items-center gap-0.5 active:scale-95 transition-transform"
+            @click="toast.show('已完成云端同步：所有教材与高亮标记已是最新！')"
+          >
+            <span>立即同步</span>
+            <span class="material-symbols-outlined text-[16px]">sync</span>
+          </button>
+        </div>
+      </section>
+    </main>
+
+    <TocSheet
+      v-model="tocOpen"
+      :book-title="activeBook?.title ?? ''"
+      :chapters="tocChapters"
+      @open-chapter="onOpenChapter"
+    />
+    <ExportFormatModal
+      v-model="exportOpen"
+      :book-title="activeBook?.title ?? ''"
+      @export="onExport"
+    />
+
+    <BottomNav />
+  </div>
+</template>
