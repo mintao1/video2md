@@ -37,7 +37,7 @@ from fastapi.testclient import TestClient  # noqa: E402
 
 from video2md import events, runs  # noqa: E402
 from video2md.api import app  # noqa: E402
-from video2md.auth import put_identity, resolve_principal  # noqa: E402（acctkit 接线层）
+from video2md.auth import put_identity, resolve_principal  # noqa: E402  # acctkit 接线层
 from video2md.graph import resolve_run  # noqa: E402
 from video2md.runs import create_run  # noqa: E402
 
