@@ -68,6 +68,9 @@ def _clean_state():
         p = Path(_TMP) / name
         if p.exists():
             p.unlink()
+    import video2md.api as _api
+    _api._GOOGLE_OAUTH_STATES.clear()  # OAuth state 单次消费测试的跨用例泄漏闸
+    _api._DEVICE_WIN.clear()           # IP 滑窗跨用例泄漏闸（设备流/授权码流限流共用一桶）
     yield
 
 
@@ -578,6 +581,177 @@ def test_auth_device_token_pending_then_ok(client, monkeypatch):
                    lambda self, dc: {"id_token": "JWT"})
         ok = client.post("/auth/device/token", json={"device_code": "DC"})
         assert ok.status_code == 200 and ok.json() == {"id_token": "JWT"}
+
+
+# ------------------------------------------- /auth/google/*（网页端授权码重定向登录）
+
+_GENV = {"GOOGLE_CLIENT_ID": "cid-web", "GOOGLE_CLIENT_SECRET": "sec-web",
+         "V2MD_WEB_BASE_URL": "http://frontend.test",
+         "V2MD_PUBLIC_BASE_URL": "http://api.public"}
+
+
+def _seed_state(st: str = "state-ok", ttl: float = 300.0) -> None:
+    import video2md.api as _api
+    _api._GOOGLE_OAUTH_STATES[st] = time.monotonic() + ttl
+
+
+def test_auth_google_login_redirects_to_google(client, monkeypatch):
+    import urllib.parse as _up
+    import video2md.api as _api
+    monkeypatch.setattr(_api, "ENV", dict(_GENV))
+    r = client.get("/auth/google/login", follow_redirects=False)
+    assert r.status_code == 302
+    loc = r.headers["location"]
+    u = _up.urlparse(loc)
+    assert u.netloc == "accounts.google.com"
+    q = _up.parse_qs(u.query)
+    assert q["client_id"] == ["cid-web"]
+    assert q["redirect_uri"] == ["http://api.public/auth/google/callback"]
+    assert q["response_type"] == ["code"]
+    assert "openid" in q["scope"][0]
+    st = q["state"][0]
+    assert len(st) >= 32 and st in _api._GOOGLE_OAUTH_STATES  # 已登记待消费
+    assert "v2md_oauth_state" in r.headers.get("set-cookie", "")  # CSRF 绑定 cookie
+
+
+def test_auth_google_login_missing_config(client, monkeypatch):
+    import video2md.api as _api
+    monkeypatch.setattr(_api, "ENV", {})
+    r = client.get("/auth/google/login", follow_redirects=False)
+    assert r.status_code == 302
+    assert "auth_error=" in r.headers["location"]  # 未配凭据 → fragment 错误出口
+
+
+def test_auth_google_login_rate_limit(client):
+    import video2md.api as _api
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(_api, "ENV", dict(_GENV))
+        mp.setattr(_api, "DEVICE_RATE_PER_MIN", 2)
+        _api._DEVICE_WIN.clear()
+        for _ in range(2):
+            ok = client.get("/auth/google/login", follow_redirects=False)
+            assert ok.status_code == 302 and "auth_error=" not in ok.headers["location"]
+        over = client.get("/auth/google/login", follow_redirects=False)
+        assert over.status_code == 302  # 浏览器导航端点：429 折叠进 fragment 错误出口
+        assert "auth_error=" in over.headers["location"]
+
+
+def test_auth_google_callback_happy_path(client, monkeypatch):
+    import video2md.api as _api
+    from acctkit import providers as _p
+    monkeypatch.setattr(_api, "ENV", dict(_GENV))
+    _seed_state("st-ok")
+    seen: dict = {}
+
+    class _Resp:
+        status_code = 200
+        @staticmethod
+        def json():
+            return {"id_token": "JWT.WT.OK"}
+
+    async def _fake_post(self, url, data=None, **kw):  # noqa: ANN001
+        seen["url"] = url
+        seen["data"] = data
+        return _Resp()
+
+    monkeypatch.setattr(httpx.AsyncClient, "post", _fake_post)
+    monkeypatch.setattr(_p.GoogleProvider, "_verify",
+                        lambda self, t: {"sub": "s1", "email": "a@b.test"})
+    r = client.get("/auth/google/callback?code=abc&state=st-ok",
+                   cookies={"v2md_oauth_state": "st-ok"}, follow_redirects=False)
+    assert r.status_code == 302
+    assert r.headers["location"] == "http://frontend.test/login#id_token=JWT.WT.OK"
+    assert seen["url"] == _api._GOOGLE_OAUTH_TOKEN_URL
+    assert seen["data"]["code"] == "abc" and seen["data"]["redirect_uri"] == \
+        "http://api.public/auth/google/callback"
+    assert "st-ok" not in _api._GOOGLE_OAUTH_STATES  # state 单次消费
+    assert 'v2md_oauth_state="";' in r.headers.get("set-cookie", "").replace(" ", "") \
+        or "v2md_oauth_state=;" in r.headers.get("set-cookie", "")  # cookie 已焚
+
+
+def test_auth_google_callback_state_rejected(client, monkeypatch):
+    """未知 state / 缺 cookie / cookie 不符 → fragment 错误出口；合法 state 被消耗。"""
+    import video2md.api as _api
+    monkeypatch.setattr(_api, "ENV", dict(_GENV))
+
+    def _assert_rejected(r):
+        assert r.status_code == 302 and "auth_error=" in r.headers["location"]
+
+    # (a) 未知 state
+    _assert_rejected(client.get("/auth/google/callback?code=abc&state=nope",
+                                cookies={"v2md_oauth_state": "nope"}, follow_redirects=False))
+    # (b) 合法 state 但缺 cookie
+    _seed_state("st-nc")
+    _assert_rejected(client.get("/auth/google/callback?code=abc&state=st-nc",
+                                follow_redirects=False))
+    assert "st-nc" not in _api._GOOGLE_OAUTH_STATES  # 即便被拒也消耗（防重放试探）
+    # (c) 合法 state + cookie 值不符
+    _seed_state("st-bad")
+    _assert_rejected(client.get("/auth/google/callback?code=abc&state=st-bad",
+                                cookies={"v2md_oauth_state": "other"}, follow_redirects=False))
+    # (d) 缺 code（用户在 Google 授权页取消）
+    _seed_state("st-nocode")
+    r = client.get(f"/auth/google/callback?state=st-nocode",
+                   cookies={"v2md_oauth_state": "st-nocode"}, follow_redirects=False)
+    assert r.status_code == 302 and "auth_error=" in r.headers["location"]
+
+
+def test_auth_google_callback_exchange_rejected(client, monkeypatch):
+    import video2md.api as _api
+    monkeypatch.setattr(_api, "ENV", dict(_GENV))
+    _seed_state("st-x")
+
+    class _Resp:
+        status_code = 400
+        @staticmethod
+        def json():
+            return {"error": "invalid_grant"}
+
+    async def _fake_post(self, url, data=None, **kw):  # noqa: ANN001
+        return _Resp()
+
+    monkeypatch.setattr(httpx.AsyncClient, "post", _fake_post)
+    r = client.get("/auth/google/callback?code=abc&state=st-x",
+                   cookies={"v2md_oauth_state": "st-x"}, follow_redirects=False)
+    assert r.status_code == 302 and "auth_error=" in r.headers["location"]
+
+
+def test_auth_google_callback_verify_fails(client, monkeypatch):
+    import video2md.api as _api
+    from acctkit import providers as _p
+    monkeypatch.setattr(_api, "ENV", dict(_GENV))
+    _seed_state("st-v")
+
+    class _Resp:
+        status_code = 200
+        @staticmethod
+        def json():
+            return {"id_token": "JWT.BAD"}
+
+    async def _fake_post(self, url, data=None, **kw):  # noqa: ANN001
+        return _Resp()
+
+    monkeypatch.setattr(httpx.AsyncClient, "post", _fake_post)
+    monkeypatch.setattr(_p.GoogleProvider, "_verify",
+                        lambda self, t: (_ for _ in ()).throw(ValueError("bad aud")))
+    r = client.get("/auth/google/callback?code=abc&state=st-v",
+                   cookies={"v2md_oauth_state": "st-v"}, follow_redirects=False)
+    assert r.status_code == 302 and "auth_error=" in r.headers["location"]
+
+
+def test_multi_aud_google_provider_registration():
+    from acctkit.providers import make_provider
+    from video2md.auth.ext_google import MultiAudGoogleProvider
+
+    # 双 client 并存：audiences 去重保序 [web, tv]
+    p = make_provider("google", {"GOOGLE_CLIENT_ID": "tv", "GOOGLE_WEB_CLIENT_ID": "web"})
+    assert isinstance(p, MultiAudGoogleProvider) and p._audiences == ["web", "tv"]
+    # 只配 base（设备流单 client 档）：与基座等价
+    p2 = make_provider("google", {"GOOGLE_CLIENT_ID": "tv"})
+    assert p2._audiences == ["tv"] and p2.client_id == "tv"
+    # 只配 web（无设备流档）：client_id 回落 web（基座空 client_id 直接 500 的防呆）
+    p3 = make_provider("google", {"GOOGLE_WEB_CLIENT_ID": "web"})
+    assert p3._audiences == ["web"] and p3.client_id == "web"
 
 
 # ---------------------------------------------------------------- 配额闸（终局布局·限流配额）

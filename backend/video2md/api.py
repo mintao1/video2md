@@ -34,9 +34,11 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import secrets
 import shutil
 import tempfile
 import time
+import urllib.parse
 import uuid
 import zipfile
 from collections import deque
@@ -50,7 +52,7 @@ import uvicorn
 from fastapi import Depends, FastAPI, HTTPException, Request, UploadFile
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, StreamingResponse
 from starlette.background import BackgroundTask
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
@@ -362,10 +364,11 @@ def _client_ip(request: Request) -> str:
     return (request.client.host if request.client else "") or "unknown"
 
 
-def _admit_device(request: Request) -> str:
+def _admit_device(request: Request, *, label: str = "POST /auth/device/*") -> str:
     """设备流两端点的 IP 滑窗闸（P0-2）：匿名零频控可刷 OAuth 配额/被 Google 封 client_id。
 
     打在调 Google 之前（护的是出网配额）；0 = 不设限。返回客户端 IP 供审计日志。
+    label 供复用方（Google 授权码流登录端点）改审计行的方法名——默认值=设备流原口径。
     """
     ip = _client_ip(request)
     if not DEVICE_RATE_PER_MIN:
@@ -375,7 +378,7 @@ def _admit_device(request: Request) -> str:
     while dq and now - dq[0] > 60:
         dq.popleft()
     if len(dq) >= DEVICE_RATE_PER_MIN:
-        _req_log("POST", "/auth/device/*", 429, user=f"(anon:{ip})")
+        _req_log(*label.split(" ", 1), 429, user=f"(anon:{ip})")
         raise HTTPException(429, f"请求过频（限 {DEVICE_RATE_PER_MIN} 次/分钟/IP），稍后重试",
                             headers={"X-Error": "RATE_LIMITED"})
     dq.append(now)
@@ -1063,6 +1066,130 @@ async def _google_device_code() -> dict:
     return {"device_code": d["device_code"], "user_code": d["user_code"],
             "verification_url": d["verification_url"],
             "expires_in": int(d.get("expires_in") or 0), "interval": int(d.get("interval") or 5)}
+
+
+# ------------------------------------------- Google 授权码重定向登录（网页端）
+_GOOGLE_OAUTH_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
+_GOOGLE_OAUTH_TOKEN_URL = "https://oauth2.googleapis.com/token"
+_GOOGLE_STATE_TTL_S = 600
+_GOOGLE_OAUTH_STATES: dict[str, float] = {}  # state → 过期时刻（monotonic）。进程内记账
+# 口径同 _DEVICE_WIN：单节点单副本安全；多副本各副本独立 dict 会挂——扩副本前先挪共享存储。
+
+
+def _google_web_creds() -> tuple[str, str]:
+    """网页端授权码流凭据：优先 GOOGLE_WEB_*（OAuth 应用里「Web」型 client），缺省回落
+    GOOGLE_CLIENT_*。设备流的 GOOGLE_CLIENT_* 是「TV 与 Limited Input」型（Web 型无设备码
+    端点），两者并存时必须分两套 env——本函数只管发起/换票侧取哪对；验签侧的多 audience
+    收口在 video2md/auth/ext_google.py。回落语义保证单 client 开发档零配置。"""
+    cid = (ENV.get("GOOGLE_WEB_CLIENT_ID") or ENV.get("GOOGLE_CLIENT_ID") or "").strip()
+    secret = (ENV.get("GOOGLE_WEB_CLIENT_SECRET") or ENV.get("GOOGLE_CLIENT_SECRET") or "").strip()
+    return cid, secret
+
+
+def _google_public_base() -> str:
+    """对外可达的 api scheme+host（redirect_uri 前缀）。生产=网关 https 域名，
+    Google 对 redirect_uri 在授权页与换票时逐字比对、且须与控制台登记一致。"""
+    return (ENV.get("V2MD_PUBLIC_BASE_URL") or "http://127.0.0.1:8790").rstrip("/")
+
+
+def _google_web_base() -> str:
+    """前端 origin：成功 302 回 {WEB}/login#id_token=…，失败 #auth_error=…（fragment
+    不进服务端日志/代理）。"""
+    return (ENV.get("V2MD_WEB_BASE_URL") or "http://localhost:5173").rstrip("/")
+
+
+def _google_state_purge() -> None:
+    now = time.monotonic()
+    for k in [k for k, exp in _GOOGLE_OAUTH_STATES.items() if exp <= now]:
+        _GOOGLE_OAUTH_STATES.pop(k, None)
+
+
+def _google_error_redirect(msg: str) -> RedirectResponse:
+    """浏览器整页导航端点的错误出口：JSON 错误信封对 302 跳转无意义，
+    统一 302 回登录页 fragment，前端 toast 消费。"""
+    return RedirectResponse(f"{_google_web_base()}/login"
+                            f"#auth_error={urllib.parse.quote(msg)}", status_code=302)
+
+
+def _google_finish(resp: RedirectResponse) -> RedirectResponse:
+    """所有出口统一清 CSRF state cookie（一次性，用完即焚）。"""
+    resp.delete_cookie("v2md_oauth_state", path="/auth/google/callback")
+    return resp
+
+
+@app.get("/auth/google/login", summary="Google 授权码流发起：302 到 Google 授权页")
+async def auth_google_login(request: Request) -> RedirectResponse:
+    """网页端登录入口（整页跳转）：与设备流并存的第二条 Google 登录路——本端点只负责
+    发起，真正换票/验签在 /auth/google/callback。IP 滑窗复用设备流闸（护 Google 出网
+    配额；超限也走 fragment 错误出口——429 JSON 对浏览器导航无意义）。"""
+    try:
+        ip = _admit_device(request, label="GET /auth/google/login")
+    except HTTPException:
+        return _google_error_redirect(f"请求过频（限 {DEVICE_RATE_PER_MIN} 次/分钟/IP），稍后重试")
+    cid, secret = _google_web_creds()
+    if not (cid and secret):
+        _req_log("GET", "/auth/google/login", 500, user=f"(anon:{ip})")
+        return _google_error_redirect("服务端未配置 Google 登录凭据")
+    _google_state_purge()
+    state = secrets.token_urlsafe(32)
+    _GOOGLE_OAUTH_STATES[state] = time.monotonic() + _GOOGLE_STATE_TTL_S
+    q = urllib.parse.urlencode({
+        "client_id": cid,
+        "redirect_uri": f"{_google_public_base()}/auth/google/callback",
+        "response_type": "code",
+        "scope": "openid email profile",
+        "state": state,
+        "prompt": "select_account",  # 重登强制账号选择器，避免静默选中旧账号
+    })
+    _req_log("GET", "/auth/google/login", 302, user=f"(anon:{ip})")
+    resp = RedirectResponse(f"{_GOOGLE_OAUTH_AUTH_URL}?{q}", status_code=302)
+    # 登录 CSRF 闸：state 与浏览器绑定（HttpOnly 防脚本读；SameSite=Lax 保证 Google 顶层
+    # 跳回本端点时仍携带；Path 只对回调生效，不污染其它请求）。
+    resp.set_cookie("v2md_oauth_state", state, max_age=_GOOGLE_STATE_TTL_S,
+                    httponly=True, samesite="lax", path="/auth/google/callback")
+    return resp
+
+
+@app.get("/auth/google/callback", summary="Google 回调：换票验签后 302 回前端（fragment 带 id_token）")
+async def auth_google_callback(request: Request, code: str = "", state: str = "") -> RedirectResponse:
+    """授权码 → id_token（服务端换票，client secret 不出后端）→ 302 回前端 fragment。
+    state 单次消费 + cookie 比对（防登录 CSRF：攻击者拿自己的 code+state 钓受害者回跳
+    即可把受害者登录成攻击者账号——cookie 绑定后该向量关闭）。验 aud=cid 早失败早提示；
+    后续 /me 的验签走引擎侧多 audience provider（ext_google），两条路 external_id=sub
+    同口径归并同一 uid。"""
+    ip = _client_ip(request)
+    exp = _GOOGLE_OAUTH_STATES.pop(state, None) if state else None
+    cookie_state = request.cookies.get("v2md_oauth_state") or ""
+    if exp is None or exp <= time.monotonic() or cookie_state != state:
+        _req_log("GET", "/auth/google/callback", 400, user=f"(anon:{ip})")
+        return _google_finish(_google_error_redirect("登录状态已过期或校验失败，请重新登录"))
+    if not code:
+        return _google_finish(_google_error_redirect("Google 未返回授权码（用户可能取消了授权）"))
+    cid, secret = _google_web_creds()
+    redirect_uri = f"{_google_public_base()}/auth/google/callback"
+    try:
+        async with httpx.AsyncClient(timeout=15) as c:
+            r = await c.post(_GOOGLE_OAUTH_TOKEN_URL,
+                             data={"code": code, "client_id": cid, "client_secret": secret,
+                                   "redirect_uri": redirect_uri,
+                                   "grant_type": "authorization_code"})
+    except Exception as exc:
+        return _google_finish(_google_error_redirect(f"Google 换票不可达（{type(exc).__name__}）"))
+    if r.status_code != 200:
+        return _google_finish(_google_error_redirect("Google 授权码无效或已使用，请重新登录"))
+    idt = str(r.json().get("id_token") or "")
+    if not idt:
+        return _google_finish(_google_error_redirect("Google 未返回 id_token"))
+    from acctkit.providers import GoogleProvider
+
+    try:
+        await asyncio.to_thread(GoogleProvider(cid)._verify, idt)
+    except Exception:
+        return _google_finish(_google_error_redirect("Google ID-Token 校验失败"))
+    _req_log("GET", "/auth/google/callback", 302, user=f"(anon:{ip})")
+    # id_token 是 base64url JWT（fragment 字符集安全，无需再编码）；fragment 不落服务端日志。
+    return _google_finish(RedirectResponse(f"{_google_web_base()}/login#id_token={idt}",
+                                           status_code=302))
 
 
 @app.get("/runs", response_model=RunListOut,

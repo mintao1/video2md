@@ -17,6 +17,15 @@ export const useAuthStore = defineStore('auth', () => {
     user.value = result.user
   }
 
+  // Google 授权码流回跳：id_token 已验签（后端 callback），用户资料靠 /me 拉真实数据；
+  // 失败抛错给调用方（回滚 token + toast），login() 的 mock user 语义不适用这里。
+  async function loginWithIdToken(idToken: string) {
+    token.value = idToken
+    localStorage.setItem(TOKEN_KEY, idToken)
+    user.value = null
+    await fetchUser()
+  }
+
   async function fetchUser() {
     if (!isLoggedIn.value || user.value) return
     user.value = await api.currentUser()
@@ -28,5 +37,5 @@ export const useAuthStore = defineStore('auth', () => {
     localStorage.removeItem(TOKEN_KEY)
   }
 
-  return { token, user, isLoggedIn, login, fetchUser, logout }
+  return { token, user, isLoggedIn, login, loginWithIdToken, fetchUser, logout }
 })

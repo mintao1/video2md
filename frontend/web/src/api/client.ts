@@ -1,7 +1,7 @@
 // fetch 封装占位：第一版不接线；换真实 API 时 live/* 用它。
 import type { ApiError } from '../types'
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:8790'
+export const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:8790'
 
 export function getToken(): string | null {
   return localStorage.getItem('v2md_token')

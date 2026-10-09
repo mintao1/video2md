@@ -340,7 +340,11 @@ def test_build_from_env_provider_list_and_unknown():
            "WECHAT_APP_ID": "wx-id", "WECHAT_APP_SECRET": "wx-secret",
            "V2MD_USERS_FILE": "unused"}
     eng = build_from_env(env, "V2MD_", store=MemoryStore())
-    assert [type(p).__name__ for p in eng.providers] == ["GoogleProvider", "WeChatProvider"]
+    # google 工厂可被宿主扩展同名覆盖（video2md/auth/ext_google.py 多 audience 档，
+    # register_provider 是 core 认可的挂点）——断言 provider 家族（isinstance）而非具体
+    # 类名，否则宿主 ext 一 import 就把本测试染红（同进程全量跑时注册表是全局的）
+    assert isinstance(eng.providers[0], GoogleProvider)
+    assert isinstance(eng.providers[1], WeChatProvider)
     assert eng.providers[0].client_id == "cid-xyz"  # env 凭据注入构造（不带入引擎次序）
     assert (eng.providers[1].app_id, eng.providers[1].app_secret) == ("wx-id", "wx-secret")
     with pytest.raises(AuthError) as ei:

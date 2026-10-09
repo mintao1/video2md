@@ -26,6 +26,8 @@ def _build_store() -> IdentityStore:
     return JsonFileStore(USERS_FILE)
 
 
+from . import ext_google  # noqa: F401  自注册 google 多 audience 覆盖（须在 build_from_env 之前）
+
 # 单例：模块 import 时装配一次（off/google 语义见 acctkit.build_from_env）
 engine: AuthEngine = build_from_env(ENV, "V2MD_", store=_build_store())
 

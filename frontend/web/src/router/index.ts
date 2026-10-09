@@ -34,7 +34,9 @@ router.beforeEach((to) => {
   if (!to.meta.public && !auth.isLoggedIn) {
     return { name: 'login', query: { redirect: to.fullPath } }
   }
-  if (to.name === 'login' && auth.isLoggedIn) {
+  // 已登录访问 /login → 强制去 library；但 Google 授权码流回跳带 #id_token= 必须放行
+  // 进 LoginView 处理（否则 fragment 在守卫重定向中丢失，登录白走一圈）。
+  if (to.name === 'login' && auth.isLoggedIn && !(to.hash || '').includes('id_token')) {
     return { name: 'library' }
   }
 })
