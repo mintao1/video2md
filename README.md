@@ -8,7 +8,7 @@ GPU 重活（转写/OCR/剪辑）外包给 [gpu_router](https://github.com/minta
 **生产形态 = 云服务器 · 多用户 API**：登录鉴权（Google id_token/设备流 + 微信扫码）→
 run 按 uid 归属隔离 → deliver「云端不储存」投递（bundle 拉取 + ACK/TTL 即焚），
 公网经反代 TLS 暴露。架构/部署/运维的单一真相源在
-**[docs/architecture/](docs/architecture/)**（含[生产就绪 ROADMAP](docs/architecture/ROADMAP.md)），
+**[docs/architecture/](docs/architecture/)**，
 部署落地见[部署与架构文档](#部署与架构文档云服务器--多用户)。
 
 ```
@@ -79,12 +79,10 @@ POST /runs（FastAPI 内嵌图，并发闸门 V2MD_MAX_CONCURRENT_RUNS，默认 
 | [07 算力池契约](docs/architecture/07-gpu-pool-contract.md) | gpu_plugins 协议、四种 provider、异步 job |
 | [08 容量与 SLO](docs/architecture/08-capacity-and-slo.md) | 容量模型框架 + SLO 草案（P1 实测回填） |
 | [09 灾备 runbook](docs/architecture/09-disaster-recovery.md) | RTO/RPO、备份恢复流程、演练制度 |
-| [ROADMAP](docs/architecture/ROADMAP.md) | P0 上公网前 / P1 上量前 / P2 规模化（带验收标准） |
 | [批判存档](docs/architecture/critique/) | 十层「叙述 vs 现实」对照 + ISO 25010 质量属性评估（2026-09-24） |
 
-> ⚠ **上公网前必读**：[05 安全](docs/architecture/05-security.md) 的检查清单 +
-> [ROADMAP P0](docs/architecture/ROADMAP.md)（AUTH 防呆、匿名端点限流、preflight 脱敏、
-> 反代配置实体化、schema 迁移纪律、上传内容嗅探等七项）。
+> ⚠ **上公网前必读**：[05 安全](docs/architecture/05-security.md) 的检查清单。
+> （原 ROADMAP P0 七项清单已随该文件 2026-10-10 删除，原文见 git 历史。）
 
 ## Obsidian 插件（Video2MD Inbox · 产物回传主路）
 

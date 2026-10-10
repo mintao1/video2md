@@ -15,7 +15,6 @@
 | [07-gpu-pool-contract.md](07-gpu-pool-contract.md) | 算力池契约：gpu_plugins 协议、四种 provider、异步 job | 算力侧开发 |
 | [08-capacity-and-slo.md](08-capacity-and-slo.md) | 容量规划与 SLO（含待实测占位） | SRE/容量规划 |
 | [09-disaster-recovery.md](09-disaster-recovery.md) | 灾备 runbook：RTO/RPO、备份恢复、演练制度 | 运维/on-call |
-| [ROADMAP.md](ROADMAP.md) | 生产就绪路线：P0/P1/P2 分级，带验收标准与阻塞边 | 所有人 |
 | [critique/](critique/) | 批判存档（有日期的快照，不更新）：十层对照 + 质量属性 | 评审/参考 |
 
 ## 文档纪律
