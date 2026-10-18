@@ -1,9 +1,0 @@
-{
-  "id": "video2md-obsidian",
-  "name": "Video2MD Inbox",
-  "version": "0.1.0",
-  "minAppVersion": "1.5.0",
-  "description": "视频转笔记产物的收件箱：轮询 video2md 服务器上完成的 run，自动拉取 bundle 写入本库；支持在 Obsidian 内提交链接与设备流登录。",
-  "author": "Lin Mintao",
-  "isDesktopOnly": true
-}

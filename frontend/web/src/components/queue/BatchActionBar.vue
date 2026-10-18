@@ -1,7 +1,13 @@
 <script setup lang="ts">
+import { useToastStore } from '../../stores/toast'
 import { useQueueStore } from '../../stores/queue'
 
 const queue = useQueueStore()
+const toast = useToastStore()
+async function remove() {
+  try { await queue.removeSelected(); toast.show('任务记录已删除') }
+  catch (error) { toast.show(error instanceof Error ? error.message : '删除失败，请稍后重试') }
+}
 </script>
 
 <template>
@@ -35,7 +41,7 @@ const queue = useQueueStore()
           : 'bg-error/30 text-on-error/50 cursor-not-allowed'
       "
       :disabled="queue.selected.size === 0"
-      @click="queue.removeSelected()"
+      @click="remove()"
     >
       <span class="material-symbols-outlined text-[16px]">delete</span>
       <span>批量删除 ({{ queue.selected.size }})</span>

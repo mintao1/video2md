@@ -1,5 +1,11 @@
 # 07 · 算力池契约（gpu_plugins/v2md ↔ gpu_router）
 
+> 当前默认（2026-10-18）：ASR / OCR / clips 均配置 `colab-cli`，由 video2md
+> 直接运行官方 Colab CLI，无需启动 gpu_router。安装、授权、专用会话和容器凭证挂载
+> 见 [README 的 Colab CLI GPU](../../README.md#colab-cli-gpu)。下文算力池契约仅适用于
+> 显式配置 HTTP REMOTE 地址的兼容档。
+
+
 - 最后核对：2026-09-24 ｜ 基准：HEAD=f6a4a0e
 - 批判参照：① 算力层（🟡）；② 安全 S8
 

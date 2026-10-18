@@ -1,11 +1,4 @@
-"""转录：本地 whisper（CPU 兜底）或远端 HTTP（GPU 算力池/任意参考服务端）。
-
-2026-09-21 起 Colab 直联机械（google-colab-cli 会话编排）已抽离到独立项目
-~/Desktop/开发项目/gpu_router——本仓不再直接碰 Colab，远端一律走 HTTP 契约：
-  V2MD_REMOTE=http://127.0.0.1:9700   → GPU 算力池（多平台动态路由，推荐）
-  V2MD_REMOTE=https://xxx.trycloudflare.com → 裸参考服务端（隧道等）
-  V2MD_REMOTE 置空                      → 本地 CPU whisper
-"""
+"""转录：Colab CLI GPU（colab-cli）、显式 HTTP 服务或本地 whisper。"""
 from __future__ import annotations
 
 import json
@@ -16,12 +9,6 @@ from pathlib import Path
 import httpx
 
 from .util import fmt_hms, pool_headers, redact, run
-
-_MIGRATION_HINT = (
-    "V2MD_REMOTE=colab 已抽离（2026-09-21）：Colab 归 GPU 算力池统一接管。"
-    "起池子：cd ~/Desktop/开发项目/gpu_router && .venv/bin/python -m gpu_router；"
-    "然后本仓 .env 改 V2MD_REMOTE=http://127.0.0.1:9700（置空则走本地 CPU whisper）")
-
 
 
 def remote_transcribe(video: Path, tmp: Path, base: str, model: str, language: str) -> dict:
@@ -47,7 +34,10 @@ def remote_transcribe(video: Path, tmp: Path, base: str, model: str, language: s
 
 def transcribe(video: Path, model: str, language: str, tmp: Path, remote: str = "") -> tuple[list[dict], float, int]:
     if remote and remote.lower() in ("colab", "colab-cli"):
-        raise SystemExit(_MIGRATION_HINT)  # 响亮失败指路，不静默退化
+        from .colab import transcribe_audio
+        audio = tmp / "colab-audio.m4a"
+        run(["ffmpeg", "-y", "-i", str(video), "-vn", "-c:a", "aac", "-b:a", "64k", str(audio)])
+        data = transcribe_audio(audio, tmp, model, language)
     elif remote:
         data = remote_transcribe(video, tmp, remote, model, language)
         print(f"  ✅ 远程模型 {data.get('model', '?')} · 音频时长 {fmt_hms(data.get('duration') or 0)}"

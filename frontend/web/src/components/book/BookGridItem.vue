@@ -21,7 +21,7 @@ const emit = defineEmits<{
         :hue="book.hue"
         :title="book.title"
         :badge="book.source_badge"
-        :footer-left="`${book.pages} 页`"
+        :footer-left="`${book.pages} ${book.pages_unit ?? '页'}`"
       />
       <div class="absolute top-1 right-1">
         <FavBookmarkBtn :fav="book.fav" @toggle="emit('toggleFav', book.id)" />

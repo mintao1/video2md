@@ -1,7 +1,7 @@
 # 视书 · Web（frontend/web）
 
 video2md 的移动端 Web 前端：Vue 3 + Vite + TypeScript + Tailwind CSS v3 + Pinia + vue-router。
-第一版全部走 mock 数据（无后端依赖），数据层签名与后端 FastAPI 契约对齐，后续可无缝切真实 API。
+队列、教材库、阅读器、资料与配额使用 FastAPI；短信/密码/微信登录入口仍为原型，Google 登录使用真实授权码流。
 
 ## 命令
 
@@ -9,16 +9,51 @@ video2md 的移动端 Web 前端：Vue 3 + Vite + TypeScript + Tailwind CSS v3 +
 npm install        # 安装依赖
 npm run dev        # 开发服务器（默认 http://localhost:5173，移动视口 390px 设计）
 npm run build      # vue-tsc 类型检查 + vite 生产构建 → dist/
+npm run test:integration # Pinia → 真实 HTTP → FastAPI 集成测试（需 backend/.venv）
 npm run preview    # 预览构建产物
 ```
 
+## 集成测试
+
+前置：Node 24+，仓根下 `cd backend && uv sync --frozen` 安装后端依赖，
+再到 `frontend/web` 执行 `npm ci && npm run test:integration`。
+自定义 Python 环境可设 `V2MD_TEST_PYTHON=/absolute/path/to/python`。
+
+测试使用 Node 内置测试运行器，通过 Vite 加载真实 TypeScript 模块，不新增测试依赖。
+每次启动独立 FastAPI 子进程，监听随机回环端口；runs、prefs、日志及其他数据全部在
+临时目录内，结束后关闭进程并清理文件。只替换外部身份验签，用固定 Alice/Bob 凭据；
+关闭 lifespan，预置任务不会启动视频下载、GPU 或 LLM。此套件不验证浏览器渲染、CORS、
+真实 OAuth 或图执行，图执行由 `scripts/smoke_ci.sh` 覆盖。
+
+集成用例覆盖：按 owner 列任务、真实进度映射、无后端进展时状态不变、后端完成自动同步、
+取消持久化及状态一致性、终态/越权取消、缺失凭据、删除后刷新、恢复/插队失败反馈，
+以及收藏/进度部分更新持久化、跨用户隔离、笔记正文读取。
+
+队列从后端轮询真实状态；取消、重试、优先执行、删除均通过 HTTP 持久化。
+取消是协作式终止，长阶段结束前显示「取消中」；重试只支持 error/partial，保留已完成笔记。
+优先执行只重排等待中的任务，不抢占已经运行的任务；删除要求终态，保留用户 vault 笔记及已结算用量。
+浏览器 bundle 下载不自动 ACK：成功开始下载不等于文件已被用户保存。
+阅读器通过带 Bearer 鉴权的媒体接口获取图片/视频；对象 URL 在切讲或卸载时释放。
+
 ## 页面
+
+「我的」页面提供 **LLM API 配置**：填写 OpenAI 兼容的 Base URL、API Key，以及可选模型名称。
+保存后用于该用户后续启动的转换任务；运行中的任务保持启动时的配置。API Key 默认隐藏，
+保存成功后输入框清空，服务端读接口不返回 Key，浏览器 localStorage 不保存 Key。
+已有配置时 Key 留空可保留原值；“恢复服务默认”删除个人配置并回落后端 `LLM_*`。
+保存只校验格式，不代表上游余额或连通性已验证。
+
+接口为鉴权的 `GET/PUT/DELETE /settings/llm`。JSON 档写入 `V2MD_PREFS_FILE` 同目录的
+`llm-settings.json`（0600，可用 `V2MD_LLM_SETTINGS_FILE` 覆盖）；`V2MD_PREFS_STORE=postgres`
+时写入独立的 `v2md_llm_settings` 表。升级 PG 部署前运行
+`uv run --project backend python -m video2md migrate`，然后重启后端。
+凭据为服务端可读取的配置数据，应按服务端机密文件/数据库管理，不包含在 run 记录与图 checkpoint 中。
 
 | 路由 | 页面 | 说明 |
 |---|---|---|
 | `/login` | 登录注册 | 短信/密码双 tab、60s 发码倒计时、微信一键登录（mock）、协议勾选校验 |
 | `/library` | 教材库 | 搜索/分类/收藏夹过滤、继续阅读横幅、grid/list 视图、目录抽屉、导出弹窗 |
-| `/queue` | 转换队列 | 快速链接导入、导入面板（来源 tab/开关/模板）、任务状态卡、批量管理、3s 模拟进度 |
+| `/queue` | 转换队列 | 快速链接导入、导入面板（来源 tab/开关/模板）、任务状态卡、批量管理、3s 后端状态轮询 |
 | `/profile` | 个人中心 | 资料卡、配额仪表、SVIP 推广、设置行、会员套餐底部弹层、退出登录 |
 
 未登录访问受保护路由会跳 `/login`；登录/退出状态存 `localStorage['v2md_token']`。

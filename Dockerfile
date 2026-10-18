@@ -1,5 +1,5 @@
 # video2md 容器镜像：python3.12-slim + ffmpeg + 项目依赖（不含 whisper/torch——
-# 转写/OCR/剪辑走 gpu_router 远程池，见 docker-compose.yml 的 V2MD_*_REMOTE）。
+# 转写/OCR/剪辑默认走 Colab CLI，见 README 的 Colab CLI GPU 配置）。
 # 在目标架构上构建（服务器 x86：直接在目标机上 docker build，避免 Mac arm64 交叉构建；
 # CI/registry 走 buildx 多架构，见 .github/workflows/ci.yml 的 release job）。
 FROM python:3.12-slim
@@ -33,13 +33,15 @@ RUN pip install --no-cache-dir uv
 
 WORKDIR /app
 # 依赖层先行：源码变动不击穿缓存。package=false 项目，uv sync 只装依赖
-# --extra evals：离线评测旁路（scripts/eval_notes.py）在容器内可跑（deepeval/ragas/langfuse SDK）
+# --extra evals：离线评测旁路（backend/scripts/eval_notes.py）在容器内可跑（deepeval/ragas/langfuse SDK）
 COPY backend/pyproject.toml backend/uv.lock ./
+COPY backend/vendor/ ./vendor/
 RUN uv sync --frozen --no-dev --extra evals
 # 无 mac extra：pyobjc 是 macOS 专属，Linux 镜像天然不含
 
 COPY backend/video2md/ ./video2md/
 COPY backend/acctkit/ ./acctkit/
+COPY backend/gpu_plugins/ ./gpu_plugins/
 COPY README.md ./
 
 ENV PATH="/app/.venv/bin:$PATH" \
@@ -47,6 +49,7 @@ ENV PATH="/app/.venv/bin:$PATH" \
     V2MD_HOST=0.0.0.0 \
     V2MD_STATE_FILE=/app/data/state.json \
     V2MD_RUNS_FILE=/app/data/runs.json \
+    V2MD_PREFS_FILE=/app/data/prefs.json \
     V2MD_LOG_DIR=/app/data/logs
 
 VOLUME ["/app/data", "/vault"]

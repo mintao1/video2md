@@ -300,13 +300,10 @@ export const mockRuns: RunListItem[] = [
   },
 ]
 
-/** 教材目录 mock（TocSheet 用） */
-export interface TocChapter {
-  no: number
-  title: string
-  meta: string
-  state: 'done' | 'current' | 'locked' | 'quiz'
-}
+/** 教材目录 mock（TocSheet 用）；类型本体已上收 src/types（live 档共用） */
+import type { TocChapter } from '../../types'
+
+export type { TocChapter }
 
 export const mockToc: TocChapter[] = [
   { no: 1, title: '导论与核心概念体系', meta: '时长 38:20 · 24 张板书切片 · 3 公式', state: 'done' },

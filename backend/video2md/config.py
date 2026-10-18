@@ -110,6 +110,15 @@ _SPEC: dict[str, tuple] = {
     "V2MD_UPLOADS_TTL_H":   ("float", 24.0, ("gt", 0.0)),
     # 任务表真相源（P4b·多副本档）
     "V2MD_TASKS_STORE":     ("enum", "json", ("json", "postgres")),
+    # 教材偏好存储（收藏/阅读进度，(uid,run_id) 维度；web 教材库页数据源）
+    "V2MD_PREFS_FILE":      ("path", str(PROJ / "prefs.json"), None),
+    "V2MD_LLM_SETTINGS_FILE": ("str", "", None),  # 可选路径；空=跟随 PREFS_FILE 同目录
+    "V2MD_PREFS_STORE":     ("enum", "json", ("json", "postgres")),
+    "V2MD_COLAB_SESSION":   ("str", "v2md-whisper", None),
+    "V2MD_COLAB_BIN":       ("str", "", None),
+    "V2MD_COLAB_LOCK":      ("path", str(PROJ / "data" / "colab.lock"), None),
+    "V2MD_COLAB_MAX_WAIT_S": ("int", 2700, ("min", 30)),
+    "V2MD_COLAB_CPU_FALLBACK": ("enum", "off", ("on", "off")),
     # 本地路径输入策略（auto/allow/deny 语义见 _validate_run_url）
     "V2MD_LOCAL_PATHS":     ("enum", "auto", ("auto", "allow", "deny")),
     # 匿名面限流（P0-2）：设备流两端点按 IP 共享滑窗（0=不设限）。缺省 30/min 而非
@@ -256,6 +265,11 @@ UPLOADS_TTL_H: float = _PARSED["V2MD_UPLOADS_TTL_H"]
 # postgres = /queue、配额闸、dedup 判活、watchdog 巡检、启动恢复认领读 v2md_runs
 # 提取列（record jsonb 仍是状态唯一真相，status 列是其可查镜像）。需先切 RUNS_STORE。
 TASKS_STORE: str = _PARSED["V2MD_TASKS_STORE"]
+
+# 教材偏好（收藏/阅读进度）：json 缺省指 PROJ/prefs.json（容器指 data 卷）；
+# postgres = v2md_prefs 表（migrations/0003，共用 V2MD_PG_DSN）——云上多副本切此档
+PREFS_FILE: Path = _PARSED["V2MD_PREFS_FILE"]
+PREFS_STORE: str = _PARSED["V2MD_PREFS_STORE"]
 
 # 本地路径输入策略（POST /runs 的 url 收非 http 时）：auto = AUTH=off 放行（开发/
 # 自托管），AUTH≠off 只认本人 uploads 白名单内路径；allow/deny 显式覆盖。

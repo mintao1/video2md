@@ -1,0 +1,132 @@
+{
+  "date": "2026-10-18",
+  "scope": "uncommitted local workspace; no deployed production endpoint",
+  "backend_contract_passed": 93,
+  "frontend_integration_passed": 21,
+  "frontend_production_build": "passed",
+  "mypy": "36 source files passed",
+  "script_suites": [
+    {
+      "name": "test_graph",
+      "exit": 0
+    },
+    {
+      "name": "test_llm",
+      "exit": 0
+    },
+    {
+      "name": "test_observability",
+      "exit": 0
+    },
+    {
+      "name": "test_otel_replay",
+      "exit": 0
+    },
+    {
+      "name": "test_evals",
+      "exit": 0
+    },
+    {
+      "name": "test_graph_obs",
+      "exit": 0
+    },
+    {
+      "name": "test_resolve",
+      "exit": 0
+    },
+    {
+      "name": "test_remote_clients",
+      "exit": 0
+    },
+    {
+      "name": "test_watchdog",
+      "exit": 0
+    },
+    {
+      "name": "test_backup_scripts",
+      "exit": 0
+    }
+  ],
+  "colab_real": {
+    "asr": "passed",
+    "confidence": 0.921,
+    "ocr": "passed",
+    "clips_ffprobe": "passed"
+  },
+  "real_pipeline": {
+    "run_id": "af031a9d",
+    "status": "error",
+    "completed_stages": [
+      "download",
+      "transcribe",
+      "frames",
+      "ocr",
+      "select",
+      "clips"
+    ],
+    "error": "LLM HTTP 402 Insufficient account balance",
+    "bundle_ack": "not reached"
+  },
+  "mock_deliver": {
+    "run_id": "1e905153",
+    "status": "done",
+    "zip_integrity": "passed",
+    "note_bundle_equality": "passed",
+    "jpg_and_mp4": "passed",
+    "vault_zero_writes": "passed",
+    "ack_physical_deletion": "passed",
+    "bundle_and_note_after_ack": 410
+  },
+  "pg": {
+    "web_tests_passed": 3,
+    "rescue": "passed",
+    "original_script": "failed cancel cmd assertion; previous test left V2MD_EVENTS=local",
+    "in_memory_mode_restore_experiment": "entire script passed; source unchanged",
+    "two_replica_smoke": "passed all 5 scenarios"
+  },
+  "browser": {
+    "fixture": "synthetic isolated book",
+    "favorite_after_reload": "passed",
+    "reader_text_and_image": "passed",
+    "progress_persisted": 100,
+    "export": "toast only; no export implementation",
+    "sync": "success toast only; no sync implementation"
+  },
+  "local_read_baseline": {
+    "requests": 100,
+    "concurrency": 10,
+    "all_status": 200,
+    "p50_ms": 8.7,
+    "p95_ms": 60.2,
+    "max_ms": 62.8
+  },
+  "lint_errors": [
+    "backend/scripts/otel_replay.py:49 I001",
+    "backend/scripts/smoke_colab_cli.py:42 I001"
+  ],
+  "production_auth": {
+    "runs_and_prefs": "anonymous and 2 mock tokens rejected 401",
+    "me_anonymous": 401,
+    "me_mock_token": "one request exceeded client 10s budget; root cause unconfirmed"
+  },
+  "late_sse": {
+    "repro": "curl -sN --max-time 3 http://127.0.0.1:<isolated-port>/runs/<done-run-id>/events",
+    "observed": "connected with status done then no EOF before timeout",
+    "expected": "terminate stream for already terminal run"
+  },
+  "not_tested": [
+    "Docker image build",
+    "container Nginx proxy",
+    "public TLS deployment",
+    "successful real Google OAuth",
+    "platform downloads and anti-bot behavior",
+    "production-scale load"
+  ],
+  "colab_cleanup": {
+    "cli_exit": 0,
+    "sessions": {
+      "v2md-acceptance-20261018": "not listed",
+      "v2md-full-acceptance-20261018": "not listed"
+    }
+  }
+}

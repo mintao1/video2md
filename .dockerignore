@@ -11,16 +11,19 @@ runs.lock
 logs/
 data/
 tmp/
-legacy/
+backend/legacy/
 docs/
 scripts/
+backend/scripts/
 test_*.py
 test_e2e.sh
 .zcode/
 .DS_Store
 docker-compose*.yml
 deploy/
-# 布局分层后：镜像只 COPY backend/{video2md,acctkit}——前端与测试/插件运行时不进 context
+# 布局分层后：镜像只 COPY backend/{video2md,acctkit}——前端与测试不进 context
 frontend/
 backend/tests/
-backend/gpu_plugins/
+**/llm-settings.json
+**/llm-settings.lock
+**/llm-settings.json.tmp.*

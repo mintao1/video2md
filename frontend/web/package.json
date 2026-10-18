@@ -4,11 +4,14 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "test:integration": "node --test tests/*.integration.test.mjs",
     "dev": "vite",
     "build": "vue-tsc -b && vite build",
     "preview": "vite preview"
   },
   "dependencies": {
+    "dompurify": "^3.4.16",
+    "marked": "^18.1.0",
     "pinia": "^2.3.1",
     "vue": "^3.5.42",
     "vue-router": "^4.6.4"

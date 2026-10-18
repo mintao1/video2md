@@ -48,7 +48,7 @@ json 档跳过）。全部迁移幂等（IF NOT EXISTS）——存量库重跑 n
 边界：langgraph `PostgresSaver.setup()` 自管的 `checkpoints*` 表族同库共存，不收编。
 加新迁移 = 落一个 `NNNN_*.sql` + `pgmigrate.MIGRATIONS` 注册表加一行。
 
-切换路径：`scripts/migrate_json_to_pg.py` 幂等导入存量（反向迁移明确不提供，导入前自动应用迁移基线）。
+切换路径：`backend/scripts/migrate_json_to_pg.py` 幂等导入存量（反向迁移明确不提供，导入前自动应用迁移基线）。
 
 ## 任务表两档口径（批判① E2 修订后）
 

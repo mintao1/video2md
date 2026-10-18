@@ -15,7 +15,7 @@ export const useQueueStore = defineStore('queue', () => {
   const filtered = computed(() => {
     switch (filter.value) {
       case 'active':
-        return runs.value.filter((r) => r.status === 'running' || r.status === 'paused')
+        return runs.value.filter((r) => r.status === 'running' || r.status === 'paused' || r.status === 'cancelling')
       case 'queued':
         return runs.value.filter((r) => r.status === 'queued')
       case 'done':
@@ -27,46 +27,47 @@ export const useQueueStore = defineStore('queue', () => {
 
   /** BottomNav 角标 = 进行中（running/paused + queued） */
   const activeCount = computed(
-    () => runs.value.filter((r) => r.status === 'running' || r.status === 'queued' || r.status === 'paused').length,
+    () => runs.value.filter((r) => r.status === 'running' || r.status === 'queued' || r.status === 'paused' || r.status === 'cancelling').length,
   )
 
   const counts = computed(() => ({
     all: runs.value.length,
-    active: runs.value.filter((r) => r.status === 'running' || r.status === 'paused').length,
+    active: runs.value.filter((r) => r.status === 'running' || r.status === 'paused' || r.status === 'cancelling').length,
     queued: runs.value.filter((r) => r.status === 'queued').length,
     done: runs.value.filter((r) => ['done', 'partial', 'error'].includes(r.status)).length,
   }))
 
+  let revision = 0
   async function load() {
+    const version = ++revision
     loading.value = true
     try {
-      runs.value = await api.listRuns()
+      const items = await api.listRuns()
+      if (version === revision) runs.value = items
     } finally {
-      loading.value = false
+      if (version === revision) loading.value = false
     }
   }
 
   async function createRun(url: string, title?: string) {
     const run = await api.createRun({ url, title })
+    revision++
     runs.value.unshift(run)
   }
 
   async function pause(id: string) {
-    await api.cancelRun(id)
+    const result = await api.cancelRun(id)
+    revision++
     const r = runs.value.find((x) => x.run_id === id)
     if (r) {
-      r.status = 'paused'
+      r.status = result.status
       r.eta_sec = undefined
     }
   }
 
   async function resume(id: string) {
     await api.resumeRun(id)
-    const r = runs.value.find((x) => x.run_id === id)
-    if (r) {
-      r.status = 'running'
-      r.eta_sec = 300
-    }
+    await load()
   }
 
   async function promote(id: string) {
@@ -76,8 +77,11 @@ export const useQueueStore = defineStore('queue', () => {
 
   async function removeSelected() {
     const ids = [...selected.value]
-    await api.deleteRuns(ids)
-    runs.value = runs.value.filter((r) => !ids.includes(r.run_id))
+    try {
+      await api.deleteRuns(ids)
+    } finally {
+      await load() // 批量请求部分成功时也以服务端快照为准。
+    }
     selected.value = new Set()
     batchMode.value = false
   }
@@ -102,49 +106,27 @@ export const useQueueStore = defineStore('queue', () => {
     selected.value = new Set()
   }
 
-  // ---- mock 进度推进（真实 API 下由 SSE /runs/{id}/events 驱动，直接删掉即可）----
+  // 后端是真实进度唯一来源；定时器只刷新，不自行推进任务。
   let timer: ReturnType<typeof setInterval> | null = null
+  let refreshing = false
 
   function startProgressTick() {
     if (timer) return
-    timer = setInterval(() => {
-      let changed = false
-      for (const r of runs.value) {
-        if (r.status !== 'running') continue
-        r.progress = Math.min(100, r.progress + Math.random() * 2)
-        if (r.eta_sec && r.eta_sec > 0) r.eta_sec = Math.max(0, r.eta_sec - 3)
-        api._setProgress({ run_id: r.run_id, progress: r.progress, eta_sec: r.eta_sec })
-        changed = true
-        if (r.progress >= 100) {
-          r.status = 'done'
-          r.bundle_ready = true
-          r.progress = 100
-          api._setProgress({ run_id: r.run_id, status: 'done', progress: 100, bundle_ready: true })
-        }
+    timer = setInterval(async () => {
+      if (refreshing) return
+      refreshing = true
+      try {
+        await load()
+      } catch {
+        // 保留最后一次成功快照；网络失败不伪造完成态。
+      } finally {
+        refreshing = false
       }
-      // running 空位时，把队首 queued 任务顶上（模拟并发闸门放行）
-      if (!runs.value.some((r) => r.status === 'running')) {
-        const next = runs.value.find((r) => r.status === 'queued')
-        if (next) {
-          next.status = 'running'
-          next.eta_sec = 300
-          api._setProgress({ run_id: next.run_id, status: 'running', eta_sec: 300 })
-        }
-      }
-      // 重排排队位次
-      let pos = 1
-      for (const r of runs.value) {
-        if (r.status === 'queued') {
-          r.queue_pos = pos++
-        } else if (r.queue_pos !== undefined) {
-          r.queue_pos = undefined
-        }
-      }
-      void changed
     }, 3000)
   }
 
   function stopProgressTick() {
+    revision++
     if (timer) {
       clearInterval(timer)
       timer = null

@@ -1,8 +1,4 @@
-"""视频节段剪辑：本地 ffmpeg（CPU 兜底）或远端 HTTP（GPU 算力池/参考服务端）。
-
-2026-09-21 起 Colab 直联（会话剪辑 worker）已抽离到 GPU 算力池项目
-（~/Desktop/开发项目/gpu_router 的 colab_machinery.py）——本仓只认 /clips HTTP 契约。
-"""
+"""视频节段剪辑：Colab CLI、显式 HTTP 服务或本地 ffmpeg。"""
 from __future__ import annotations
 
 import io
@@ -74,6 +70,18 @@ def remote_cut_clips(published: list, video: Path, dur: float,
         return result
     prefer_remote = bool(direct_url) and (ENV.get("V2MD_CLIPS_SOURCE") or "").lower() == "remote"
     specs = [{"out": v[0], "s0": v[2], "s1": v[3]} for _k, v in todo]
+    if base.lower() in ("colab", "colab-cli"):
+        from .colab import cut_specs
+        outcomes, directory = cut_specs(None if prefer_remote else video,
+                                        direct_url if prefer_remote else "", specs, tmp)
+        for name, spec in todo:
+            src = directory / spec[0]
+            if outcomes.get(spec[0]) and src.is_file() and src.stat().st_size:
+                shutil.move(str(src), str(artsink.attach_dir() / spec[0]))
+                result[name] = spec[0]
+            else:
+                result[name] = None
+        return result
     data = {"spec": json.dumps({"clips": specs}),
             "direct_url": direct_url if prefer_remote else ""}
     http = client

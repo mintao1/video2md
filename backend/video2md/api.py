@@ -34,6 +34,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import re
 import secrets
 import shutil
 import tempfile
@@ -58,6 +59,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from . import artsink, events, observability, watchdog
 from .auth import AuthError, Identity, current_identity, optional_identity
+from .colab_auth import router as colab_auth_router
 from .config import (
     BUDGET_MONTH_USD,
     CORS_ORIGINS,
@@ -90,10 +92,15 @@ from .models import (
     DeviceTokenBody,
     DeviceTokenOut,
     HealthOut,
+    LlmSettingsOut,
+    LlmSettingsUpdate,
     MeOut,
     PreflightOut,
-    QuotaOut,
+    PrefsItem,
+    PrefsOut,
+    PrefsUpdate,
     QueueOut,
+    QuotaOut,
     RunCreate,
     RunCreatedOut,
     RunListOut,
@@ -101,13 +108,16 @@ from .models import (
     RunStatusOut,
     UploadOut,
 )
+from .prefs import prefs_store
 from .runs import (
     _load_runs,
     _runs_file_lock,
     _runs_merge,
     cancel_requested,
+    delete_terminal_run,
     forget_cancel,
     month_rollup,
+    patch_owned_run,
     request_cancel,
     settle_cost,
 )
@@ -142,8 +152,9 @@ def _preflight() -> dict:
             False, str(exc)[:120])
     remote = (ENV.get("V2MD_REMOTE") or "").strip()
     if remote.lower() in ("colab", "colab-cli"):
-        add("gpu_pool", False, "V2MD_REMOTE=colab 已抽离：起 ~/Desktop/开发项目/gpu_router "
-                               "后改 V2MD_REMOTE=http://127.0.0.1:9700")
+        from .colab import health
+        ok, detail = health()
+        add("colab_cli", ok, detail)
     elif remote.startswith(("http://", "https://")):
         # GPU 算力池/远程转录服务：/status（池子）或 /ping（裸参考服务端）二选一认
         base = remote.rstrip("/")
@@ -226,7 +237,7 @@ def _prune_orphan_tmps(min_age_h: float = 6.0) -> None:
     6 小时内动过的目录视为可能在跑（目录 mtime 随文件增删刷新），不清。
     """
     tdir = Path(tempfile.gettempdir())
-    claimed = {r.get("tmp") for r in _load_runs().values()}
+    claimed = {r.get("tmp") for r in _load_runs().values() if not r.get("deleted")}
     n = 0
     for d in tdir.glob("video2md-run-*"):
         if str(d) in claimed:
@@ -332,6 +343,8 @@ def _require_run_access(run_id: str, ident: Identity) -> dict | None:
     """
     run = _load_runs().get(run_id)
     task = _TASKS.get(run_id)
+    if run and run.get("deleted"):
+        raise HTTPException(404, f"run {run_id} 不存在")
     if not run and not task:
         raise HTTPException(404, f"run {run_id} 不存在")
     owner = (run.get("owner", "") if run else (task or {}).get("owner", "")) or ""
@@ -378,7 +391,8 @@ def _admit_device(request: Request, *, label: str = "POST /auth/device/*") -> st
     while dq and now - dq[0] > 60:
         dq.popleft()
     if len(dq) >= DEVICE_RATE_PER_MIN:
-        _req_log(*label.split(" ", 1), 429, user=f"(anon:{ip})")
+        method, path = label.split(" ", 1)
+        _req_log(method, path, 429, user=f"(anon:{ip})")
         raise HTTPException(429, f"请求过频（限 {DEVICE_RATE_PER_MIN} 次/分钟/IP），稍后重试",
                             headers={"X-Error": "RATE_LIMITED"})
     dq.append(now)
@@ -617,6 +631,29 @@ async def _outbox_sweeper(period_s: float = 600.0) -> None:
 
 # ---------------------------------------------------------------- 后台执行
 
+_DRIVES: dict[str, asyncio.Task] = {}
+_RUNNING_DRIVES: set[str] = set()
+
+
+@asynccontextmanager
+async def _execution_slot(run_id: str):
+    # Recheck persisted priority after acquiring: promotion can reorder existing
+    # waiters while async with guarantees release on cancellation or storage errors.
+    while True:
+        async with _SEMA:
+            records = _load_runs()
+            waiting = [(rid, task) for rid, task in _TASKS.items()
+                       if task.get("status") == "queued" and (rid in _DRIVES or rid == run_id)]
+            waiting.sort(key=lambda item: (
+                -int((records.get(item[0]) or {}).get("queue_priority") or 0),
+                int(item[1].get("queued_at") or 0), item[1].get("created", "")))
+            task = _TASKS.get(run_id) or {}
+            if task.get("status") != "queued" or not waiting or waiting[0][0] == run_id:
+                yield
+                return
+        await asyncio.sleep(0.05)
+
+
 async def _drive(run_id: str, url: str, part_items: str, force: bool,
                  review: bool, max_frames: int, owner: str = "") -> None:
     """排队等信号量 → 线程里跑同步 graph（stage 函数全是同步阻塞，不能堵事件循环）。
@@ -625,7 +662,7 @@ async def _drive(run_id: str, url: str, part_items: str, force: bool,
     时静默让位（接管方重投驱动，本进程不双跑）；②created/queued 皆翻 running
     （排队接管路径 DB 态是 queued，原 created→running 翻转对它不命中）。
     """
-    async with _SEMA:
+    async with _execution_slot(run_id):
         be = _tasks_backend()
         if be is not None and not be.still_mine(run_id, _PROC_ID):
             _TASKS.pop(run_id, None)   # 已被他副本接管：本进程视图让位，DB 真相由接管者续写
@@ -659,6 +696,7 @@ async def _drive(run_id: str, url: str, part_items: str, force: bool,
         if be is not None:
             be.note_claimed_by(run_id, _PROC_ID)  # 大盘 watchdog 据此区分本进程/他进程残档
         try:
+            _RUNNING_DRIVES.add(run_id)
             final = await asyncio.to_thread(run_graph, url, part_items=part_items,
                                             force=force, review=review,
                                             max_frames=max_frames, run_id=run_id,
@@ -668,7 +706,10 @@ async def _drive(run_id: str, url: str, part_items: str, force: bool,
         except Exception as exc:  # graph 节点已全捕获，走到这是框架级异常
             _TASKS[run_id].update(status="error", finished=_now(),
                                   errors=[redact(str(exc))[:300]])
+            patch_owned_run(run_id, owner, ("created", "queued", "running", "done", "partial", "error"),
+                            {"status": "error", "errors": [redact(str(exc))[:300]]})
         finally:
+            _RUNNING_DRIVES.discard(run_id)
             observability.metric_run(_TASKS[run_id].get("status", "error"))
             observability.close_run(run_id)  # 兜底闭合 run 级 root span（各 stage 已各自闭合）
             observability.flush()
@@ -697,7 +738,19 @@ def _flip_cancelled(run_id: str, msg: str) -> None:
 def _enqueue(url: str, part_items: str, force: bool, review: bool,
              max_frames: int, run_id: str = "", owner: str = "") -> dict:
     run_id = run_id or uuid.uuid4().hex[:8]
-    _TASKS[run_id] = {"status": "queued", "url": url, "owner": owner, "created": _now()}
+    queued_at = time.time_ns()
+    _TASKS[run_id] = {"status": "queued", "url": url, "owner": owner, "created": _now(),
+                      "queued_at": queued_at}
+    with _runs_file_lock():
+        record = _load_runs().get(run_id)
+        if record:
+            if record.get("status") != "queued" or not record.get("queued_at"):
+                record.update(queued_at=queued_at, queue_priority=0)
+            _TASKS[run_id]["queued_at"] = record["queued_at"]
+            record.update(status="queued", review=review, max_frames=max_frames)
+            _runs_merge(record)
+            if record.get("cancel_requested"):
+                request_cancel(run_id)
     if len(_TASKS) > _TASKS_KEEP:  # 裁最老的已完成记录（queued/running 永不裁）
         done = sorted((k for k, v in _TASKS.items() if v.get("finished")),
                       key=lambda k: _TASKS[k]["finished"])
@@ -708,7 +761,14 @@ def _enqueue(url: str, part_items: str, force: bool, review: bool,
         # P1-1：入队即落库+钉名——PG 档配额闸/判活/queue gauge/大盘接管从此看得见排队项
         # （此前 queued 只在内存 _TASKS，DB 停在 created：跨副本双投、重启丢排队 run）
         be.mark_queued(run_id, _PROC_ID)
-    asyncio.create_task(_drive(run_id, url, part_items, force, review, max_frames, owner))
+    drive = asyncio.create_task(_drive(run_id, url, part_items, force, review, max_frames, owner))
+    _DRIVES[run_id] = drive
+
+    def finished(task):
+        if _DRIVES.get(run_id) is task:
+            _DRIVES.pop(run_id, None)
+
+    drive.add_done_callback(finished)
     return {"run_id": run_id, "status": "queued"}
 
 
@@ -859,7 +919,7 @@ async def _lifespan(app: FastAPI):
         rec_task.add_done_callback(_report_resumed)
     else:
         for r in _load_runs().values():
-            if r.get("status") != "running" or not r.get("url"):
+            if r.get("deleted") or r.get("status") not in ("queued", "running") or not r.get("url"):
                 continue
             if _tmp_missing_run(r):
                 r["status"] = "error"
@@ -902,6 +962,7 @@ async def _lifespan(app: FastAPI):
 
 app = FastAPI(title="video2md", version=VERSION, lifespan=_lifespan,
               docs_url="/docs", redoc_url=None, openapi_url="/openapi.json")
+app.include_router(colab_auth_router)
 
 # CORS：仅当配了 origin 才挂（同源/SSH 隧道开发不需要，也避免误开 *）
 if CORS_ORIGINS:
@@ -941,6 +1002,13 @@ async def _on_starlette_error(request: Request, exc: StarletteHTTPException) -> 
 
 @app.exception_handler(RequestValidationError)
 async def _on_validation_error(request: Request, exc: RequestValidationError) -> JSONResponse:
+    if request.url.path == "/settings/llm":
+        # Pydantic errors can contain the entire submitted body, including an API key.
+        return _err(422, "LLM 配置校验失败", details=[
+            {"loc": e["loc"], "type": e["type"],
+             "msg": "请检查 API URL、Key 或模型格式"} for e in exc.errors()])
+    if request.url.path.startswith("/settings/colab"):
+        return _err(422, "Colab 授权参数无效，请重新开始授权")
     return _err(422, "请求校验失败", details=exc.errors())
 
 
@@ -963,6 +1031,28 @@ _register_pg_503()
 
 
 # ---------------------------------------------------------------- 用户级端点（鉴权 + 归属）
+
+@app.get("/settings/llm", response_model=LlmSettingsOut, summary="读取本人的 LLM 配置（不回传 Key）")
+def get_llm_settings(ident: Identity = Depends(current_identity)) -> dict:
+    from . import llm_settings
+    return llm_settings.public(llm_settings.load(ident.uid))
+
+
+@app.put("/settings/llm", response_model=LlmSettingsOut, summary="保存本人的 OpenAI 兼容 LLM 配置")
+def put_llm_settings(body: LlmSettingsUpdate, ident: Identity = Depends(current_identity)) -> dict:
+    from . import llm_settings
+    key = body.api_key.get_secret_value() if body.api_key is not None else None
+    if key is None and not llm_settings.load(ident.uid).get("api_key"):
+        raise HTTPException(422, "首次配置请填写 API Key")
+    row = llm_settings.update(ident.uid, base_url=body.base_url, api_key=key, model=body.model.strip())
+    return llm_settings.public(row)
+
+
+@app.delete("/settings/llm", response_model=LlmSettingsOut, summary="清除本人配置，恢复服务默认 LLM")
+def delete_llm_settings(ident: Identity = Depends(current_identity)) -> dict:
+    from . import llm_settings
+    return llm_settings.public(llm_settings.update(ident.uid, clear=True))
+
 
 @app.post("/uploads", response_model=UploadOut,
           summary="上传视频/音频文件（多用户专用上传面：落地后 path 直接喂 POST /runs）")
@@ -1192,6 +1282,18 @@ async def auth_google_callback(request: Request, code: str = "", state: str = ""
                                            status_code=302))
 
 
+def _run_title(r: dict) -> str:
+    """教材展示名（GET /runs 列表，web 教材库页数据源）：note 阶段的 LLM 标题优先
+    （art.title；deliver 剥 md 但 title 留存）→ entry.title → url 主机名。永不空串。"""
+    for a in (r.get("artifacts") or {}).values():
+        if isinstance(a, dict) and (a.get("title") or "").strip():
+            return str(a["title"]).strip()
+    for e in (r.get("entries") or []):
+        if (e.get("title") or "").strip():
+            return str(e["title"]).strip()
+    return urllib.parse.urlparse(r.get("url") or "").hostname or r.get("url") or ""
+
+
 @app.get("/runs", response_model=RunListOut,
          summary="列出本人名下的 run（插件收件箱发现新产物用）")
 def get_runs(status: str = "", limit: int = 50,
@@ -1201,7 +1303,14 @@ def get_runs(status: str = "", limit: int = 50,
     limit = max(1, min(limit, 500))
     mode = artsink.current_mode()
     rows = []
-    for r in sorted(_load_runs().values(), key=lambda x: str(x.get("created") or ""), reverse=True):
+    records = _load_runs()
+    queued = sorted((r for r in records.values() if r.get("status") == "queued"),
+                    key=lambda r: (-int(r.get("queue_priority") or 0), int(r.get("queued_at") or 0),
+                                   r.get("created") or "", r["run_id"]))
+    positions = {r["run_id"]: i for i, r in enumerate(queued, 1)}
+    for r in sorted(records.values(), key=lambda x: str(x.get("created") or ""), reverse=True):
+        if r.get("deleted"):
+            continue
         if (r.get("owner", "") or "") != ident.uid:
             continue
         if status and r.get("status") != status:
@@ -1212,12 +1321,35 @@ def get_runs(status: str = "", limit: int = 50,
         if mode == "deliver":
             path, exp = _outbox_live(r)
             arts = {"mode": "deliver", "present": path is not None, "expires": exp}
+        visible_status = ("cancelling" if r.get("cancel_requested") and r.get("status") in ("running", "queued")
+                          else r.get("status"))
         rows.append({"run_id": r.get("run_id"), "url": r.get("url"),
-                     "status": r.get("status"), "created": r.get("created"),
+                     "title": _run_title(r),
+                     "status": visible_status, "created": r.get("created"),
+                     "queue_pos": positions.get(r["run_id"]),
                      "total": r.get("total"), "done_entries": done_n, "artifacts": arts})
         if len(rows) >= limit:
             break
     return {"items": rows, "mode": mode}
+
+
+@app.get("/prefs", response_model=PrefsOut,
+         summary="本人教材偏好（收藏/阅读进度；web 教材库页数据源）")
+def get_prefs(ident: Identity = Depends(current_identity)) -> dict:
+    rows = prefs_store().list_uid(ident.uid)
+    return {"items": [{"run_id": rid,
+                       "fav": bool(p.get("fav")),
+                       "progress": int(p.get("progress") or 0)}
+                      for rid, p in sorted(rows.items())]}
+
+
+@app.put("/prefs/{run_id}", response_model=PrefsItem,
+         summary="更新本人教材偏好（部分更新 upsert；收藏/阅读进度）")
+def put_prefs(run_id: str, body: PrefsUpdate,
+              ident: Identity = Depends(current_identity)) -> dict:
+    _require_run_access(run_id, ident)  # 404 不存在 / 403 越权
+    row = prefs_store().upsert(ident.uid, run_id, fav=body.fav, progress=body.progress)
+    return {"run_id": run_id, "fav": bool(row["fav"]), "progress": int(row["progress"])}
 
 
 @app.post("/runs", response_model=RunCreatedOut,
@@ -1306,6 +1438,8 @@ def get_run(run_id: str, ident: Identity = Depends(current_identity)) -> dict:
                    stages=run.get("stages"), partial_failures=run.get("partial_failures"),
                    errors=run.get("errors"),
                    entries=entries)
+        if run.get("cancel_requested") and run.get("status") in ("running", "queued"):
+            out["status"] = "cancelling"
     if run and artsink.current_mode() == "deliver":
         path, exp = _outbox_live(run)  # 客户端凭它知道拉取窗口（present=false 即已焚）
         out["artifacts"] = {"mode": "deliver", "present": path is not None, "expires": exp}
@@ -1336,6 +1470,28 @@ def get_run_notes(run_id: str, ident: Identity = Depends(current_identity)) -> d
             md = p.read_text(encoding="utf-8")
         notes.append({"title": a.get("title", ""), "path": a.get("note", ""), "md": md or ""})
     return {"run_id": run_id, "status": run.get("status"), "notes": notes}
+
+
+@app.get("/runs/{run_id}/media/{name}", summary="读取本人笔记引用的图片或视频")
+def get_run_media(run_id: str, name: str, ident: Identity = Depends(current_identity)):
+    run = _require_run_access(run_id, ident)
+    if not run or Path(name).name != name or "\\" in name:
+        raise HTTPException(404, "媒体不存在")
+    suffix = Path(name).suffix.lower()
+    media_types = {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png",
+                   ".webp": "image/webp", ".mp4": "video/mp4"}
+    if suffix not in media_types:
+        raise HTTPException(404, "媒体不存在")
+    deliver = artsink.current_mode() == "deliver"
+    shelf = _deliver_outbox(run_id, ident) if deliver else OUT_DIR
+    notes = get_run_notes(run_id, ident)["notes"]
+    referenced = any(name in re.findall(r"!\[\[attachments/([^\]|]+)(?:\|[^\]]*)?\]\]", n["md"])
+                     for n in notes)
+    path = shelf / "attachments" / name
+    allowed_root = (shelf / "attachments").resolve()
+    if not referenced or not path.resolve().is_relative_to(allowed_root) or not path.is_file():
+        raise HTTPException(404, "媒体不存在")
+    return FileResponse(path, media_type=media_types[suffix], headers={"Cache-Control": "no-store"})
 
 
 def _zip_dir(src: Path) -> tuple[str, int]:
@@ -1412,6 +1568,7 @@ def cancel_run(run_id: str, ident: Identity = Depends(current_identity)) -> dict
     task = _TASKS.get(run_id)
     local = (task or {}).get("status")
     if local in ("queued", "running"):
+        patch_owned_run(run_id, ident.uid, ("queued", "running"), {"cancel_requested": True})
         request_cancel(run_id)
         _req_log("POST", f"/runs/{run_id}/cancel", 200, run_id=run_id, user=ident.uid,
                  local=local)
@@ -1430,6 +1587,7 @@ def cancel_run(run_id: str, ident: Identity = Depends(current_identity)) -> dict
         except Exception:
             st = None
         if st in ("queued", "running"):
+            patch_owned_run(run_id, ident.uid, ("queued", "running"), {"cancel_requested": True})
             _req_log("POST", f"/runs/{run_id}/cancel", 200, run_id=run_id, user=ident.uid,
                      remote=True)
             events.publish_cmd("cancel", run_id)  # 目标副本 _on_cmd → 本地驱动才落标志
@@ -1437,6 +1595,93 @@ def cancel_run(run_id: str, ident: Identity = Depends(current_identity)) -> dict
     raise HTTPException(409, f"run {run_id} 无可取消的进行中任务"
                              f"（当前 {local or st or '无任务记录'}）",
                         headers={"X-Error": "NOT_CANCELLABLE"})
+
+
+async def _discard_waiting_drive(run_id: str) -> None:
+    """A cancelled queued coroutine must retire before reusing its run ID."""
+    old = _DRIVES.get(run_id)
+    if old is not None and not old.done():
+        old.cancel()
+        with suppress(asyncio.CancelledError):
+            await old
+
+
+@app.post("/runs/{run_id}/resume", response_model=CancelOut, summary="重试失败或部分完成的任务")
+async def resume_run(run_id: str, ident: Identity = Depends(current_identity)) -> dict:
+    run = _require_run_access(run_id, ident)
+    if not run or run.get("status") not in ("error", "partial"):
+        raise HTTPException(409, "只有失败或部分完成的任务可以重试")
+    task = _TASKS.get(run_id) or {}
+    if run_id in _RUNNING_DRIVES or task.get("status") in ("running", "cancelling"):
+        raise HTTPException(409, "原任务仍在结束中，请稍后重试")
+    _admit_submission(ident.uid)
+    run = patch_owned_run(run_id, ident.uid, ("error", "partial"),
+                          {"status": "created", "cancel_requested": False})
+    if run is None:
+        raise HTTPException(409, "任务已被其他请求重试或删除")
+    await _discard_waiting_drive(run_id)
+    forget_cancel(run_id)
+    # 新建临时目录时复制仍在架的 deliver 产物，finalize 替换旧架时不能丢掉已完成笔记。
+    fresh = None
+    try:
+        if run.get("tmp_cleaned") or not Path(run.get("tmp") or "/nonexistent").exists():
+            fresh = Path(tempfile.mkdtemp(prefix="video2md-run-"))
+            shelf, _expires = _outbox_live(run) if artsink.current_mode() == "deliver" else (None, None)
+            if shelf is not None:
+                shutil.copytree(shelf, fresh / "outbox")
+                for art in run.get("artifacts", {}).values():
+                    for key in ("note", "transcript_path"):
+                        if art.get(key) and Path(art[key]).is_relative_to(shelf):
+                            art[key] = str(fresh / "outbox" / Path(art[key]).relative_to(shelf))
+            run["tmp"] = str(fresh)
+            run["tmp_cleaned"] = False
+            for art in run.get("artifacts", {}).values():
+                if art.get("note") and not Path(art["note"]).is_file():
+                    art.pop("note", None)
+                    art.pop("md", None)
+                for key in tuple(art):
+                    if key not in ("note", "md", "title", "fp", "transcript_path"):
+                        art.pop(key, None)
+        run.update(status="created", errors=[], partial_failures={})
+        with _runs_file_lock():
+            _runs_merge(run)
+        return _enqueue(run["url"], run.get("part_items", ""), False,
+                        bool(run.get("review")), int(run.get("max_frames") or 60),
+                        run_id=run_id, owner=ident.uid)
+    except Exception:
+        if fresh is not None:
+            shutil.rmtree(fresh, ignore_errors=True)
+        patch_owned_run(run_id, ident.uid, ("created", "queued"),
+                        {"status": "error", "errors": ["重试准备失败，请稍后重试"]})
+        raise
+
+
+
+@app.post("/runs/{run_id}/promote", response_model=CancelOut, summary="将排队任务设为优先")
+async def promote_run(run_id: str, ident: Identity = Depends(current_identity)) -> dict:
+    run = _require_run_access(run_id, ident)
+    if not run or run.get("status") != "queued":
+        raise HTTPException(409, "只有排队任务可以设为优先")
+    if patch_owned_run(run_id, ident.uid, ("queued",), {"queue_priority": time.time_ns()}) is None:
+        raise HTTPException(409, "任务已开始，不能调整顺序")
+    return {"run_id": run_id, "status": "queued"}
+
+
+@app.delete("/runs/{run_id}", summary="删除已结束的任务记录（不删除本地 vault 笔记）")
+async def delete_run(run_id: str, ident: Identity = Depends(current_identity)) -> dict:
+    run = _require_run_access(run_id, ident)
+    if not run or run.get("status") not in ("done", "partial", "error"):
+        raise HTTPException(409, "请先取消任务并等待结束后再删除")
+    if run_id in _RUNNING_DRIVES or (_TASKS.get(run_id) or {}).get("status") in ("running", "cancelling"):
+        raise HTTPException(409, "任务仍在结束中，请稍后再删除")
+    await _discard_waiting_drive(run_id)
+    if artsink.current_mode() == "deliver" and run.get("outbox"):
+        _burn_run(run_id, run, "deleted")
+    if not delete_terminal_run(run_id, ident.uid):
+        raise HTTPException(409, "任务状态已改变，无法删除")
+    _TASKS.pop(run_id, None)
+    forget_cancel(run_id)
+    return {"run_id": run_id, "deleted": True}
 
 
 @app.get("/runs/{run_id}/events", summary="SSE 实时进度（graph:*/stage 事件流）")

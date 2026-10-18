@@ -3,7 +3,7 @@ name: CI
 on:
   push:
     branches: [main]
-    tags: ['v*']   # 打 tag 同样把关（test/lint/plugin/gate）；镜像发布走部署时节点构建（ADR-0023）
+    tags: ['v*']   # 打 tag 同样把关（test/lint/web-integration/gate）；镜像发布走部署时节点构建（ADR-0023）
   pull_request:
   workflow_dispatch: {}   # 手动触发（CI 侧环境性失败的隔离调试面——2026-09-27 反代冒烟连败排查用）
 
@@ -41,8 +41,8 @@ jobs:
       # 布局口径：pyproject 在 backend/，Python 侧 uv/pytest/脚本式测试一律在 backend/ 下跑
       - run: uv sync --frozen
         working-directory: backend
-      - name: pytest（契约 + acctkit）
-        run: uv run pytest tests/test_api_contract.py tests/test_acctkit.py -q
+      - name: pytest（契约 + acctkit + Colab CLI）
+        run: uv run pytest tests/test_api_contract.py tests/test_acctkit.py tests/test_colab_cli.py -q
         working-directory: backend
       - name: 脚本式测试（8 个，全离线）
         run: |
@@ -63,6 +63,7 @@ jobs:
       - name: PG 档真库测试（三存储适配器 + events 扇出；无 DSN 自动 skip）
         run: |
           uv run python3 tests/test_pg_stores.py
+          uv run pytest tests/test_web_stores_pg.py -q
           uv run python3 tests/test_rescue_pg.py
         working-directory: backend
       - name: e2e（进程级 mockpool 冒烟：testsrc2 夹具 + 假 LLM，零 token，跨平台）
@@ -85,30 +86,33 @@ jobs:
           enable-cache: true
       - run: uv sync --frozen
         working-directory: backend
-      - run: uv run ruff check video2md acctkit ../scripts
+      - run: uv run ruff check video2md acctkit scripts
         working-directory: backend
       - run: uv run mypy video2md acctkit
         working-directory: backend
 
-  # Obsidian 插件（frontend/obsidian-plugin/）：类型检查 + 纯逻辑单测（zip-slip 闸/写盘计划/
-  # 索引去重）+ 生产打包。Node 24 跑 .ts 走 type-stripping，与本地开发口径一致。
-  plugin:
+  web-integration:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+          enable-cache: true
+      - run: uv sync --frozen
+        working-directory: backend
       - uses: actions/setup-node@v4
         with:
           node-version: "24"
           cache: npm
-          cache-dependency-path: frontend/obsidian-plugin/package-lock.json
+          cache-dependency-path: frontend/web/package-lock.json
       - run: npm ci
-        working-directory: frontend/obsidian-plugin
-      - run: npx tsc --noEmit
-        working-directory: frontend/obsidian-plugin
-      - run: node --test src/*.test.ts
-        working-directory: frontend/obsidian-plugin
+        working-directory: frontend/web
       - run: npm run build
-        working-directory: frontend/obsidian-plugin
+        working-directory: frontend/web
+      - run: npm run test:integration
+        working-directory: frontend/web
 
   # 生产镜像构建路径验证（此前只在服务器上验证过）
   # 2026-10-08：GHCR 灾备副本与 artifact 制品通道已终止（平台仓 ADR-0023 / HC-02）。

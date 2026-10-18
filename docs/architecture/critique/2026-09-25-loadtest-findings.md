@@ -1,6 +1,6 @@
 # 批判补遗：P1-6 容量实测过程的三项发现（2026-09-25）
 
-来源：scripts/loadtest.py 首轮跑通。按纪律「新增缺口先登记批判再入表」。
+来源：backend/scripts/loadtest.py 首轮跑通。按纪律「新增缺口先登记批判再入表」。
 
 ## 发现① state.json 异构值打穿 POST 全路（已修）
 

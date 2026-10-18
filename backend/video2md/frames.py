@@ -325,11 +325,23 @@ def ocr_candidates(frames: list[tuple[float, Path]], ocr: str,
     ocr_raw 喂给内容选帧（需要知道哪些候选没文字），ocr_items 进时间线/清单。
     ocr="remote" 走 GPU 路由批量接口（V2MD_OCR_REMOTE 或显式 base）；其余值固定本地
     Vision（gemini 路径已摘除，入参保留兼容）。"""
+    raw: list[list]
     if ocr == "remote":
         base = base or ENV.get("V2MD_OCR_REMOTE", "")
         if not base:
             raise SystemExit("ocr=remote 但 V2MD_OCR_REMOTE 未配置")
-        raw = ocr_remote(frames, base, client=client)
+        if base.lower() in ("colab", "colab-cli"):
+            import tempfile
+
+            from .colab import ocr_images
+            with tempfile.TemporaryDirectory(prefix="v2md-colab-ocr-") as directory:
+                rows = ocr_images([p for _t, p in frames], Path(directory))
+            by_name = {row["name"]: row for row in rows}
+            raw = [[t, str(by_name.get(p.name, {}).get("text") or ""),
+                    float(by_name.get(p.name, {}).get("conf") or 0),
+                    by_name.get(p.name, {}).get("err")] for t, p in frames]
+        else:
+            raw = ocr_remote(frames, base, client=client)
         ocr_items = [(t, txt, c) for t, txt, c, _e in raw if txt and c >= LOW_CONF]
         return ocr_items, raw
     raw = []

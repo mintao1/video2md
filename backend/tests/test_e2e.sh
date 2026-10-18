@@ -8,7 +8,7 @@
 #   MODE=deliver ./test_e2e.sh         # deliver 形态（云端不储存）：产物进 outbox →
 #                                      # bundle 拉取解包后跑同一套内容断言 + ACK 即焚链
 set -euo pipefail
-cd "$(dirname "$0")/../.."   # backend/：pyproject 与包根，uv run/python -m 在此解析
+cd "$(dirname "$0")/.."   # backend/：pyproject 与包根，uv run/python -m 在此解析
 
 MODEL="${WHISPER_MODEL:-small}"
 PORT="${V2MD_API_PORT:-8791}"

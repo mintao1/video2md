@@ -148,9 +148,42 @@ def _runs_merge(run: dict) -> dict:
         be.merge(run)
         return {run["run_id"]: run}
     runs = _load_runs()
+    if (runs.get(run["run_id"]) or {}).get("deleted"):
+        run["deleted"] = True  # a late settlement may not resurrect a deleted resource
     runs[run["run_id"]] = run
     _save_runs(runs)
     return runs
+
+
+def delete_terminal_run(run_id: str, owner: str) -> bool:
+    """Hide an owned terminal record; retain usage so deletion cannot reset budgets."""
+    be = _runs_backend()
+    if be is not None:
+        return be.delete_terminal(run_id, owner)
+    with _runs_file_lock():
+        records = _load_runs()
+        row = records.get(run_id)
+        if (not row or row.get("deleted") or row.get("owner") != owner
+                or row.get("status") not in ("done", "partial", "error")):
+            return False
+        row["deleted"] = True
+        _save_runs(records)
+        return True
+
+
+def patch_owned_run(run_id: str, owner: str, statuses: tuple[str, ...], patch: dict) -> dict | None:
+    """Conditional metadata/status transition, atomic across threads and replicas."""
+    be = _runs_backend()
+    if be is not None:
+        return be.patch_owned(run_id, owner, statuses, patch)
+    with _runs_file_lock():
+        record = _load_runs().get(run_id)
+        if (not record or record.get("deleted") or record.get("owner") != owner
+                or record.get("status") not in statuses):
+            return None
+        record.update(patch)
+        _runs_merge(record)
+        return record
 
 
 
@@ -408,6 +441,8 @@ def _run_stage_inner(run: dict, stage: str, args: dict, log: "RunLog") -> None:
         watchdog.touch(run["run_id"])
         _check_cancel(run["run_id"])  # P1-2：协作式取消点（排队/远端广播的请求在此生效）
         art = run["artifacts"].setdefault(entry["url"], {})
+        if stage != "note" and art.get("note") and Path(art["note"]).is_file():
+            continue  # 重试 partial 时已完成条目无需重新下载/转写。
         if art.get("skipped"):
             print(f"    ⏭ 条目 {idx}/{len(run['entries'])} 已处理过（state 幂等），跳过")
             continue
@@ -459,7 +494,8 @@ def _run_stage_inner(run: dict, stage: str, args: dict, log: "RunLog") -> None:
     all_failed = False
     if ok_field:
         non_skipped = [a for e in run["entries"]
-                       if not (a := run["artifacts"].get(e["url"], {})).get("skipped")]
+                       if not (a := run["artifacts"].get(e["url"], {})).get("skipped")
+                       and not (a.get("note") and Path(a["note"]).is_file())]
         all_failed = bool(non_skipped) and not any(a.get(ok_field) for a in non_skipped)
     run["stages"][stage] = {"ts": datetime.now().isoformat(timespec="seconds")}
     if failed:
@@ -719,10 +755,8 @@ def _stage_clips(run, entry, art, tmp, args):
         print("    ⏭ 无选中帧，跳过节段")
         art["clips_done"] = True
         return
-    if (ENV.get("V2MD_CLIPS_REMOTE") or "").lower() in ("colab", "colab-cli"):
-        raise SystemExit("V2MD_CLIPS_REMOTE=colab 已抽离（2026-09-21）：Colab 归 GPU 算力池接管——"
-                         "起 ~/Desktop/开发项目/gpu_router 后改 V2MD_CLIPS_REMOTE=http://127.0.0.1:9700")
-    if (ENV.get("V2MD_CLIPS_REMOTE") or "").startswith(("http://", "https://")):
+    clips_remote = (ENV.get("V2MD_CLIPS_REMOTE") or "").strip()
+    if clips_remote.lower() in ("colab", "colab-cli") or clips_remote.startswith(("http://", "https://")):
         # GPU 算力池/参考服务端：远端失败即本条目失败，异常上抛、不回退本地——
         # 本地 CPU 重剪是整条管线最大头（实测占 97min/条），静默回退会把批次拖垮；
         # 故障转移由池子在 provider 间完成，全局故障由本层熔断收口。

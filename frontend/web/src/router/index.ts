@@ -17,9 +17,19 @@ const router = createRouter({
       component: () => import('../views/LibraryView.vue'),
     },
     {
+      path: '/read/:id',
+      name: 'read',
+      component: () => import('../views/ReaderView.vue'),
+    },
+    {
       path: '/queue',
       name: 'queue',
       component: () => import('../views/QueueView.vue'),
+    },
+    {
+      path: '/profile/colab',
+      name: 'colab-auth',
+      component: () => import('../views/ColabAuthView.vue'),
     },
     {
       path: '/profile',

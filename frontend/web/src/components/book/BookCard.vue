@@ -25,7 +25,7 @@ const emit = defineEmits<{
         <BookCover
           :hue="book.hue"
           :title="book.title"
-          :footer-left="`${book.pages} 页`"
+          :footer-left="`${book.pages} ${book.pages_unit ?? '页'}`"
           :footer-right="book.footer_badge"
         />
       </div>
@@ -48,7 +48,7 @@ const emit = defineEmits<{
         <p class="font-body-sm text-body-sm text-on-surface-variant line-clamp-2 mt-1">
           {{ book.subtitle }}
         </p>
-        <div class="flex flex-wrap gap-1 mt-2">
+        <div v-if="book.features.length" class="flex flex-wrap gap-1 mt-2">
           <span
             v-for="f in book.features"
             :key="f.label"

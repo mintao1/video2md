@@ -168,7 +168,24 @@ def test_llm():
     assert llm.chat("s", "u", task="t", temperature=0, max_tokens=1, span_rec=sp4) == "去选项 ok"
     assert n2[0] == 2 and sp4["attempts"] == 2
     llm._TRANSPORT = None
-    
+
+    # mimo 式 5xx 甩锅：流式带 stream_options 回 500 "Upstream Response Error"
+    # （2026-10-13 实测，同请求摘掉即 200）→ 5xx 也摘一次重试
+    seq3 = iter([httpx.Response(500, text="Upstream Response Error"),
+                 httpx.Response(200, json={"choices": [{"message": {"content": "mimo ok"}}]})])
+    n3, bodies3 = [0], []
+    def mimo_handler(r):
+        n3[0] += 1
+        bodies3.append(json.loads(r.content))
+        return next(seq3)
+    llm._TRANSPORT = httpx.MockTransport(mimo_handler)
+    llm.LLM_BASE, llm.LLM_KEY = "https://llm.test/v1", "sk-test"
+    sp5 = {}
+    assert llm.chat("s", "u", task="t", temperature=0, max_tokens=1, span_rec=sp5) == "mimo ok"
+    assert n3[0] == 2 and sp5["attempts"] == 2
+    assert "stream_options" in bodies3[0] and "stream_options" not in bodies3[1]
+    llm._TRANSPORT = None
+
     
     # ---- 选帧解析（移植自 DSL code 节点）-----------------------------------------
     manifest = ("===== 条目 1/2：https://a =====\nf1.jpg [00:01] OCR: 标题\nf2.jpg [00:02] OCR: —\n\n"

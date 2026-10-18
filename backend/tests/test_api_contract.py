@@ -19,6 +19,7 @@ os.environ.update({
     "V2MD_AUTH": "off",
     "V2MD_USERS_FILE": str(Path(_TMP) / "users.json"),
     "V2MD_RUNS_FILE": str(Path(_TMP) / "runs.json"),
+    "V2MD_PREFS_FILE": str(Path(_TMP) / "prefs.json"),
     "V2MD_STATE_FILE": str(Path(_TMP) / "state.json"),
     "V2MD_LOG_DIR": str(Path(_TMP) / "logs"),
     "V2MD_UPLOADS_DIR": str(Path(_TMP) / "uploads"),
@@ -64,7 +65,7 @@ def _seed_run(run_id: str, owner: str, *, status: str = "done") -> dict:
 @pytest.fixture(autouse=True)
 def _clean_state():
     """每测前清空持久化文件——防跨用例泄漏（如上一用例留下的 running run 被 lifespan 恢复真跑）。"""
-    for name in ("runs.json", "users.json", "state.json"):
+    for name in ("runs.json", "users.json", "state.json", "prefs.json"):
         p = Path(_TMP) / name
         if p.exists():
             p.unlink()
@@ -529,6 +530,60 @@ def test_run_list_deliver_marks_shelf_present(client, deliver):
     assert items["r_off"]["artifacts"]["present"] is False
 
 
+def test_run_list_title_derivation(client):
+    """教材展示名三路派生：art.title（LLM note 标题）→ entry.title → url 主机名。"""
+    put_identity("test", "alice", "uid_alice")
+    _seed_run("r_art", "uid_alice")  # _seed_run 默认带 art.title="n"
+    # entry.title 回落：抹掉 art.title，entries 里给 title
+    _seed_run("r_entry", "uid_alice")
+    # 主机名回落：art/entry 都没 title
+    _seed_run("r_host", "uid_alice")
+    db = runs._load_runs()
+    db["r_entry"]["artifacts"] = {u: {k: v for k, v in a.items() if k != "title"}
+                                  for u, a in db["r_entry"]["artifacts"].items()}
+    db["r_entry"]["entries"] = [{"playlist_index": 1, "title": "Entry 标题",
+                                 "url": "https://example.test/e"}]
+    db["r_host"]["artifacts"] = {u: {k: v for k, v in a.items() if k != "title"}
+                                 for u, a in db["r_host"]["artifacts"].items()}
+    runs._save_runs(db)
+
+    items = {i["run_id"]: i["title"] for i in
+             client.get("/runs", headers={"X-Test-Auth": "alice"}).json()["items"]}
+    assert items["r_art"] == "n"
+    assert items["r_entry"] == "Entry 标题"
+    assert items["r_host"] == "example.test"
+
+
+# ---------------------------------------------------------------- /prefs（教材偏好：收藏/阅读进度）
+
+def test_prefs_empty_upsert_partial_and_persist(client):
+    put_identity("test", "alice", "uid_alice")
+    _seed_run("r_p1", "uid_alice")
+    assert client.get("/prefs", headers={"X-Test-Auth": "alice"}).json() == {"items": []}
+
+    r = client.put("/prefs/r_p1", json={"fav": True, "progress": 42},
+                   headers={"X-Test-Auth": "alice"})
+    assert r.status_code == 200 and r.json() == {"run_id": "r_p1", "fav": True, "progress": 42}
+    # 部分更新：只动 progress，fav 保持
+    r = client.put("/prefs/r_p1", json={"progress": 68}, headers={"X-Test-Auth": "alice"})
+    assert r.json() == {"run_id": "r_p1", "fav": True, "progress": 68}
+    # 列表读回（文件档落盘——跨请求持久）
+    items = client.get("/prefs", headers={"X-Test-Auth": "alice"}).json()["items"]
+    assert items == [{"run_id": "r_p1", "fav": True, "progress": 68}]
+
+
+def test_prefs_validation_and_access(client):
+    put_identity("test", "alice", "uid_alice")
+    put_identity("test", "bob", "uid_bob")
+    _seed_run("r_mine", "uid_alice")
+    _seed_run("r_other", "uid_bob")
+    h = {"X-Test-Auth": "alice"}
+    assert client.put("/prefs/r_mine", json={"progress": -1}, headers=h).status_code == 422
+    assert client.put("/prefs/r_mine", json={"progress": 101}, headers=h).status_code == 422
+    assert client.put("/prefs/r_nope", json={"fav": True}, headers=h).status_code == 404
+    assert client.put("/prefs/r_other", json={"fav": True}, headers=h).status_code == 403
+
+
 # ---------------------------------------------------------------- /auth/device/*（设备流桥）
 
 def test_auth_device_code_requires_config(client, monkeypatch):
@@ -988,8 +1043,8 @@ def test_usage_accumulate_and_settle(monkeypatch, tmp_path):
     import video2md.runs as _runs_mod
     import video2md.util as _util
     from video2md import llm as _llm
-    _runs_mod.RUNS_FILE = tmp_path / "runs.json"
-    _runs_mod._RUNS_LOCKFILE = _runs_mod.RUNS_FILE.with_suffix(".lock")
+    monkeypatch.setattr(_runs_mod, "RUNS_FILE", tmp_path / "runs.json")
+    monkeypatch.setattr(_runs_mod, "_RUNS_LOCKFILE", _runs_mod.RUNS_FILE.with_suffix(".lock"))
 
     rid = "usetest"
     with _runs_mod._runs_file_lock():
@@ -1496,3 +1551,322 @@ def run_all() -> None:  # `python3 test_api_contract.py` 兜底（无 pytest 时
 
 if __name__ == "__main__":
     run_all()
+
+
+def test_prefs_first_request_creates_nested_directory(client, monkeypatch, tmp_path):
+    from video2md import prefs
+    monkeypatch.setattr(prefs, "_STORE", prefs.JsonPrefsStore(tmp_path / "new-data" / "prefs.json"))
+    monkeypatch.setattr(prefs, "_store_resolved", True)
+    put_identity("test", "alice", "uid_alice")
+    _seed_run("prefs_first", "uid_alice")
+    h = {"X-Test-Auth": "alice"}
+    assert client.get("/prefs", headers=h).json() == {"items": []}
+    assert client.put("/prefs/prefs_first", headers=h, json={"fav": True}).status_code == 200
+    assert client.get("/prefs", headers=h).json()["items"][0]["fav"] is True
+
+
+def test_web_media_requires_owner_and_referenced_file(client, tmp_path):
+    from video2md.config import OUT_DIR
+    put_identity("test", "alice", "uid_alice")
+    put_identity("test", "bob", "uid_bob")
+    _seed_run("web_media", "uid_alice")
+    attachments = OUT_DIR / "attachments"
+    attachments.mkdir(parents=True, exist_ok=True)
+    (attachments / "web-frame.jpg").write_bytes(b"jpeg-fixture")
+    (attachments / "web-clip.mp4").write_bytes(b"mp4-fixture")
+    (attachments / "unreferenced.jpg").write_bytes(b"private")
+    secret = tmp_path / "secret.jpg"
+    secret.write_bytes(b"secret")
+    (attachments / "escape.jpg").symlink_to(secret)
+    records = runs._load_runs()
+    art = next(iter(records["web_media"]["artifacts"].values()))
+    art.update(note=str(OUT_DIR / "web-media.md"), md=(
+        "![[attachments/web-frame.jpg]]\n![[attachments/web-clip.mp4]]\n![[attachments/escape.jpg]]"))
+    runs._save_runs(records)
+    h = {"X-Test-Auth": "alice"}
+    response = client.get("/runs/web_media/media/web-frame.jpg", headers=h)
+    assert response.status_code == 200 and response.content == b"jpeg-fixture"
+    assert response.headers["content-type"].startswith("image/jpeg")
+    assert response.headers["cache-control"] == "no-store"
+    assert client.get("/runs/web_media/media/web-clip.mp4", headers=h).content == b"mp4-fixture"
+    assert client.get("/runs/web_media/media/web-frame.jpg", headers={"X-Test-Auth": "bob"}).status_code == 403
+    assert client.get("/runs/web_media/media/unreferenced.jpg", headers=h).status_code == 404
+    assert client.get("/runs/web_media/media/escape.jpg", headers=h).status_code == 404
+
+
+def test_promote_changes_actual_execution_order(client, monkeypatch):
+    """Three real enqueued coroutines; external video work is deterministic and gated."""
+    started = threading.Event()
+    release = threading.Event()
+    order = []
+
+    def workload(url, *, run_id=""):
+        order.append(run_id)
+        if len(order) == 1:
+            started.set()
+            assert release.wait(5)
+        return {"status": "done", "run_id": run_id}
+
+    _cancel_stubs(monkeypatch, workload)
+    first = client.post("/runs", json={"url": "https://example.test/order1"}).json()["run_id"]
+    assert started.wait(3)
+    second = client.post("/runs", json={"url": "https://example.test/order2"}).json()["run_id"]
+    third = client.post("/runs", json={"url": "https://example.test/order3"}).json()["run_id"]
+    try:
+        assert client.post(f"/runs/{third}/promote").status_code == 200
+    finally:
+        release.set()
+    assert _poll_status(client, second, "done") == "done"
+    assert order == [first, third, second]
+
+
+def test_retry_cancelled_queue_does_not_revive_old_driver(client, monkeypatch):
+    started = threading.Event()
+    release = threading.Event()
+    order = []
+
+    def workload(url, *, run_id=""):
+        order.append(run_id)
+        if len(order) == 1:
+            started.set()
+            assert release.wait(5)
+        return {"status": "done", "run_id": run_id}
+
+    _cancel_stubs(monkeypatch, workload)
+    client.post("/runs", json={"url": "https://example.test/retry1"})
+    assert started.wait(3)
+    retry = client.post("/runs", json={"url": "https://example.test/retry2"}).json()["run_id"]
+    try:
+        assert client.post(f"/runs/{retry}/cancel").status_code == 200
+        assert client.post(f"/runs/{retry}/resume").status_code == 200
+        assert client.post(f"/runs/{retry}/resume").status_code == 409
+    finally:
+        release.set()
+    assert _poll_status(client, retry, "done") == "done"
+    assert order.count(retry) == 1
+    assert client.delete(f"/runs/{retry}").status_code == 200
+    assert client.get(f"/runs/{retry}").status_code == 404
+
+
+def test_cancelling_state_survives_list_refresh(client, monkeypatch):
+    started = threading.Event()
+    release = threading.Event()
+
+    def workload(url, *, run_id=""):
+        started.set()
+        assert release.wait(5)
+        return {"status": "error", "errors": ["cancelled"], "run_id": run_id}
+
+    _cancel_stubs(monkeypatch, workload)
+    rid = client.post("/runs", json={"url": "https://example.test/long-stage"}).json()["run_id"]
+    assert started.wait(3)
+    try:
+        assert client.post(f"/runs/{rid}/cancel").json()["status"] == "cancelling"
+        assert client.get(f"/runs/{rid}").json()["status"] == "cancelling"
+        items = client.get("/runs").json()["items"]
+        assert next(row for row in items if row["run_id"] == rid)["status"] == "cancelling"
+    finally:
+        release.set()
+    assert _poll_status(client, rid, "error") == "error"
+
+
+def test_partial_deliver_retry_preserves_already_written_media_and_notes(client, deliver):
+    put_identity("test", "alice", "uid_alice")
+    rec = _seed_delivered_run("retry_shelf", "uid_alice", deliver)
+    rec["status"] = "partial"
+    with runs._runs_file_lock():
+        runs._runs_merge(rec)
+    h = {"X-Test-Auth": "alice"}
+    response = client.post("/runs/retry_shelf/resume", headers=h)
+    assert response.status_code == 200, response.text
+    deadline = time.monotonic() + 8
+    while time.monotonic() < deadline:
+        status = client.get("/runs/retry_shelf", headers=h).json()["status"]
+        if status in ("done", "error", "partial"):
+            break
+        time.sleep(0.05)
+    assert status == "done"
+    notes = client.get("/runs/retry_shelf/note", headers=h)
+    assert notes.status_code == 200 and notes.json()["notes"][0]["md"] == "# retry_shelf 正文"
+    bundle = client.get("/runs/retry_shelf/bundle", headers=h)
+    assert bundle.status_code == 200
+    with zipfile.ZipFile(io.BytesIO(bundle.content)) as archive:
+        assert "attachments/a-f001.jpg" in archive.namelist()
+
+
+def test_unpromoted_jobs_keep_submission_order_even_with_identical_timestamps(client, monkeypatch):
+    from types import SimpleNamespace
+    started, release = threading.Event(), threading.Event()
+    order = []
+    def workload(url, *, run_id=""):
+        order.append(run_id)
+        if len(order) == 1:
+            started.set()
+            assert release.wait(5)
+        return {"status": "done", "run_id": run_id}
+    api, _runs = _cancel_stubs(monkeypatch, workload)
+    ids = iter(["ffffffff", "eeeeeeee", "aaaaaaaa"])
+    monkeypatch.setattr(api, "uuid", SimpleNamespace(uuid4=lambda: SimpleNamespace(hex=next(ids))))
+    monkeypatch.setattr(api, "_now", lambda: "2026-01-01T00:00:00")
+    client.post("/runs", json={"url": "https://example.test/fifo1"})
+    assert started.wait(3)
+    try:
+        client.post("/runs", json={"url": "https://example.test/fifo2"})
+        client.post("/runs", json={"url": "https://example.test/fifo3"})
+    finally:
+        release.set()
+    assert _poll_status(client, "aaaaaaaa", "done") == "done"
+    assert _poll_status(client, "eeeeeeee", "done") == "done"
+    assert order == ["ffffffff", "eeeeeeee", "aaaaaaaa"]
+
+
+def test_deleting_task_keeps_monthly_cost_and_budget_accounting(client):
+    put_identity("test", "alice", "uid_alice")
+    rec = _seed_run("billed_deleted", "uid_alice")
+    rec.update(created=datetime.now().isoformat(), cost_usd=2.5, usage={"llm_in_tok": 100, "gpu_s": 60})
+    with runs._runs_file_lock():
+        runs._runs_merge(rec)
+    h = {"X-Test-Auth": "alice"}
+    assert client.get("/cost", headers=h).json()["spend_usd"] == 2.5
+    assert client.delete("/runs/billed_deleted", headers=h).status_code == 200
+    with runs._runs_file_lock():
+        runs._runs_merge(rec)  # 模拟删除前已读取旧快照的结算写回
+    assert client.get("/runs/billed_deleted", headers=h).status_code == 404
+    assert all(row["run_id"] != "billed_deleted" for row in client.get("/runs", headers=h).json()["items"])
+    assert client.get("/cost", headers=h).json()["spend_usd"] == 2.5
+
+
+def test_same_url_submission_reuses_an_already_queued_run(client, monkeypatch):
+    import video2md.graph as graph_mod
+    real_resolve = graph_mod.resolve_run
+    started, release = threading.Event(), threading.Event()
+    def workload(url, *, run_id=""):
+        if url.endswith('/blocker'):
+            started.set()
+            assert release.wait(5)
+        return {"status": "done", "run_id": run_id}
+    api, run_mod = _cancel_stubs(monkeypatch, workload)
+    monkeypatch.setattr(graph_mod, "resolve_run", real_resolve)
+    monkeypatch.setattr(run_mod, "resolve_url", lambda url: [{"url": url, "playlist_index": 1}])
+    monkeypatch.setattr(api, "USER_QUEUE_MAX", 0)
+    client.post("/runs", json={"url": "https://example.test/blocker"})
+    assert started.wait(3)
+    try:
+        queued = client.post("/runs", json={"url": "https://example.test/dedup-queued"}).json()
+        duplicate = client.post("/runs", json={"url": "https://example.test/dedup-queued"}).json()
+        assert duplicate["run_id"] == queued["run_id"] and duplicate["dedup"] is True
+    finally:
+        release.set()
+    assert _poll_status(client, queued["run_id"], "done") == "done"
+
+
+def test_json_startup_restores_persisted_queued_work(monkeypatch):
+    def workload(url, *, run_id=""):
+        return {"status": "done", "run_id": run_id}
+    _cancel_stubs(monkeypatch, workload)
+    put_identity("test", "alice", "uid_alice")
+    _seed_run("queued_restart", "uid_alice", status="queued")
+    with TestClient(app) as restarted:
+        deadline = time.monotonic() + 2
+        while time.monotonic() < deadline:
+            status = restarted.get("/runs/queued_restart", headers={"X-Test-Auth": "alice"}).json()["status"]
+            if status == "done":
+                break
+            time.sleep(0.05)
+        assert status == "done"
+
+
+@pytest.fixture
+def llm_settings_path(tmp_path, monkeypatch):
+    from video2md import config
+    monkeypatch.setattr(config, "PREFS_FILE", tmp_path / "prefs.json")
+    monkeypatch.setattr(config, "PREFS_STORE", "json")
+    monkeypatch.delitem(config.ENV, "V2MD_LLM_SETTINGS_FILE", raising=False)
+    return tmp_path / "llm-settings.json"
+
+
+def test_llm_settings_private_persistent_update_and_clear(client, llm_settings_path):
+    from video2md import llm_settings
+    put_identity("test", "alice", "uid_alice")
+    put_identity("test", "bob", "uid_bob")
+    alice, bob = {"X-Test-Auth": "alice"}, {"X-Test-Auth": "bob"}
+    endpoint = "/settings/llm"
+    assert not client.get(endpoint, headers=alice).json()["configured"]
+    r = client.put(endpoint, headers=alice, json={"base_url": "https://alice.example/v1/chat/completions/",
+                                                 "api_key": "alice-secret", "model": "alice-model"})
+    assert r.status_code == 200
+    assert r.json() == {"base_url": "https://alice.example/v1", "model": "alice-model",
+                        "has_api_key": True, "configured": True}
+    assert "alice-secret" not in r.text
+    assert "alice-secret" not in client.get(endpoint, headers=alice).text
+    assert not client.get(endpoint, headers=bob).json()["configured"]
+    assert llm_settings_path.stat().st_mode & 0o777 == 0o600
+    r = client.put(endpoint, headers=alice, json={"base_url": "https://alice.example/v2", "api_key": ""})
+    assert r.status_code == 200
+    assert llm_settings.load("uid_alice")["api_key"] == "alice-secret"
+    client.put(endpoint, headers=bob, json={"base_url": "https://bob.example/v1", "api_key": "bob-secret"})
+    assert client.delete(endpoint, headers=alice).json()["configured"] is False
+    assert llm_settings.load("uid_alice") == {}
+    assert llm_settings.load("uid_bob")["api_key"] == "bob-secret"
+
+
+@pytest.mark.parametrize("url", ["file:///tmp/secret", "https://user:pass@example.com/v1",
+                                      "https://example.com/v1?key=secret", "https://example.com:wrong/v1"])
+def test_llm_settings_validation_never_reflects_key(client, llm_settings_path, url):
+    r = client.put("/settings/llm", json={"base_url": url, "api_key": "must-not-echo"})
+    assert r.status_code == 422 and "must-not-echo" not in r.text
+    assert not llm_settings_path.exists()
+
+
+def test_llm_settings_requires_initial_key(client, llm_settings_path):
+    r = client.put("/settings/llm", json={"base_url": "https://example.com/v1"})
+    assert r.status_code == 422 and not llm_settings_path.exists()
+    r = client.put("/settings/llm", json={"base_url": "https://example.com/v1",
+                                       "api_key": {"secret": "must-not-echo"}})
+    assert r.status_code == 422 and "must-not-echo" not in r.text
+
+
+def test_llm_user_credentials_follow_graph_threads_without_leaking(llm_settings_path, monkeypatch):
+    import json
+    from concurrent.futures import ThreadPoolExecutor
+
+    from langgraph.graph import END, START, StateGraph
+
+    from video2md import llm, llm_settings
+
+    for uid in ("alice", "bob"):
+        llm_settings.update(uid, base_url=f"https://{uid}.example/v1", api_key=uid + "-secret", model=uid)
+    monkeypatch.setattr(llm, "LLM_BASE", "https://default.example/v1")
+    monkeypatch.setattr(llm, "LLM_KEY", "default-secret")
+    monkeypatch.setattr(llm, "LLM_MODEL", "default")
+    monkeypatch.setattr(llm, "_llm_observed", lambda *a, **kw: None)
+    calls = []
+
+    def handler(request):
+        calls.append((str(request.url), request.headers["authorization"], json.loads(request.content)["model"]))
+        return httpx.Response(200, json={"choices": [{"message": {"content": "ok"}}]})
+
+    monkeypatch.setattr(llm, "_TRANSPORT", httpx.MockTransport(handler))
+
+    def invoke(uid):
+        def node(state):
+            assert llm.chat("sys", "usr", task="metadata", temperature=0, max_tokens=5) == "ok"
+            return {}
+        graph = StateGraph(dict)
+        graph.add_node("llm", node)
+        graph.add_edge(START, "llm")
+        graph.add_edge("llm", END)
+        with llm_settings.user_scope(uid):
+            graph.compile().invoke({})
+        assert llm_settings.current() is None
+
+    with ThreadPoolExecutor(max_workers=2) as workers:
+        list(workers.map(invoke, ["alice", "bob"]))
+    invoke("")
+    assert set(calls) == {(f"https://{uid}.example/v1/chat/completions", f"Bearer {uid}-secret", uid)
+                          for uid in ("alice", "bob", "default")}
+    monkeypatch.setattr(llm, "_TRANSPORT", httpx.MockTransport(
+        lambda req: httpx.Response(401, text="alice-secret")))
+    with llm_settings.user_scope("alice"), pytest.raises(RuntimeError) as exc:
+        llm.chat("sys", "usr", task="metadata", temperature=0, max_tokens=5)
+    assert "alice-secret" not in str(exc.value)

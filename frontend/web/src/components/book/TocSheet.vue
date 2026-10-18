@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import BottomSheet from '../common/BottomSheet.vue'
-import type { TocChapter } from '../../api/mock/data'
+import type { TocChapter } from '../../types'
 
 const props = defineProps<{
   modelValue: boolean

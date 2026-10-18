@@ -5,6 +5,7 @@ description = "视频 → Obsidian 笔记（LangGraph 编排：本地转写/抽�
 requires-python = ">=3.12"
 dependencies = [
     "httpx>=0.27",
+    "google-colab-cli==0.7.4; sys_platform != 'win32'",
     "pillow>=10.4",
     "pyyaml>=6.0.3",
     "websocket-client>=1.8",
@@ -27,7 +28,7 @@ mac = [
     "pyobjc-framework-Vision>=10.3",
     "pyobjc-framework-Cocoa>=10.3",
 ]
-# 评测旁路（scripts/eval_notes.py；judge 走自有 LLM 端点；ragas 带入 langchain-core，
+# 评测旁路（backend/scripts/eval_notes.py；judge 走自有 LLM 端点；ragas 带入 langchain-core，
 # 仅此路径 import，graph 运行时不染）
 evals = [
     "deepeval>=3.0",
@@ -42,7 +43,7 @@ evals = [
 package = false
 
 [tool.uv.sources]
-platform-otel-sdk = { path = "../../platform/otel-sdk", editable = true }
+platform-otel-sdk = { path = "vendor/platform-otel-sdk", editable = true }
 
 [dependency-groups]
 dev = [

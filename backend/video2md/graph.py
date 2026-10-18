@@ -109,9 +109,9 @@ def resolve_run(url: str, part_items: str = "", force: bool = False,
     # 同链接同分区同归属的进行中 run 复用（对齐 serve._post_runs 的 dedup；
     # part_items 必须参与比对——同合集的分区补跑共享 URL，只按 URL 去重会把新分区并进旧 run）
     dup = next((r for r in _load_runs().values()
-                if r.get("url") == url and str(r.get("part_items", "")).strip() == part_items
+                if not r.get("deleted") and r.get("url") == url and str(r.get("part_items", "")).strip() == part_items
                 and (r.get("owner", "") or "") == (owner or "")
-                and r.get("status") in ("created", "running")), None)
+                and r.get("status") in ("created", "queued", "running")), None)
     if dup:
         print(f"♻️ 复用进行中的 run {dup['run_id']}（{dup['total']} 条目），继续推进")
         return dup, "", True
@@ -137,6 +137,10 @@ def _stage_node(stage: str, args_of=None):
         args = args_of(state) if args_of else {}
         try:
             _run_stage(run, stage, args)
+            if stage == "clips":
+                # All GPU artifacts are local now. Release Colab before note LLMs.
+                from .colab import release_session
+                release_session()
         except (SystemExit, Exception) as exc:  # 熔断/全灭/环境炸 → 显式失败（DSL 的 if_ok 闸门）
             msg = redact(str(exc))[-300:]
             print(f"❌ 阶段 {stage} 失败：{msg}")
@@ -493,6 +497,10 @@ def run_graph(url: str, *, part_items: str = "", force: bool = False, review: bo
                          "force": force, "review": review, "max_frames": max_frames,
                          "owner": owner,
                          "entry_idx": 1, "errors": [], "status": "running"}
+    existing = _load_runs().get(run_id)
+    if (existing and existing.get("owner", "") == owner and existing.get("url") == url
+            and existing.get("status") in ("created", "queued", "running")):
+        initial["run"] = existing
     graph = build_graph(checkpointer)
     # note 回环每条目 1 个 superstep（8 + total + 2；V2MD_EVAL 接线时每条目 2 个），
     # LangGraph 默认 recursion_limit=25 会杀掉 >15 条目的合集——放宽到 1000
@@ -505,7 +513,10 @@ def run_graph(url: str, *, part_items: str = "", force: bool = False, review: bo
         config["configurable"] = {"thread_id": run_id}
     deadman.ping("start", run_id=run_id, trace_name=url)
     try:
-        final = graph.invoke(initial, config=config)
+        from .colab import session_scope
+        from .llm_settings import user_scope
+        with user_scope(owner), session_scope():
+            final = graph.invoke(initial, config=config)
     except Exception:
         deadman.ping("fail", run_id=run_id, trace_name=url)
         raise

@@ -4,6 +4,24 @@
 - 批判参照：① 鉴权层/限流层；② 安全 S1–S5
 - 契约硬化在 `video2md/models.py`（Pydantic）；契约测试 `test_api_contract.py`（TestClient 离线）
 
+
+## Web 队列与阅读器（2026-10-18）
+
+- `GET /runs` 返回真实 `status` 和 `queue_pos`；运行中已接收取消请求时显示
+  `cancelling`，刷新后不会回到 running。未优先处理的任务按入队时间保持 FIFO。
+- `POST /runs/{id}/resume`：仅 error/partial 可重试，返回 queued；按 owner 做原子状态认领，
+  同一任务的并发请求只有一个成功，其余 409。已完成笔记和仍在架的 deliver 媒体保留。
+- `POST /runs/{id}/promote`：仅 queued 可设为优先，持久化队列优先级，不抢占正在执行的工作。
+- `DELETE /runs/{id}`：仅 done/partial/error 可删除任务记录；进行中 409，越权 403。
+  任务逻辑删除并保留计费用量，不能通过删除记录重置月预算；
+  删除 deliver 记录会焚毁其在架产物，不删除用户 vault 的笔记。
+- `GET /runs/{id}/media/{name}`：只提供本人笔记明确引用的图片/视频；验证平铺文件名、扩展名、
+  实际路径边界，拒绝未引用文件及外指符号链接。deliver 已焚或过期遵循 410。
+  响应 `Cache-Control: no-store`；前端使用 Bearer 拉取 Blob，不把 token 放进 URL。
+- `GET /prefs`、`PUT /prefs/{id}`：收藏和 0–100 阅读进度，按 uid 隔离、部分更新；
+  JSON 首次请求会创建目录，容器默认 `/app/data/prefs.json`；PG 使用 0003 迁移。
+
+
 ## 端点总览
 
 | 方法+路径 | 鉴权 | 说明 | 位置 |

@@ -9,7 +9,7 @@
 
 RunLog API 不动（span/info/current_log），本模块只是 _write 的下游 sink：
 - 每 run 一条 trace：trace_id = sha256("video2md-"+run_id)[:32]（确定性——evals 旁路
-  scripts/eval_notes.py 据此把分数回挂到原 trace；2026-09-22 前为 serve- 前缀，
+  backend/scripts/eval_notes.py 据此把分数回挂到原 trace；2026-09-22 前为 serve- 前缀，
   Langfuse 里的历史回放 trace 仍用旧前缀）；root span 随首个事件开立，
   stage → entry → llm:* 逐级父子；__stage 子进程与 api 主进程靠同一 trace_id 拼合。
 - LLM span（llm:<task>）按 Langfuse OTel 映射打 gen_ai.* 属性 → 渲染为 generation 计成本

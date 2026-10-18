@@ -24,11 +24,12 @@ def download_entry(entry: dict, tmp: Path) -> tuple[Path, str]:
     idx = entry.get("playlist_index")
     prefix = f"p{idx:03d}-{eid}" if isinstance(idx, int) else eid
     if entry.get("direct_url"):
-        # 抖音直链兜底：yt-dlp 必然被 Fresh cookies 挡，直接走 play 直链
+        # 抖音 play 直链 / 百度网盘 dlink：yt-dlp 必然被挡，走 httpx 直下（headers 由 resolve 提供）
         try:
-            return _download_direct(entry["direct_url"], tmp / f"{prefix}.mp4"), entry.get("uploader", "")
+            return _download_direct(entry["direct_url"], tmp / f"{prefix}.mp4",
+                                    headers=entry.get("headers")), entry.get("uploader", "")
         except Exception as exc:
-            sys.exit(f"❌ 抖音直链下载失败: {redact(str(exc)[-200:])}")
+            sys.exit(f"❌ 直链下载失败: {redact(str(exc)[-200:])}")
     common = ["-f", "bv*[height<=720]+ba/b[height<=720]", "--merge-output-format", "mp4",
               "--concurrent-fragments", "8", "-o", str(tmp / f"{prefix}.%(ext)s"),
               "--no-playlist", "--no-simulate", "--print", "META|%(uploader)s|%(channel)s"]

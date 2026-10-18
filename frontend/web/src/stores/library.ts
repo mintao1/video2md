@@ -27,10 +27,15 @@ export const useLibraryStore = defineStore('library', () => {
     })
   })
 
-  /** 「继续阅读」横幅取进度 (0,100) 中最近的一本；无在读书籍则不显示横幅 */
+  /** 横幅选书：优先「最近在读」（进度 (0,100)，阅读器接入后自动生效）；
+   *  无在读书籍则回落「最近精讲」= 最新完成的 run（created 倒序）——真实数据下横幅不消失 */
   const featured = computed(() => {
     const inProgress = books.value.filter((b) => b.progress > 0 && b.progress < 100)
-    return inProgress.sort((a, b) => b.progress - a.progress)[0] ?? null
+    if (inProgress.length) {
+      return inProgress.sort((a, b) => b.progress - a.progress)[0]
+    }
+    const done = books.value.filter((b) => b.status === 'done' || b.status === 'partial')
+    return done.sort((a, b) => (b.created ?? '').localeCompare(a.created ?? ''))[0] ?? null
   })
 
   async function load() {

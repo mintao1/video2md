@@ -23,7 +23,9 @@ const emit = defineEmits<{
           class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-on-primary/15 backdrop-blur-sm text-inverse-on-surface font-label-sm text-label-sm"
         >
           <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-          <span>最近在读 · 进度 {{ book.progress }}%</span>
+          <span>
+            {{ book.progress > 0 ? `最近在读 · 进度 ${book.progress}%` : '最近精讲' }}
+          </span>
         </div>
         <span v-if="book.read_meta" class="font-label-sm text-label-sm text-primary-fixed-dim">
           {{ book.read_meta }}

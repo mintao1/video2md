@@ -20,9 +20,16 @@ users.json
 users.json.lock
 users.json.tmp.*
 
-# Obsidian 插件构建产物与依赖
-frontend/obsidian-plugin/node_modules/
-frontend/obsidian-plugin/main.js
-frontend/obsidian-plugin/main.js.map
 deploy/certs/
 .smoke-proxy-*
+
+# Python 工具缓存与偏好存储运行产物
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+prefs.json
+prefs.lock
+prefs.json.tmp.*
+llm-settings.json
+llm-settings.lock
+llm-settings.json.tmp.*

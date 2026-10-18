@@ -1,6 +1,6 @@
 """评测旁路：DeepEval/RAGAS 给视频笔记打分，分数回写 Langfuse（scores）。
 
-定位（2026-09-22 定稿）：离线批量为主（scripts/eval_notes.py），在线节点已接线
+定位（2026-09-22 定稿）：离线批量为主（backend/scripts/eval_notes.py），在线节点已接线
 （V2MD_EVAL=1 时 graph 在 note_entry 后插 eval_entry，旁路不致命）。
 不引入 Braintrust/Confident AI 平台——它们的能力 = 本地开源库打分 + 看板，看板由
 Langfuse scores 承担；judge 模型走自有 openai-compatible 端点（LLM_BASE_URL），

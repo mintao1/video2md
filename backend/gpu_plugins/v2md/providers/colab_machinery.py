@@ -1,8 +1,7 @@
 """google-colab-cli 会话机械（自包含副本）：建/复用会话、上传、远端后台执行、轮询产物、
 token 体检、lease 心跳、队列感知保温。
 
-本文件是 Colab 会话机械的**唯一 SSOT**（2026-09-21 抽离完成：video2md 侧的
-同名实现已删除，算力全收口到本池子）。
+本文件是 Colab 会话机械的唯一实现；video2md.colab 直接调用，兼容插件也复用它。
 与 video2md 的协同约定（可经 provider extra 配置；不配则用完即关）：
 同名会话（默认 v2md-whisper）；lease 文件心跳（watchdog 三信号之一）；
 queue_url 指 video2md serve 的 /queue（队列有货就保温）。
@@ -23,6 +22,9 @@ import httpx
 
 # ---------------------------------------------------------------- 参数（provider extra 可覆盖）
 SESSION = "v2md-whisper"
+BIN_OVERRIDE = ""
+KEEP_SESSION = False
+ALLOW_CPU_FALLBACK = True  # direct adapter opts out unless explicitly enabled
 
 LEASE_FILE = ""     # 默认由 provider 注入；空 = 仅用进程内临时 lease（看门狗协同关闭）
 
@@ -45,11 +47,10 @@ args = json.load(open("/content/v2md_args.json"))
 try:  # import 也放进 try：依赖缺失/显存不足等启动期异常必须写进 status，否则本地空等
     from faster_whisper import WhisperModel
 
-    try:
-        import torch  # 设备自适应：GPU 会话被配额打满时降级 CPU（int8）
-        _dev, _ct = ("cuda", "float16") if torch.cuda.is_available() else ("cpu", "int8")
-    except Exception:
-        _dev, _ct = "cpu", "int8"
+    import ctranslate2
+    _dev, _ct = ("cuda", "float16") if ctranslate2.get_cuda_device_count() else ("cpu", "int8")
+    if args.get("require_gpu") and _dev != "cuda":
+        raise RuntimeError("Colab runtime 未提供可用 CUDA GPU；已禁止静默 CPU 降级")
     _model = args.get("model") or "turbo"
     if _dev == "cpu" and _model in ("turbo", "large", "large-v3", "large-v3-turbo"):
         _model = "small"  # CPU 上 large 级模型等于不跑：降级 small 保可用性
@@ -70,7 +71,7 @@ try:  # import 也放进 try：依赖缺失/显存不足等启动期异常必须
                  "no_speech_prob": s.no_speech_prob, "compression_ratio": s.compression_ratio,
                  "avg_logprob": s.avg_logprob} for s in segs_iter]
     with open("/content/out.json.tmp", "w") as fh:
-        json.dump({"model": args.get("model") or "turbo", "language": info.language,
+        json.dump({"model": _model, "device": _dev, "language": info.language,
                    "duration": info.duration, "segments": segments}, fh)
     os.replace("/content/out.json.tmp", "/content/out.json")
     json.dump({"state": "done", "segments": len(segments)}, open("/content/status.json", "w"))
@@ -81,13 +82,20 @@ except Exception as exc:
 
 _COLAB_JOB = '''
 import json
+import os
+import site
 import subprocess
 import sys
 
 json.dump({"state": "running"}, open("/content/status.json", "w"))
+env = dict(os.environ)
+libs = [os.path.join(root, "nvidia", pkg, "lib") for root in site.getsitepackages()
+        for pkg in ("cublas", "cudnn", "cuda_runtime", "cuda_nvrtc", "nvjitlink")
+        if os.path.isdir(os.path.join(root, "nvidia", pkg, "lib"))]
+env["LD_LIBRARY_PATH"] = ":".join(libs + [env.get("LD_LIBRARY_PATH", "")])
 with open("/content/worker.log", "w") as log:
     p = subprocess.Popen([sys.executable, "/content/v2md_worker.py"],
-                         stdout=log, stderr=subprocess.STDOUT)
+                         stdout=log, stderr=subprocess.STDOUT, env=env)
 print("STARTED", p.pid)
 '''
 
@@ -254,7 +262,7 @@ except Exception as exc:
 # ---------------------------------------------------------------- CLI 基础
 def _colab_bin() -> str:
     """定位 colab CLI（uv tool 默认装到 ~/.local/bin，服务进程 PATH 里常没有）。"""
-    return shutil.which("colab") or next(
+    return BIN_OVERRIDE or shutil.which("colab") or next(
         (str(p) for p in (Path.home() / ".local/bin/colab",
                           Path("/opt/homebrew/bin/colab"),
                           Path("/usr/local/bin/colab")) if p.exists()), "colab")
@@ -298,17 +306,25 @@ def _ensure_colab_session(deps_pkg: str = "") -> None:
             msg = str(exc)
             if not any(s in msg for s in ("412", "TooManyAssignments", "503", "Service Unavailable")):
                 raise
+            if not ALLOW_CPU_FALLBACK:
+                raise RuntimeError("Colab T4 当前不可用；未启用 CPU 降级，请稍后重试") from exc
             print(f"  ⚠️ T4 不可用（GPU assign 被拒），降级创建 CPU 会话 {SESSION}"
                   f"（whisper 自动 int8/small，慢但能跑）…")
             _colab(["new", "-s", SESSION], timeout=420)
     if not deps_pkg:
         return
+    check = ""
+    if deps_pkg == "faster_whisper":
+        # PyAV 18+ removed metadata_errors used by released faster-whisper.
+        check = ("from importlib.metadata import version\nassert int(version('av').split('.')[0]) < 18\n"
+                 "version('nvidia-cublas-cu12')\nversion('nvidia-cudnn-cu12')\n")
     probe = _colab(["exec", "-s", SESSION], timeout=300, retries=2,
-                   stdin=f"import {deps_pkg}\nprint('DEPS' + '-OK')")
+                   stdin=f"import {deps_pkg}\n{check}print('DEPS' + '-OK')")
     if "DEPS-OK" not in probe:
-        pkg = {"faster_whisper": "faster-whisper>=1.1"}.get(deps_pkg, deps_pkg)
-        print(f"  ⏳ 会话内安装 {pkg}…")
-        _colab(["install", "-s", SESSION, pkg], timeout=600)
+        packages = (["faster-whisper>=1.1,<2", "av==17.1.0", "nvidia-cublas-cu12", "nvidia-cudnn-cu12==9.*"]
+                    if deps_pkg == "faster_whisper" else [deps_pkg])
+        print(f"  ⏳ 会话内安装 {' '.join(packages)}…")
+        _colab(["install", "-s", SESSION, *packages], timeout=600)
 
 
 
@@ -324,10 +340,20 @@ def _colab_session_active(max_age: float = 10.0) -> bool:
 def _colab_stop_session(reason: str = "") -> bool:
     """关会话（幂等：不存在也返回 True）。任何异常都吞掉，不能因清理动作影响主流程。"""
     try:
-        subprocess.run([_colab_bin(), "stop", "-s", SESSION],
-                       capture_output=True, text=True, timeout=120)
+        stopped = False
+        for _attempt in range(2):
+            try:
+                response = subprocess.run([_colab_bin(), "stop", "-s", SESSION],
+                                          capture_output=True, text=True, timeout=120)
+            except (OSError, subprocess.TimeoutExpired):
+                continue
+            if response.returncode == 0:
+                stopped = True
+                break
+        if not stopped:
+            return False
         if reason:
-            print(f"  🛑 关闭 Colab 会话（{reason}）")
+            print(f"  🛑 关闭 Colab 会话（{reason}）", flush=True)
         return True
     except Exception:
         return False
@@ -419,6 +445,8 @@ def _lease_fresh(max_age: float = 180.0) -> bool:
 def _session_epilogue() -> None:
     """任务收尾：队列有货就保温（省下一条 1–2min 冷启动），见底即关（不烧闲置配额）。"""
     _lease_release()
+    if KEEP_SESSION:
+        return
     if _more_jobs_waiting():
         print("  ♻️ 队列还有排队任务，保留 Colab 会话给下一条复用")
     else:
@@ -510,12 +538,17 @@ def colab_run_asr(audio: Path, tmp: Path, model: str, language: str) -> dict:
     worker = tmp / "v2md_worker.py"
     worker.write_text(_COLAB_WORKER)
     args_json = tmp / "v2md_args.json"
-    args_json.write_text(json.dumps({"model": model, "language": language}))
+    args_json.write_text(json.dumps({"model": model, "language": language,
+                                     "require_gpu": not ALLOW_CPU_FALLBACK}))
     print(f"  ☁️ Colab GPU 转录（会话 {SESSION}）…")
     _lease_touch()
     t0 = time.time()
     try:
         _ensure_colab_session("faster_whisper")
+        _colab(["exec", "-s", SESSION], timeout=90, stdin=(
+            "import os\n"
+            "for f in ('/content/out.json', '/content/status.json', '/content/worker.log'):\n"
+            "    if os.path.exists(f):\n        os.remove(f)\nprint('clean')"))
         _colab(["upload", "-s", SESSION, str(audio), "/content/in.m4a"], timeout=600)
         for local, remote in ((worker, "/content/v2md_worker.py"),
                               (args_json, "/content/v2md_args.json")):
@@ -631,7 +664,7 @@ def colab_exec_clips(video: Path | None, direct_url: str, specs: list[dict],
         in_dir = tmp / "clips_in"
         in_dir.mkdir(exist_ok=True)
         with tarfile.open(tar_local) as tf:  # 条目名全部由调用方清单生成，无路径注入面
-            tf.extractall(in_dir)
+            tf.extractall(in_dir, filter="data")
         out_dir.mkdir(parents=True, exist_ok=True)
         results: dict[str, bool] = {}
         for c in specs:

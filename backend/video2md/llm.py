@@ -97,11 +97,16 @@ def chat(system: str, user: str, *, task: str, temperature: float, max_tokens: i
 
     观测：span_rec（llm_task 的 RunLog span）回填 usage/attempts/TTFT/字符数 →
     Langfuse generation；指标（请求/耗时/token）走 observability.metric_llm。
-    include_usage 讨要 usage 尾 chunk；个别中转 400 拒识该字段时摘掉重试。
+    include_usage 讨要 usage 尾 chunk；个别中转拒识该字段（400 点名或 5xx 甩锅上游，
+    mimo 实测）时摘掉重试。
     """
-    if not LLM_BASE or not LLM_KEY:
+    from .llm_settings import current
+    settings = current()
+    base = settings["base_url"] if settings else LLM_BASE
+    key = settings["api_key"] if settings else LLM_KEY
+    if not base or not key:
         raise SystemExit("LLM_BASE_URL / LLM_API_KEY 未配置：写入 .env 或环境变量")
-    use_model = model or LLM_MODEL
+    use_model = model or (settings.get("model") if settings else None) or LLM_MODEL
     payload = {"model": use_model, "temperature": temperature, "max_tokens": max_tokens,
                "stream": True, "stream_options": {"include_usage": True},
                "messages": [{"role": "system", "content": system},
@@ -113,28 +118,33 @@ def chat(system: str, user: str, *, task: str, temperature: float, max_tokens: i
         meta = {}
         try:
             with httpx.Client(transport=_TRANSPORT) as client:
-                with client.stream("POST", f"{LLM_BASE}/chat/completions", json=payload,
-                                   headers={"Authorization": f"Bearer {LLM_KEY}"},
+                with client.stream("POST", f"{base}/chat/completions", json=payload,
+                                   headers={"Authorization": f"Bearer {key}"},
                                    timeout=httpx.Timeout(30.0, read=600.0)) as r:
                     if r.status_code != 200:
                         r.read()
-                        # 中转不认识 stream_options（400 且点名）→ 摘掉重建 payload 重试
-                        if r.status_code == 400 and "stream_options" in r.text \
-                                and "stream_options" in payload:
+                        # 中转不认识 stream_options → 摘掉重建 payload 重试：
+                        #   400 点名字段（旧中转）；5xx 甩锅上游（mimo 实测 2026-10-13：
+                        #   流式带 stream_options 回 500 "Upstream Response Error"，
+                        #   同请求摘掉即 200）——摘掉只丢 usage 尾 chunk，无害，至多摘一次
+                        if "stream_options" in payload and (
+                                (r.status_code == 400 and "stream_options" in r.text)
+                                or r.status_code >= 500):
                             payload.pop("stream_options")
-                            last_err = "HTTP 400: 中转拒识 stream_options，已摘掉重试"
+                            last_err = f"HTTP {r.status_code}: 摘掉 stream_options 重试"
                             continue
                         # 429/5xx 可重试；其余 4xx（401/403/参数错）重试无意义，响亮失败
                         if r.status_code != 429 and r.status_code < 500:
-                            raise RuntimeError(f"LLM 请求失败 HTTP {r.status_code}: {r.text[:300]}")
-                        last_err = f"HTTP {r.status_code}: {r.text[:200]}"
+                            detail = "请检查 API URL、Key、模型和上游余额" if settings else r.text[:300]
+                            raise RuntimeError(f"LLM 请求失败 HTTP {r.status_code}: {detail}")
+                        last_err = f"HTTP {r.status_code}" if settings else f"HTTP {r.status_code}: {r.text[:200]}"
                     else:
                         text, parse_err = "", ""
                         try:
                             text = _collect_stream(r, meta)
                         except Exception as exc:
                             # 非流式兼容路径的畸形 JSON 等：当中转故障处理，进统一重试
-                            parse_err = f"回包解析失败：{redact(str(exc))[:150]}"
+                            parse_err = f"回包解析失败：{redact(str(exc).replace(key, '<REDACTED>'))[:150]}"
                         if text.strip():
                             _llm_observed(task, "ok", t0, attempt + 1, meta, span_rec,
                                           system, user, text, use_model)
@@ -143,7 +153,7 @@ def chat(system: str, user: str, *, task: str, temperature: float, max_tokens: i
                         # 524 后重试拿到 200 空流）。视同可重试错误，不静默返回空串
                         last_err = parse_err or "空回包（HTTP 200 但零内容）"
         except httpx.HTTPError as exc:
-            last_err = redact(str(exc))[:300]
+            last_err = redact(str(exc).replace(key, '<REDACTED>'))[:300]
         if attempt < attempts - 1:
             print(f"  ⚠ LLM {task} 第 {attempt + 1} 次调用失败（{last_err[:80]}），30s 后重试")
             _sleep(30)

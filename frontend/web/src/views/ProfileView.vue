@@ -6,6 +6,7 @@ import { useProfileStore } from '../stores/profile'
 import { useToastStore } from '../stores/toast'
 import BottomNav from '../components/common/BottomNav.vue'
 import ProfileCard from '../components/profile/ProfileCard.vue'
+import LlmSettingsCard from '../components/profile/LlmSettingsCard.vue'
 import QuotaDashboard from '../components/profile/QuotaDashboard.vue'
 import SvipPromoBanner from '../components/profile/SvipPromoBanner.vue'
 import VipMembershipSheet from '../components/profile/VipMembershipSheet.vue'
@@ -52,6 +53,17 @@ function onLogout() {
         <!-- 资料卡 -->
         <ProfileCard :user="user" :quota="profile.quota" />
 
+        <RouterLink to="/profile/colab" class="bg-surface-container-lowest rounded-xl shadow-sm p-space-md flex items-center justify-between gap-space-md hover:bg-surface-container-low transition-colors">
+          <div class="flex items-center gap-space-md">
+            <span class="material-symbols-outlined text-primary" aria-hidden="true">cloud_sync</span>
+            <div class="flex flex-col">
+              <span class="font-title-sm text-title-sm text-on-surface">Colab 授权</span>
+              <span class="text-body-sm text-outline">连接 Google 账号，启用云端转写与剪辑</span>
+            </div>
+          </div>
+          <span class="material-symbols-outlined text-outline" aria-hidden="true">chevron_right</span>
+        </RouterLink>
+
         <!-- 配额 -->
         <div class="flex flex-col gap-space-sm">
           <QuotaDashboard :quota="profile.quota" />
@@ -59,6 +71,8 @@ function onLogout() {
         </div>
 
         <!-- 排版与引擎配置 -->
+        <LlmSettingsCard />
+
         <div class="flex flex-col gap-space-sm">
           <span class="font-title-sm text-title-sm text-on-surface px-space-xs">转书排版与 AI 引擎配置</span>
           <div class="bg-surface-container-lowest rounded-xl shadow-sm overflow-hidden flex flex-col">

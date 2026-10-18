@@ -14,7 +14,7 @@ export type RunStatus =
 /** 后端错误信封 */
 export interface ApiError {
   error: {
-    code: string
+    code: string | number
     message: string
     details?: unknown
   }
@@ -57,11 +57,25 @@ export interface Book {
   source_badge: string
   source_kind: string
   pages: number
+  /** 封面页数单位（mock 档「页」；live 档 run 无页数概念，用讲数「讲」） */
+  pages_unit?: string
   footer_badge: string
   features: { icon: string; label: string; color: string }[]
   toc_count: number
   /** 滚动横幅补充信息 */
   read_meta?: string
+  /** 源 run 状态（live 档：横幅「最近精讲」选书用） */
+  status?: RunStatus
+  /** 源 run 创建时间（created 倒序选最新） */
+  created?: string
+}
+
+/** 教材目录章节（TocSheet 用；live 档由 /runs/{id}/note 派生） */
+export interface TocChapter {
+  no: number
+  title: string
+  meta: string
+  state: 'done' | 'current' | 'locked' | 'quiz'
 }
 
 export type BookCategory = 'ai' | 'math' | 'econ' | 'lang'

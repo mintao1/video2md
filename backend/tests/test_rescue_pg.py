@@ -21,7 +21,7 @@ if not DSN:
     import pytest
     pytest.skip("未配 V2MD_TEST_PG_DSN（rescue PG E2E 只在有库的环境跑）", allow_module_level=True)
 
-REPO = Path(__file__).resolve().parents[2]  # 仓根（deploy/ scripts/ 留根）
+REPO = Path(__file__).resolve().parents[2]  # 仓根（deploy/ 留根）
 TMP = Path(tempfile.mkdtemp(prefix="v2md-rescue-pg-"))
 VAULT = TMP / "vault"
 POOL_PORT = 9799
@@ -89,7 +89,7 @@ try:
              "V2MD_CLIPS_SOURCE": "remote", "PYTHONUNBUFFERED": "1",
              "V2MD_PORT": str(POOL_PORT + 1)}  # healthz 防护探测位（本测试无 api 在跑）
     (VAULT / "资料库" / "视频笔记").mkdir(parents=True, exist_ok=True)
-    r = subprocess.run([sys.executable, str(REPO / "scripts" / "rescue_partial.py"),
+    r = subprocess.run([sys.executable, str(REPO / "backend" / "scripts" / "rescue_partial.py"),
                         "resc1", "--max-entries", "1", "--no-tmp-guard"],
                        env=r_env, capture_output=True, text=True,
                        cwd=str(REPO), timeout=900)

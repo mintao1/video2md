@@ -151,18 +151,14 @@ class WeChatProvider(AuthProvider):
         return self._get_json_direct("https://api.weixin.qq.com/sns/userinfo?" + urlencode({
             "access_token": access_token, "openid": openid, "lang": "zh_CN"}))
 
-
-def _get_json_direct(url: str) -> dict:
-    """GET → JSON：urllib 直连且显式禁代理（api.weixin.qq.com 国内站，不走境外
-    隧道出口），10s 超时。微信系 provider 共用。"""
-    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
-    req = urllib.request.Request(url, headers={"User-Agent": "acctkit"})
-    with opener.open(req, timeout=10) as resp:
-        return json.loads(resp.read().decode("utf-8"))
-
-
-# 打桩缝：类属性直引模块函数（行为等价，实例可覆写——测试 _StubWeChat 覆写本方法即断网）
-WeChatProvider._get_json_direct = staticmethod(_get_json_direct)
+    @staticmethod
+    def _get_json_direct(url: str) -> dict:
+        """GET → JSON：urllib 直连且显式禁代理（api.weixin.qq.com 国内站，不走境外
+        隧道出口），10s 超时。打桩缝：测试 _StubWeChat 覆写本方法即断网。"""
+        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+        req = urllib.request.Request(url, headers={"User-Agent": "acctkit"})
+        with opener.open(req, timeout=10) as resp:
+            return json.loads(resp.read().decode("utf-8"))
 
 
 class DevProvider(AuthProvider):

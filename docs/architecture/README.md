@@ -8,7 +8,7 @@
 |---|---|---|
 | [01-overview.md](01-overview.md) | 系统总览：上下文、核心数据流、设计哲学 | 所有人 |
 | [02-runtime-topology.md](02-runtime-topology.md) | 运行拓扑与部署形态：进程/容器/网络视图、安全组口径 | 部署/运维 |
-| [03-api-contract.md](03-api-contract.md) | HTTP 契约 + 鉴权账目：端点、错误信封、匿名面清单 | 前端/插件/集成方 |
+| [03-api-contract.md](03-api-contract.md) | HTTP 契约 + 鉴权账目：端点、错误信封、匿名面清单 | 前端/集成方 |
 | [04-data-and-consistency.md](04-data-and-consistency.md) | 数据与一致性：存储分派、PG 表、幂等、备份、迁移纪律 | 后端 |
 | [05-security.md](05-security.md) | 安全：威胁模型、鉴权、匿名面、密钥管理、上线检查清单 | 安全评审/部署 |
 | [06-observability.md](06-observability.md) | 可观测性：三层模型、指标清单、告警链、watchdog | 运维/SRE |
@@ -48,7 +48,7 @@
 | 阶段 | 落地内容 | 状态 |
 |---|---|---|
 | P1/P2（e320ee5） | 并发闸门 `V2MD_MAX_CONCURRENT_RUNS`、配额限流三闸（429 统一信封）、`POST /uploads` 上传面 + 路径白名单、GHCR 发布流水线（tag 驱动 + `deploy.sh`）、`backup.sh` rclone 异地钩子 | ✅ |
-| P3 | 存储分派 `json｜postgres`：`V2MD_RUNS/STATE/USERS_STORE` 三存储 + checkpointer 同池、`V2MD_EVENTS=pg`（LISTEN/NOTIFY 跨进程 SSE 扇出）、存量导入 `scripts/migrate_json_to_pg.py` | ✅ |
+| P3 | 存储分派 `json｜postgres`：`V2MD_RUNS/STATE/USERS_STORE` 三存储 + checkpointer 同池、`V2MD_EVENTS=pg`（LISTEN/NOTIFY 跨进程 SSE 扇出）、存量导入 `backend/scripts/migrate_json_to_pg.py` | ✅ |
 | P4b（3f7bb1a） | 任务表 **PG 读侧真相源**（`V2MD_TASKS_STORE=postgres`）：`/queue`·配额·dedup·watchdog 大盘巡检·启动认领恢复走 `v2md_runs`；events `v2md_cmds` 心跳广播；多副本 tmp 保护 | ✅（读侧；写路径仍进程内，见 [04 篇](04-data-and-consistency.md#任务表两档口径)） |
 
 **距「完整多副本生产」尚差四件**（原 README 出界项，全部已入 ROADMAP）：

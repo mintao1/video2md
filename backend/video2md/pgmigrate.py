@@ -30,6 +30,8 @@ if TYPE_CHECKING:
 MIGRATIONS: list[tuple[int, str]] = [
     (1, "0001_init.sql"),
     (2, "0002_membership.sql"),
+    (3, "0003_prefs.sql"),
+    (4, "0004_llm_settings.sql"),
 ]
 SCHEMA_LATEST = MIGRATIONS[-1][0]
 

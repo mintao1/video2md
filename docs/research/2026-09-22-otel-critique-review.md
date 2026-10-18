@@ -37,7 +37,7 @@ SpanContext 携带 trace_id、SDK 照单全收。`observability.py:177-181` 用�
 锚点（`SpanContext(trace_id=sha256("serve-"+run_id)[:32], is_remote=True)`）钉死
 traceId，**2026-09-22 实测端到端成立**：trace `0x5f3c19a3…`（=
 `sha256("serve-da76c99b")[:32]`）原样穿透 app→OTLP→collector→otlphttp→Langfuse
-Cloud，UI 可查。同日 233 个历史 run 的回放（`scripts/otel_replay.py`）复用同一机制
+Cloud，UI 可查。同日 233 个历史 run 的回放（`backend/scripts/otel_replay.py`）复用同一机制
 批量验证通过。
 
 ### 2. `create_trace_id(seed=...)` 方案内部不一致

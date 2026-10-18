@@ -59,7 +59,7 @@
 | | 内容 |
 |---|---|
 | **叙述** | 「Postgres 承载 users / runs / state + checkpointer；单文件 JSON 形态只属开发机」（README L266） |
-| **现实** | 三存储分派 + 迁移脚本真实落地（`pgstore.py`、`auth/pg_store.py`、`scripts/migrate_json_to_pg.py`）。**但全库无任何 schema 版本化机制**：建表 DDL 散在各 store 构造函数里（`pgstore.py:40-51, 88-93`；`auth/pg_store.py:32-44`），`claimed_by` 列靠 `ALTER TABLE ... IF NOT EXISTS` 就地补（`pgstore.py:127`），无 `schema_version` 表、无 migrations 目录、无回滚概念、无启动期漂移校验 |
+| **现实** | 三存储分派 + 迁移脚本真实落地（`pgstore.py`、`auth/pg_store.py`、`backend/scripts/migrate_json_to_pg.py`）。**但全库无任何 schema 版本化机制**：建表 DDL 散在各 store 构造函数里（`pgstore.py:40-51, 88-93`；`auth/pg_store.py:32-44`），`claimed_by` 列靠 `ALTER TABLE ... IF NOT EXISTS` 就地补（`pgstore.py:127`），无 `schema_version` 表、无 migrations 目录、无回滚概念、无启动期漂移校验 |
 | **定级依据** | 当下能用（绿字段+幂等 DDL 对单库场景足够），但这是**以技术债计息的方式活着**：第一个需要改列/拆 jsonb/加约束的版本到来时，没有任何机制保证「代码版本 ↔ 库结构版本」对齐 |
 
 **批判**：PG 连接池同样裸奔——`pg.py:33-36` 只配了 `min_size=1/max_size=5/autocommit/prepare_threshold=0`，无 `connect_timeout`、无池获取超时、无语句超时：PG 挂起时请求线程会无限期阻塞在池获取上，把「数据库故障」放大成「API 全挂」。企业基线：任何外部依赖的连接必须带超时预算。

@@ -55,6 +55,24 @@ class PostgresRunsStore:
             out[rec["run_id"]] = rec
         return out
 
+    def delete_terminal(self, run_id: str, owner: str) -> bool:
+        with self.pool.connection() as conn:
+            row = conn.execute("""
+                UPDATE v2md_runs SET record=record || '{"deleted":true}'::jsonb, updated=now()
+                WHERE run_id=%s AND owner=%s AND record->>'deleted' IS DISTINCT FROM 'true'
+                AND status IN ('done', 'partial', 'error') RETURNING run_id
+                """, (run_id, owner)).fetchone()
+        return row is not None
+
+    def patch_owned(self, run_id: str, owner: str, statuses: tuple[str, ...], patch: dict) -> dict | None:
+        with self.pool.connection() as conn:
+            row = conn.execute("""
+                UPDATE v2md_runs SET record = record || %s::jsonb, status = COALESCE(%s, status), updated = now()
+                WHERE run_id=%s AND owner=%s AND record->>'deleted' IS DISTINCT FROM 'true'
+                AND status = ANY(%s) RETURNING record
+                """, (Json(patch), patch.get("status"), run_id, owner, list(statuses))).fetchone()
+        return row[0] if row else None
+
     def merge(self, run: dict) -> None:
         """行级 upsert（原子）。调用方无需持锁——文件档的锁纪律在此内化为行锁。"""
         with self.pool.connection() as conn:
@@ -65,7 +83,8 @@ class PostgresRunsStore:
                     owner = EXCLUDED.owner,
                     status = EXCLUDED.status,
                     created = EXCLUDED.created,
-                    record = EXCLUDED.record,
+                    record = CASE WHEN v2md_runs.record->>'deleted'='true'
+                        THEN EXCLUDED.record || '{"deleted":true}'::jsonb ELSE EXCLUDED.record END,
                     updated = now()""",
                 {"run_id": run.get("run_id", ""),
                  "owner": run.get("owner", "") or "",

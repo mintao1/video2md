@@ -202,10 +202,12 @@ def douyin_direct_resolve(url: str) -> dict:
 
 
 
-def _download_direct(url: str, dst: Path) -> Path:
-    """绕过 yt-dlp 的直链下载（抖音 play 直链 302 到 douyinvod CDN）。"""
-    with httpx.stream("GET", url, follow_redirects=True, timeout=60,
-                      headers={"User-Agent": _DOUYIN_UA, "Referer": "https://www.douyin.com/"}) as r:
+def _download_direct(url: str, dst: Path, *, headers: dict | None = None) -> Path:
+    """绕过 yt-dlp 的直链下载（抖音 play 直链 302 到 douyinvod CDN；百度 dlink 同路）。"""
+    hdrs = dict(headers or {"User-Agent": _DOUYIN_UA,
+                            "Referer": "https://www.douyin.com/"})
+    # 百度 dlink 单文件可上 GB、网盘节点慢，60s 不够；带宽×超时取 600s 上限
+    with httpx.stream("GET", url, follow_redirects=True, timeout=600, headers=hdrs) as r:
         r.raise_for_status()
         with open(dst, "wb") as f:
             for chunk in r.iter_bytes(1 << 18):
@@ -310,7 +312,9 @@ def douyin_user_resolve(url: str, *, max_pages: int = 40, budget_s: float = 240.
     mid = 0
     ws = None
     try:
-        ws = websocket.create_connection(ws_url, timeout=10)
+        # suppress_origin：Chrome 111+ 拒绝带 Origin 头的 WS（除非 --remote-allow-origins），
+        # 抑制 Origin 后握手放行
+        ws = websocket.create_connection(ws_url, timeout=10, suppress_origin=True)
 
         def send(method: str, params: dict | None = None) -> int:
             nonlocal mid
@@ -432,7 +436,6 @@ def douyin_user_resolve(url: str, *, max_pages: int = 40, budget_s: float = 240.
     return entries
 
 
-
 def _clean_ytdlp_err(stderr: str) -> str:
     """yt-dlp stderr 去污：剥掉 requests/urllib3 版本警告行，保住真正的 ERROR 行。"""
     lines = [ln for ln in (stderr or "").splitlines()
@@ -476,7 +479,6 @@ def _subprocess_env(url: str) -> dict | None:
         env.setdefault("no_proxy", env["NO_PROXY"])
         return env
     return None
-
 
 
 def resolve_url(url: str) -> list[dict]:

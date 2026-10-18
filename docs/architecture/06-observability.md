@@ -39,7 +39,7 @@ otel-collector（memory_limiter → batch）
 - LLM 调用渲染为 generation（gen_ai semconv：model/usage/TTFT + prompt/completion 全文经 `_otel` 旁路上云，不落 jsonl/SSE）。
 - 图编排插桩：`GraphObsHandler` 挂 `run_graph` 的 callbacks（`graph:node/state/route/start|end` 零时长点事件；`test_graph_obs.py` 钉字段口径）。
 - **Langfuse 只收生产**：开发机不配 OTEL/LANGFUSE 端点，保持纯本地 jsonl；开发/生产分 Langfuse 项目。
-- **历史回放**：本机时代的 233 个 run（含 Dify 时代真实业务）已一次性回放进 Langfuse，root 属性 `replayed=true` 可过滤；按需再回放 `LANGFUSE_PK=… LANGFUSE_SK=… uv run python scripts/otel_replay.py [--run-id …]`（重复跑产生重复 span；离线测试 `test_otel_replay.py`）。
+- **历史回放**：本机时代的 233 个 run（含 Dify 时代真实业务）已一次性回放进 Langfuse，root 属性 `replayed=true` 可过滤；按需再回放 `LANGFUSE_PK=… LANGFUSE_SK=… uv run --project backend python backend/scripts/otel_replay.py [--run-id …]`（重复跑产生重复 span；离线测试 `test_otel_replay.py`）。
 - 核验陷阱：2026-09-16 后建的 Langfuse 组织 legacy traces API 404、v2 observations 读路径不可靠——**核验以网页 UI 为准**（摄入本身正常；设计评审存档 `docs/research/2026-09-22-otel-critique-review.md`）。
 - **Grafana 访问**：仅绑回环——`ssh -L 3000:127.0.0.1:3000 <server>` 隧道（或反代+自行加访问控制）；已开匿名只读 Viewer（面板仅回环/隧道可达，写操作仍需 admin）。
 - **图调试**：`langgraph dev`（本地 Studio UI 看 checkpoint/单步）走 LangGraph Server 事件流，不经过 `run_graph`，与 api 形态互不干扰。
@@ -61,7 +61,7 @@ otel-collector（memory_limiter → batch）
 
 ## evals 旁路
 
-`scripts/eval_notes.py` 对已完成条目批量打分（DeepEval G-Eval/Faithfulness/Summarization + RAGAS faithfulness），分数回写同 trace，本地落 `docs/evals/baseline-<date>.json` 回归基线（`--compare` 均值跌 >0.05 退出码 2）。在线模式 `V2MD_EVAL=1` 逐条目即评（失败只留痕）。
+`backend/scripts/eval_notes.py` 对已完成条目批量打分（DeepEval G-Eval/Faithfulness/Summarization + RAGAS faithfulness），分数回写同 trace，本地落 `docs/evals/baseline-<date>.json` 回归基线（`--compare` 均值跌 >0.05 退出码 2）。在线模式 `V2MD_EVAL=1` 逐条目即评（失败只留痕）。
 
 ## 已知限制
 

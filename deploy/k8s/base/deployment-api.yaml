@@ -23,7 +23,7 @@ spec:
         app.kubernetes.io/name: video2md
         app.kubernetes.io/component: api
     spec:
-      hostNetwork: true   # 消费 gpu_router(127.0.0.1:9700)/obs(4318)/代理(17898) 全回环
+      hostNetwork: true   # 消费 obs(4318)/代理(17898) 回环；GPU 使用 Colab CLI
       dnsPolicy: ClusterFirstWithHostNet
       serviceAccountName: video2md
       enableServiceLinks: false
@@ -32,6 +32,24 @@ spec:
         runAsNonRoot: true
         runAsUser: 10001
         runAsGroup: 10001
+      # PostgreSQL schema is the deployment gate. The migration container uses the
+      # same image and secret file as the API, so a new revision cannot start against
+      # an older schema.
+      initContainers:
+        - name: migrate
+          image: video2md:0.1.2
+          imagePullPolicy: IfNotPresent
+          command: ["python", "-m", "video2md", "migrate"]
+          env:
+            - name: V2MD_ENV
+              value: production
+            - name: V2MD_SECRETS_FILE
+              value: /run/video2md.env
+          volumeMounts:
+            - name: secrets
+              mountPath: /run/video2md.env
+              subPath: video2md.env
+              readOnly: true
       containers:
         - name: api
           # registry 全名（D2 预构建收官）：制品=CI tag 构建产物（GHCR 灾备副本同 ID）。
@@ -57,12 +75,29 @@ spec:
               value: production
             - name: V2MD_SECRETS_FILE
               value: /run/video2md.env
+            # Production is a shared, multi-user deployment: all durable state and
+            # cross-replica events live in the same PostgreSQL database. V2MD_PG_DSN
+            # is supplied by the mounted secret file and is never committed here.
+            - name: V2MD_CHECKPOINTER
+              value: postgres
+            - name: V2MD_RUNS_STORE
+              value: postgres
+            - name: V2MD_STATE_STORE
+              value: postgres
+            - name: V2MD_USERS_STORE
+              value: postgres
+            - name: V2MD_TASKS_STORE
+              value: postgres
+            - name: V2MD_PREFS_STORE
+              value: postgres
+            - name: V2MD_EVENTS
+              value: pg
             - name: V2MD_REMOTE
-              value: http://127.0.0.1:9700
+              value: colab-cli
             - name: V2MD_OCR_REMOTE
-              value: http://127.0.0.1:9700
+              value: colab-cli
             - name: V2MD_CLIPS_REMOTE
-              value: http://127.0.0.1:9700
+              value: colab-cli
             - name: V2MD_CLIPS_SOURCE
               value: remote
             - name: OTEL_EXPORTER_OTLP_ENDPOINT
@@ -81,6 +116,8 @@ spec:
             - name: http
               containerPort: 8790
           volumeMounts:
+            - name: colab-auth
+              mountPath: /home/appuser/.config/colab-cli
             - name: data   # state.json/runs.json/checkpoints.sqlite/logs（docker 卷原位）
               mountPath: /app/data
             - name: vault   # vault 模式产物卷
@@ -117,6 +154,10 @@ spec:
             periodSeconds: 5
             failureThreshold: 30    # 150s 启动窗口
       volumes:
+        - name: colab-auth
+          hostPath:
+            path: /home/ubuntu/stack/video2md/colab-auth
+            type: Directory
         - name: data
           hostPath:
             path: /var/lib/docker/volumes/video2md_v2md-data/_data

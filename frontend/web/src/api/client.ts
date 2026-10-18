@@ -1,14 +1,20 @@
 // fetch 封装占位：第一版不接线；换真实 API 时 live/* 用它。
 import type { ApiError } from '../types'
 
-export const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:8790'
+const configuredBaseUrl = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim()
+
+// Production is served behind the same TLS origin as the API. Keep local
+// development explicit, while avoiding a localhost API URL in a deployed
+// browser bundle.
+export const BASE_URL = configuredBaseUrl ||
+  (typeof window !== 'undefined' ? window.location.origin : 'http://127.0.0.1:8790')
 
 export function getToken(): string | null {
   return localStorage.getItem('v2md_token')
 }
 
 export class ApiRequestError extends Error {
-  code: string
+  code: string | number
   details?: unknown
   constructor(envelope: ApiError['error']) {
     super(envelope.message)
@@ -18,7 +24,7 @@ export class ApiRequestError extends Error {
   }
 }
 
-export async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+async function response(path: string, init: RequestInit = {}): Promise<Response> {
   const token = getToken()
   const res = await fetch(`${BASE_URL}${path}`, {
     ...init,
@@ -38,5 +44,13 @@ export async function request<T>(path: string, init: RequestInit = {}): Promise<
     }
     throw new ApiRequestError(envelope)
   }
-  return (await res.json()) as T
+  return res
+}
+
+export async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+  return (await (await response(path, init)).json()) as T
+}
+
+export async function requestBlob(path: string): Promise<Blob> {
+  return (await response(path)).blob()
 }

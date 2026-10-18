@@ -7,7 +7,38 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, SecretStr, field_validator
+
+
+class LlmSettingsUpdate(BaseModel):
+    base_url: str = Field(..., min_length=1, max_length=2048)
+    api_key: SecretStr | None = Field(None, max_length=4096)
+    model: str = Field("", max_length=200)
+
+    @field_validator("base_url")
+    @classmethod
+    def normalize_base_url(cls, value: str) -> str:
+        from .llm_settings import normalize_url
+        return normalize_url(value)
+
+    @field_validator("api_key")
+    @classmethod
+    def validate_key(cls, value: SecretStr | None) -> SecretStr | None:
+        if value is None:
+            return None
+        text = value.get_secret_value().strip()
+        if not text:
+            return None  # Blank preserves the saved key; DELETE explicitly clears it.
+        if any(ord(char) < 32 or ord(char) == 127 for char in text):
+            raise ValueError("API Key 不能包含控制字符")
+        return SecretStr(text)
+
+
+class LlmSettingsOut(BaseModel):
+    base_url: str
+    model: str
+    has_api_key: bool
+    configured: bool
 
 # ---------------------------------------------------------------- POST /runs
 
@@ -87,7 +118,9 @@ class ArtifactsAckOut(BaseModel):
 class RunListItem(BaseModel):
     run_id: str
     url: str
+    title: str | None = Field(None, description="教材展示名：art.title → entry.title → url 主机名（教材库页数据源）")
     status: str | None = None
+    queue_pos: int | None = None
     created: str | None = None
     total: int | None = None
     done_entries: int = Field(0, description="note 产物已写成的条目数（skipped 不计入）")
@@ -98,6 +131,23 @@ class RunListItem(BaseModel):
 class RunListOut(BaseModel):
     items: list[RunListItem]
     mode: str = Field(description="当前产物形态 vault|deliver（客户端据此决定拉不拉 bundle）")
+
+
+# ---------------------------------------------------------------- /prefs（教材偏好：收藏/阅读进度）
+
+class PrefsItem(BaseModel):
+    run_id: str
+    fav: bool = False
+    progress: int = Field(0, ge=0, le=100, description="阅读进度 0-100（阅读器页接入后写入）")
+
+
+class PrefsOut(BaseModel):
+    items: list[PrefsItem]
+
+
+class PrefsUpdate(BaseModel):
+    fav: bool | None = None       # None = 本字段不动（部分更新）
+    progress: int | None = Field(None, ge=0, le=100)
 
 
 # ---------------------------------------------------------------- /auth/device/*（设备流登录桥）

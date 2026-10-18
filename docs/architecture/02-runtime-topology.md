@@ -1,5 +1,11 @@
 # 02 · 运行拓扑与部署形态
 
+> 当前 GPU 执行面（2026-10-18）已切换为 Colab CLI：K8s API 清单的三个 REMOTE
+> 均为 `colab-cli`，不要求启动 gpu_router。部署前准备清单指定的独立 Colab 授权目录，
+> 供 UID/GID 10001 写入 token 刷新和会话状态；详见 [README](../../README.md#colab-cli-gpu)。
+> 下文涉及算力池进程的步骤只适用于显式使用 HTTP REMOTE 的兼容部署。
+
+
 - 最后核对：2026-09-24 ｜ 基准：HEAD=f6a4a0e
 - 批判参照：① 入口层/发布层；② 可用性/可运维性
 
@@ -50,7 +56,7 @@
 - 一个域名 + TLS 证书（Google 登录回调要求 https；Caddy 可全自动签续）
 - LLM 端点凭证（openai-compatible 三键）
 - 至少一家 GPU provider 凭证（colab-cli token / kaggle.json / …，缺了对应 provider 自动冷却）
-- Google OAuth「Web」客户端 client_id（后端只验签不持 secret）；插件/CLI 无浏览器登录另备「TV 与 Limited Input」型 client（设备流，需 client_secret）
+- Google OAuth「Web」客户端 client_id（后端只验签不持 secret）；CLI 无浏览器登录另备「TV 与 Limited Input」型 client（设备流，需 client_secret）
 - 两仓库同级放 `~/stack/{video2md,gpu_router}`（别处则设 `GPU_ROUTER_DIR`）
 
 **1. 代码与凭证**（secrets 0600，只放服务器，不进 git）：
@@ -148,11 +154,11 @@ watchdog `V2MD_WATCHDOG_ACTION=exit`（compose 生产已配）：判定卡死 �
 | `V2MD_MAX_CONCURRENT_RUNS` | 执行并发闸门（默认 1=单 worker）；调大前 checkpointer 切 postgres；vault 自托管保持 1 |
 | `V2MD_QUEUE_MAX` / `V2MD_USER_QUEUE_MAX` / `V2MD_USER_SUBMIT_PER_MIN` | 三道提交闸（0=不设限）；PG 档跨副本一致，json 档进程内 |
 | `V2MD_UPLOAD_*` | 上传面：单文件 2GB / 每用户 5GB / TTL 24h（`data/uploads/<uid>/`） |
-| `V2MD_RUNS/STATE/USERS_STORE` `V2MD_TASKS_STORE` `V2MD_EVENTS` | 存储分派与事件扇出档位（详见 [04 篇](04-data-and-consistency.md)）；切换前先 `scripts/migrate_json_to_pg.py` 导存量 |
+| `V2MD_RUNS/STATE/USERS_STORE` `V2MD_TASKS_STORE` `V2MD_EVENTS` | 存储分派与事件扇出档位（详见 [04 篇](04-data-and-consistency.md)）；切换前先 `backend/scripts/migrate_json_to_pg.py` 导存量 |
 | `V2MD_CHECKPOINTER=postgres` + `V2MD_PG_DSN` | 两行进 `secrets/video2md.env`；compose PG 挂 `profiles:["pg"]` 默认不起：`docker compose --profile pg up -d postgres`（PG 未就绪 api fail-fast，restart 自拉起）；checkpoint 易失无存量迁移 |
 | `V2MD_ARTIFACT_MODE=deliver` + `V2MD_OUTBOX_DIR/TTL_H` | 产物不落 vault、bundle+ACK/TTL 即焚（03 篇） |
 
-存量 run 收编（迁移到多用户归属）：`python scripts/migrate_run_owner.py --to <uid> [--status done] [--dry-run]`。
+存量 run 收编（迁移到多用户归属）：`python backend/scripts/migrate_run_owner.py --to <uid> [--status done] [--dry-run]`。
 
 ## 已知限制
 

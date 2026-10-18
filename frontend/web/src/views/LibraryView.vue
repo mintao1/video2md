@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { useLibraryStore } from '../stores/library'
 import { useToastStore } from '../stores/toast'
 import { getToc } from '../api'
-import type { Book } from '../types'
-import type { TocChapter } from '../api/mock/data'
+import type { Book, TocChapter } from '../types'
 import AppHeader from '../components/common/AppHeader.vue'
 import BottomNav from '../components/common/BottomNav.vue'
 import FilterChips from '../components/common/FilterChips.vue'
@@ -17,6 +17,7 @@ import ExportFormatModal from '../components/book/ExportFormatModal.vue'
 
 const lib = useLibraryStore()
 const toast = useToastStore()
+const router = useRouter()
 
 const tocOpen = ref(false)
 const exportOpen = ref(false)
@@ -48,7 +49,8 @@ function openExport(book: Book) {
 }
 
 function onRead(book: Book) {
-  toast.show(`正在加载并渲染《${book.title}》...`)
+  // 进阅读器：起始讲由阅读器按 prefs 进度反推（0 → 第 1 讲）
+  void router.push({ name: 'read', params: { id: book.id } })
 }
 
 function onShare(book: Book) {
@@ -61,7 +63,13 @@ function onExport(format: string) {
 }
 
 function onOpenChapter(ch: TocChapter) {
-  toast.show(`开始进入第 ${ch.no} 章：${ch.title}`)
+  if (activeBook.value) {
+    void router.push({
+      name: 'read',
+      params: { id: activeBook.value.id },
+      query: { ch: ch.no },
+    })
+  }
 }
 
 function onClearSearch() {

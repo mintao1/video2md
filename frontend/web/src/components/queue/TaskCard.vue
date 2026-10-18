@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
+import { downloadBundle } from '../../api'
 import type { RunListItem } from '../../types'
 import ProgressBar from '../common/ProgressBar.vue'
 import { useQueueStore } from '../../stores/queue'
@@ -16,6 +17,31 @@ const emit = defineEmits<{ (e: 'read', run: RunListItem): void }>()
 const queue = useQueueStore()
 const toast = useToastStore()
 
+const busy = ref(false)
+async function action(kind: 'cancel' | 'resume' | 'promote' | 'download') {
+  if (busy.value) return
+  busy.value = true
+  try {
+    if (kind === 'cancel') await queue.pause(props.run.run_id)
+    else if (kind === 'resume') await queue.resume(props.run.run_id)
+    else if (kind === 'promote') await queue.promote(props.run.run_id)
+    else {
+      const url = URL.createObjectURL(await downloadBundle(props.run.run_id))
+      const anchor = document.createElement('a')
+      anchor.href = url
+      anchor.download = `video2md-${props.run.run_id}.zip`
+      document.body.append(anchor)
+      anchor.click()
+      anchor.remove()
+      setTimeout(() => URL.revokeObjectURL(url), 60_000)
+    }
+    toast.show({ cancel: '已提交取消请求', resume: '任务已重新排队', promote: '已设为优先', download: '下载已开始' }[kind])
+  } catch (error) {
+    toast.show(error instanceof Error ? error.message : '操作失败，请稍后重试')
+  } finally { busy.value = false }
+}
+
+
 const isSelected = computed(() => queue.selected.has(props.run.run_id))
 
 const statusBadge = computed(() => {
@@ -23,6 +49,10 @@ const statusBadge = computed(() => {
   switch (r.status) {
     case 'running':
       return { text: '转录处理中', cls: 'bg-primary/10 text-primary' }
+    case 'created':
+      return { text: '待处理', cls: 'bg-surface-container text-outline' }
+    case 'cancelling':
+      return { text: '取消中', cls: 'bg-surface-container text-outline' }
     case 'paused':
       return { text: '已暂停', cls: 'bg-surface-container text-on-surface-variant' }
     case 'queued':
@@ -123,7 +153,7 @@ function fmtEta(sec?: number): string {
 
     <!-- 进度条（running） -->
     <ProgressBar
-      v-if="run.status === 'running'"
+      v-if="run.status === 'running' || run.status === 'cancelling'"
       :value="run.progress"
       color="bg-gradient-to-r from-primary to-secondary"
       height="h-1"
@@ -141,23 +171,27 @@ function fmtEta(sec?: number): string {
     <div v-if="run.status === 'running'" class="flex items-center justify-end gap-space-sm pt-1">
       <button
         class="px-space-md py-1.5 rounded-lg bg-surface-container text-on-surface-variant font-label-md text-label-md active:scale-95 transition-transform flex items-center gap-1"
-        @click="queue.pause(run.run_id)"
+        :disabled="busy" @click="action('cancel')"
       >
-        <span class="material-symbols-outlined text-[16px]">pause</span>
-        暂停任务
+        <span class="material-symbols-outlined text-[16px]">cancel</span>
+        取消任务
       </button>
     </div>
 
+    <div v-else-if="run.status === 'cancelling'" class="text-outline font-label-sm text-label-sm">
+      正在等待当前处理阶段结束
+    </div>
+
     <div
-      v-else-if="run.status === 'paused'"
+      v-else-if="run.status === 'paused' || run.status === 'error'"
       class="flex items-center justify-between bg-surface-container-low px-space-md py-space-sm rounded-lg"
     >
       <div class="flex items-center gap-space-xs text-on-surface-variant font-label-sm text-label-sm">
         <span class="material-symbols-outlined text-[18px] text-outline">pause_circle</span>
-        <span>已暂停 · 等待恢复</span>
+        <span>任务已结束，可重新排队</span>
       </div>
-      <button class="font-label-sm text-label-sm text-primary font-semibold active:opacity-75" @click="queue.resume(run.run_id)">
-        继续任务
+      <button class="font-label-sm text-label-sm text-primary font-semibold active:opacity-75" :disabled="busy" @click="action('resume')">
+        重试任务
       </button>
     </div>
 
@@ -169,12 +203,15 @@ function fmtEta(sec?: number): string {
         <span class="material-symbols-outlined text-[18px] text-outline">hourglass_top</span>
         <span>等待中</span>
       </div>
+      <div class="flex items-center gap-3">
+      <button class="font-label-sm text-label-sm text-outline" :disabled="busy" @click="action('cancel')">取消排队</button>
       <button
         class="font-label-sm text-label-sm text-primary font-semibold active:opacity-75"
-        @click="queue.promote(run.run_id), toast.show('已设为优先，将最先开始转换')"
+        :disabled="busy" @click="action('promote')"
       >
         设为优先
       </button>
+      </div>
     </div>
 
     <div v-else-if="run.status === 'done' || run.status === 'partial'" class="flex items-center gap-space-sm pt-1">
@@ -185,24 +222,18 @@ function fmtEta(sec?: number): string {
         <span class="material-symbols-outlined text-[18px]">menu_book</span>
         立即阅读
       </button>
+      <button v-if="run.status === 'partial'" class="font-label-sm text-label-sm text-primary"
+        :disabled="busy" @click="action('resume')">补跑失败条目</button>
       <button
         v-if="run.bundle_ready"
         class="px-space-md py-2 rounded-lg bg-surface-container text-on-surface-variant font-label-md text-label-md active:scale-95 transition-transform flex items-center gap-1"
-        @click="toast.show('正在下载产物包（deliver 模式一次性拉取）...')"
+        :disabled="busy" @click="action('download')"
       >
         <span class="material-symbols-outlined text-[18px]">download</span>
         下载
       </button>
     </div>
 
-    <div v-else-if="run.status === 'error'" class="flex items-center justify-end gap-space-sm pt-1">
-      <button
-        class="px-space-md py-1.5 rounded-lg bg-surface-container text-on-surface-variant font-label-md text-label-md active:scale-95 transition-transform flex items-center gap-1"
-        @click="toast.show('已重新提交该链接（mock）')"
-      >
-        <span class="material-symbols-outlined text-[16px]">replay</span>
-        重试
-      </button>
-    </div>
+
   </div>
 </template>
