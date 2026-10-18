@@ -23,7 +23,7 @@ spec:
         app.kubernetes.io/name: video2md
         app.kubernetes.io/component: api
     spec:
-      hostNetwork: true   # 消费 obs(4318)/代理(17898) 回环；GPU 使用 Colab CLI
+      hostNetwork: true   # 消费 obs(4318)/代理(17898)/gpu-router(9700) 回环
       dnsPolicy: ClusterFirstWithHostNet
       serviceAccountName: video2md
       enableServiceLinks: false
@@ -39,6 +39,10 @@ spec:
         - name: migrate
           image: video2md:0.1.3
           imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
           command: ["python", "-m", "video2md", "migrate"]
           env:
             - name: V2MD_ENV
@@ -93,11 +97,11 @@ spec:
             - name: V2MD_EVENTS
               value: pg
             - name: V2MD_REMOTE
-              value: colab-cli
+              value: http://127.0.0.1:9700
             - name: V2MD_OCR_REMOTE
-              value: colab-cli
+              value: http://127.0.0.1:9700
             - name: V2MD_CLIPS_REMOTE
-              value: colab-cli
+              value: http://127.0.0.1:9700
             - name: V2MD_CLIPS_SOURCE
               value: remote
             - name: OTEL_EXPORTER_OTLP_ENDPOINT
@@ -116,8 +120,6 @@ spec:
             - name: http
               containerPort: 8790
           volumeMounts:
-            - name: colab-auth
-              mountPath: /home/appuser/.config/colab-cli
             - name: data   # state.json/runs.json/checkpoints.sqlite/logs（docker 卷原位）
               mountPath: /app/data
             - name: vault   # vault 模式产物卷
@@ -154,10 +156,6 @@ spec:
             periodSeconds: 5
             failureThreshold: 30    # 150s 启动窗口
       volumes:
-        - name: colab-auth
-          hostPath:
-            path: /home/ubuntu/stack/video2md/colab-auth
-            type: Directory
         - name: data
           hostPath:
             path: /var/lib/docker/volumes/video2md_v2md-data/_data
