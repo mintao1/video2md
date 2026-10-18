@@ -21,8 +21,9 @@ test_e2e.sh
 .DS_Store
 docker-compose*.yml
 deploy/
-# 布局分层后：镜像只 COPY backend/{video2md,acctkit}——前端与测试不进 context
-frontend/
+# 生产镜像内置前端 bundle；只排除本地依赖和构建产物。
+frontend/web/node_modules/
+frontend/web/dist/
 backend/tests/
 **/llm-settings.json
 **/llm-settings.lock
