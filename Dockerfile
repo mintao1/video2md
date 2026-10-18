@@ -70,7 +70,8 @@ EXPOSE 8790
 
 # 非 root 运行（平台基线 L0：ADR-0020）
 RUN useradd -u 10001 -m -d /home/appuser appuser \
-    && mkdir -p /app/data && chown -R appuser:appuser /home/appuser /app/data /vault
+    && mkdir -p /app/data /vault \
+    && chown -R appuser:appuser /home/appuser /app/data /vault
 USER 10001
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s \
