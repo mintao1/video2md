@@ -32,6 +32,7 @@ spec:
         runAsNonRoot: true
         runAsUser: 10001
         runAsGroup: 10001
+        fsGroup: 10001
       # PostgreSQL schema is the deployment gate. The migration container uses the
       # same image and secret file as the API, so a new revision cannot start against
       # an older schema.
@@ -165,8 +166,8 @@ spec:
             path: /var/lib/docker/volumes/video2md_vault/_data
             type: Directory
         - name: secrets
-          hostPath:
-            path: /home/ubuntu/stack/video2md/secrets
-            type: Directory
+          secret:
+            secretName: video2md-secrets
+            defaultMode: 0440
         - name: tmp
           emptyDir: {}
