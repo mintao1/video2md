@@ -1824,6 +1824,40 @@ def preflight(request: Request, ident: Identity | None = Depends(optional_identi
     return full if _preflight_privileged(host, real_auth and ident is not None) \
         else _preflight_public(full)
 
+
+# The production image also contains the Vite bundle. Keep the API at the root
+# paths for backwards compatibility, and let the final catch-all serve Vue
+# history routes such as /login and /read/:id. If the bundle is not present
+# (tests and API-only development images), these handlers remain ordinary 404s.
+_WEB_DIST = Path(ENV.get("V2MD_WEB_DIST") or "/app/web-dist").resolve()
+_API_PATH_PREFIXES = (
+    "auth/", "runs", "uploads", "settings/", "prefs", "healthz", "preflight",
+    "queue", "me", "quota", "cost", "docs", "openapi", "redoc",
+)
+
+
+def _web_file(path: str) -> FileResponse:
+    candidate = (_WEB_DIST / path).resolve()
+    if _WEB_DIST not in candidate.parents and candidate != _WEB_DIST:
+        raise HTTPException(status_code=404, detail="Not Found")
+    if candidate.is_file():
+        return FileResponse(candidate)
+    if (index := _WEB_DIST / "index.html").is_file():
+        return FileResponse(index)
+    raise HTTPException(status_code=404, detail="Not Found")
+
+
+@app.get("/", include_in_schema=False)
+def web_root() -> FileResponse:
+    return _web_file("index.html")
+
+
+@app.get("/{path:path}", include_in_schema=False)
+def web_fallback(path: str) -> FileResponse:
+    if path.startswith(_API_PATH_PREFIXES):
+        raise HTTPException(status_code=404, detail="Not Found")
+    return _web_file(path)
+
 def cmd_api(port: int) -> None:
     # launchd/容器环境 PATH 极简，补齐框架/homebrew 路径让子进程找得到 yt-dlp/whisper/ffmpeg
     os.environ["PATH"] = ":".join([

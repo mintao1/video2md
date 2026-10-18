@@ -2,6 +2,18 @@
 # 转写/OCR/剪辑默认走 Colab CLI，见 README 的 Colab CLI GPU 配置）。
 # 在目标架构上构建（服务器 x86：直接在目标机上 docker build，避免 Mac arm64 交叉构建；
 # CI/registry 走 buildx 多架构，见 .github/workflows/ci.yml 的 release job）。
+
+# 同一镜像携带生产 Web bundle，避免公网 Nginx 落回默认欢迎页；API 仍可
+# 单独运行，bundle 不存在时不会改变 API-only 行为。
+FROM node:24-alpine AS web-build
+WORKDIR /web
+COPY frontend/web/package.json frontend/web/package-lock.json ./
+RUN npm ci --no-audit --no-fund
+COPY frontend/web/ ./
+ARG VITE_API_BASE_URL=""
+ENV VITE_API_BASE_URL="${VITE_API_BASE_URL}"
+RUN npm run build
+
 FROM python:3.12-slim
 
 # 版本注入（CI release job 传 --build-arg；本地构建缺省空，运行时版本以 pyproject 兜底为准）
@@ -42,6 +54,7 @@ RUN uv sync --frozen --no-dev --extra evals
 COPY backend/video2md/ ./video2md/
 COPY backend/acctkit/ ./acctkit/
 COPY backend/gpu_plugins/ ./gpu_plugins/
+COPY --from=web-build /web/dist/ ./web-dist/
 COPY README.md ./
 
 ENV PATH="/app/.venv/bin:$PATH" \
