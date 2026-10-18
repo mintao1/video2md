@@ -14,16 +14,25 @@ import time
 from pathlib import Path
 
 import httpx
+import pytest
 
 V2MD_ROOT = Path(__file__).resolve().parent.parent          # backend/
 GPU_ROUTER_ROOT = (V2MD_ROOT.parent.parent / "gpu-router").resolve()  # 平台工作区兄弟仓
 sys.path.insert(0, str(GPU_ROUTER_ROOT))
 
 from fastapi.testclient import TestClient
-from gpu_router.config import load_config
-from gpu_router.router import Router
-from gpu_router.server import create_app
-from gpu_router.state import StateStore
+try:
+    from gpu_router.config import load_config
+    from gpu_router.router import Router
+    from gpu_router.server import create_app
+    from gpu_router.state import StateStore
+except ModuleNotFoundError as exc:
+    if exc.name == "gpu_router":
+        pytest.skip(
+            "gpu_router sibling repository is not checked out; run this suite in the platform workspace",
+            allow_module_level=True,
+        )
+    raise
 
 FAILED: list[str] = []
 
