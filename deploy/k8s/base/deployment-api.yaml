@@ -38,7 +38,7 @@ spec:
       # an older schema.
       initContainers:
         - name: migrate
-          image: video2md:0.1.3
+          image: video2md:0.2.0
           imagePullPolicy: IfNotPresent
           securityContext:
             allowPrivilegeEscalation: false
@@ -48,6 +48,13 @@ spec:
           env:
             - name: V2MD_ENV
               value: production
+            # config 启动期校验与 api 容器同口径（secret 可能设 V2MD_AUTH=google）
+            - name: V2MD_PUBLIC_BASE_URL
+              value: https://ferosse.tech
+            - name: V2MD_WEB_BASE_URL
+              value: https://ferosse.tech
+            - name: V2MD_GOOGLE_OAUTH_TIMEOUT_S
+              value: "15"
             - name: V2MD_SECRETS_FILE
               value: /run/video2md.env
           volumeMounts:
@@ -59,7 +66,7 @@ spec:
         - name: api
           # registry 全名（D2 预构建收官）：制品=CI tag 构建产物（GHCR 灾备副本同 ID）。
           # 服务器落地流：gh run download artifact → gunzip | ctr import（无 packages 凭证通道）。
-          image: video2md:0.1.3
+          image: video2md:0.2.0
           imagePullPolicy: IfNotPresent
           securityContext:
             allowPrivilegeEscalation: false
@@ -74,10 +81,19 @@ spec:
             - name: V2MD_TRUST_XFF
               value: "on"
             - name: V2MD_ENV
-              # 2026-09-27 第十四窗升回 production：google 凭证已配（secrets/video2md.env
-              # V2MD_AUTH=google + TV 型 client——设备流桥 google_device 同批启用）；
-              # P0-1 防呆（production 禁无鉴权）从此常态执法。纵深叠加 iptables 8790 白名单。
               value: production
+            - name: V2MD_AUTH
+              value: google
+            - name: V2MD_AUTH_PROVIDERS
+              value: google
+            # 同源部署：API 与 Vite bundle 都在 ferosse.tech。Google 控制台登记的
+            # redirect_uri 须逐字等于 https://ferosse.tech/auth/google/callback。
+            - name: V2MD_PUBLIC_BASE_URL
+              value: https://ferosse.tech
+            - name: V2MD_WEB_BASE_URL
+              value: https://ferosse.tech
+            - name: V2MD_GOOGLE_OAUTH_TIMEOUT_S
+              value: "15"
             - name: V2MD_SECRETS_FILE
               value: /run/video2md.env
             # Production is a shared, multi-user deployment: all durable state and
@@ -110,6 +126,12 @@ spec:
             - name: OTEL_SERVICE_NAME
               value: video2md
             - name: V2MD_PROXY
+              value: http://127.0.0.1:17898
+            # OAuth token exchange uses httpx.AsyncClient and reads the standard
+            # proxy variables; V2MD_PROXY only applies to yt-dlp subprocesses.
+            - name: HTTP_PROXY
+              value: http://127.0.0.1:17898
+            - name: HTTPS_PROXY
               value: http://127.0.0.1:17898
             - name: V2MD_PROXY_DOMESTIC
               value: "1"

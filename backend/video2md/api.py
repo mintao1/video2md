@@ -878,9 +878,33 @@ async def _recover_interrupted(be) -> int:
 
 # ---------------------------------------------------------------- app
 
+def _ensure_database_ready() -> None:
+    """Fail fast when a PostgreSQL-backed component is configured.
+
+    Previously the stores were resolved lazily, so a process could report healthy
+    while still pointing at JSON files (or fail only on the first request).  A
+    production process must either have a complete PostgreSQL configuration or
+    explicitly use the JSON/SQLite development defaults.
+    """
+    pg_keys = ("V2MD_RUNS_STORE", "V2MD_STATE_STORE", "V2MD_USERS_STORE",
+               "V2MD_TASKS_STORE", "V2MD_PREFS_STORE", "V2MD_EVENTS",
+               "V2MD_CHECKPOINTER")
+    wants_pg = any((ENV.get(key) or "").strip().lower() == "postgres" or
+                    (key == "V2MD_EVENTS" and (ENV.get(key) or "").strip().lower() == "pg")
+                    for key in pg_keys)
+    if not wants_pg:
+        return
+    from . import pg
+    if not pg.pg_enabled():
+        raise RuntimeError("已启用 PostgreSQL 存储，但未配置 V2MD_PG_DSN")
+    # shared_pool validates the migration version before accepting traffic.
+    pg.shared_pool()
+
+
 @asynccontextmanager
 async def _lifespan(app: FastAPI):
     global _CHECKPOINTER, _ck_closer
+    _ensure_database_ready()
     events.bind_loop(asyncio.get_running_loop())  # SSE 总线钉住主循环（工作线程据此投递）
     _CHECKPOINTER, _ck_closer = make_checkpointer_from_env(ENV)
     # 遥测出口：OTEL_EXPORTER_OTLP_ENDPOINT（collector）> LANGFUSE 直连 > 纯本地 jsonl
@@ -1163,6 +1187,15 @@ _GOOGLE_OAUTH_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 _GOOGLE_OAUTH_TOKEN_URL = "https://oauth2.googleapis.com/token"
 _GOOGLE_STATE_TTL_S = 600
 _GOOGLE_OAUTH_STATES: dict[str, float] = {}  # state → 过期时刻（monotonic）。进程内记账
+_GOOGLE_OAUTH_REDIRECTS: dict[str, str] = {}  # state → 登录后回到的站内路径（随 state 一并消费）
+
+
+def _google_oauth_timeout_s() -> float:
+    """Token exchange timeout, bounded so a bad deployment cannot hang callbacks."""
+    try:
+        return min(60.0, max(3.0, float(ENV.get("V2MD_GOOGLE_OAUTH_TIMEOUT_S", "15"))))
+    except (TypeError, ValueError):
+        return 15.0
 # 口径同 _DEVICE_WIN：单节点单副本安全；多副本各副本独立 dict 会挂——扩副本前先挪共享存储。
 
 
@@ -1192,12 +1225,30 @@ def _google_state_purge() -> None:
     now = time.monotonic()
     for k in [k for k, exp in _GOOGLE_OAUTH_STATES.items() if exp <= now]:
         _GOOGLE_OAUTH_STATES.pop(k, None)
+    for k in [k for k in _GOOGLE_OAUTH_REDIRECTS if k not in _GOOGLE_OAUTH_STATES]:
+        _GOOGLE_OAUTH_REDIRECTS.pop(k, None)
 
 
-def _google_error_redirect(msg: str) -> RedirectResponse:
+def _google_safe_redirect(path: str) -> str:
+    """只接受站内绝对路径：拒 `//host`、`/\\host`（浏览器按协议相对处理）与控制字符，
+    防开放重定向。不合格一律回空串（= 前端默认页）。"""
+    path = (path or "").strip()
+    if not path.startswith("/") or path.startswith(("//", "/\\")) or len(path) > 512:
+        return ""
+    if any(ord(ch) < 0x20 or ch == "\\" for ch in path):
+        return ""
+    return path
+
+
+def _google_login_url(redirect: str) -> str:
+    base = f"{_google_web_base()}/login"
+    return f"{base}?{urllib.parse.urlencode({'redirect': redirect})}" if redirect else base
+
+
+def _google_error_redirect(msg: str, back: str = "") -> RedirectResponse:
     """浏览器整页导航端点的错误出口：JSON 错误信封对 302 跳转无意义，
-    统一 302 回登录页 fragment，前端 toast 消费。"""
-    return RedirectResponse(f"{_google_web_base()}/login"
+    统一 302 回登录页 fragment，前端 toast 消费。back=站内回跳路径，重试时不丢。"""
+    return RedirectResponse(f"{_google_login_url(back)}"
                             f"#auth_error={urllib.parse.quote(msg)}", status_code=302)
 
 
@@ -1208,21 +1259,25 @@ def _google_finish(resp: RedirectResponse) -> RedirectResponse:
 
 
 @app.get("/auth/google/login", summary="Google 授权码流发起：302 到 Google 授权页")
-async def auth_google_login(request: Request) -> RedirectResponse:
+async def auth_google_login(request: Request, redirect: str = "") -> RedirectResponse:
     """网页端登录入口（整页跳转）：与设备流并存的第二条 Google 登录路——本端点只负责
     发起，真正换票/验签在 /auth/google/callback。IP 滑窗复用设备流闸（护 Google 出网
     配额；超限也走 fragment 错误出口——429 JSON 对浏览器导航无意义）。"""
     try:
         ip = _admit_device(request, label="GET /auth/google/login")
     except HTTPException:
-        return _google_error_redirect(f"请求过频（限 {DEVICE_RATE_PER_MIN} 次/分钟/IP），稍后重试")
+        return _google_error_redirect(f"请求过频（限 {DEVICE_RATE_PER_MIN} 次/分钟/IP），稍后重试",
+                                      _google_safe_redirect(redirect))
+    back = _google_safe_redirect(redirect)
     cid, secret = _google_web_creds()
     if not (cid and secret):
         _req_log("GET", "/auth/google/login", 500, user=f"(anon:{ip})")
-        return _google_error_redirect("服务端未配置 Google 登录凭据")
+        return _google_error_redirect("服务端未配置 Google 登录凭据", back)
     _google_state_purge()
     state = secrets.token_urlsafe(32)
     _GOOGLE_OAUTH_STATES[state] = time.monotonic() + _GOOGLE_STATE_TTL_S
+    if back:
+        _GOOGLE_OAUTH_REDIRECTS[state] = back
     q = urllib.parse.urlencode({
         "client_id": cid,
         "redirect_uri": f"{_google_public_base()}/auth/google/callback",
@@ -1249,36 +1304,42 @@ async def auth_google_callback(request: Request, code: str = "", state: str = ""
     同口径归并同一 uid。"""
     ip = _client_ip(request)
     exp = _GOOGLE_OAUTH_STATES.pop(state, None) if state else None
+    back = _GOOGLE_OAUTH_REDIRECTS.pop(state, "") if state else ""
     cookie_state = request.cookies.get("v2md_oauth_state") or ""
     if exp is None or exp <= time.monotonic() or cookie_state != state:
         _req_log("GET", "/auth/google/callback", 400, user=f"(anon:{ip})")
-        return _google_finish(_google_error_redirect("登录状态已过期或校验失败，请重新登录"))
+        return _google_finish(_google_error_redirect("登录状态已过期或校验失败，请重新登录", back))
     if not code:
-        return _google_finish(_google_error_redirect("Google 未返回授权码（用户可能取消了授权）"))
+        return _google_finish(_google_error_redirect("Google 未返回授权码（用户可能取消了授权）", back))
     cid, secret = _google_web_creds()
     redirect_uri = f"{_google_public_base()}/auth/google/callback"
     try:
-        async with httpx.AsyncClient(timeout=15) as c:
+        async with httpx.AsyncClient(timeout=_google_oauth_timeout_s()) as c:
             r = await c.post(_GOOGLE_OAUTH_TOKEN_URL,
                              data={"code": code, "client_id": cid, "client_secret": secret,
                                    "redirect_uri": redirect_uri,
                                    "grant_type": "authorization_code"})
     except Exception as exc:
-        return _google_finish(_google_error_redirect(f"Google 换票不可达（{type(exc).__name__}）"))
+        # Keep the failure actionable without ever logging code/state/credentials.
+        _req_log("POST", "/auth/google/token", 503, user=f"(anon:{ip})",
+                 error_type=type(exc).__name__, timeout_s=_google_oauth_timeout_s())
+        return _google_finish(_google_error_redirect(f"Google 换票不可达（{type(exc).__name__}）", back))
     if r.status_code != 200:
-        return _google_finish(_google_error_redirect("Google 授权码无效或已使用，请重新登录"))
+        _req_log("POST", "/auth/google/token", r.status_code, user=f"(anon:{ip})",
+                 error_type="oauth_http_error")
+        return _google_finish(_google_error_redirect("Google 授权码无效或已使用，请重新登录", back))
     idt = str(r.json().get("id_token") or "")
     if not idt:
-        return _google_finish(_google_error_redirect("Google 未返回 id_token"))
+        return _google_finish(_google_error_redirect("Google 未返回 id_token", back))
     from acctkit.providers import GoogleProvider
 
     try:
         await asyncio.to_thread(GoogleProvider(cid)._verify, idt)
     except Exception:
-        return _google_finish(_google_error_redirect("Google ID-Token 校验失败"))
+        return _google_finish(_google_error_redirect("Google ID-Token 校验失败", back))
     _req_log("GET", "/auth/google/callback", 302, user=f"(anon:{ip})")
     # id_token 是 base64url JWT（fragment 字符集安全，无需再编码）；fragment 不落服务端日志。
-    return _google_finish(RedirectResponse(f"{_google_web_base()}/login#id_token={idt}",
+    return _google_finish(RedirectResponse(f"{_google_login_url(back)}#id_token={idt}",
                                            status_code=302))
 
 
@@ -1780,11 +1841,16 @@ def get_me(ident: Identity = Depends(current_identity)) -> dict:
           summary="本人会员配额与统计（展示档，来自 v2md_membership；不参与提交强制）")
 def get_quota(ident: Identity = Depends(current_identity)) -> dict:
     row = _membership_row(ident.uid) or {}
+    # 已生成教材数取 runs 真相源（与教材库同口径：本人、未删、done/partial），
+    # 不读 membership.stats_books——该列无写入方，恒为 0。
+    books = sum(1 for r in _load_runs().values()
+                if (r.get("owner", "") or "") == ident.uid and not r.get("deleted")
+                and r.get("status") in ("done", "partial"))
     return {"ai_hours_used": float(row.get("ai_hours_used") or 0),
             "ai_hours_total": float(row.get("ai_hours_total") or 0),
             "storage_gb_used": float(row.get("storage_gb_used") or 0),
             "storage_gb_total": float(row.get("storage_gb_total") or 0),
-            "stats": {"books": int(row.get("stats_books") or 0),
+            "stats": {"books": books,
                       "knowledge_points": int(row.get("stats_knowledge_points") or 0),
                       "accuracy": float(row.get("stats_accuracy") or 0)}}
 
