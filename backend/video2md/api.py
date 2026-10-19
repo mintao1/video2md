@@ -1196,6 +1196,16 @@ def _google_oauth_timeout_s() -> float:
         return min(60.0, max(3.0, float(ENV.get("V2MD_GOOGLE_OAUTH_TIMEOUT_S", "15"))))
     except (TypeError, ValueError):
         return 15.0
+
+
+def _google_oauth_proxy() -> str | None:
+    """Optional dedicated OAuth proxy; reject the retired 17898 endpoint."""
+    proxy = (ENV.get("V2MD_GOOGLE_OAUTH_PROXY_URL") or "").strip()
+    if not proxy:
+        return None
+    if ":17898" in proxy or "127.0.0.1:17898" in proxy:
+        raise RuntimeError("V2MD_GOOGLE_OAUTH_PROXY_URL 指向已弃用的 17898 代理")
+    return proxy
 # 口径同 _DEVICE_WIN：单节点单副本安全；多副本各副本独立 dict 会挂——扩副本前先挪共享存储。
 
 
@@ -1314,7 +1324,8 @@ async def auth_google_callback(request: Request, code: str = "", state: str = ""
     cid, secret = _google_web_creds()
     redirect_uri = f"{_google_public_base()}/auth/google/callback"
     try:
-        async with httpx.AsyncClient(timeout=_google_oauth_timeout_s()) as c:
+        async with httpx.AsyncClient(timeout=_google_oauth_timeout_s(),
+                                     proxy=_google_oauth_proxy()) as c:
             r = await c.post(_GOOGLE_OAUTH_TOKEN_URL,
                              data={"code": code, "client_id": cid, "client_secret": secret,
                                    "redirect_uri": redirect_uri,

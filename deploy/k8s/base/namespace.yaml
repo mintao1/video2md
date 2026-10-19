@@ -8,7 +8,7 @@
 #   - 无 Service（边缘走回环 8790；多副本/集群内发现出现时再立 Service）
 #
 # PSA（2026-10-06 更正）：enforce 由 baseline 改为 privileged。本 ns 的 Pod
-# 用 hostNetwork 消费 gpu_router(127.0.0.1:9700)/obs(4318)/代理(17898)，
+# 用 hostNetwork 消费 gpu_router(127.0.0.1:9700)/obs(4318)；旧代理不再作为默认出口。
 # 而 PSS baseline 明令禁止 host namespaces——两者直接冲突。PSA 豁免只有
 # namespace/username/runtimeClass 三种粒度，无 per-workload 豁免，故 ns 级降级。
 # warn/audit=restricted 零风险（官方定义二者 otherwise allowed，永不拒绝）。

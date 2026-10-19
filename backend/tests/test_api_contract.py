@@ -71,6 +71,7 @@ def _clean_state():
             p.unlink()
     import video2md.api as _api
     _api._GOOGLE_OAUTH_STATES.clear()  # OAuth state 单次消费测试的跨用例泄漏闸
+    _api._GOOGLE_OAUTH_REDIRECTS.clear()
     _api._DEVICE_WIN.clear()           # IP 滑窗跨用例泄漏闸（设备流/授权码流限流共用一桶）
     yield
 
@@ -101,6 +102,32 @@ def test_operational_probes_no_auth(client):
     assert client.get("/preflight").status_code == 200
 
 
+# ---------------------------------------------------------------- 同源 SPA 路由不撞 API
+
+_WEB_ROUTER = Path(__file__).resolve().parents[2] / "frontend/web/src/router/index.ts"
+
+
+def _spa_paths() -> list[str]:
+    import re
+    paths = re.findall(r"path:\s*'([^']+)'", _WEB_ROUTER.read_text(encoding="utf-8"))
+    # 参数段代入样例值；catch-all（`/:pathMatch(.*)*`）不是可直达的具体路由，跳过。
+    return [re.sub(r":\w+", "x", p) for p in paths if p != "/" and "(" not in p]
+
+
+def test_spa_routes_serve_index_not_api(client, monkeypatch, tmp_path):
+    # 生产同源托管 Vite bundle：刷新/直达任一前端路由都必须拿到 index.html；
+    # 前端路由一旦与 API 路由或 _API_PATH_PREFIXES 重名，浏览器会看到 JSON（L-01）。
+    from video2md import api as _api
+    (tmp_path / "index.html").write_text("<!doctype html><div id=app></div>")
+    monkeypatch.setattr(_api, "_WEB_DIST", tmp_path.resolve())
+    paths = _spa_paths()
+    assert "/tasks" in paths and "/login" in paths, paths
+    for path in paths:
+        r = client.get(path, headers={"Accept": "text/html"})
+        assert r.status_code == 200 and r.headers["content-type"].startswith("text/html"), path
+    assert client.get("/queue").json().get("queue_len") == 0  # gpu_router 回读口不受影响
+
+
 # ---------------------------------------------------------------- 配置防呆（P0-1）
 
 def _import_config_with_env(**overrides):
@@ -110,20 +137,29 @@ def _import_config_with_env(**overrides):
     import subprocess
     import sys
     env = {**os.environ, **overrides}
+    # The subprocess runs from backend/, but package=false means video2md is
+    # not installed into the venv. Preserve the same import path pytest uses.
+    env["PYTHONPATH"] = str(Path(__file__).resolve().parent.parent) + os.pathsep + env.get("PYTHONPATH", "")
     return subprocess.run([sys.executable, "-c", "import video2md.config"],
                           capture_output=True, text=True, env=env,
                           cwd=str(Path(__file__).resolve().parent.parent), timeout=60)
 
 
-def test_production_auth_failfast():
-    # production + off / 缺省 → import 期 RuntimeError，stderr 指明两键与修法
-    for bad in ({"V2MD_AUTH": "off"}, {"V2MD_AUTH": ""}):
-        r = _import_config_with_env(V2MD_ENV="production", **bad)
-        assert r.returncode != 0, bad
-        assert "V2MD_AUTH" in r.stderr and "V2MD_ENV" in r.stderr, r.stderr
-    # development + off（本套件自身组合）/ production + google → 放行
-    assert _import_config_with_env(V2MD_ENV="development", V2MD_AUTH="off").returncode == 0
-    assert _import_config_with_env(V2MD_ENV="production", V2MD_AUTH="google").returncode == 0
+def test_production_anonymous_auth_is_rejected():
+    assert _import_config_with_env(V2MD_ENV="production", V2MD_AUTH="off").returncode != 0
+    assert _import_config_with_env(V2MD_ENV="production", V2MD_AUTH="").returncode != 0
+    urls = {"V2MD_PUBLIC_BASE_URL": "https://v.test", "V2MD_WEB_BASE_URL": "https://v.test"}
+    assert _import_config_with_env(V2MD_ENV="production", V2MD_AUTH="google", **urls).returncode == 0
+
+
+def test_production_google_requires_public_urls():
+    # 缺省回落 localhost 会让生产 Google 登录跳回本机——启动期拒绝
+    ok = {"V2MD_PUBLIC_BASE_URL": "https://v.test", "V2MD_WEB_BASE_URL": "https://v.test"}
+    for key in ok:
+        for bad in ("", "http://localhost:5173"):
+            env = {**ok, key: bad}
+            r = _import_config_with_env(V2MD_ENV="production", V2MD_AUTH="google", **env)
+            assert r.returncode != 0 and key in r.stderr, (key, bad)
 
 
 # ---------------------------------------------------------------- /preflight 信息收敛（P0-3）
@@ -145,14 +181,16 @@ def test_config_spec_aggregate_errors_and_empty_clear():
     code = ("import sys; sys.path.insert(0, '.');"
             "import video2md.config as c; print(c.TASKS_STORE, c.UPLOADS_TTL_H)")
     r2 = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True,
-                        env={**os.environ, "V2MD_TASKS_STORE": "",
-                             "V2MD_UPLOADS_TTL_H": ""}, timeout=30)
+                env={**os.environ, "V2MD_TASKS_STORE": "",
+                     "V2MD_UPLOADS_TTL_H": "",
+                     "PYTHONPATH": str(Path(__file__).resolve().parent.parent)}, timeout=30)
     assert r2.stdout.split()[:2] == ["json", "24.0"], \
         f"空串未清空：{r2.stdout}{r2.stderr[:200]}"
     # ③ 显式合法值覆盖默认（合并优先级真实生效）
     r3 = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True,
                         env={**os.environ, "V2MD_TASKS_STORE": "postgres",
-                             "V2MD_UPLOADS_TTL_H": "48"}, timeout=30)
+                             "V2MD_UPLOADS_TTL_H": "48",
+                             "PYTHONPATH": str(Path(__file__).resolve().parent.parent)}, timeout=30)
     assert r3.stdout.split()[:2] == ["postgres", "48.0"], r3.stdout
 
 
@@ -224,6 +262,17 @@ def test_quota_defaults(client):
     assert body["ai_hours_used"] == 0 and body["ai_hours_total"] == 0
     assert body["storage_gb_used"] == 0 and body["storage_gb_total"] == 0
     assert body["stats"] == {"books": 0, "knowledge_points": 0, "accuracy": 0}
+
+
+def test_quota_books_counts_finished_runs(client):
+    # L-09：「已生成教材」= 本人未删的 done/partial run，不读无写入方的 membership 列
+    put_identity("test", "carol", "u_carol123")
+    _seed_run("r_c1", "u_carol123")
+    _seed_run("r_c2", "u_carol123", status="partial")
+    _seed_run("r_c3", "u_carol123", status="error")
+    _seed_run("r_other", "u_someone_else")
+    r = client.get("/quota", headers={"X-Test-Auth": "carol"})
+    assert r.json()["stats"]["books"] == 2
 
 
 def test_no_token_dev_identity_is_stable(client):
@@ -675,6 +724,8 @@ def test_auth_google_login_missing_config(client, monkeypatch):
     r = client.get("/auth/google/login", follow_redirects=False)
     assert r.status_code == 302
     assert "auth_error=" in r.headers["location"]  # 未配凭据 → fragment 错误出口
+    r = client.get("/auth/google/login", params={"redirect": "/tasks"}, follow_redirects=False)
+    assert r.headers["location"].startswith("http://localhost:5173/login?redirect=%2Ftasks#auth_error=")
 
 
 def test_auth_google_login_rate_limit(client):
@@ -722,6 +773,55 @@ def test_auth_google_callback_happy_path(client, monkeypatch):
     assert "st-ok" not in _api._GOOGLE_OAUTH_STATES  # state 单次消费
     assert 'v2md_oauth_state="";' in r.headers.get("set-cookie", "").replace(" ", "") \
         or "v2md_oauth_state=;" in r.headers.get("set-cookie", "")  # cookie 已焚
+
+
+def test_google_oauth_proxy_rejects_retired_17898(monkeypatch):
+    """OAuth must never silently fall back to the retired mihomo 17898 port."""
+    import video2md.api as _api
+    env = dict(_GENV)
+    env["V2MD_GOOGLE_OAUTH_PROXY_URL"] = "http://127.0.0.1:17898"
+    monkeypatch.setattr(_api, "ENV", env)
+    with pytest.raises(RuntimeError, match="17898"):
+        _api._google_oauth_proxy()
+    env["V2MD_GOOGLE_OAUTH_PROXY_URL"] = ""
+    assert _api._google_oauth_proxy() is None
+
+
+def test_auth_google_redirect_round_trip(client, monkeypatch):
+    """L-05：发起时带站内 redirect，随 state 记账，回调落到 /login?redirect=…；
+    站外/协议相对路径不记账（防开放重定向）。"""
+    import urllib.parse as _up
+    import video2md.api as _api
+    from acctkit import providers as _p
+    monkeypatch.setattr(_api, "ENV", dict(_GENV))
+
+    def _state_of(r):
+        return _up.parse_qs(_up.urlparse(r.headers["location"]).query)["state"][0]
+
+    for bad in ("//evil.test/x", "/\\evil.test", "https://evil.test/", "read/x"):
+        st = _state_of(client.get("/auth/google/login", params={"redirect": bad},
+                                  follow_redirects=False))
+        assert st not in _api._GOOGLE_OAUTH_REDIRECTS, bad
+    st = _state_of(client.get("/auth/google/login", params={"redirect": "/read/r1?p=2"},
+                              follow_redirects=False))
+    assert _api._GOOGLE_OAUTH_REDIRECTS[st] == "/read/r1?p=2"
+
+    class _Resp:
+        status_code = 200
+        @staticmethod
+        def json():
+            return {"id_token": "JWT.WT.OK"}
+
+    async def _fake_post(self, url, data=None, **kw):  # noqa: ANN001
+        return _Resp()
+
+    monkeypatch.setattr(httpx.AsyncClient, "post", _fake_post)
+    monkeypatch.setattr(_p.GoogleProvider, "_verify", lambda self, t: {"sub": "s1"})
+    r = client.get(f"/auth/google/callback?code=abc&state={st}",
+                   cookies={"v2md_oauth_state": st}, follow_redirects=False)
+    assert r.headers["location"] == \
+        "http://frontend.test/login?redirect=%2Fread%2Fr1%3Fp%3D2#id_token=JWT.WT.OK"
+    assert st not in _api._GOOGLE_OAUTH_REDIRECTS
 
 
 def test_auth_google_callback_state_rejected(client, monkeypatch):

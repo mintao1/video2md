@@ -23,7 +23,7 @@ spec:
         app.kubernetes.io/name: video2md
         app.kubernetes.io/component: api
     spec:
-      hostNetwork: true   # 消费 obs(4318)/代理(17898)/gpu-router(9700) 回环
+      hostNetwork: true   # 消费 obs(4318)/gpu-router(9700) 回环
       dnsPolicy: ClusterFirstWithHostNet
       serviceAccountName: video2md
       enableServiceLinks: false
@@ -125,14 +125,6 @@ spec:
               value: http://127.0.0.1:4318   # 平台统一观测栈
             - name: OTEL_SERVICE_NAME
               value: video2md
-            - name: V2MD_PROXY
-              value: http://127.0.0.1:17898
-            # OAuth token exchange uses httpx.AsyncClient and reads the standard
-            # proxy variables; V2MD_PROXY only applies to yt-dlp subprocesses.
-            - name: HTTP_PROXY
-              value: http://127.0.0.1:17898
-            - name: HTTPS_PROXY
-              value: http://127.0.0.1:17898
             - name: V2MD_PROXY_DOMESTIC
               value: "1"
             - name: V2MD_WATCHDOG_ACTION

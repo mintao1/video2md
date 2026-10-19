@@ -7,6 +7,16 @@ resources:
   - ../../base
 
 patches:
+  # 17898 is retired; prevent the shared platform ConfigMap from reintroducing
+  # it as ambient proxy settings for OAuth requests.
+  - target:
+      kind: ConfigMap
+      name: common-config
+    patch: |-
+      - op: remove
+        path: /data/HTTP_PROXY
+      - op: remove
+        path: /data/HTTPS_PROXY
   - target:
       kind: Deployment
       name: video2md-api
