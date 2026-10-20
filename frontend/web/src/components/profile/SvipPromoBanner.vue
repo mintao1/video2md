@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import type { User } from '../../types'
+
+defineProps<{ plan: User['plan'] }>()
 const emit = defineEmits<{ (e: 'upgrade'): void }>()
 </script>
 
@@ -25,7 +28,7 @@ const emit = defineEmits<{ (e: 'upgrade'): void }>()
       class="shrink-0 bg-tertiary-fixed text-on-tertiary-fixed font-title-sm text-title-sm px-3.5 py-1.5 rounded-lg shadow-sm hover:brightness-105 active:scale-95 transition-all z-10"
       @click="emit('upgrade')"
     >
-      立即续费
+      {{ plan === 'free' ? '立即升级' : '立即续费' }}
     </button>
   </div>
 </template>

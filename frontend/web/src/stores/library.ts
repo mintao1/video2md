@@ -10,6 +10,7 @@ const VIEW_KEY = 'v2md_library_view'
 export const useLibraryStore = defineStore('library', () => {
   const books = ref<Book[]>([])
   const loading = ref(false)
+  const loadedAt = ref<Date | null>(null)
   const query = ref('')
   const category = ref<'all' | 'fav' | Book['category']>('all')
   const viewMode = ref<ViewMode>((localStorage.getItem(VIEW_KEY) as ViewMode) || 'list')
@@ -42,6 +43,7 @@ export const useLibraryStore = defineStore('library', () => {
     loading.value = true
     try {
       books.value = await api.getBooks()
+      loadedAt.value = new Date()
     } finally {
       loading.value = false
     }
@@ -71,6 +73,7 @@ export const useLibraryStore = defineStore('library', () => {
   return {
     books,
     loading,
+    loadedAt,
     query,
     category,
     viewMode,

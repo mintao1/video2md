@@ -120,7 +120,7 @@ backend/.venv/bin/python backend/scripts/smoke_colab_cli.py --session v2md-smoke
 | | 本地开发（Mac/任意开发机） | 云服务器（生产 · 多用户） |
 |---|---|---|
 | 入口 | `cd backend && uv run python -m video2md api`（或 `graph-run` CLI） | Kubernetes API + Colab CLI + 反代 TLS 域名 |
-| 鉴权 | `V2MD_AUTH=off`（无 token 归同一 dev uid） | `V2MD_AUTH=google`（`Authorization: Bearer <id_token>`；设备流/微信可并列） |
+| 鉴权 | 本地开发可用 `V2MD_AUTH=off`（无 token 归同一 dev uid） | 生产使用 `V2MD_AUTH=google`（`Authorization: Bearer <id_token>`） |
 | OCR | macOS Vision（`uv sync --extra mac`，在 backend/ 下）或 Colab CLI | Colab CLI RapidOCR（Linux 无 Vision） |
 | 转写/剪辑 | 本地 whisper/ffmpeg 或 Colab CLI | Colab CLI T4（镜像不含 whisper/torch） |
 | 出网 | Clash 等本地出口（可选） | `V2MD_PROXY` 出网代理；国内站需大陆住宅类出口（风控，见「出网与风控」） |
@@ -278,13 +278,12 @@ REAL_LLM=1 ./tests/test_e2e.sh        # 烧真实 LLM 的端到端（用 ~/.conf
 本地跨域联调需设置 `V2MD_CORS_ORIGINS=http://localhost:5173`。
 
 - 本地开发身份：`V2MD_AUTH=off` 使用固定 `dev` 身份，不需要手机号或密码；所有请求共享该身份。
-  前端可通过 `http://localhost:5173/login#id_token=local-acceptance-only`
-  进入本地联调。这里的字符串只是开发占位符，不能用于生产登录。
+  前端启动时以无凭据请求探测 `GET /me`，返回 200 即视为匿名模式：直接进入应用，访问 `/login` 会跳回
+  `/library`。启用登录（`V2MD_AUTH=google`）时 `/me` 返回 401，前端要求先通过 Google 登录。
 - 自动化测试身份：`backend/tests/fixtures/web_integration_api.py` 提供 Alice/Bob，
   分别使用 `Authorization: Bearer integration-alice` / `Bearer integration-bob`。
   这两个凭据仅由测试夹具识别；`npm run test:integration` 会自行启动和清理夹具服务。
-- 真实登录：使用 Google 授权码流和自己授权的账号。短信、密码、微信按钮目前仍接 mock，
-  返回的 `mock-id-token` 不能作为生产测试账号。
+- 真实登录：生产前端通过 Google 授权码流登录，后端验签 `id_token`；本地开发可继续使用匿名模式。
 
 测试进程应把 runs/state/users/prefs、上传、日志、vault 和 outbox 指向临时目录，
 PostgreSQL 测试使用专门的可清空数据库。不要把现有业务库交给 `test_pg_stores.py`。
@@ -317,7 +316,7 @@ PostgreSQL 测试使用专门的可清空数据库。不要把现有业务库交
 2. **导出未实现**：教材库选择 Markdown 后仅提示打包，不生成文件；`LibraryView.vue` 的
    `onExport` 仅显示 toast。PDF / EPUB / LaTeX 也共用该处理器。
 3. **同步误报成功**：点击“立即同步”直接显示成功，没有执行刷新/同步；“上次同步于 2 分钟前”是静态文案。
-4. **登录仍有原型入口**：短信、密码、微信返回模拟 token，与真实鉴权后端不兼容。
+4. **生产登录已启用**：前端提供 Google 登录入口，生产部署必须使用 `V2MD_AUTH=google`；`V2MD_AUTH=off` 仅用于本地开发和测试。
 5. **CI lint 失败**：`backend/scripts/otel_replay.py:49` 和
    `backend/scripts/smoke_colab_cli.py:42` 的导入顺序触发 Ruff I001。
 6. **PG 测试模式未恢复**：`test_pg_stores.py` 在事件测试后设置 `V2MD_EVENTS=local`，

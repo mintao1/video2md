@@ -1,0 +1,61 @@
+{
+  "schema_version": "1.0",
+  "name": "video2md-backend-hygiene-regression",
+  "description": "Deterministic regression set for backend test isolation, execution entry points, state-file compatibility, run-context cleanup, and vendor synchronization.",
+  "run": {
+    "from_repo_root": "backend/.venv/bin/python -m pytest backend/tests/test_backend_hygiene.py -q",
+    "from_backend_dir": "../backend/.venv/bin/python -m pytest tests/test_backend_hygiene.py -q",
+    "vendor": "backend/.venv/bin/python -m pytest backend/tests/test_vendor_acctkit.py -q"
+  },
+  "cases": [
+    {
+      "id": "entry-root-import",
+      "layer": "execution",
+      "setup": "cwd is repository root; no PYTHONPATH override",
+      "input": "import video2md.config",
+      "expected": ["import succeeds", "default TASKS_STORE is json", "default UPLOADS_TTL_H is 24.0"]
+    },
+    {
+      "id": "entry-backend-import",
+      "layer": "execution",
+      "setup": "cwd is backend/",
+      "input": "import video2md.config",
+      "expected": ["import succeeds", "same defaults as repo-root invocation"]
+    },
+    {
+      "id": "state-scalar-compatibility",
+      "layer": "evaluation",
+      "setup": "state contains legacy scalar entries and completed record entries",
+      "input": "iterate evaluation targets",
+      "expected": ["scalar entries are skipped", "valid completed entries remain evaluable", "no AttributeError"]
+    },
+    {
+      "id": "run-context-cleanup-success",
+      "layer": "isolation",
+      "setup": "run_graph completes",
+      "input": "read current_run_id after completion",
+      "expected": ["empty run id", "a subsequent direct bump_usage call records nothing"]
+    },
+    {
+      "id": "run-context-cleanup-error",
+      "layer": "isolation",
+      "setup": "run_graph raises from a stage",
+      "input": "read current_run_id after failure",
+      "expected": ["empty run id", "exception is preserved"]
+    },
+    {
+      "id": "global-test-double-restoration",
+      "layer": "isolation",
+      "setup": "run test modules in collection order",
+      "input": "execute Colab machinery tests followed by Colab CLI tests",
+      "expected": ["stop implementation is restored", "CLI session cleanup assertions pass"]
+    },
+    {
+      "id": "acctkit-vendor-sync",
+      "layer": "consistency",
+      "setup": "acctkit-core SSOT is present",
+      "input": "compare kernel files and provider prefix",
+      "expected": ["models/store/engine byte-identical", "providers core prefix identical", "project extension marker present"]
+    }
+  ]
+}

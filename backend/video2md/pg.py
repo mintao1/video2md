@@ -50,7 +50,9 @@ def make_pool(dsn: str) -> ConnectionPool:
                           timeout=t,  # 池获取预算（默认 30s → 跟随统一预算）
                           kwargs={"autocommit": True, "prepare_threshold": 0,
                                   "connect_timeout": int(t),        # 建池/重连 TCP+auth 有界
-                                  "options": f"-c statement_timeout={int(t * 1000)}",
+                                  # Force UTF-8 for migration comments and JSON text even when
+                                  # a legacy database was initialized with SQL_ASCII.
+                                  "options": f"-c statement_timeout={int(t * 1000)} -c client_encoding=UTF8",
                                   # 语句超时：锁等待/挂起查询被打断——池耗尽退化为瞬态
                                   })
 

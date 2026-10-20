@@ -18,6 +18,10 @@ from video2md import graph, observability, runs, util
 _TMP = Path(tempfile.mkdtemp(prefix="video2md-test-graph-"))
 
 # ---- 隔离文件 SSOT：state.json / runs.json / runs.lock / 日志目录全部进 tmp ----
+_ORIG_STATE_FILE = util.STATE_FILE
+_ORIG_LOG_DIR = util.LOG_DIR
+_ORIG_RUNS_FILE = runs.RUNS_FILE
+_ORIG_RUNS_LOCKFILE = runs._RUNS_LOCKFILE
 util.STATE_FILE = _TMP / "state.json"
 util.LOG_DIR = _TMP / "logs"
 runs.RUNS_FILE = _TMP / "runs.json"
@@ -320,5 +324,13 @@ print("✅ 9c. deliver 全链路：note 经 sink 写 outbox → finalize 搬家�
 
 v2config.ARTIFACT_MODE, v2config.OUTBOX_DIR, v2config.OUT_DIR = (
     _orig_mode, _orig_ob, _orig_outdir)
+
+# test_graph.py runs assertions at import/collection time. Restore every shared
+# module global it temporarily redirects so later test modules keep their own
+# persistence roots regardless of pytest collection order.
+util.STATE_FILE = _ORIG_STATE_FILE
+util.LOG_DIR = _ORIG_LOG_DIR
+runs.RUNS_FILE = _ORIG_RUNS_FILE
+runs._RUNS_LOCKFILE = _ORIG_RUNS_LOCKFILE
 
 print("\n✅ test_graph.py 全部通过")

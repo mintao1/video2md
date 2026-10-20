@@ -13,6 +13,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # backend/（包根）
 from video2md import resolve as m
 
+# m.subprocess / m.time 是全局模块：pytest 收集本文件时同进程的其它用例也会受影响，
+# 跑完必须还原（见文末）。
+_ORIG = (subprocess.run, m.time.sleep, m.douyin_user_resolve)
 m.time.sleep = lambda _s: None  # resolve 重试退避在测试里不走真 sleep
 
 FAILED: list[str] = []
@@ -167,6 +170,8 @@ m.douyin_user_resolve = lambda u: (called.setdefault("url", u), [{"url": "x", "i
 e = m.resolve_url(f"https://www.douyin.com/user/{SEC}?vid=999")
 check("进入 douyin_user_resolve", called.get("url", "").endswith(f"/user/{SEC}"), str(called))
 check("返回枚举条目", len(e) == 1 and e[0]["id"] == "1")
+
+subprocess.run, m.time.sleep, m.douyin_user_resolve = _ORIG
 
 print()
 if FAILED:

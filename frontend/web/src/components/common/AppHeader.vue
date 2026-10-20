@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useAuthStore } from '../../stores/auth'
+import { getToken } from '../../api/client'
 import LogoMark from '../art/LogoMark.vue'
 
 defineProps<{ subtitle?: string }>()
@@ -8,6 +9,15 @@ defineProps<{ subtitle?: string }>()
 const emit = defineEmits<{ (e: 'notifications'): void }>()
 
 const auth = useAuthStore()
+const canSignOut = Boolean(getToken())
+// Free users get no badge; paid plans show what /me actually reports.
+const planBadge = computed(() => ({ free: '', pro: 'Pro 会员', svip: 'SVIP 会员' })[auth.user?.plan ?? 'free'])
+
+onMounted(() => {
+  auth.fetchUser().catch(() => {
+    /* a 401 is already handled by the API client */
+  })
+})
 const initial = computed(() => auth.user?.name?.[0] ?? '视')
 const avatarStyle = computed(() => {
   const hue = auth.user?.avatar_hue ?? 258
@@ -40,10 +50,11 @@ const avatarStyle = computed(() => {
           <span class="material-symbols-outlined text-[22px]">notifications</span>
         </button>
         <div
+          v-if="planBadge"
           class="flex items-center gap-0.5 px-2 py-0.5 rounded-full bg-primary/10 text-primary font-label-sm text-[11px] leading-tight font-semibold shadow-sm mr-1"
         >
           <span class="material-symbols-outlined text-[13px] filled">workspace_premium</span>
-          <span>Pro 会员</span>
+          <span>{{ planBadge }}</span>
         </div>
         <RouterLink
           to="/profile"
@@ -52,6 +63,7 @@ const avatarStyle = computed(() => {
         >
           {{ initial }}
         </RouterLink>
+        <button v-if="canSignOut" aria-label="退出登录" class="text-xs text-outline" @click="auth.logout">退出</button>
       </div>
     </div>
   </header>

@@ -1,0 +1,21 @@
+{
+  "n": 60,
+  "route_accuracy": 1.0,
+  "fallback_correctness": 1.0,
+  "failure_taxonomy_accuracy": 1.0,
+  "observability_completeness": 1.0,
+  "failure_cases": [],
+  "failure_classes": {
+    "none": 28,
+    "429": 6,
+    "500": 6,
+    "empty": 6,
+    "timeout": 8,
+    "fallback": 6
+  },
+  "dataset": {
+    "name": "route_contract",
+    "version": "v1",
+    "n": 60
+  }
+}

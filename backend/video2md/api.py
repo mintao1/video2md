@@ -984,8 +984,10 @@ async def _lifespan(app: FastAPI):
         pg.close_shared_pool()  # 三存储/checkpointer/事件扇出共用的进程级池
 
 
+_production = (ENV.get("V2MD_ENV") or "").strip().lower() == "production"
 app = FastAPI(title="video2md", version=VERSION, lifespan=_lifespan,
-              docs_url="/docs", redoc_url=None, openapi_url="/openapi.json")
+              docs_url=None if _production else "/docs", redoc_url=None,
+              openapi_url=None if _production else "/openapi.json")
 app.include_router(colab_auth_router)
 
 # CORS：仅当配了 origin 才挂（同源/SSH 隧道开发不需要，也避免误开 *）
@@ -1345,9 +1347,19 @@ async def auth_google_callback(request: Request, code: str = "", state: str = ""
     from acctkit.providers import GoogleProvider
 
     try:
-        await asyncio.to_thread(GoogleProvider(cid)._verify, idt)
-    except Exception:
-        return _google_finish(_google_error_redirect("Google ID-Token 校验失败", back))
+        await asyncio.to_thread(
+            GoogleProvider(cid, proxy_url=_google_oauth_proxy() or "")._verify,
+            idt,
+        )
+    except Exception as exc:
+        cause = exc.__cause__ or exc.__context__
+        _req_log("POST", "/auth/google/verify", 401, user=f"(anon:{ip})",
+                 error_type=type(exc).__name__,
+                 error_detail=str(exc)[:240],
+                 cause_type=type(cause).__name__ if cause else "",
+                 cause_detail=str(cause)[:240] if cause else "")
+        return _google_finish(_google_error_redirect(
+            f"Google ID-Token 校验失败（{type(exc).__name__}）", back))
     _req_log("GET", "/auth/google/callback", 302, user=f"(anon:{ip})")
     # id_token 是 base64url JWT（fragment 字符集安全，无需再编码）；fragment 不落服务端日志。
     return _google_finish(RedirectResponse(f"{_google_login_url(back)}#id_token={idt}",

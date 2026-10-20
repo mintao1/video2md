@@ -14,25 +14,26 @@ from __future__ import annotations
 
 from typing import Mapping
 
-from acctkit.providers import GoogleProvider, register_provider
+from acctkit.providers import GoogleProvider, _GoogleHttpxRequest, register_provider
 
 
 class MultiAudGoogleProvider(GoogleProvider):
     """按 audiences 列表依次验 aud（google-auth 的 verify_oauth2_token 每次只认一个
     audience 参数）；全部不符时抛最后一个异常——对上层与基座同为「校验失败 401」。"""
 
-    def __init__(self, client_id: str = "", *, audiences: list[str] | None = None):
-        super().__init__(client_id)
+    def __init__(self, client_id: str = "", *, audiences: list[str] | None = None,
+                 proxy_url: str = ""):
+        super().__init__(client_id, proxy_url=proxy_url)
         self._audiences = [a for a in (audiences or [client_id]) if a]
 
     def _verify(self, token: str) -> dict:
-        from google.auth.transport import requests as grequests
         from google.oauth2 import id_token as gid
 
         last: Exception | None = None
+        request = _GoogleHttpxRequest(self.proxy_url)
         for cid in self._audiences:
             try:
-                return gid.verify_oauth2_token(token, grequests.Request(), audience=cid)
+                return gid.verify_oauth2_token(token, request, audience=cid)
             except Exception as exc:
                 last = exc
         raise last if last is not None else ValueError("未配置任何 Google audience")
@@ -43,7 +44,11 @@ def _factory(env: Mapping[str, str]):
     base = (env.get("GOOGLE_CLIENT_ID") or "").strip()
     cids = list(dict.fromkeys([web, base]))  # 去重保序：web 在前（新流优先），回落 base
     # client_id 回落 web：基座 authenticate 对空 client_id 直接 500——只配 web 档不能栽在这
-    return MultiAudGoogleProvider(base or web, audiences=cids or [""])
+    return MultiAudGoogleProvider(
+        base or web,
+        audiences=cids or [""],
+        proxy_url=(env.get("V2MD_GOOGLE_OAUTH_PROXY_URL") or "").strip(),
+    )
 
 
 # 同名覆盖基座工厂（core 提供的扩展点，register_provider 语义=同名覆盖）。

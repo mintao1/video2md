@@ -23,6 +23,11 @@ const tocOpen = ref(false)
 const exportOpen = ref(false)
 const activeBook = ref<Book | null>(null)
 const tocChapters = ref<TocChapter[]>([])
+const syncedLabel = computed(() => {
+  const at = lib.loadedAt
+  if (!at) return '尚未同步'
+  return `上次同步于 ${at.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}`
+})
 
 const chips = computed(() => [
   { key: 'all', label: '全部教材', icon: 'auto_stories', count: lib.books.length },
@@ -33,8 +38,12 @@ const chips = computed(() => [
   { key: 'fav', label: '收藏夹', icon: 'bookmark' },
 ])
 
-onMounted(() => {
-  lib.load()
+onMounted(async () => {
+  try {
+    await lib.load()
+  } catch {
+    toast.show('教材库暂时无法加载，请检查网络后重试')
+  }
 })
 
 async function openToc(book: Book) {
@@ -193,7 +202,7 @@ function onClearSearch() {
             <span class="material-symbols-outlined text-primary text-[20px]">cloud_sync</span>
             <div class="flex flex-col">
               <span class="font-label-md text-label-md text-on-surface">全端书籍与笔记自动同步已开启</span>
-              <span class="font-label-sm text-label-sm text-outline">上次同步于 2 分钟前</span>
+              <span class="font-label-sm text-label-sm text-outline">{{ syncedLabel }}</span>
             </div>
           </div>
           <button

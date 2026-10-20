@@ -1,0 +1,25 @@
+{
+  "schema_version": "1.0",
+  "name": "video2md-fullstack-regression",
+  "description": "Deterministic regression set for the FastAPI + Vue web application. Cases are contract-oriented and do not require external OAuth, GPU, or LLM services.",
+  "fixture": "backend/tests/fixtures/web_integration_api.py",
+  "run": {
+    "backend": "python backend/tests/fixtures/web_integration_api.py <tmp-dir>",
+    "frontend": "npm --prefix frontend/web run test:integration",
+    "build": "npm --prefix frontend/web run build"
+  },
+  "cases": [
+    {"id":"auth-anonymous-mode","layer":"api+frontend","setup":"V2MD_AUTH=off","input":"GET /me without token","expected":["HTTP 200","router allows /library","/login redirects to /library"]},
+    {"id":"auth-protected-redirect","layer":"api+frontend","setup":"fixture auth enabled","input":"Open /tasks without token","expected":["redirect to /login?redirect=/tasks","no private data rendered"]},
+    {"id":"auth-user-isolation","layer":"api","setup":"Alice and Bob fixture tokens","input":"GET /runs as each user","expected":["Alice sees only Alice runs","Bob sees only Bob runs"]},
+    {"id":"auth-safe-redirect","layer":"api","setup":"fixture auth enabled","input":"OAuth login with redirect=//evil.example","expected":["external redirect rejected","callback remains on configured web origin"]},
+    {"id":"queue-status-semantics","layer":"api+frontend","setup":"seed queued/running/done/error runs","input":"Open /tasks and switch filters","expected":["counts match status groups","error is not labelled historical success"]},
+    {"id":"queue-read-navigation","layer":"frontend","setup":"seed completed run","input":"Click 立即阅读","expected":["route matches /read/:id","reader loads the selected run"]},
+    {"id":"reader-media-auth","layer":"api+frontend","setup":"seed note with image/video","input":"Open reader","expected":["media requests carry auth","blob/object URLs render","no raw private media URL exposed"]},
+    {"id":"library-empty-state","layer":"frontend","setup":"empty library","input":"Open /library, search, clear filter","expected":["empty state is visible","clear action restores unfiltered state"]},
+    {"id":"profile-plan-consistency","layer":"api+frontend","setup":"/me plan=free","input":"Open /profile and shared header","expected":["both surfaces show free state","no Pro/SVIP entitlement presented as active"]},
+    {"id":"logout-clears-session","layer":"frontend","setup":"authenticated Alice session","input":"Click header logout","expected":["token is removed","navigation goes to /login","previous private page is not left visible"]},
+    {"id":"spa-route-collision","layer":"api+frontend","setup":"same-origin FastAPI hosting","input":"GET each frontend route with Accept: text/html","expected":["HTML index returned","/queue remains JSON API","/tasks serves the SPA"]},
+    {"id":"invalid-route-fallback","layer":"frontend","setup":"running web app","input":"Open /nope/deeper","expected":["redirect to /library","no blank page"]}
+  ]
+}

@@ -1,15 +1,10 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import { useAuthStore } from '../stores/auth'
+import { getToken, hasAnonymousSession } from '../api/client'
 
 const router = createRouter({
   history: createWebHistory(),
   routes: [
-    {
-      path: '/login',
-      name: 'login',
-      component: () => import('../views/LoginView.vue'),
-      meta: { public: true },
-    },
+    { path: '/login', name: 'login', component: () => import('../views/LoginView.vue') },
     { path: '/', redirect: '/library' },
     {
       path: '/library',
@@ -22,8 +17,8 @@ const router = createRouter({
       component: () => import('../views/ReaderView.vue'),
     },
     {
-      path: '/queue',
-      name: 'queue',
+      path: '/tasks',
+      name: 'tasks',
       component: () => import('../views/QueueView.vue'),
     },
     {
@@ -36,19 +31,22 @@ const router = createRouter({
       name: 'profile',
       component: () => import('../views/ProfileView.vue'),
     },
+    { path: '/terms', name: 'terms', component: () => import('../views/TermsView.vue') },
+    { path: '/privacy', name: 'privacy', component: () => import('../views/PrivacyView.vue') },
+    { path: '/:pathMatch(.*)*', redirect: '/library' },
   ],
 })
 
-router.beforeEach((to) => {
-  const auth = useAuthStore()
-  if (!to.meta.public && !auth.isLoggedIn) {
-    return { name: 'login', query: { redirect: to.fullPath } }
+router.beforeEach(async (to) => {
+  if (to.name === 'terms' || to.name === 'privacy') return true
+  const signedIn = Boolean(getToken()) || await hasAnonymousSession()
+  if (to.name === 'login') {
+    // The Google callback lands here with #id_token / #auth_error; LoginView consumes it.
+    if (/(^|[#&])(id_token|auth_error)=/.test(to.hash)) return true
+    return signedIn ? { name: 'library' } : true
   }
-  // 已登录访问 /login → 强制去 library；但 Google 授权码流回跳带 #id_token= 必须放行
-  // 进 LoginView 处理（否则 fragment 在守卫重定向中丢失，登录白走一圈）。
-  if (to.name === 'login' && auth.isLoggedIn && !(to.hash || '').includes('id_token')) {
-    return { name: 'library' }
-  }
+  if (!signedIn) return { name: 'login', query: { redirect: to.fullPath } }
+  return true
 })
 
 export default router

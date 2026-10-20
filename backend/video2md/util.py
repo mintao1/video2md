@@ -144,6 +144,11 @@ def bind_current_run(run_id: str) -> None:
     _CURRENT_RUN_ID.set(run_id)
 
 
+def clear_current_run() -> None:
+    """清除当前线程/任务的 run 绑定，避免跨请求污染后续 CLI 或测试。"""
+    _CURRENT_RUN_ID.set("")
+
+
 def current_run_id() -> str:
     """当前执行上下文绑定的 run_id（run_graph 入口 set；未绑定返回 ""——CLI/测试
     直调深层函数时据此跳过用量归因，不记账也不报错）。"""

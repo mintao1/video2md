@@ -519,6 +519,8 @@ def run_graph(url: str, *, part_items: str = "", force: bool = False, review: bo
             final = graph.invoke(initial, config=config)
     except Exception:
         deadman.ping("fail", run_id=run_id, trace_name=url)
+        from .util import clear_current_run
+        clear_current_run()
         raise
     if checkpointer and final.get("status") in ("done", "partial"):
         # checkpoint 裁剪：完成的 run 不需要步进历史（重跑靠 state.json 幂等，不靠 checkpoint）
@@ -529,4 +531,6 @@ def run_graph(url: str, *, part_items: str = "", force: bool = False, review: bo
     # partial 也 ping 成功：部分失败在 trace/metrics 已留痕，死人开关只回答「跑没跑完」
     deadman.ping("fail" if final.get("status") == "error" else "ok",
                  run_id=run_id, trace_name=url)
+    from .util import clear_current_run
+    clear_current_run()
     return final

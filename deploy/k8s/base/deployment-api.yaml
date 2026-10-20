@@ -38,7 +38,7 @@ spec:
       # an older schema.
       initContainers:
         - name: migrate
-          image: video2md:0.2.0
+          image: video2md:0.2.0-hotfix-20261021g
           imagePullPolicy: IfNotPresent
           securityContext:
             allowPrivilegeEscalation: false
@@ -55,6 +55,8 @@ spec:
               value: https://ferosse.tech
             - name: V2MD_GOOGLE_OAUTH_TIMEOUT_S
               value: "15"
+            - name: V2MD_GOOGLE_OAUTH_PROXY_URL
+              value: http://127.0.0.1:18080
             - name: V2MD_SECRETS_FILE
               value: /run/video2md.env
           volumeMounts:
@@ -66,7 +68,7 @@ spec:
         - name: api
           # registry 全名（D2 预构建收官）：制品=CI tag 构建产物（GHCR 灾备副本同 ID）。
           # 服务器落地流：gh run download artifact → gunzip | ctr import（无 packages 凭证通道）。
-          image: video2md:0.2.0
+          image: video2md:0.2.0-hotfix-20261021g
           imagePullPolicy: IfNotPresent
           securityContext:
             allowPrivilegeEscalation: false
@@ -94,6 +96,9 @@ spec:
               value: https://ferosse.tech
             - name: V2MD_GOOGLE_OAUTH_TIMEOUT_S
               value: "15"
+            # hostNetwork Pod 通过 4c 本机 SSH tunnel 访问 lcode-cn CONNECT relay。
+            - name: V2MD_GOOGLE_OAUTH_PROXY_URL
+              value: http://127.0.0.1:18080
             - name: V2MD_SECRETS_FILE
               value: /run/video2md.env
             # Production is a shared, multi-user deployment: all durable state and

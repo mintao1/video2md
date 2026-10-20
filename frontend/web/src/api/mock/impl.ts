@@ -5,7 +5,6 @@ import type {
   Quota,
   RunListItem,
   RunStatus,
-  SmsCodeOut,
   User,
 } from '../../types'
 import { mockBooks, mockQuota, mockRuns, mockToc, mockUser, type TocChapter } from './data'
@@ -24,23 +23,7 @@ const state = {
 let runSeq = 0
 
 export const impl = {
-  // ---------- auth ----------
-  async sendSmsCode(_phone: string): Promise<SmsCodeOut> {
-    await delay()
-    return { sent: true, expires_in: 300 }
-  },
-  async loginWithSms(_phone: string, _code: string): Promise<{ token: string; user: User }> {
-    await delay(400)
-    return { token: 'mock-id-token', user: state.user }
-  },
-  async loginWithPassword(_phone: string, _password: string): Promise<{ token: string; user: User }> {
-    await delay(400)
-    return { token: 'mock-id-token', user: state.user }
-  },
-  async loginWithWechat(): Promise<{ token: string; user: User }> {
-    await delay(600)
-    return { token: 'mock-id-token', user: state.user }
-  },
+  // ---------- anonymous profile ----------
   async currentUser(): Promise<User> {
     await delay(120)
     return state.user

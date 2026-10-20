@@ -7,9 +7,9 @@ const route = useRoute()
 const queue = useQueueStore()
 
 const tabs = [
-  { path: '/queue', icon: 'motion_photos_on', label: '排队处理' },
+  { path: '/tasks', icon: 'motion_photos_on', label: '排队处理' },
   { path: '/library', icon: 'local_library', label: '教材库' },
-  { path: '/queue', icon: 'add', label: '新建转换', center: true },
+  { path: '/tasks', icon: 'add', label: '新建转换', center: true },
   { path: '/profile', icon: 'person', label: '我的' },
 ] as const
 
@@ -25,7 +25,7 @@ const badge = computed(() => queue.activeCount)
         <!-- 中央凸起按钮：跳到队列页并预期打开导入面板 -->
         <RouterLink
           v-if="'center' in tab && tab.center"
-          :to="{ path: '/queue', query: { openImport: '1' } }"
+          :to="{ path: '/tasks', query: { openImport: '1' } }"
           class="flex flex-col items-center justify-center -mt-5 min-w-[56px] group"
         >
           <div

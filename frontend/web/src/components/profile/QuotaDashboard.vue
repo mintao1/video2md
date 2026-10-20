@@ -5,11 +5,16 @@ import ProgressBar from '../common/ProgressBar.vue'
 
 const props = defineProps<{ quota: Quota | null }>()
 
+function percentage(used: number, total: number): number {
+  if (!Number.isFinite(total) || total <= 0 || !Number.isFinite(used)) return 0
+  return Math.min(100, Math.max(0, Math.round((used / total) * 100)))
+}
+
 const aiPct = computed(() =>
-  props.quota ? Math.round((props.quota.ai_hours_used / props.quota.ai_hours_total) * 100) : 0,
+  props.quota ? percentage(props.quota.ai_hours_used, props.quota.ai_hours_total) : 0,
 )
 const storagePct = computed(() =>
-  props.quota ? Math.round((props.quota.storage_gb_used / props.quota.storage_gb_total) * 100) : 0,
+  props.quota ? percentage(props.quota.storage_gb_used, props.quota.storage_gb_total) : 0,
 )
 </script>
 
@@ -31,7 +36,7 @@ const storagePct = computed(() =>
             AI 转换时长
           </span>
           <span class="font-label-sm text-label-sm text-primary bg-primary-fixed px-1.5 py-0.5 rounded-full">
-            剩余 {{ 100 - aiPct }}%
+            剩余 {{ quota?.ai_hours_total ? `${100 - aiPct}%` : '—' }}
           </span>
         </div>
         <div class="my-space-sm flex items-baseline gap-1">
@@ -52,7 +57,7 @@ const storagePct = computed(() =>
             教材库空间
           </span>
           <span class="font-label-sm text-label-sm text-secondary bg-secondary-fixed px-1.5 py-0.5 rounded-full">
-            已用 {{ storagePct }}%
+            已用 {{ quota?.storage_gb_total ? `${storagePct}%` : '—' }}
           </span>
         </div>
         <div class="my-space-sm flex items-baseline gap-1">

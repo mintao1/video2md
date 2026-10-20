@@ -14,16 +14,24 @@ const url = ref('')
 const ocrEnabled = ref(true)
 const tocEnabled = ref(true)
 const template = ref<'academic' | 'notes'>('academic')
+const validationError = ref('')
 
 watch(
   () => props.modelValue,
   (open) => {
-    if (open && !url.value) url.value = 'https://www.bilibili.com/video/BV1WE411d7v4'
+    if (open) {
+      validationError.value = ''
+      if (!url.value) url.value = 'https://www.bilibili.com/video/BV1WE411d7v4'
+    }
   },
 )
 
 function start() {
-  if (source.value === 'link' && !url.value.trim()) return
+  validationError.value = ''
+  if (source.value === 'link' && !url.value.trim()) {
+    validationError.value = '请输入视频或音频链接'
+    return
+  }
   emit('start', {
     url: url.value.trim() || '本地上传视频.mp4',
     title:
@@ -92,6 +100,7 @@ function saveDraft() {
           清空
         </button>
       </div>
+      <p v-if="validationError" class="text-xs text-red-600 px-1" role="alert">{{ validationError }}</p>
       <div
         v-else
         class="bg-surface-container-low rounded-xl p-space-md border border-outline-variant/30 flex flex-col items-center gap-space-xs shadow-sm"

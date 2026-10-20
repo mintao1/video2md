@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { useProfileStore } from '../stores/profile'
 import { useToastStore } from '../stores/toast'
+import { getToken } from '../api/client'
 import BottomNav from '../components/common/BottomNav.vue'
 import ProfileCard from '../components/profile/ProfileCard.vue'
 import LlmSettingsCard from '../components/profile/LlmSettingsCard.vue'
@@ -14,9 +14,10 @@ import VipMembershipSheet from '../components/profile/VipMembershipSheet.vue'
 const auth = useAuthStore()
 const profile = useProfileStore()
 const toast = useToastStore()
-const router = useRouter()
 
 const vipOpen = ref(false)
+// AUTH=off development has no token and nothing to sign out of.
+const canSignOut = Boolean(getToken())
 
 const user = computed(
   () =>
@@ -25,24 +26,23 @@ const user = computed(
       name: '视书用户',
       display_name: '视书用户',
       avatar_hue: 258,
-      plan: 'pro' as const,
+      plan: 'free' as const,
       id_label: 'ID: ----',
     },
 )
 
 onMounted(async () => {
-  await auth.fetchUser()
-  profile.load()
+  try {
+    await auth.fetchUser()
+    await profile.load()
+  } catch {
+    toast.show('个人资料暂时无法加载，请检查网络后重试')
+  }
 })
 
 function onNotionToggle() {
   profile.setNotionSync(!profile.notionSync)
   toast.show(profile.notionSync ? '已开启：生成完成后自动同步 Notion' : '已关闭 Notion 自动同步')
-}
-
-function onLogout() {
-  auth.logout()
-  router.replace('/login')
 }
 </script>
 
@@ -67,7 +67,7 @@ function onLogout() {
         <!-- 配额 -->
         <div class="flex flex-col gap-space-sm">
           <QuotaDashboard :quota="profile.quota" />
-          <SvipPromoBanner @upgrade="vipOpen = true" />
+          <SvipPromoBanner :plan="user.plan" @upgrade="vipOpen = true" />
         </div>
 
         <!-- 排版与引擎配置 -->
@@ -172,16 +172,13 @@ function onLogout() {
           </div>
         </div>
 
-        <!-- 退出登录 -->
-        <div class="flex flex-col gap-space-sm pt-space-xs mb-space-sm">
-          <button
-            class="w-full bg-surface-container hover:bg-surface-container-high text-error font-title-sm text-title-sm py-3.5 rounded-xl transition-colors active:scale-[0.99] flex items-center justify-center gap-space-xs shadow-sm"
-            @click="onLogout"
-          >
-            <span class="material-symbols-outlined text-[20px]">logout</span>
-            退出登录
-          </button>
-        </div>
+        <button
+          v-if="canSignOut"
+          class="w-full rounded-xl bg-surface-container-lowest shadow-sm p-space-md text-center font-title-sm text-title-sm text-error hover:bg-surface-container-low transition-colors"
+          @click="auth.logout"
+        >
+          退出登录
+        </button>
       </div>
     </main>
 

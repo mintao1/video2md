@@ -44,6 +44,11 @@ jobs:
       - name: pytest（契约 + acctkit + Colab CLI）
         run: uv run pytest tests/test_api_contract.py tests/test_acctkit.py tests/test_colab_cli.py -q
         working-directory: backend
+      - name: 生产就绪防回退门禁自测（不访问生产、不读取密钥）
+        run: python3 scripts/check_production_readiness.py --self-test
+      - name: 生产全站修复评测契约（部署/路由/OAuth 防回退）
+        run: uv run pytest tests/test_production_readiness_gate.py -q
+        working-directory: backend
       - name: 脚本式测试（8 个，全离线）
         run: |
           for t in test_graph test_llm test_observability test_otel_replay \

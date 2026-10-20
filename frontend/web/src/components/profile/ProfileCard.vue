@@ -10,6 +10,11 @@ const avatarStyle = computed(() => {
 })
 
 const initial = computed(() => props.user.name[0] ?? '视')
+const planLabel = computed(() => ({
+  free: '免费版',
+  pro: '高级学术会员 (Pro)',
+  svip: 'SVIP 旗舰会员',
+}[props.user.plan]))
 </script>
 
 <template>
@@ -38,7 +43,7 @@ const initial = computed(() => props.user.name[0] ?? '视')
               class="bg-secondary text-on-secondary font-label-sm text-label-sm px-2 py-0.5 rounded-full flex items-center gap-0.5 shadow-sm"
             >
               <span class="material-symbols-outlined text-[12px] filled">workspace_premium</span>
-              高级学术会员 (Pro)
+              {{ planLabel }}
             </span>
             <span class="font-body-sm text-body-sm text-outline">{{ user.id_label }}</span>
           </div>

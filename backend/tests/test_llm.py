@@ -25,6 +25,10 @@ llm._sleep = lambda _s: None  # 重试间隔不真等
 
 
 def test_llm():
+    # Other contract tests intentionally set V2MD_FAKE_LLM=1 for safety. This
+    # test exercises the real HTTP/mock transport path, so isolate that module
+    # switch from process-wide test ordering.
+    llm._FAKE_LLM = False
     
     # ---- render：{{var}} 替换纪律 ------------------------------------------------
     assert llm.render("a {{x}} b", x="1") == "a 1 b"

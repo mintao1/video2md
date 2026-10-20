@@ -1,41 +1,32 @@
 import { defineStore } from 'pinia'
-import { computed, ref } from 'vue'
+import { ref } from 'vue'
 import * as api from '../api'
 import type { User } from '../types'
+import { clearToken, getToken, setToken } from '../api/client'
 
-const TOKEN_KEY = 'v2md_token'
-
+/**
+ * Google OAuth returns an ID token in the login URL fragment. The token is
+ * kept locally and sent as a Bearer credential by the API client.
+ */
 export const useAuthStore = defineStore('auth', () => {
-  const token = ref<string | null>(localStorage.getItem(TOKEN_KEY))
   const user = ref<User | null>(null)
 
-  const isLoggedIn = computed(() => token.value !== null)
-
-  async function login(result: { token: string; user: User }) {
-    token.value = result.token
-    localStorage.setItem(TOKEN_KEY, result.token)
-    user.value = result.user
+  function acceptToken(token: string): void {
+    setToken(token)
   }
 
-  // Google 授权码流回跳：id_token 已验签（后端 callback），用户资料靠 /me 拉真实数据；
-  // 失败抛错给调用方（回滚 token + toast），login() 的 mock user 语义不适用这里。
-  async function loginWithIdToken(idToken: string) {
-    token.value = idToken
-    localStorage.setItem(TOKEN_KEY, idToken)
+  /** A full page load (not router.replace) drops every Pinia store, so the
+   *  previous user's books/runs/quota cannot stay on screen after sign-out. */
+  function logout(): void {
+    clearToken()
     user.value = null
-    await fetchUser()
+    window.location.replace('/login')
   }
 
   async function fetchUser() {
-    if (!isLoggedIn.value || user.value) return
+    if (user.value || !getToken()) return
     user.value = await api.currentUser()
   }
 
-  function logout() {
-    token.value = null
-    user.value = null
-    localStorage.removeItem(TOKEN_KEY)
-  }
-
-  return { token, user, isLoggedIn, login, loginWithIdToken, fetchUser, logout }
+  return { user, acceptToken, logout, fetchUser, isAuthenticated: () => Boolean(getToken()) }
 })

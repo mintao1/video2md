@@ -76,6 +76,10 @@ finally:
 # ---- 看门狗决策：空闲 + lease 不新鲜 + 会话活着 → 关；任一条件否 → 不关
 print("== 看门狗决策 ==")
 stopped: list[str] = []
+_orig_stop_session = M._colab_stop_session
+_orig_session_active = M._colab_session_active
+_orig_more_jobs = M._more_jobs_waiting
+_orig_lease_fresh = M._lease_fresh
 M._colab_stop_session = lambda reason="": stopped.append(reason) or True
 M._colab_session_active = lambda *a, **kw: True
 M._more_jobs_waiting = lambda: False
@@ -124,6 +128,10 @@ try:
     check("lease 新鲜 → 不关", stopped == [])
 finally:
     M.time.sleep = _orig_sleep
+    M._colab_stop_session = _orig_stop_session
+    M._colab_session_active = _orig_session_active
+    M._more_jobs_waiting = _orig_more_jobs
+    M._lease_fresh = _orig_lease_fresh
 
 print()
 if FAILED:

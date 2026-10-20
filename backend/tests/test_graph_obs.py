@@ -25,6 +25,10 @@ from video2md import graph, graph_obs, observability, runs, util
 from video2md.util import RunLog
 
 _TMP = Path(tempfile.mkdtemp(prefix="video2md-test-graphobs-"))
+_ORIG_STATE_FILE = util.STATE_FILE
+_ORIG_LOG_DIR = util.LOG_DIR
+_ORIG_RUNS_FILE = runs.RUNS_FILE
+_ORIG_RUNS_LOCKFILE = runs._RUNS_LOCKFILE
 util.STATE_FILE = _TMP / "state.json"
 util.LOG_DIR = _TMP / "logs"
 runs.RUNS_FILE = _TMP / "runs.json"
@@ -206,6 +210,11 @@ try:
     assert final["status"] == "done" and not final.get("errors"), final.get("errors")
 finally:
     graph_obs.RunLog = _orig
+
+util.STATE_FILE = _ORIG_STATE_FILE
+util.LOG_DIR = _ORIG_LOG_DIR
+runs.RUNS_FILE = _ORIG_RUNS_FILE
+runs._RUNS_LOCKFILE = _ORIG_RUNS_LOCKFILE
 print("✅ 5. 兜底：graph 事件写失败被吞，run 照常 done 无留痕（注册先于写事件）")
 
 print("\n✅ test_graph_obs.py 全部通过")

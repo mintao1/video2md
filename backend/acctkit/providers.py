@@ -23,6 +23,40 @@ from urllib.parse import urlencode
 from .models import AuthError, NoCredentials, Principal
 
 
+class _GoogleHttpxResponse:
+    """Small google-auth transport response adapter backed by HTTPX."""
+
+    def __init__(self, response):
+        self.status = response.status_code
+        self.data = response.content
+        self.headers = response.headers
+
+
+class _GoogleHttpxRequest:
+    """Use the same proven HTTPX CONNECT path as the OAuth token exchange."""
+
+    def __init__(self, proxy_url: str):
+        import httpx
+
+        self._client = httpx.Client(proxy=proxy_url or None)
+
+    def __call__(self, url, method="GET", body=None, headers=None, timeout=120, **kwargs):
+        import httpx
+        from google.auth import exceptions as gexceptions
+
+        try:
+            response = self._client.request(
+                method,
+                url,
+                content=body,
+                headers=headers,
+                timeout=timeout,
+            )
+        except httpx.HTTPError as exc:
+            raise gexceptions.TransportError(str(exc)) from exc
+        return _GoogleHttpxResponse(response)
+
+
 def credential_token(headers: Mapping[str, str], provider: str, scheme: str = "Bearer") -> str:
     """从 ``Authorization: <scheme> <token>`` 取凭据；缺头/scheme 不符 → NoCredentials。
 
@@ -57,8 +91,9 @@ class GoogleProvider(AuthProvider):
     """
     name = "google"
 
-    def __init__(self, client_id: str = ""):
+    def __init__(self, client_id: str = "", *, proxy_url: str = ""):
         self.client_id = (client_id or "").strip()
+        self.proxy_url = (proxy_url or "").strip()
 
     async def authenticate(self, headers: Mapping[str, str]) -> Principal:
         token = bearer_token(headers, self.name)
@@ -79,10 +114,10 @@ class GoogleProvider(AuthProvider):
                               if payload.get(k) is not None})
 
     def _verify(self, token: str) -> dict:
-        from google.auth.transport import requests as grequests
         from google.oauth2 import id_token as gid
 
-        return gid.verify_oauth2_token(token, grequests.Request(), audience=self.client_id)
+        request = _GoogleHttpxRequest(self.proxy_url)
+        return gid.verify_oauth2_token(token, request, audience=self.client_id)
 
 
 class WeChatProvider(AuthProvider):
@@ -99,6 +134,7 @@ class WeChatProvider(AuthProvider):
     access_token 只用于顺带拉昵称头像（best-effort，失败不挡登录），不外发不落盘。
     """
     name = "wechat"
+    _get_json_direct = staticmethod(lambda url: _get_json_direct(url))
     _CONFIG_ERRCODES = {40013, 41004, 40002}  # invalid appid / appsecret missing / invalid secret
 
     def __init__(self, app_id: str = "", app_secret: str = ""):
@@ -151,14 +187,14 @@ class WeChatProvider(AuthProvider):
         return self._get_json_direct("https://api.weixin.qq.com/sns/userinfo?" + urlencode({
             "access_token": access_token, "openid": openid, "lang": "zh_CN"}))
 
-    @staticmethod
-    def _get_json_direct(url: str) -> dict:
-        """GET → JSON：urllib 直连且显式禁代理（api.weixin.qq.com 国内站，不走境外
-        隧道出口），10s 超时。打桩缝：测试 _StubWeChat 覆写本方法即断网。"""
-        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
-        req = urllib.request.Request(url, headers={"User-Agent": "acctkit"})
-        with opener.open(req, timeout=10) as resp:
-            return json.loads(resp.read().decode("utf-8"))
+
+def _get_json_direct(url: str) -> dict:
+    """GET → JSON：urllib 直连且显式禁代理（api.weixin.qq.com 国内站，不走境外
+    隧道出口），10s 超时。微信系 provider 共用。"""
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+    req = urllib.request.Request(url, headers={"User-Agent": "acctkit"})
+    with opener.open(req, timeout=10) as resp:
+        return json.loads(resp.read().decode("utf-8"))
 
 
 class DevProvider(AuthProvider):
@@ -193,10 +229,13 @@ class FakeProvider(AuthProvider):
 
 
 # provider 名 → 工厂（env 进来，方便 google 这类需要配置的构造；自定义登录方式 register 进来）
-# wxsession 的工厂在 session.py 底部注册（那边要 import 本模块的 AuthProvider，反向会循环）
+# 仓特有 provider（token/wxsession 等）由消费方 ext_* 模块 register_provider 自注册
 FactoriesT = dict[str, Callable[[Mapping[str, str]], AuthProvider]]
 _FACTORIES: FactoriesT = {
-    GoogleProvider.name: lambda env: GoogleProvider(env.get("GOOGLE_CLIENT_ID", "")),
+    GoogleProvider.name: lambda env: GoogleProvider(
+        env.get("GOOGLE_CLIENT_ID", ""),
+        proxy_url=env.get("V2MD_GOOGLE_OAUTH_PROXY_URL", ""),
+    ),
     WeChatProvider.name: lambda env: WeChatProvider(env.get("WECHAT_APP_ID", ""),
                                                      env.get("WECHAT_APP_SECRET", "")),
     DevProvider.name: lambda env: DevProvider(),

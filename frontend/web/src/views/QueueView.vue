@@ -25,10 +25,15 @@ const filterOptions = computed(() => [
   { key: 'active', label: '转码中', count: queue.counts.active },
   { key: 'queued', label: '排队中', count: queue.counts.queued },
   { key: 'done', label: '历史完成', count: queue.counts.done },
+  { key: 'error', label: '转换失败', count: queue.counts.error },
 ])
 
 onMounted(async () => {
-  await queue.load()
+  try {
+    await queue.load()
+  } catch {
+    toast.show('任务队列暂时无法加载，请检查网络后重试')
+  }
   queue.startProgressTick()
   // 从 BottomNav 中央按钮进入时自动打开导入面板
   if (route.query.openImport === '1') {
@@ -56,7 +61,7 @@ async function startConvert(payload: { url: string; title?: string }) {
 }
 
 function onRead(run: RunListItem) {
-  toast.show(`正在打开《${run.title}》...`)
+  router.push(`/read/${encodeURIComponent(run.run_id)}`)
 }
 
 function setFilter(key: string) {

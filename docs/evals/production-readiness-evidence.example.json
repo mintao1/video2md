@@ -1,0 +1,11 @@
+{
+  "postgres": {"status": "healthy"},
+  "schema": {"version": 4},
+  "api": {"status": "healthy", "version": "0.2.0"},
+  "google_token_probe": {"network_ok": true, "http_status": 404},
+  "oauth_relay": {"topology": "host-network-loopback", "container_reachable_host": "127.0.0.1", "port": 18080, "container_probe_http_status": 404, "tunnel_service_active": true},
+  "container_env": {"present_forbidden": []},
+  "config": {"owner": "app", "mode": "0600", "secrets_redacted": true},
+  "browser_google_login": {"status": "pending", "callback_success": false, "session_me_http_status": null, "library_http_status": null, "tasks_http_status": null, "profile_http_status": null, "session_persistent_after_refresh": false},
+  "public_routes": {"healthz": 200, "terms": 200, "privacy": 200, "docs": 403, "openapi_json": 403, "redoc": 403, "queue": 404}
+}

@@ -3,7 +3,7 @@ import { computed, ref } from 'vue'
 import * as api from '../api'
 import type { RunListItem } from '../types'
 
-export type QueueFilter = 'all' | 'active' | 'queued' | 'done'
+export type QueueFilter = 'all' | 'active' | 'queued' | 'done' | 'error'
 
 export const useQueueStore = defineStore('queue', () => {
   const runs = ref<RunListItem[]>([])
@@ -19,7 +19,9 @@ export const useQueueStore = defineStore('queue', () => {
       case 'queued':
         return runs.value.filter((r) => r.status === 'queued')
       case 'done':
-        return runs.value.filter((r) => ['done', 'partial', 'error'].includes(r.status))
+        return runs.value.filter((r) => r.status === 'done' || r.status === 'partial')
+      case 'error':
+        return runs.value.filter((r) => r.status === 'error')
       default:
         return runs.value
     }
@@ -34,7 +36,8 @@ export const useQueueStore = defineStore('queue', () => {
     all: runs.value.length,
     active: runs.value.filter((r) => r.status === 'running' || r.status === 'paused' || r.status === 'cancelling').length,
     queued: runs.value.filter((r) => r.status === 'queued').length,
-    done: runs.value.filter((r) => ['done', 'partial', 'error'].includes(r.status)).length,
+    done: runs.value.filter((r) => r.status === 'done' || r.status === 'partial').length,
+    error: runs.value.filter((r) => r.status === 'error').length,
   }))
 
   let revision = 0

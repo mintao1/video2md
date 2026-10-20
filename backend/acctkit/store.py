@@ -14,6 +14,7 @@ from __future__ import annotations
 import contextlib
 import fcntl
 import json
+import os
 import threading
 import uuid
 from abc import ABC, abstractmethod
@@ -21,7 +22,7 @@ from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
 
-from .models import Identity, Principal
+from .models import AuthError, Identity, Principal
 
 
 def _noop_save(users: dict) -> None:
@@ -124,19 +125,25 @@ class JsonFileStore(IdentityStore):
         self._lock = threading.Lock()
 
     def _load(self) -> dict:
-        if self.path.exists():
-            try:
-                data = json.loads(self.path.read_text())
-                if isinstance(data, dict):
-                    return data
-            except (json.JSONDecodeError, OSError):
-                return {}
-        return {}
+        """读全量用户表。文件不存在 = 空表；**坏文件直接报错**——旧实现静默当空表，
+        下一次 _save 就把全部用户覆写清零（uid 全换、资源归属全断），宁可 500 待人工修。"""
+        if not self.path.exists():
+            return {}
+        try:
+            data = json.loads(self.path.read_text(encoding="utf-8") or "{}")
+        except (json.JSONDecodeError, OSError, UnicodeDecodeError) as exc:
+            raise AuthError(f"用户表 {self.path} 无法读取：{type(exc).__name__}", status=500) from exc
+        if not isinstance(data, dict):
+            raise AuthError(f"用户表 {self.path} 格式错误（顶层须为对象）", status=500)
+        return data
 
     def _save(self, users: dict) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         tmp = self.path.with_name(f"{self.path.name}.tmp.{threading.get_ident()}")
-        tmp.write_text(json.dumps(users, ensure_ascii=False, indent=1))
+        with tmp.open("w", encoding="utf-8") as fh:  # fsync 后再 rename：断电不留半截文件
+            fh.write(json.dumps(users, ensure_ascii=False, indent=1))
+            fh.flush()
+            os.fsync(fh.fileno())
         tmp.replace(self.path)
 
     @contextlib.contextmanager

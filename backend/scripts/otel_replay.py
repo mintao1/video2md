@@ -58,6 +58,7 @@ from opentelemetry.trace import (
     set_span_in_context,
 )
 from platform_otel_sdk._otel import _endpoint  # _endpoint 随 otel 迁移入 SDK（033ae72）
+
 from video2md.observability import _scalar_attrs
 
 PROJ = Path(__file__).resolve().parents[2]

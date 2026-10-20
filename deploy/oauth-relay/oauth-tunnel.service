@@ -1,10 +1,10 @@
 [Unit]
-Description=Video2MD OAuth reverse SSH tunnel to 4c
+Description=Video2MD OAuth local SSH tunnel from 4c to lcode-cn
 After=network-online.target
 Wants=network-online.target
 
 [Service]
-ExecStart=/usr/bin/ssh -N -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ExitOnForwardFailure=yes -R 127.0.0.1:18080:127.0.0.1:18080 lcode-4c
+ExecStart=/usr/bin/ssh -N -i /etc/video2md/oauth-tunnel -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ExitOnForwardFailure=yes -o ServerAliveInterval=30 -o ServerAliveCountMax=3 -L 127.0.0.1:18080:127.0.0.1:18080 root@43.135.164.222
 Restart=always
 RestartSec=5
 User=root

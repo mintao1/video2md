@@ -40,6 +40,7 @@ def main() -> None:
             "LANGFUSE_PK": "", "LANGFUSE_SK": "", "OTEL_EXPORTER_OTLP_ENDPOINT": "",
         })
         from PIL import Image, ImageDraw, ImageFont
+
         from video2md import artsink, colab
         from video2md.clips import remote_cut_clips
         from video2md.frames import ocr_candidates

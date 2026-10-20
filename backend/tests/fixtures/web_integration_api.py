@@ -26,7 +26,13 @@ os.environ.update({
     "V2MD_CLIPS_REMOTE": "off", "V2MD_FAKE_LLM": "1", "V2MD_EVAL": "off",
     "OTEL_EXPORTER_OTLP_ENDPOINT": "", "LANGFUSE_PK": "", "LANGFUSE_SK": "",
     "TMPDIR": str(root),
-    "V2MD_CORS_ORIGINS": os.environ.get("V2MD_TEST_CORS_ORIGIN", ""),
+    # Browser-level integration tests run from the local Vite origin. Keep the
+    # fixture usable for both hostnames used by the dev server; callers can
+    # still override this explicitly for a stricter CORS test.
+    "V2MD_CORS_ORIGINS": os.environ.get(
+        "V2MD_TEST_CORS_ORIGIN",
+        "http://localhost:5173,http://127.0.0.1:5173",
+    ),
 })
 
 import uvicorn  # noqa: E402

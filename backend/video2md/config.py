@@ -85,6 +85,13 @@ _SPEC: dict[str, tuple] = {
     "V2MD_STATE_FILE":      ("path", str(PROJ / "state.json"), None),
     "V2MD_RUNS_FILE":       ("path", str(PROJ / "runs.json"), None),
     "V2MD_USERS_FILE":      ("path", str(PROJ / "users.json"), None),
+    "V2MD_PG_DSN":          ("raw", "", None),
+    "V2MD_PG_TIMEOUT_S":    ("float", 10.0, ("min", 1.0)),
+    "V2MD_RUNS_STORE":      ("enum", "json", ("json", "postgres")),
+    "V2MD_STATE_STORE":     ("enum", "json", ("json", "postgres")),
+    "V2MD_USERS_STORE":     ("enum", "json", ("json", "postgres")),
+    "V2MD_EVENTS":          ("enum", "local", ("local", "pg")),
+    "V2MD_CHECKPOINTER":    ("enum", "sqlite", ("sqlite", "postgres")),
     "V2MD_LOG_DIR":         ("path", str(PROJ / "logs"), None),
     "V2MD_SECRETS_FILE":    ("path", str(SECRETS_FILE), None),
     "OBSIDIAN_VAULT":       ("path", str(Path.home() / "Documents/Obsidian Vault"), None),
@@ -152,6 +159,8 @@ def _parse_spec(env: dict[str, str]) -> tuple[dict, list[str]]:
                 out[key] = Path(raw)
             elif typ == "str":
                 out[key] = raw.lower()
+            elif typ == "raw":
+                out[key] = raw
             elif typ == "int":
                 out[key] = int(raw)
             elif typ == "float":
@@ -180,11 +189,18 @@ def _parse_spec(env: dict[str, str]) -> tuple[dict, list[str]]:
 
 _PARSED, _ERRS = _parse_spec(ENV)
 
-# 生产防呆（P0-1）：production 档禁无鉴权裸奔。与表错误一并汇总（一次报全）。
-if _PARSED.get("V2MD_ENV") == "production" \
-        and (ENV.get("V2MD_AUTH") or "off").strip().lower() in ("", "off", "none"):
-    _ERRS.append("V2MD_ENV=production 但 V2MD_AUTH=off（或未配置）：生产档禁止无鉴权裸奔——"
-                 "secrets/video2md.env 设 V2MD_AUTH=google（+ GOOGLE_CLIENT_ID）")
+# Production deployments must provide a real authentication provider.
+if ENV.get("V2MD_ENV", "development").strip().lower() == "production" \
+        and (ENV.get("V2MD_AUTH", "off") or "off").strip().lower() in ("", "off", "none"):
+    raise RuntimeError("生产环境禁止 V2MD_AUTH=off；请配置 V2MD_AUTH=google 或其它真实 provider")
+
+# Google 网页登录的 redirect_uri 与回跳地址由这两个键拼出；生产缺省会回落到 localhost，
+# 登录必坏且只在真人点击时暴露，所以启动期就拒绝。
+if ENV.get("V2MD_ENV", "development").strip().lower() == "production" \
+        and "google" in (ENV.get("V2MD_AUTH", "") or "").strip().lower():
+    for _k in ("V2MD_PUBLIC_BASE_URL", "V2MD_WEB_BASE_URL"):
+        if not (ENV.get(_k) or "").strip().lower().startswith("https://"):
+            raise RuntimeError(f"生产环境 V2MD_AUTH=google 须配置 https 的 {_k}（当前：{ENV.get(_k)!r}）")
 
 if _ERRS:
     raise RuntimeError("配置错误（共 {} 处，一次改全）：\n  - ".format(len(_ERRS))
@@ -305,5 +321,4 @@ except PackageNotFoundError:
 # ---------------------------------------------------------------- fin
 # dify_kit / DIFY_* / dataset_api 已随 Dify 抽离（2026-09-21）摘除：
 # 知识库入库（kb 阶段）取消；LLM 凭证由 SECRETS_FILE 提供（LLM_BASE_URL/LLM_API_KEY/LLM_MODEL）。
-# PG 域键（V2MD_PG_DSN/V2MD_PG_TIMEOUT_S）在 pg.py 调用期读取（测试运行时可变），
-# 校验复用本表口径——集中收编随下一批存储键迁移时并入。
+# PG 域键统一在本表解析；pg.py 仍从 ENV 读取，保留测试运行时切档能力。

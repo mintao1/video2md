@@ -395,6 +395,10 @@ def _iter_targets(state: dict, run_id: str = "", day: str = "", limit: int = 0):
     from pathlib import Path
     n = 0
     for fp, rec in state.items():
+        # Older state files may contain scalar migration markers/counters.  They
+        # are not evaluation records and must not abort the whole batch.
+        if not isinstance(rec, dict):
+            continue
         if rec.get("status") != "completed" or rec.get("dry_run"):
             continue
         if run_id and rec.get("run_id") != run_id:
