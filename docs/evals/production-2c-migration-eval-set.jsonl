@@ -1,0 +1,10 @@
+{"id":"2c-mig-001","name":"capacity baseline","scope":"lcode-cn","check":"available memory >= 512Mi after existing services","pass":"baseline recorded and headroom remains"}
+{"id":"2c-mig-002","name":"image availability","scope":"lcode-cn","check":"video2md:0.2.0 imported and digest recorded","pass":"image starts without pull from untrusted registry"}
+{"id":"2c-mig-003","name":"persistent data","scope":"lcode-cn","check":"database, uploads, vault and library paths mapped","pass":"restore test completed before traffic"}
+{"id":"2c-mig-004","name":"secret parity","scope":"lcode-cn","check":"production secrets injected without plaintext logs","pass":"OAuth and storage config present, secrets redacted"}
+{"id":"2c-mig-005","name":"egress","scope":"lcode-cn","check":"DNS/TCP/TLS to oauth2.googleapis.com:443","pass":"all stages pass within bounded timeout"}
+{"id":"2c-mig-006","name":"oauth callback","scope":"production","check":"Google redirect URI and callback host match","pass":"callback reaches 2c API and request_id is logged"}
+{"id":"2c-mig-007","name":"smoke and session","scope":"production","check":"healthz, login, /me, /library","pass":"healthz 200, /me 200, library session persists"}
+{"id":"2c-mig-008","name":"cutover","scope":"production","check":"DNS or reverse-proxy switch with TTL and drain window","pass":"no 5xx spike during controlled switch"}
+{"id":"2c-mig-009","name":"rollback","scope":"production","check":"restore 4c deployment and callback routing","pass":"rollback completes within 5 minutes and old path healthy"}
+{"id":"2c-mig-010","name":"retired proxy guard","scope":"production","check":"17898, HTTP_PROXY, HTTPS_PROXY and V2MD_PROXY absent","pass":"deployment rejects retired proxy fallback"}
