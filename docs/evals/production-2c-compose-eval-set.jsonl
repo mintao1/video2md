@@ -1,0 +1,10 @@
+{"id":"2c-compose-001","name":"compose config gate","check":"docker compose -f deploy/docker-compose.prod.yml config","pass":"renders with all required variables and no 17898/HTTP_PROXY/HTTPS_PROXY"}
+{"id":"2c-compose-002","name":"postgres readiness","check":"postgres healthcheck and pg_isready","pass":"healthy before API starts"}
+{"id":"2c-compose-003","name":"migration gate","check":"python -m video2md migrate","pass":"schema migration completes before API"}
+{"id":"2c-compose-004","name":"persistent paths","check":"pg-data, app-data, vault-data survive restart","pass":"data remains after recreate"}
+{"id":"2c-compose-005","name":"secret hygiene","check":"env file permissions and logs","pass":"0600 secret file; no client secret in logs"}
+{"id":"2c-compose-006","name":"2c egress","check":"DNS/TCP/TLS and controlled token endpoint via V2MD_GOOGLE_OAUTH_PROXY_URL","pass":"bounded request reaches Google without network error"}
+{"id":"2c-compose-007","name":"health","check":"GET /healthz","pass":"200 and version 0.2.0"}
+{"id":"2c-compose-008","name":"real OAuth","check":"browser Google login then GET /me and /library","pass":"session established and retained"}
+{"id":"2c-compose-009","name":"rollback","check":"stop 2c stack and restore 4c deployment","pass":"4c healthz 200 within 5 minutes"}
+{"id":"2c-compose-010","name":"retired proxy guard","check":"set V2MD_GOOGLE_OAUTH_PROXY_URL to 127.0.0.1:17898","pass":"startup/test rejects retired endpoint"}

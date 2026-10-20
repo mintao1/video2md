@@ -1,0 +1,62 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?set POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  api:
+    build:
+      context: ..
+      args:
+        VERSION: ${VIDEO2MD_VERSION:-0.2.0}
+    image: video2md:${VIDEO2MD_VERSION:-0.2.0}
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - ${VIDEO2MD_ENV_FILE:-.env}
+    environment:
+      V2MD_HOST: 0.0.0.0
+      V2MD_ENV: production
+      V2MD_AUTH: google
+      V2MD_AUTH_PROVIDERS: google
+      V2MD_CHECKPOINTER: postgres
+      V2MD_RUNS_STORE: postgres
+      V2MD_STATE_STORE: postgres
+      V2MD_USERS_STORE: postgres
+      V2MD_TASKS_STORE: postgres
+      V2MD_PREFS_STORE: postgres
+      V2MD_EVENTS: pg
+      V2MD_PG_DSN: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      V2MD_GOOGLE_OAUTH_PROXY_URL: ${V2MD_GOOGLE_OAUTH_PROXY_URL:?set a non-17898 relay URL}
+      V2MD_SECRETS_FILE: /run/video2md.env
+      V2MD_PUBLIC_BASE_URL: ${V2MD_PUBLIC_BASE_URL:?set public URL}
+      V2MD_WEB_BASE_URL: ${V2MD_WEB_BASE_URL:?set web URL}
+    volumes:
+      - app-data:/app/data
+      - vault-data:/vault
+      - ${VIDEO2MD_ENV_FILE:-.env}:/run/video2md.env:ro
+    ports:
+      - "127.0.0.1:8790:8790"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8790/healthz', timeout=4)"]
+      interval: 30s
+      timeout: 5s
+      start_period: 30s
+      retries: 5
+
+volumes:
+  pg-data:
+  app-data:
+  vault-data:
