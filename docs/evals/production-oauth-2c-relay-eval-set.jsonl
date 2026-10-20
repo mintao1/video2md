@@ -1,0 +1,7 @@
+{"id":"oauth-2c-001","name":"2c DNS resolution","scope":"lcode-cn","command":"getent ahostsv4 oauth2.googleapis.com","pass":"returns IPv4 address"}
+{"id":"oauth-2c-002","name":"2c TCP 443","scope":"lcode-cn","command":"socket connect oauth2.googleapis.com:443","pass":"TCP connect succeeds within 8s"}
+{"id":"oauth-2c-003","name":"2c TLS SNI","scope":"lcode-cn","command":"TLS client with server_hostname oauth2.googleapis.com","pass":"TLS handshake succeeds"}
+{"id":"oauth-2c-004","name":"4c-to-2c relay CONNECT","scope":"production","command":"API container HTTPS request through SSH-backed CONNECT relay","pass":"CONNECT 200 and TLS succeeds without 17898"}
+{"id":"oauth-2c-005","name":"Google token endpoint","scope":"production","command":"POST oauth2.googleapis.com/token with controlled invalid body","pass":"bounded HTTP response, no network error"}
+{"id":"oauth-2c-006","name":"retired proxy fallback","scope":"production","command":"configure 127.0.0.1:17898 or :17898 URL","pass":"explicit rejection; no fallback"}
+{"id":"oauth-2c-007","name":"real Google login","scope":"production","command":"browser Google OAuth login","pass":"callback establishes session and GET /me returns 200"}
