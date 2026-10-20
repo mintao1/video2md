@@ -1,0 +1,13 @@
+[Unit]
+Description=Video2MD OAuth reverse SSH tunnel to 4c
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+ExecStart=/usr/bin/ssh -N -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ExitOnForwardFailure=yes -R 127.0.0.1:18080:127.0.0.1:18080 lcode-4c
+Restart=always
+RestartSec=5
+User=root
+
+[Install]
+WantedBy=multi-user.target
