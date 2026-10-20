@@ -43,7 +43,8 @@ Google account chooser 和授权回跳，实际阻塞点是生产后端 Google �
 确定性防回退门禁为 `backend/tests/test_production_readiness_gate.py`，已接入 CI。
 
 `production-readiness-regression.json` 把 PostgreSQL/API 健康、schema 版本、发布版本、
-Google 出网、旧代理清退、公网路由、配置权限和真实浏览器登录固化为发布防回退集。生产环境只需
+Git 提交/镜像溯源、Pod Ready/重启/近期错误、Google 出网、旧代理清退、公网路由、
+未登录 `/me=401`、配置权限和真实浏览器登录固化为发布防回退集。生产环境只需
 填写脱敏证据（参考 `production-readiness-evidence.example.json`），不得记录密钥值：
 
 OAuth relay 证据必须声明 `host-network-loopback` 拓扑：Pod 因 `hostNetwork: true`

@@ -8,11 +8,13 @@
     {"id":"prod-schema-version","evidence":"schema.version","expected":{"minimum":4}},
     {"id":"prod-api-health","evidence":"api.status","expected":"healthy"},
     {"id":"prod-release-version","evidence":"api.version","expected":"0.2.0"},
+    {"id":"prod-release-provenance","evidence":"release","expected":{"branch":"main","source_commit_equals_expected_commit":true,"deployed_image_equals_expected_image":true}},
+    {"id":"prod-runtime-stability","evidence":"runtime","expected":{"pod_phase":"Running","pod_ready":true,"restart_count":0,"recent_error_count":0}},
     {"id":"prod-google-egress","evidence":"google_token_probe","expected":{"network_ok":true,"http_status_min":400,"http_status_max":499}},
     {"id":"prod-oauth-relay-topology","evidence":"oauth_relay","expected":{"topology":"host-network-loopback","container_reachable_host":"127.0.0.1","port":18080,"container_probe_http_status_min":400,"container_probe_http_status_max":499,"tunnel_service_active":true}},
     {"id":"prod-proxy-retirement","evidence":"container_env.present_forbidden","expected":[]},
     {"id":"prod-config-permissions","evidence":"config","expected":{"mode_max":"0600","allowed_owners":["root","app"]}},
     {"id":"prod-browser-google-login","evidence":"browser_google_login","expected":{"status":"passed","callback_success":true,"session_me_http_status":200,"library_http_status":200,"tasks_http_status":200,"profile_http_status":200,"session_persistent_after_refresh":true}},
-    {"id":"prod-public-routes","evidence":"public_routes","expected":{"healthz":200,"terms":200,"privacy":200,"docs":403,"openapi_json":403,"redoc":403,"queue":404}}
+    {"id":"prod-public-routes","evidence":"public_routes","expected":{"healthz":200,"terms":200,"privacy":200,"unauthenticated_me":401,"docs":403,"openapi_json":403,"redoc":403,"queue":404}}
   ]
 }

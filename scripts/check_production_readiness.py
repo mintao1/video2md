@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import stat
 import sys
 from pathlib import Path
@@ -34,6 +35,34 @@ def evaluate(evidence: dict[str, Any], *, require_browser: bool) -> list[str]:
     expect("prod-schema-version", isinstance(schema_version, int) and schema_version >= 4, "schema version must be >= 4")
     expect("prod-api-health", nested(evidence, "api.status") == "healthy", "API must be healthy")
     expect("prod-release-version", nested(evidence, "api.version") == "0.2.0", "/healthz version must equal 0.2.0")
+
+    release = nested(evidence, "release")
+    expected_commit = release.get("expected_commit") if isinstance(release, dict) else None
+    source_commit = release.get("source_commit") if isinstance(release, dict) else None
+    expected_image = release.get("expected_image") if isinstance(release, dict) else None
+    deployed_image = release.get("deployed_image") if isinstance(release, dict) else None
+    expect(
+        "prod-release-provenance",
+        isinstance(expected_commit, str)
+        and re.fullmatch(r"[0-9a-f]{40}", expected_commit) is not None
+        and source_commit == expected_commit
+        and release.get("branch") == "main"
+        and isinstance(expected_image, str)
+        and bool(expected_image)
+        and deployed_image == expected_image,
+        "deployed source SHA and image must exactly match the intended main release",
+    )
+
+    runtime = nested(evidence, "runtime")
+    expect(
+        "prod-runtime-stability",
+        isinstance(runtime, dict)
+        and runtime.get("pod_phase") == "Running"
+        and runtime.get("pod_ready") is True
+        and runtime.get("restart_count") == 0
+        and runtime.get("recent_error_count") == 0,
+        "production pod must be ready with zero restarts and no recent errors",
+    )
 
     probe = nested(evidence, "google_token_probe")
     probe_status = probe.get("http_status") if isinstance(probe, dict) else None
@@ -101,6 +130,7 @@ def evaluate(evidence: dict[str, Any], *, require_browser: bool) -> list[str]:
         and routes.get("healthz") == 200
         and routes.get("terms") == 200
         and routes.get("privacy") == 200
+        and routes.get("unauthenticated_me") == 401
         and routes.get("docs") == 403
         and routes.get("openapi_json") == 403
         and routes.get("redoc") == 403
@@ -182,6 +212,14 @@ def self_test() -> None:
         "postgres": {"status": "healthy"},
         "schema": {"version": 4},
         "api": {"status": "healthy", "version": "0.2.0"},
+        "release": {
+            "branch": "main",
+            "expected_commit": "a83147d5be0d75253804e74663fefccbe70a904b",
+            "source_commit": "a83147d5be0d75253804e74663fefccbe70a904b",
+            "expected_image": "video2md:0.2.0-hotfix-20261021g",
+            "deployed_image": "video2md:0.2.0-hotfix-20261021g",
+        },
+        "runtime": {"pod_phase": "Running", "pod_ready": True, "restart_count": 0, "recent_error_count": 0},
         "google_token_probe": {"network_ok": True, "http_status": 404},
         "oauth_relay": {"topology": "host-network-loopback", "container_reachable_host": "127.0.0.1", "port": 18080, "container_probe_http_status": 404, "tunnel_service_active": True},
         "container_env": {"present_forbidden": []},
@@ -195,11 +233,13 @@ def self_test() -> None:
             "profile_http_status": 200,
             "session_persistent_after_refresh": True,
         },
-        "public_routes": {"healthz": 200, "terms": 200, "privacy": 200, "docs": 403, "openapi_json": 403, "redoc": 403, "queue": 404},
+        "public_routes": {"healthz": 200, "terms": 200, "privacy": 200, "unauthenticated_me": 401, "docs": 403, "openapi_json": 403, "redoc": 403, "queue": 404},
     }
     assert evaluate(good, require_browser=True) == []
     bad = json.loads(json.dumps(good))
     bad["schema"]["version"] = 3
+    bad["release"]["source_commit"] = "0" * 40
+    bad["runtime"]["restart_count"] = 2
     bad["container_env"]["present_forbidden"] = ["HTTPS_PROXY"]
     bad["oauth_relay"]["tunnel_service_active"] = False
     bad["config"]["mode"] = "0644"
@@ -208,6 +248,8 @@ def self_test() -> None:
     failures = evaluate(bad, require_browser=True)
     assert {item.split(":", 1)[0] for item in failures} >= {
         "prod-schema-version",
+        "prod-release-provenance",
+        "prod-runtime-stability",
         "prod-proxy-retirement",
         "prod-oauth-relay-topology",
         "prod-config-mode",
