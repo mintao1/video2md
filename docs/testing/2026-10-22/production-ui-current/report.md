@@ -32,7 +32,7 @@
 ## 修复动作
 
 - 提交 `3b3e55e` 已推送到 `main`。
-- 生产镜像 `video2md:0.2.0-kaggle-entry-20261022a` 已构建并导入节点。
+- 生产镜像 `video2md:0.2.0-colab-tenant-20261022a` 已构建并导入节点，包含 Kaggle 前端 bundle 与按租户 Colab 授权逻辑。
 - `video2md-api` 已滚动更新，Pod `video2md-api-f4d9fdb86-jbdk5` 就绪。
 - `/healthz` 返回 `ok=true`；真实浏览器重新登录后，`/profile` 显示 Kaggle 入口，LLM URL/模型配置仍持久化。
 - Colab 后端已更新为按租户身份授权；真实生产页面显示“尚未连接我的 Colab”与“连接我的 Google Colab”，不再显示管理员权限阻塞。

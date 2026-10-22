@@ -35,7 +35,7 @@
     }
   },
   "deployed_asset": "/assets/index-CGFm16TP.js",
-  "deployed_image": "video2md:0.2.0-kaggle-entry-20261022a",
+  "deployed_image": "video2md:0.2.0-colab-tenant-20261022a",
   "regression_guard": "profile must expose visible Kaggle 登录 link with href https://www.kaggle.com/account/login and target=_blank",
   "eval_set": "docs/evals/production-remediation-2026-10-22.jsonl"
 }
