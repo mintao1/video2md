@@ -11,9 +11,7 @@ function percentage(used: number, total: number): number {
   return Math.min(100, Math.max(0, Math.round((used / total) * 100)))
 }
 
-const aiPct = computed(() =>
-  props.quota ? percentage(props.quota.ai_hours_used, props.quota.ai_hours_total) : 0,
-)
+const aiPct = computed(() => (props.quota ? percentage(props.quota.ai_hours_used, props.quota.ai_hours_total) : 0))
 const storagePct = computed(() =>
   props.quota ? percentage(props.quota.storage_gb_used, props.quota.storage_gb_total) : 0,
 )
@@ -23,7 +21,11 @@ const storagePct = computed(() =>
   <div class="flex flex-col gap-space-sm">
     <div class="flex items-center justify-between px-space-xs">
       <span class="font-title-sm text-title-sm text-on-surface">算力与云存储用量</span>
-      <button type="button" class="font-label-sm text-label-sm text-primary flex items-center gap-0.5" @click="emit('details')">
+      <button
+        type="button"
+        class="font-label-sm text-label-sm text-primary flex items-center gap-0.5"
+        @click="emit('details')"
+      >
         明细流水
         <span class="material-symbols-outlined text-[14px]">chevron_right</span>
       </button>

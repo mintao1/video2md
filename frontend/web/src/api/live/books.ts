@@ -14,6 +14,7 @@ interface RunListResp {
     created?: string | null
     total?: number | null
     done_entries: number
+    artifacts?: { present?: boolean } | null
   }[]
   mode: string
 }
@@ -65,11 +66,8 @@ function categoryOf(text: string): Book['category'] {
   return 'ai' // 强化学习/机器学习/Python/大模型/计算机默认 ai 桶
 }
 
-function toBook(
-  r: RunListResp['items'][number],
-  pref: { fav: boolean; progress: number },
-): Book {
-  let host = ''
+function toBook(r: RunListResp['items'][number], pref: { fav: boolean; progress: number }, mode: string): Book {
+  let host: string
   try {
     host = new URL(r.url).hostname
   } catch {
@@ -96,18 +94,16 @@ function toBook(
     read_meta: r.done_entries > 0 ? `已转录 ${r.done_entries}/${total} 讲` : undefined,
     status: r.status,
     created: r.created ?? undefined,
+    bundle_ready: mode === 'deliver' && !!r.artifacts?.present,
   }
 }
 
 export async function getBooks(): Promise<Book[]> {
-  const [runs, prefs] = await Promise.all([
-    request<RunListResp>('/runs?limit=500'),
-    request<PrefsResp>('/prefs'),
-  ])
+  const [runs, prefs] = await Promise.all([request<RunListResp>('/runs?limit=500'), request<PrefsResp>('/prefs')])
   prefsCache = new Map(prefs.items.map((p) => [p.run_id, { fav: p.fav, progress: p.progress }]))
   return runs.items
     .filter((r) => (r.status === 'done' || r.status === 'partial') && r.done_entries > 0)
-    .map((r) => toBook(r, prefsCache.get(r.run_id) ?? { fav: false, progress: 0 }))
+    .map((r) => toBook(r, prefsCache.get(r.run_id) ?? { fav: false, progress: 0 }, runs.mode))
 }
 
 export async function toggleFav(id: string): Promise<void> {
@@ -129,9 +125,7 @@ export async function toggleFav(id: string): Promise<void> {
 export async function getNotes(bookId: string): Promise<{ title: string; md: string }[]> {
   try {
     const resp = await request<RunNotesResp>(`/runs/${bookId}/note`)
-    return resp.notes
-      .filter((n) => n.md.trim())
-      .map((n) => ({ title: n.title, md: n.md }))
+    return resp.notes.filter((n) => n.md.trim()).map((n) => ({ title: n.title, md: n.md }))
   } catch (error) {
     if (error instanceof ApiRequestError && error.code === 410) return []
     throw error

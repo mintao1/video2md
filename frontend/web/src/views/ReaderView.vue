@@ -34,14 +34,21 @@ function releaseMedia() {
   pendingMedia.value = []
 }
 
-watch(() => [runId.value, notes.value[idx.value]?.md] as const, ([id, md]) => {
-  releaseMedia()
-  pendingMedia.value = mediaNames(md ?? '')
-  stopMedia = startMediaLoad(pendingMedia.value, (name) => getMedia(id, name), (name, url) => {
-    if (url) mediaUrls.value = { ...mediaUrls.value, [name]: url }
-    pendingMedia.value = pendingMedia.value.filter((item) => item !== name)
-  })
-})
+watch(
+  () => [runId.value, notes.value[idx.value]?.md] as const,
+  ([id, md]) => {
+    releaseMedia()
+    pendingMedia.value = mediaNames(md ?? '')
+    stopMedia = startMediaLoad(
+      pendingMedia.value,
+      (name) => getMedia(id, name),
+      (name, url) => {
+        if (url) mediaUrls.value = { ...mediaUrls.value, [name]: url }
+        pendingMedia.value = pendingMedia.value.filter((item) => item !== name)
+      },
+    )
+  },
+)
 
 onBeforeUnmount(() => {
   loadVersion++
@@ -51,12 +58,8 @@ const tocOpen = ref(false)
 const contentEl = ref<HTMLElement | null>(null)
 
 const total = computed(() => notes.value.length)
-const progress = computed(() =>
-  total.value ? Math.round(((idx.value + 1) / total.value) * 100) : 0,
-)
-const html = computed(() =>
-  notes.value[idx.value] ? renderMd(notes.value[idx.value].md) : '',
-)
+const progress = computed(() => (total.value ? Math.round(((idx.value + 1) / total.value) * 100) : 0))
+const html = computed(() => (notes.value[idx.value] ? renderMd(notes.value[idx.value].md) : ''))
 const chapters = computed<TocChapter[]>(() =>
   notes.value.map((n, i) => ({
     no: i + 1,
@@ -100,30 +103,36 @@ async function goTo(no: number): Promise<void> {
   }
 }
 
-watch(() => [route.params.id, route.query.ch], async () => {
-  const version = ++loadVersion
-  loading.value = true
-  loadError.value = ''
-  try {
-    const [books, loaded] = await Promise.all([getBooks(), getNotes(runId.value)])
-    if (version !== loadVersion) return
-    book.value = books.find((b) => b.id === runId.value) ?? null
-    notes.value = loaded
-    idx.value = chapterIndex(route.query.ch, loaded.length, book.value?.progress)
-    if (loaded.length) {
-      try { await saveProgress(runId.value, progress.value) }
-      catch { toast.show('阅读进度保存失败，稍后重试') }
+watch(
+  () => [route.params.id, route.query.ch],
+  async () => {
+    const version = ++loadVersion
+    loading.value = true
+    loadError.value = ''
+    try {
+      const [books, loaded] = await Promise.all([getBooks(), getNotes(runId.value)])
+      if (version !== loadVersion) return
+      book.value = books.find((b) => b.id === runId.value) ?? null
+      notes.value = loaded
+      idx.value = chapterIndex(route.query.ch, loaded.length, book.value?.progress)
+      if (loaded.length) {
+        try {
+          await saveProgress(runId.value, progress.value)
+        } catch {
+          toast.show('阅读进度保存失败，稍后重试')
+        }
+      }
+    } catch (error) {
+      if (version !== loadVersion) return
+      notes.value = []
+      loadError.value = error instanceof Error ? error.message : '加载失败，请稍后重试'
+      toast.show(loadError.value)
+    } finally {
+      if (version === loadVersion) loading.value = false
     }
-  } catch (error) {
-    if (version !== loadVersion) return
-    notes.value = []
-    loadError.value = error instanceof Error ? error.message : '加载失败，请稍后重试'
-    toast.show(loadError.value)
-  } finally {
-    if (version === loadVersion) loading.value = false
-  }
-}, { immediate: true })
-
+  },
+  { immediate: true },
+)
 </script>
 
 <template>
@@ -160,15 +169,10 @@ watch(() => [route.params.id, route.query.ch], async () => {
     <!-- 正文 -->
     <main ref="contentEl" class="flex-1 overflow-y-auto">
       <div v-if="loading" class="flex items-center justify-center py-24">
-        <span class="material-symbols-outlined animate-spin text-4xl text-primary"
-          >progress_activity</span
-        >
+        <span class="material-symbols-outlined animate-spin text-4xl text-primary">progress_activity</span>
       </div>
 
-      <div
-        v-else-if="!notes.length"
-        class="flex items-center justify-center px-6 py-24"
-      >
+      <div v-else-if="!notes.length" class="flex items-center justify-center px-6 py-24">
         <EmptyState
           icon="menu_book"
           title="暂无精讲笔记"
@@ -178,11 +182,8 @@ watch(() => [route.params.id, route.query.ch], async () => {
         />
       </div>
 
-      <article
-        v-else
-        class="prose-v2md text-on-surface px-5 py-5 pb-24"
-        v-html="html"
-      />
+      <!-- eslint-disable-next-line vue/no-v-html -- html 由 renderMd 经 DOMPurify 净化 -->
+      <article v-else class="prose-v2md text-on-surface px-5 py-5 pb-24" v-html="html" />
     </main>
 
     <!-- 底部章节导航 -->
@@ -213,9 +214,7 @@ watch(() => [route.params.id, route.query.ch], async () => {
       <button
         class="flex-1 py-2.5 rounded-lg font-title-sm text-label-md flex items-center justify-center gap-1 transition-colors"
         :class="
-          idx >= total - 1
-            ? 'bg-surface-container-low text-outline'
-            : 'bg-primary text-on-primary active:scale-95'
+          idx >= total - 1 ? 'bg-surface-container-low text-outline' : 'bg-primary text-on-primary active:scale-95'
         "
         :disabled="idx >= total - 1"
         @click="goTo(idx + 2)"

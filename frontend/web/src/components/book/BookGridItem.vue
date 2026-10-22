@@ -31,10 +31,7 @@ const emit = defineEmits<{
       {{ book.title }}
     </h3>
     <div class="w-full h-1 bg-surface-container rounded-full overflow-hidden">
-      <div
-        class="h-full rounded-full bg-primary transition-all"
-        :style="{ width: `${book.progress}%` }"
-      />
+      <div class="h-full rounded-full bg-primary transition-all" :style="{ width: `${book.progress}%` }" />
     </div>
   </article>
 </template>

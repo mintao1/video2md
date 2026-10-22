@@ -1,4 +1,4 @@
-// fetch 封装占位：第一版不接线；换真实 API 时 live/* 用它。
+// API 客户端：live/* 通过这里发起带 Bearer 鉴权的请求，并统一错误信封。
 import type { ApiError } from '../types'
 
 const configuredBaseUrl = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim()
@@ -6,12 +6,17 @@ const configuredBaseUrl = (import.meta.env.VITE_API_BASE_URL as string | undefin
 // Production is served behind the same TLS origin as the API. Local Vite
 // development uses a separate API port, so keep that default explicit while
 // avoiding a localhost API URL in a deployed browser bundle.
-const localDevOrigin = typeof window !== 'undefined' &&
+const localDevOrigin =
+  typeof window !== 'undefined' &&
   (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
 
-export const BASE_URL = configuredBaseUrl ||
-  (localDevOrigin ? 'http://127.0.0.1:8790' :
-    (typeof window !== 'undefined' ? window.location.origin : 'http://127.0.0.1:8790'))
+export const BASE_URL =
+  configuredBaseUrl ||
+  (localDevOrigin
+    ? 'http://127.0.0.1:8790'
+    : typeof window !== 'undefined'
+      ? window.location.origin
+      : 'http://127.0.0.1:8790')
 
 // Google ID token is carried as a Bearer credential for every API request.
 export function getToken(): string | null {
@@ -105,38 +110,51 @@ export async function requestBlob(path: string): Promise<Blob> {
 export async function requestMediaBlob(path: string): Promise<Blob> {
   const parts: Blob[] = []
   const chunkSize = 64 * 1024
-  let offset = 0, total = 0, etag = '', type = ''
+  let offset = 0,
+    total = 0,
+    etag = ''
   while (true) {
     let res: Response | undefined, blob: Blob | undefined
     for (let attempt = 0; attempt < 2; attempt++) {
       try {
-        res = await response(path, { headers: {
-          Range: `bytes=${offset}-${offset + chunkSize - 1}`,
-          ...(etag ? { 'If-Range': etag } : {}),
-        } })
+        res = await response(path, {
+          headers: {
+            Range: `bytes=${offset}-${offset + chunkSize - 1}`,
+            ...(etag ? { 'If-Range': etag } : {}),
+          },
+        })
         blob = await res.blob()
         const length = Number(res.headers.get('Content-Length'))
         if (length && blob.size !== length) throw new TypeError('Incomplete media response')
         break
       } catch (error) {
         if (!(error instanceof TypeError)) throw error
-        if (attempt === 1) throw new Error('媒体传输中断，请稍后重试')
+        if (attempt === 1) throw new Error('媒体传输中断，请稍后重试', { cause: error })
       }
     }
     if (!res || !blob) throw new Error('媒体响应为空')
     if (res.status === 200 && offset === 0) return blob // Older servers without range support.
     const range = /^bytes (\d+)-(\d+)\/(\d+)$/.exec(res.headers.get('Content-Range') ?? '')
-    const start = Number(range?.[1]), end = Number(range?.[2]), size = Number(range?.[3])
-    if (res.status !== 206 || !range || start !== offset || end < start || size <= end ||
-        end !== Math.min(offset + chunkSize - 1, size - 1) || blob.size !== end - start + 1 ||
-        (total && size !== total) || (etag && res.headers.get('ETag') !== etag)) {
+    const start = Number(range?.[1]),
+      end = Number(range?.[2]),
+      size = Number(range?.[3])
+    if (
+      res.status !== 206 ||
+      !range ||
+      start !== offset ||
+      end < start ||
+      size <= end ||
+      end !== Math.min(offset + chunkSize - 1, size - 1) ||
+      blob.size !== end - start + 1 ||
+      (total && size !== total) ||
+      (etag && res.headers.get('ETag') !== etag)
+    ) {
       throw new Error('媒体分段响应不一致，请重新打开本讲')
     }
     total = size
     etag = res.headers.get('ETag') ?? ''
-    type = blob.type
     parts.push(blob)
     offset = end + 1
-    if (offset === total) return new Blob(parts, { type })
+    if (offset === total) return new Blob(parts, { type: blob.type })
   }
 }

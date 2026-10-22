@@ -34,8 +34,9 @@ interface RunCreatedResp {
 /** 后端终态/partial/error 原样透传；queued/created 等直接是前端词表 */
 function asStatus(s: string | null | undefined): RunStatus {
   const v = (s || 'created') as RunStatus
-  return (['created', 'queued', 'running', 'paused', 'cancelling',
-    'done', 'partial', 'error'] as string[]).includes(v) ? v : 'created'
+  return (['created', 'queued', 'running', 'paused', 'cancelling', 'done', 'partial', 'error'] as string[]).includes(v)
+    ? v
+    : 'created'
 }
 
 function deriveTitle(url: string): string {

@@ -463,3 +463,28 @@ python3 scripts/check_production_ui_annotations.py --require-closed
 本轮回放结果见 `docs/testing/2026-10-22/production-ui-annotation-evals/`：离线回放通过；严格门禁按真实证据保留
 `pua-001/002` 的浏览器动作审计缺口，以及 `pua-005/006/007/008` 的媒体就绪/实播缺口。重复提交的用量和费用
 核对本身通过，只有实播条件未满足时整条 `pua-008` 才保持未关闭。
+
+## 前端质量评测集（2026-10-22）
+
+`frontend-quality-eval-set.jsonl` 固化前端评审的四项整改，共 16 条用例、56 个可执行反例：
+
+| 项 | 用例 | 约束 |
+| --- | --- | --- |
+| README | `fq-readme-001`～`005` | 链接与 `src/` 路径存在、统一 `npm ci`、脚本全部有文档、5 张截图齐全且为 PNG、不再描述 mock 层 |
+| 清理假功能 | `fq-mock-001`～`004` | 源码无 mock/模拟文案、已删除的支付/草稿/网盘/Notion/分享/多格式导出不回归、下载受 `bundle_ready` 约束、E2E 断言页面无 mock 文案 |
+| Lint/格式 | `fq-lint-001`～`005` | 配置严格且依赖精确锁定、真实 ESLint/Prettier 能报出探针问题、`v-html` 必须带理由豁免、CI 按序运行全部门禁 |
+| E2E | `fq-e2e-001`～`002` | 登录/提交/阅读关键断言齐全、连接真实 FastAPI 夹具且只拦截 Google 授权页、CI 禁止 `test.only`、不重试 |
+
+每条用例分为 `input`（场景与检查器）、`expectedOutput`（零违规与验收标准）、`metadata`（整改项、回归入口、反例）。
+回归入口在仓库当前状态下必须零违规，且对每个反例补丁（在内存中改写或删除文件，或替换 ESLint/Prettier 探针）必须报出违规，
+因此放宽检查器同样会使测试失败。
+
+```bash
+cd frontend/web
+npm run test:regression   # 评测集 + 反例，无需后端
+npm run lint && npm run format:check
+npm run test:e2e          # 需 backend/.venv；本机已有 Chromium 时设 PW_CHROMIUM_PATH
+```
+
+E2E 另做过变异验证：去掉阅读器对 `blob:` 地址的恢复，或去掉队列对重复提交的去重，都会使对应用例失败。
+记录见 [frontend-quality-results-2026-10-22.md](frontend-quality-results-2026-10-22.md)。

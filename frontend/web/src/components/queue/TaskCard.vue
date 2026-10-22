@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { downloadBundle } from '../../api'
+import { saveBundle } from '../../download'
 import type { RunListItem } from '../../types'
 import ProgressBar from '../common/ProgressBar.vue'
 import { useQueueStore } from '../../stores/queue'
@@ -8,7 +8,7 @@ import { useToastStore } from '../../stores/toast'
 
 const props = defineProps<{
   run: RunListItem
-  /** 缩略图色相（mock 占位封面用） */
+  /** 缩略图渐变封面的色相 */
   hue?: number
 }>()
 
@@ -25,22 +25,16 @@ async function action(kind: 'cancel' | 'resume' | 'promote' | 'download') {
     if (kind === 'cancel') await queue.pause(props.run.run_id)
     else if (kind === 'resume') await queue.resume(props.run.run_id)
     else if (kind === 'promote') await queue.promote(props.run.run_id)
-    else {
-      const url = URL.createObjectURL(await downloadBundle(props.run.run_id))
-      const anchor = document.createElement('a')
-      anchor.href = url
-      anchor.download = `video2md-${props.run.run_id}.zip`
-      document.body.append(anchor)
-      anchor.click()
-      anchor.remove()
-      setTimeout(() => URL.revokeObjectURL(url), 60_000)
-    }
-    toast.show({ cancel: '已提交取消请求', resume: '任务已重新排队', promote: '已设为优先', download: '下载已开始' }[kind])
+    else await saveBundle(props.run.run_id)
+    toast.show(
+      { cancel: '已提交取消请求', resume: '任务已重新排队', promote: '已设为优先', download: '下载已开始' }[kind],
+    )
   } catch (error) {
     toast.show(error instanceof Error ? error.message : '操作失败，请稍后重试')
-  } finally { busy.value = false }
+  } finally {
+    busy.value = false
+  }
 }
-
 
 const isSelected = computed(() => queue.selected.has(props.run.run_id))
 
@@ -104,10 +98,7 @@ function fmtEta(sec?: number): string {
 
       <!-- 缩略图占位 -->
       <div class="relative w-24 h-16 rounded-lg overflow-hidden shrink-0" :style="thumbStyle">
-        <span
-          class="material-symbols-outlined absolute inset-0 m-auto text-white/40"
-          style="font-size: 32px"
-        >
+        <span class="material-symbols-outlined absolute inset-0 m-auto text-white/40" style="font-size: 32px">
           smart_display
         </span>
         <span
@@ -121,10 +112,7 @@ function fmtEta(sec?: number): string {
       <!-- 信息 -->
       <div class="flex flex-col flex-1 min-w-0">
         <div class="flex items-center justify-between gap-space-xs">
-          <span
-            class="px-1.5 py-0.5 rounded font-label-sm text-[10px] shrink-0"
-            :class="statusBadge.cls"
-          >
+          <span class="px-1.5 py-0.5 rounded font-label-sm text-[10px] shrink-0" :class="statusBadge.cls">
             {{ statusBadge.text }}
           </span>
           <span
@@ -158,7 +146,11 @@ function fmtEta(sec?: number): string {
       <span>GPU {{ run.usage.gpu_s.toFixed(3) }} 秒</span>
       <span>费用 {{ run.cost_usd == null ? '待结算' : `$${run.cost_usd.toFixed(6)}` }}</span>
     </div>
-    <div v-if="run.diagnostic" role="alert" class="bg-error-container/50 rounded-lg px-space-sm py-1.5 text-body-sm text-on-error-container">
+    <div
+      v-if="run.diagnostic"
+      role="alert"
+      class="bg-error-container/50 rounded-lg px-space-sm py-1.5 text-body-sm text-on-error-container"
+    >
       <span>失败阶段：{{ run.diagnostic.stage }}。</span>{{ run.diagnostic.message }}
     </div>
     <!-- 进度条（running） -->
@@ -181,7 +173,8 @@ function fmtEta(sec?: number): string {
     <div v-if="run.status === 'running'" class="flex items-center justify-end gap-space-sm pt-1">
       <button
         class="px-space-md py-1.5 rounded-lg bg-surface-container text-on-surface-variant font-label-md text-label-md active:scale-95 transition-transform flex items-center gap-1"
-        :disabled="busy" @click="action('cancel')"
+        :disabled="busy"
+        @click="action('cancel')"
       >
         <span class="material-symbols-outlined text-[16px]">cancel</span>
         取消任务
@@ -200,7 +193,11 @@ function fmtEta(sec?: number): string {
         <span class="material-symbols-outlined text-[18px] text-outline">pause_circle</span>
         <span>任务已结束，可重新排队</span>
       </div>
-      <button class="font-label-sm text-label-sm text-primary font-semibold active:opacity-75" :disabled="busy" @click="action('resume')">
+      <button
+        class="font-label-sm text-label-sm text-primary font-semibold active:opacity-75"
+        :disabled="busy"
+        @click="action('resume')"
+      >
         重试任务
       </button>
     </div>
@@ -214,13 +211,16 @@ function fmtEta(sec?: number): string {
         <span>等待中</span>
       </div>
       <div class="flex items-center gap-3">
-      <button class="font-label-sm text-label-sm text-outline" :disabled="busy" @click="action('cancel')">取消排队</button>
-      <button
-        class="font-label-sm text-label-sm text-primary font-semibold active:opacity-75"
-        :disabled="busy" @click="action('promote')"
-      >
-        设为优先
-      </button>
+        <button class="font-label-sm text-label-sm text-outline" :disabled="busy" @click="action('cancel')">
+          取消排队
+        </button>
+        <button
+          class="font-label-sm text-label-sm text-primary font-semibold active:opacity-75"
+          :disabled="busy"
+          @click="action('promote')"
+        >
+          设为优先
+        </button>
       </div>
     </div>
 
@@ -234,18 +234,23 @@ function fmtEta(sec?: number): string {
         立即阅读
       </button>
       <span v-else class="text-body-sm text-outline">尚未生成可读教材</span>
-      <button v-if="run.status === 'partial'" class="font-label-sm text-label-sm text-primary"
-        :disabled="busy" @click="action('resume')">补跑失败条目</button>
+      <button
+        v-if="run.status === 'partial'"
+        class="font-label-sm text-label-sm text-primary"
+        :disabled="busy"
+        @click="action('resume')"
+      >
+        补跑失败条目
+      </button>
       <button
         v-if="run.bundle_ready"
         class="px-space-md py-2 rounded-lg bg-surface-container text-on-surface-variant font-label-md text-label-md active:scale-95 transition-transform flex items-center gap-1"
-        :disabled="busy" @click="action('download')"
+        :disabled="busy"
+        @click="action('download')"
       >
         <span class="material-symbols-outlined text-[18px]">download</span>
         下载
       </button>
     </div>
-
-
   </div>
 </template>

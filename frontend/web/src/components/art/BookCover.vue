@@ -16,7 +16,12 @@ const coverStyle = computed(() => ({
   background: `linear-gradient(150deg, hsl(${props.hue} 62% 42%) 0%, hsl(${(props.hue + 30) % 360} 70% 24%) 100%)`,
 }))
 
-const shortTitle = computed(() => props.title.replace(/[（(].*$/, '').trim().slice(0, 10))
+const shortTitle = computed(() =>
+  props.title
+    .replace(/[（(].*$/, '')
+    .trim()
+    .slice(0, 10),
+)
 </script>
 
 <template>

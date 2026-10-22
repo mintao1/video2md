@@ -10,11 +10,14 @@ const avatarStyle = computed(() => {
 })
 
 const initial = computed(() => props.user.name[0] ?? '视')
-const planLabel = computed(() => ({
-  free: '免费版',
-  pro: '高级学术会员 (Pro)',
-  svip: 'SVIP 旗舰会员',
-}[props.user.plan]))
+const planLabel = computed(
+  () =>
+    ({
+      free: '免费版',
+      pro: '高级学术会员 (Pro)',
+      svip: 'SVIP 旗舰会员',
+    })[props.user.plan],
+)
 </script>
 
 <template>

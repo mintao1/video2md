@@ -10,8 +10,7 @@ const emit = defineEmits<{
   (e: 'toggleFav', id: string): void
   (e: 'read', book: Book): void
   (e: 'toc', book: Book): void
-  (e: 'export', book: Book): void
-  (e: 'share', book: Book): void
+  (e: 'download', book: Book): void
 }>()
 </script>
 
@@ -35,7 +34,9 @@ const emit = defineEmits<{
         <div class="flex items-center justify-between">
           <span
             class="font-label-sm text-label-sm font-semibold flex items-center gap-0.5 truncate"
-            :class="book.category === 'ai' ? 'text-secondary' : book.category === 'econ' ? 'text-tertiary' : 'text-primary'"
+            :class="
+              book.category === 'ai' ? 'text-secondary' : book.category === 'econ' ? 'text-tertiary' : 'text-primary'
+            "
           >
             <span class="material-symbols-outlined text-[14px]">school</span>
             <span class="truncate">{{ book.source_badge }}</span>
@@ -100,18 +101,13 @@ const emit = defineEmits<{
       </div>
       <div class="flex items-center gap-1">
         <button
+          v-if="book.bundle_ready"
           class="w-8 h-8 rounded-full text-on-surface-variant hover:bg-surface-container flex items-center justify-center transition-colors"
-          title="导出书籍"
-          @click="emit('export', book)"
+          title="下载 Markdown 原始包"
+          aria-label="下载 Markdown 原始包"
+          @click="emit('download', book)"
         >
           <span class="material-symbols-outlined text-[18px]">download</span>
-        </button>
-        <button
-          class="w-8 h-8 rounded-full text-on-surface-variant hover:bg-surface-container flex items-center justify-center transition-colors"
-          title="分享教材"
-          @click="emit('share', book)"
-        >
-          <span class="material-symbols-outlined text-[18px]">share</span>
         </button>
       </div>
     </div>

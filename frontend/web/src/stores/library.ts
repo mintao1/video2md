@@ -18,12 +18,8 @@ export const useLibraryStore = defineStore('library', () => {
   const filtered = computed(() => {
     const q = query.value.trim().toLowerCase()
     return books.value.filter((b) => {
-      const matchCat =
-        category.value === 'all' ||
-        (category.value === 'fav' && b.fav) ||
-        category.value === b.category
-      const matchQ =
-        !q || b.title.toLowerCase().includes(q) || b.subtitle.toLowerCase().includes(q)
+      const matchCat = category.value === 'all' || (category.value === 'fav' && b.fav) || category.value === b.category
+      const matchQ = !q || b.title.toLowerCase().includes(q) || b.subtitle.toLowerCase().includes(q)
       return matchCat && matchQ
     })
   })

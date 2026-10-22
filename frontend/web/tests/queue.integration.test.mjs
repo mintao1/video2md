@@ -32,7 +32,10 @@ async function http(path, init = {}) {
 async function eventually(check) {
   const deadline = Date.now() + 2000
   while (true) {
-    try { check(); return } catch (error) {
+    try {
+      check()
+      return
+    } catch (error) {
       if (Date.now() >= deadline) throw error
       await delay(20)
     }
@@ -47,43 +50,57 @@ async function waitForBackend() {
     if (baseUrl) {
       try {
         if ((await fetch(`${baseUrl}/healthz`, { signal: AbortSignal.timeout(1000) })).ok) return
-      } catch { /* socket bound before uvicorn starts accepting */ }
+      } catch {
+        /* socket bound before uvicorn starts accepting */
+      }
     }
     await delay(50)
   }
   throw new Error(`Backend startup timed out: ${backendLog}`)
 }
 
-before(async () => {
-  temp = await mkdtemp(resolve(tmpdir(), 'v2md-web-integration-'))
-  Object.defineProperty(globalThis, 'localStorage', {
-    configurable: true,
-    value: {
-      getItem: (key) => storage.get(key) ?? null,
-      setItem: (key, value) => storage.set(key, String(value)),
-      removeItem: (key) => storage.delete(key),
-    },
-  })
-  backend = spawn(process.env.V2MD_TEST_PYTHON || resolve(repoRoot, 'backend/.venv/bin/python'), [
-    resolve(repoRoot, 'backend/tests/fixtures/web_integration_api.py'), temp,
-  ], { cwd: repoRoot, stdio: ['ignore', 'pipe', 'pipe'] })
-  backend.on('error', (error) => { spawnError = error })
-  backend.stdout.on('data', (chunk) => {
-    backendLog += chunk
-    const line = backendLog.split('\n').find((value) => value.startsWith('{"base_url":'))
-    if (line) baseUrl = JSON.parse(line).base_url
-  })
-  backend.stderr.on('data', (chunk) => { backendLog += chunk })
-  await waitForBackend()
-  // Vite performs the same TS/import.meta.env transformations as the application.
-  // The store, API facade, live adapters, Pinia and HTTP client are all real modules.
-  vite = await createServer({
-    root: webRoot, configFile: false, plugins: [vue()], server: { middlewareMode: true },
-    define: { 'import.meta.env.VITE_API_BASE_URL': JSON.stringify(baseUrl) },
-  })
-  api = await vite.ssrLoadModule('/src/api/index.ts')
-  ;({ useQueueStore } = await vite.ssrLoadModule('/src/stores/queue.ts'))
-}, { timeout: 20_000 })
+before(
+  async () => {
+    temp = await mkdtemp(resolve(tmpdir(), 'v2md-web-integration-'))
+    Object.defineProperty(globalThis, 'localStorage', {
+      configurable: true,
+      value: {
+        getItem: (key) => storage.get(key) ?? null,
+        setItem: (key, value) => storage.set(key, String(value)),
+        removeItem: (key) => storage.delete(key),
+      },
+    })
+    backend = spawn(
+      process.env.V2MD_TEST_PYTHON || resolve(repoRoot, 'backend/.venv/bin/python'),
+      [resolve(repoRoot, 'backend/tests/fixtures/web_integration_api.py'), temp],
+      { cwd: repoRoot, stdio: ['ignore', 'pipe', 'pipe'] },
+    )
+    backend.on('error', (error) => {
+      spawnError = error
+    })
+    backend.stdout.on('data', (chunk) => {
+      backendLog += chunk
+      const line = backendLog.split('\n').find((value) => value.startsWith('{"base_url":'))
+      if (line) baseUrl = JSON.parse(line).base_url
+    })
+    backend.stderr.on('data', (chunk) => {
+      backendLog += chunk
+    })
+    await waitForBackend()
+    // Vite performs the same TS/import.meta.env transformations as the application.
+    // The store, API facade, live adapters, Pinia and HTTP client are all real modules.
+    vite = await createServer({
+      root: webRoot,
+      configFile: false,
+      plugins: [vue()],
+      server: { middlewareMode: true },
+      define: { 'import.meta.env.VITE_API_BASE_URL': JSON.stringify(baseUrl) },
+    })
+    api = await vite.ssrLoadModule('/src/api/index.ts')
+    ;({ useQueueStore } = await vite.ssrLoadModule('/src/stores/queue.ts'))
+  },
+  { timeout: 20_000 },
+)
 
 beforeEach(async () => {
   storage.clear()
@@ -100,7 +117,11 @@ after(async () => {
     const exited = once(backend, 'exit')
     backend.kill('SIGTERM')
     const force = setTimeout(() => backend.kill('SIGKILL'), 3000)
-    try { await exited } finally { clearTimeout(force) }
+    try {
+      await exited
+    } finally {
+      clearTimeout(force)
+    }
   }
   if (temp) await rm(temp, { recursive: true, force: true })
   if (originalStorage) Object.defineProperty(globalThis, 'localStorage', originalStorage)
@@ -181,7 +202,10 @@ describe('queue store → HTTP client → FastAPI', () => {
     store.toggleSelect('finished')
     await store.removeSelected()
     await store.load()
-    assert.equal(store.runs.some((r) => r.run_id === 'finished'), false)
+    assert.equal(
+      store.runs.some((r) => r.run_id === 'finished'),
+      false,
+    )
   })
 
   it('rejects retrying a completed task', async () => {
@@ -225,9 +249,7 @@ describe('library live adapter → FastAPI preferences and notes', () => {
     const book = (await api.getBooks()).find((b) => b.id === 'finished')
     assert.equal(book.fav, true)
     assert.equal(book.progress, 42)
-    assert.deepEqual((await (await http('/prefs')).json()).items, [
-      { run_id: 'finished', fav: true, progress: 42 },
-    ])
+    assert.deepEqual((await (await http('/prefs')).json()).items, [{ run_id: 'finished', fav: true, progress: 42 }])
   })
 
   it('does not disclose Alice’s preferences to Bob', async () => {
@@ -245,7 +267,6 @@ describe('library live adapter → FastAPI preferences and notes', () => {
   })
 })
 
-
 it('fetches referenced media as an authenticated binary response', async () => {
   const blob = await api.getMedia('finished', 'demo.png')
   assert.equal(blob.type, 'image/png')
@@ -258,14 +279,19 @@ it('the actual getMedia adapter uses authenticated ranges through FastAPI for MP
   assert.equal((await http('/__tests/seed-range-media', { method: 'POST' })).status, 200)
   const blob = await api.getMedia('finished', 'range-demo.mp4')
   assert.equal(blob.type, 'video/mp4')
-  assert.deepEqual(new Uint8Array(await blob.arrayBuffer()),
-    Uint8Array.from({ length: 150000 }, (_, i) => i % 251))
+  assert.deepEqual(
+    new Uint8Array(await blob.arrayBuffer()),
+    Uint8Array.from({ length: 150000 }, (_, i) => i % 251),
+  )
   const auditResponse = await http('/__tests/range-audit', { method: 'POST' })
   assert.equal(auditResponse.status, 200)
   const audit = (await auditResponse.json()).requests
-  assert.deepEqual(audit.map(row => row.range), ['bytes=0-65535', 'bytes=65536-131071', 'bytes=131072-196607'])
-  assert.ok(audit.every(row => row.authenticated && row.status === 206))
-  assert.ok(audit.slice(1).every(row => row.if_range === audit[1].if_range && row.if_range))
+  assert.deepEqual(
+    audit.map((row) => row.range),
+    ['bytes=0-65535', 'bytes=65536-131071', 'bytes=131072-196607'],
+  )
+  assert.ok(audit.every((row) => row.authenticated && row.status === 206))
+  assert.ok(audit.slice(1).every((row) => row.if_range === audit[1].if_range && row.if_range))
   storage.set('v2md_token', 'integration-bob')
   await assert.rejects(() => api.getMedia('finished', 'range-demo.mp4'), { code: 403 })
   const denied = (await (await http('/__tests/range-audit', { method: 'POST' })).json()).requests.at(-1)
@@ -280,7 +306,9 @@ it('persists private LLM settings through the live API without returning or cach
   storage.set('v2md_token', 'integration-alice')
   try {
     const saved = await api.saveLlmSettings({
-      base_url: 'https://llm.example.test/v1', api_key: 'fixture-only-secret', model: 'test-model',
+      base_url: 'https://llm.example.test/v1',
+      api_key: 'fixture-only-secret',
+      model: 'test-model',
     })
     assert.equal(saved.configured, true)
     assert.equal(saved.has_api_key, true)
@@ -299,7 +327,6 @@ it('persists private LLM settings through the live API without returning or cach
     await api.clearLlmSettings()
   }
 })
-
 
 it('preserves real run usage and redacted failure diagnostics through HTTP, adapter and rendered card', async () => {
   assert.equal((await http('/__tests/model-failure', { method: 'POST' })).status, 200)
@@ -321,7 +348,10 @@ it('preserves real run usage and redacted failure diagnostics through HTTP, adap
 
 it('loads actual monthly billing details and renders per-run usage instead of an inert placeholder', async () => {
   const report = await api.getCost()
-  assert.deepEqual(report.runs.map((r) => r.run_id), ['finished'])
+  assert.deepEqual(
+    report.runs.map((r) => r.run_id),
+    ['finished'],
+  )
   assert.equal(report.runs[0].usage.llm_in_tok, 1000)
   assert.equal(report.spend_usd, 0.00028)
   const Component = (await vite.ssrLoadModule('/src/components/profile/BillingPanel.vue')).default
@@ -380,16 +410,26 @@ for (const code of [422, 429]) {
     const beforeCost = await api.getCost()
     const url = code === 422 ? '/not-an-approved-upload.mp4' : 'https://example.test/budget-rejected'
     if (code === 429) {
-      assert.equal((await http('/__tests/budget', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled: true }),
-      })).status, 200)
+      assert.equal(
+        (
+          await http('/__tests/budget', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ enabled: true }),
+          })
+        ).status,
+        200,
+      )
     }
     try {
       let failure
-      await assert.rejects(() => store.createRun(url), (error) => {
-        failure = error
-        return error.name === 'ApiRequestError' && error.code === code
-      })
+      await assert.rejects(
+        () => store.createRun(url),
+        (error) => {
+          failure = error
+          return error.name === 'ApiRequestError' && error.code === code
+        },
+      )
       assert.match(failure.message, code === 422 ? /本地路径输入已被禁用/ : /本月预算已用尽/)
       assert.equal(JSON.stringify(store.runs), beforeRows)
       await store.load()
@@ -407,7 +447,9 @@ for (const code of [422, 429]) {
     } finally {
       if (code === 429) {
         await http('/__tests/budget', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled: false }),
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ enabled: false }),
         })
         assert.equal((await api.getCost()).budget_usd, beforeCost.budget_usd)
       }

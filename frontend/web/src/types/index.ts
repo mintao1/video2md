@@ -1,15 +1,7 @@
 // 与后端契约对齐的共享类型（参照 backend/video2md/models.py 与 docs/architecture/03-api-contract.md）
 
 /** 后端 run 状态词表（多出的 paused 是前端本地态） */
-export type RunStatus =
-  | 'created'
-  | 'queued'
-  | 'running'
-  | 'paused'
-  | 'cancelling'
-  | 'done'
-  | 'partial'
-  | 'error'
+export type RunStatus = 'created' | 'queued' | 'running' | 'paused' | 'cancelling' | 'done' | 'partial' | 'error'
 
 /** 后端错误信封 */
 export interface ApiError {
@@ -72,6 +64,8 @@ export interface Book {
   status?: RunStatus
   /** 源 run 创建时间（created 倒序选最新） */
   created?: string
+  /** deliver 模式下 Markdown 原始包可下载（vault 模式笔记已直接写入 vault） */
+  bundle_ready?: boolean
 }
 
 /** 教材目录章节（TocSheet 用；live 档由 /runs/{id}/note 派生） */

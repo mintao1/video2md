@@ -12,6 +12,6 @@ test('queue submission failures stay visible and preserve the form', async () =>
   assert.match(queue, /function submissionMessage[\s\S]*提交失败/)
   assert.equal((queue.match(/catch \(error\)[\s\S]{0,80}submissionMessage\(error\)/g) || []).length, 2)
   assert.match(queue, /await queue\.createRun[\s\S]*importOpen\.value = false/)
-  const startFunction = modal.slice(modal.indexOf('function start()'), modal.indexOf('function saveDraft()'))
+  const startFunction = modal.slice(modal.indexOf('function start()'), modal.indexOf('</script>'))
   assert.doesNotMatch(startFunction, /emit\('update:modelValue', false\)/)
 })
