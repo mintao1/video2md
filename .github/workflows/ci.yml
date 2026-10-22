@@ -174,6 +174,8 @@ jobs:
         working-directory: frontend/web
       - run: npm run build
         working-directory: frontend/web
+      - name: Production platform entry bundle gate
+        run: node scripts/check_frontend_bundle.mjs frontend/web/dist
       - run: npm run test:integration
         working-directory: frontend/web
       - run: npm run test:regression

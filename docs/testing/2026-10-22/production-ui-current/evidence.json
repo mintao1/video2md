@@ -1,0 +1,15 @@
+{
+  "date": "2026-10-22",
+  "environment": "production",
+  "site": "https://ferosse.tech",
+  "checks": {
+    "healthz": {"status": "pass", "version": "0.2.0"},
+    "profile_kaggle_entry": {"status": "fail", "observed": false},
+    "source_kaggle_entry": {"status": "pass", "files": ["frontend/web/src/views/ProfileView.vue", "frontend/web/src/components/profile/LlmSettingsCard.vue"]},
+    "local_build": {"status": "pass", "command": "cd frontend/web && npm run build"},
+    "kaggle_relogin": {"status": "blocked_by_missing_production_entry", "official_session": "signed_out"},
+    "colab_relogin": {"status": "blocked", "reason": "production says service admin permission required"}
+  },
+  "deployed_asset": "/assets/index-CujR_0ZK.js",
+  "regression_guard": "profile must expose visible Kaggle 登录 link with href https://www.kaggle.com/account/login and target=_blank"
+}
