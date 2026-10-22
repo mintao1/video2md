@@ -121,7 +121,7 @@ def test_spa_routes_serve_index_not_api(client, monkeypatch, tmp_path):
     (tmp_path / "index.html").write_text("<!doctype html><div id=app></div>")
     monkeypatch.setattr(_api, "_WEB_DIST", tmp_path.resolve())
     paths = _spa_paths()
-    assert "/tasks" in paths and "/login" in paths, paths
+    assert "/tasks" in paths and "/login" not in paths, paths
     for path in paths:
         r = client.get(path, headers={"Accept": "text/html"})
         assert r.status_code == 200 and r.headers["content-type"].startswith("text/html"), path
@@ -701,6 +701,7 @@ def _seed_state(st: str = "state-ok", ttl: float = 300.0) -> None:
 
 def test_auth_google_login_redirects_to_google(client, monkeypatch):
     import urllib.parse as _up
+
     import video2md.api as _api
     monkeypatch.setattr(_api, "ENV", dict(_GENV))
     r = client.get("/auth/google/login", follow_redirects=False)
@@ -725,7 +726,7 @@ def test_auth_google_login_missing_config(client, monkeypatch):
     assert r.status_code == 302
     assert "auth_error=" in r.headers["location"]  # 未配凭据 → fragment 错误出口
     r = client.get("/auth/google/login", params={"redirect": "/tasks"}, follow_redirects=False)
-    assert r.headers["location"].startswith("http://localhost:5173/login?redirect=%2Ftasks#auth_error=")
+    assert r.headers["location"].startswith("http://localhost:5173/?redirect=%2Ftasks#auth_error=")
 
 
 def test_auth_google_login_rate_limit(client):
@@ -766,7 +767,7 @@ def test_auth_google_callback_happy_path(client, monkeypatch):
     r = client.get("/auth/google/callback?code=abc&state=st-ok",
                    cookies={"v2md_oauth_state": "st-ok"}, follow_redirects=False)
     assert r.status_code == 302
-    assert r.headers["location"] == "http://frontend.test/login#id_token=JWT.WT.OK"
+    assert r.headers["location"] == "http://frontend.test/#id_token=JWT.WT.OK"
     assert seen["url"] == _api._GOOGLE_OAUTH_TOKEN_URL
     assert seen["data"]["code"] == "abc" and seen["data"]["redirect_uri"] == \
         "http://api.public/auth/google/callback"
@@ -788,9 +789,10 @@ def test_google_oauth_proxy_rejects_retired_17898(monkeypatch):
 
 
 def test_auth_google_redirect_round_trip(client, monkeypatch):
-    """L-05：发起时带站内 redirect，随 state 记账，回调落到 /login?redirect=…；
+    """L-05：发起时带站内 redirect，随 state 记账，回调落到品牌首页；
     站外/协议相对路径不记账（防开放重定向）。"""
     import urllib.parse as _up
+
     import video2md.api as _api
     from acctkit import providers as _p
     monkeypatch.setattr(_api, "ENV", dict(_GENV))
@@ -820,7 +822,7 @@ def test_auth_google_redirect_round_trip(client, monkeypatch):
     r = client.get(f"/auth/google/callback?code=abc&state={st}",
                    cookies={"v2md_oauth_state": st}, follow_redirects=False)
     assert r.headers["location"] == \
-        "http://frontend.test/login?redirect=%2Fread%2Fr1%3Fp%3D2#id_token=JWT.WT.OK"
+        "http://frontend.test/?redirect=%2Fread%2Fr1%3Fp%3D2#id_token=JWT.WT.OK"
     assert st not in _api._GOOGLE_OAUTH_REDIRECTS
 
 
@@ -846,7 +848,7 @@ def test_auth_google_callback_state_rejected(client, monkeypatch):
                                 cookies={"v2md_oauth_state": "other"}, follow_redirects=False))
     # (d) 缺 code（用户在 Google 授权页取消）
     _seed_state("st-nocode")
-    r = client.get(f"/auth/google/callback?state=st-nocode",
+    r = client.get("/auth/google/callback?state=st-nocode",
                    cookies={"v2md_oauth_state": "st-nocode"}, follow_redirects=False)
     assert r.status_code == 302 and "auth_error=" in r.headers["location"]
 
@@ -1134,7 +1136,7 @@ def test_budget_gate_and_cost_endpoint(client, monkeypatch):
     body = c.json()
     assert body["spend_usd"] == 5.0 and body["budget_usd"] == 10.0
     assert body["usage"]["llm_in_tok"] == 1000 and body["usage"]["gpu_s"] == 60.0
-    assert set(body["prices"]) == {"llm_in_mtok", "llm_out_mtok", "gpu_min"}
+    assert set(body["prices"]) == {"llm_in_mtok", "llm_out_mtok", "llm_cached_in_mtok", "gpu_min"}
     assert "prices" in body and body["month"].startswith(month_now)
 
 
@@ -1166,11 +1168,15 @@ def test_usage_accumulate_and_settle(monkeypatch, tmp_path):
     settled = _runs_mod.settle_cost(rid)
     assert settled["cost_usd"] == round(100 / 1e6 * 2 + 50 / 1e6 * 4 + 1.5 * 0.03, 6)
     assert settled["usage"]["gpu_s"] == 90.0
-    # 幂等：终态已结算的记录，后续 usage 不再入账、不重复计费
+    # Repeating settlement without new calls is idempotent.
+    assert _runs_mod.settle_cost(rid) is None
+    # A retry that really consumes more tokens must add that new batch.
     _runs_mod.bump_usage(llm_in_tok=999)
     again = _runs_mod.settle_cost(rid)
-    assert again["cost_usd"] == settled["cost_usd"]
-    assert _runs_mod._load_runs()[rid]["usage"]["llm_in_tok"] == 100  # 999 未覆盖落盘值
+    assert again["cost_usd"] == round(settled["cost_usd"] + 999 / 1e6 * 2, 6)
+    assert again["usage"]["llm_in_tok"] == 1099
+    assert _runs_mod.settle_cost(rid) is None
+    assert _runs_mod._load_runs()[rid]["usage"]["llm_in_tok"] == 1099  # Retry adds to persisted usage.
 
 
 def test_cost_cli_export(client, monkeypatch, capsys):
@@ -1689,6 +1695,11 @@ def test_web_media_requires_owner_and_referenced_file(client, tmp_path):
     assert response.headers["content-type"].startswith("image/jpeg")
     assert response.headers["cache-control"] == "no-store"
     assert client.get("/runs/web_media/media/web-clip.mp4", headers=h).content == b"mp4-fixture"
+    part = client.get("/runs/web_media/media/web-clip.mp4", headers={**h, "Range": "bytes=0-3"})
+    assert part.status_code == 206 and part.content == b"mp4-"
+    assert part.headers["content-range"] == "bytes 0-3/11"
+    assert client.get("/runs/web_media/media/web-clip.mp4", headers={
+        "X-Test-Auth": "bob", "Range": "bytes=0-3"}).status_code == 403
     assert client.get("/runs/web_media/media/web-frame.jpg", headers={"X-Test-Auth": "bob"}).status_code == 403
     assert client.get("/runs/web_media/media/unreferenced.jpg", headers=h).status_code == 404
     assert client.get("/runs/web_media/media/escape.jpg", headers=h).status_code == 404
@@ -1970,3 +1981,214 @@ def test_llm_user_credentials_follow_graph_threads_without_leaking(llm_settings_
     with llm_settings.user_scope("alice"), pytest.raises(RuntimeError) as exc:
         llm.chat("sys", "usr", task="metadata", temperature=0, max_tokens=5)
     assert "alice-secret" not in str(exc.value)
+
+
+def test_run_accounting_and_redacted_failure_reach_owned_list_and_detail(client):
+    put_identity('test', 'alice', 'uid_alice')
+    rec = _seed_run('diagnostic-bill', 'uid_alice', status='error')
+    rec.update(usage={'llm_in_tok': 100, 'llm_out_tok': 50, 'gpu_s': 12.5}, cost_usd=0.000028,
+               errors=['note 条目 1 LLM: HTTP 403 sk-do-not-expose-this-key https://upstream.test/?token=secret'])
+    with runs._runs_file_lock():
+        runs._runs_merge(rec)
+    headers = {'X-Test-Auth': 'alice'}
+    detail = client.get('/runs/diagnostic-bill', headers=headers).json()
+    item = next(r for r in client.get('/runs', headers=headers).json()['items'] if r['run_id'] == rec['run_id'])
+    for value in (detail, item):
+        assert value['usage']['gpu_s'] == 12.5 and value['cost_usd'] == 0.000028
+        assert value['diagnostic']['stage'] == 'note'
+        assert '403' in value['diagnostic']['message']
+        assert 'sk-do-not' not in str(value) and 'token=secret' not in str(value)
+    assert client.get('/runs/diagnostic-bill', headers={'X-Test-Auth': 'bob'}).status_code == 403
+
+
+def test_monthly_cost_details_include_only_owner_and_keep_deleted_bills(client):
+    put_identity('test', 'alice', 'uid_alice')
+    rec = _seed_run('monthly-bill', 'uid_alice', status='done')
+    rec.update(created=datetime.now().isoformat(), cost_usd=0.5,
+               usage={'llm_in_tok': 1000, 'llm_out_tok': 500, 'gpu_s': 180}, deleted=True)
+    with runs._runs_file_lock():
+        runs._runs_merge(rec)
+    _seed_run('someone-elses-bill', 'uid_bob')
+    body = client.get('/cost', headers={'X-Test-Auth': 'alice'}).json()
+    assert [r['run_id'] for r in body['runs']] == ['monthly-bill']
+    assert body['runs'][0]['deleted'] is True and body['runs'][0]['usage']['gpu_s'] == 180
+    assert body['spend_usd'] == sum(r['cost_usd'] or 0 for r in body['runs'])
+
+
+def test_partial_without_notes_has_quality_diagnostic_and_is_not_a_book(client):
+    put_identity('test', 'alice', 'uid_alice')
+    rec = _seed_run('short-transcript', 'uid_alice', status='partial')
+    rec.update(partial_failures={'note': ['1']}, errors=[])
+    rec['artifacts'] = {rec['entries'][0]['url']: {'transcript': '字' * 193}}
+    with runs._runs_file_lock():
+        runs._runs_merge(rec)
+    headers = {'X-Test-Auth': 'alice'}
+    item = client.get('/runs', headers=headers).json()['items'][0]
+    assert item['done_entries'] == 0
+    assert item['diagnostic']['stage'] == 'note'
+    assert '过短' in item['diagnostic']['message']
+    assert client.get('/quota', headers=headers).json()['stats']['books'] == 0
+
+
+def test_cached_tokens_and_free_gpu_cost_are_settled_with_price_snapshot(monkeypatch, tmp_path):
+    from video2md import llm, util
+    monkeypatch.setattr(runs, 'RUNS_FILE', tmp_path / 'runs.json')
+    monkeypatch.setattr(runs, '_RUNS_LOCKFILE', tmp_path / 'runs.lock')
+    monkeypatch.setattr(runs, 'PRICE_LLM_IN_MTOK', 0.14)
+    monkeypatch.setattr(runs, 'PRICE_LLM_OUT_MTOK', 0.28)
+    monkeypatch.setattr(runs, 'PRICE_LLM_CACHED_IN_MTOK', 0.0028, raising=False)
+    monkeypatch.setattr(runs, 'PRICE_GPU_MIN', 0.0)
+    monkeypatch.setitem(runs.ENV, 'V2MD_GPU_PRICE_POLICY', 'free')
+    runs._USAGE.clear()
+    rid = 'cached-priced'
+    with runs._runs_file_lock():
+        runs._runs_merge({'run_id': rid, 'status': 'done', 'owner': 'alice', 'entries': [], 'artifacts': {}})
+    util.bind_current_run(rid)
+    try:
+        llm._llm_observed('note', 'ok', 0, 1, {'usage': {
+            'prompt_tokens': 1000, 'completion_tokens': 500,
+            'prompt_tokens_details': {'cached_tokens': 900}}}, None, '', '', 'ok')
+        runs.bump_usage(gpu_s=180)
+        rec = runs.settle_cost(rid)
+    finally:
+        util.clear_current_run()
+    assert rec['usage']['llm_cached_in_tok'] == 900
+    assert rec['cost_usd'] == round((100 * .14 + 900 * .0028 + 500 * .28) / 1e6, 6)
+    assert rec['cost_pricing']['gpu_policy'] == 'free'
+    assert rec['cost_pricing']['llm_cached_in_mtok'] == 0.0028
+
+
+def test_stage_proof_records_files_timestamps_and_local_gpu_attribution(tmp_path):
+    video = tmp_path / 'short.mp4'
+    frame = tmp_path / 'frame.jpg'
+    video.write_bytes(b'video-fixture')
+    frame.write_bytes(b'frame-fixture')
+    art = {'video': str(video), 'duration': 41, 'segs': [{'start': 0, 'end': 2, 'text': 'hello'}],
+           'candidates': [[1, 'frame.jpg']], 'clips': {'frame': 'clip.mp4'}, 'published': [[1, 'frame.jpg']],
+           'selected': [{'name': 'frame.jpg', 't': 1}], 'selection_mode': 'heuristic_fallback'}
+    assert runs._stage_proof('download', art, tmp_path, {}, 1.5, 0)['bytes'] == len(b'video-fixture')
+    assert runs._stage_proof('transcribe', art, tmp_path, {}, 5, 5)['timestamped_segments'] is True
+    art['segs'][0]['end'] = 999
+    assert runs._stage_proof('transcribe', art, tmp_path, {}, 5, 5)['timestamped_segments'] is False
+    frames = runs._stage_proof('frames', art, tmp_path, {}, 1, 0)
+    assert frames['files_nonempty'] is True and frames['timestamps_valid'] is True
+    frame.write_bytes(b'')
+    assert runs._stage_proof('frames', art, tmp_path, {}, 1, 0)['files_nonempty'] is False
+    clips = runs._stage_proof('clips', art, tmp_path, {}, 0.25, 0)
+    assert clips['device'] == 'cpu' and clips['gpu_seconds'] == 0 and clips['duration_s'] == .25
+
+
+def test_completed_live_artifact_submission_reuses_run_without_new_work(client, monkeypatch, tmp_path):
+    put_identity('test', 'alice', 'uid_alice')
+    import video2md.graph as graph
+    note = tmp_path / 'existing.md'
+    note.write_text('# Completed textbook')
+    rec = _seed_run('already-billed', 'uid_alice', status='done')
+    rec.update(url='https://example.test/completed', part_items='', cost_usd=.001,
+               usage={'llm_in_tok':100, 'llm_out_tok':50, 'gpu_s':20})
+    next(iter(rec['artifacts'].values()))['note'] = str(note)
+    with runs._runs_file_lock():
+        runs._runs_merge(rec)
+    monkeypatch.setattr(graph, 'resolve_run', lambda *a, **k: (_ for _ in ()).throw(AssertionError('duplicate resolve')))
+    before = runs._load_runs()
+    for _ in range(2):
+        result = client.post('/runs', json={'url':rec['url']}, headers={'X-Test-Auth':'alice'})
+        assert result.status_code == 200, result.text
+        assert result.json()['run_id'] == rec['run_id'] and result.json()['dedup'] is True
+        assert result.json()['status'] == 'done'
+    assert runs._load_runs() == before
+
+
+@pytest.mark.parametrize('variant', ['force', 'other-owner', 'missing-artifact', 'different-partition'])
+def test_completed_run_reuse_keeps_force_ownership_partition_and_artifact_guards(client, monkeypatch, tmp_path, variant):
+    put_identity('test', 'alice', 'uid_alice')
+    note = tmp_path / 'previous.md'
+    note.write_text('# Existing textbook')
+    rec = _seed_run('protected-completion', 'uid_bob' if variant == 'other-owner' else 'uid_alice')
+    rec.update(url='https://example.test/reuse-guard', part_items='')
+    next(iter(rec['artifacts'].values()))['note'] = str(tmp_path / 'missing.md') if variant == 'missing-artifact' else str(note)
+    with runs._runs_file_lock():
+        runs._runs_merge(rec)
+    _stub_resolve(monkeypatch)
+    body = {'url':rec['url'], 'resolve_only':True, 'force':variant == 'force'}
+    if variant == 'different-partition':
+        body['part_items'] = '2'
+    result = client.post('/runs', json=body, headers={'X-Test-Auth':'alice'})
+    assert result.status_code == 200
+    assert result.json()['run_id'] != rec['run_id']
+
+
+@pytest.mark.parametrize('error', [httpx.ReadTimeout, httpx.ConnectTimeout, httpx.ProxyError])
+def test_oauth_transport_failure_is_safe_and_fresh_login_recovers(client, monkeypatch, error):
+    """Production timeout replay: consume state, show retry, never replay code."""
+    import urllib.parse as up
+
+    import video2md.api as api
+    from acctkit.providers import GoogleProvider
+
+    env = {**_GENV, 'V2MD_GOOGLE_OAUTH_TIMEOUT_S': '9',
+           'V2MD_GOOGLE_OAUTH_PROXY_URL': 'http://oauth-relay.test:18080'}
+    monkeypatch.setattr(api, 'ENV', env)
+    events, calls = [], []
+    monkeypatch.setattr(api, '_req_log', lambda *args, **kw: events.append((args, kw)))
+    monkeypatch.setattr(GoogleProvider, '_verify', lambda *a: {'sub': 'synthetic-user'})
+
+    async def token(self, url, data=None, **kwargs):
+        calls.append((url, self.timeout.read))
+        if len(calls) == 1:
+            raise error('synthetic-code synthetic-secret must never leak')
+        return httpx.Response(200, json={'id_token': 'synthetic.id.token'})
+
+    monkeypatch.setattr(httpx.AsyncClient, 'post', token)
+    login = client.get('/auth/google/login?redirect=%2Ftasks', follow_redirects=False)
+    state = up.parse_qs(up.urlparse(login.headers['location']).query)['state'][0]
+    callback = client.get('/auth/google/callback', params={'code': 'synthetic-code', 'state': state},
+                          follow_redirects=False)
+    location = up.unquote(callback.headers['location'])
+    assert callback.status_code == 302
+    assert 'auth_error=' in location and error.__name__ in location
+    assert '重新登录' in location and 'redirect=%2Ftasks' in callback.headers['location']
+    assert 'id_token=' not in location
+    assert 'Max-Age=0' in callback.headers['set-cookie']
+    assert state not in api._GOOGLE_OAUTH_STATES and state not in api._GOOGLE_OAUTH_REDIRECTS
+    # A consumed authorization code must never be retried implicitly.
+    client.get('/auth/google/callback', params={'code': 'synthetic-code', 'state': state},
+               follow_redirects=False)
+    assert len(calls) == 1 and calls[0][1] == 9
+    for sensitive in ('synthetic-code', 'synthetic-secret', env['GOOGLE_CLIENT_SECRET'], state):
+        assert sensitive not in repr(events) and sensitive not in location
+    assert any(args[2] == 503 and fields['error_type'] == error.__name__ for args, fields in events)
+    # Recovery uses a fresh login, CSRF cookie and code, with the original destination.
+    login = client.get('/auth/google/login?redirect=%2Ftasks', follow_redirects=False)
+    fresh = up.parse_qs(up.urlparse(login.headers['location']).query)['state'][0]
+    assert fresh != state
+    recovered = client.get('/auth/google/callback', params={'code': 'fresh-code', 'state': fresh},
+                           follow_redirects=False)
+    assert recovered.headers['location'] == 'http://frontend.test/?redirect=%2Ftasks#id_token=synthetic.id.token'
+    assert len(calls) == 2 and fresh not in api._GOOGLE_OAUTH_STATES
+
+
+@pytest.mark.parametrize(('value', 'expected'), [('1', 3), ('999', 60), ('invalid', 15), ('9', 9)])
+def test_oauth_exchange_timeout_is_bounded(value, expected, monkeypatch):
+    import video2md.api as api
+    monkeypatch.setattr(api, 'ENV', {'V2MD_GOOGLE_OAUTH_TIMEOUT_S': value})
+    assert api._google_oauth_timeout_s() == expected
+
+
+@pytest.mark.parametrize(('stage','error'), [
+    ('clips', 'note 条目 1: clips 阶段无节段产物且已禁用本地回退 /private/upstream?token=secret'),
+    ('clips', 'note 条目 2: 依赖阶段 clips 未成功，停止模型生成'),
+    ('ocr', 'note 条目 1: 依赖阶段 ocr 未成功，停止模型生成'),
+])
+def test_dependency_diagnostic_exposes_action_without_provider_details(client, stage, error):
+    put_identity('test', 'alice', 'uid_alice')
+    _seed_run('dependency-diag', 'uid_alice', status='partial')
+    records = runs._load_runs()
+    records['dependency-diag'].update(errors=[error], partial_failures={stage: ['1'], 'note': ['1']})
+    runs._save_runs(records)
+    r = client.get('/runs/dependency-diag', headers={'X-Test-Auth': 'alice'})
+    assert r.status_code == 200
+    diagnostic = r.json()['diagnostic']
+    assert diagnostic['stage'] == stage
+    assert '补跑' in diagnostic['message']
+    assert all(value not in diagnostic['message'] for value in ('/private', 'token=', 'secret'))

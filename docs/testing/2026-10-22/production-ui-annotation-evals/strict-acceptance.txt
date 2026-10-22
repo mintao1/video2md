@@ -1,0 +1,8 @@
+OPEN pua-001: incomplete
+OPEN pua-002: incomplete
+OPEN pua-005: fail
+OPEN pua-006: fail
+OPEN pua-007: fail
+OPEN pua-008: fail
+
+exit=1

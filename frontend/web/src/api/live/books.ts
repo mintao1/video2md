@@ -1,7 +1,7 @@
-// 教材库 live 实现（签名对齐 mock/impl.ts，index.ts 换源零改上层）。
+// 教材库生产 API 实现。
 // 映射口径：一本「书」= 一条 done/partial 的 run；收藏/阅读进度来自 /prefs（后端入库）。
-// 页面/页码等 mock 展示字段用真实可得数据诚实替换（讲数、状态徽章），不造假。
-import { ApiRequestError, request, requestBlob } from '../client'
+// 页面/页码等展示字段使用真实可得数据（讲数、状态徽章），不造假。
+import { ApiRequestError, request, requestBlob, requestMediaBlob } from '../client'
 import type { Book, RunStatus, TocChapter } from '../../types'
 
 /** GET /runs 列表项（后端 RunListOut；title 为服务端三路派生） */
@@ -81,7 +81,7 @@ function toBook(
     id: r.run_id,
     run_id: r.run_id,
     title,
-    subtitle: r.url, // 诚实显示源地址（mock 假副标题无真源）
+    subtitle: r.url, // 诚实显示源地址
     hue: hueOf(r.run_id),
     category: categoryOf(title),
     progress: pref.progress,
@@ -106,7 +106,7 @@ export async function getBooks(): Promise<Book[]> {
   ])
   prefsCache = new Map(prefs.items.map((p) => [p.run_id, { fav: p.fav, progress: p.progress }]))
   return runs.items
-    .filter((r) => r.status === 'done' || r.status === 'partial')
+    .filter((r) => (r.status === 'done' || r.status === 'partial') && r.done_entries > 0)
     .map((r) => toBook(r, prefsCache.get(r.run_id) ?? { fav: false, progress: 0 }))
 }
 
@@ -139,7 +139,8 @@ export async function getNotes(bookId: string): Promise<{ title: string; md: str
 }
 
 export async function getMedia(bookId: string, name: string): Promise<Blob> {
-  return requestBlob(`/runs/${encodeURIComponent(bookId)}/media/${encodeURIComponent(name)}`)
+  const path = `/runs/${encodeURIComponent(bookId)}/media/${encodeURIComponent(name)}`
+  return /\.mp4$/i.test(name) ? requestMediaBlob(path) : requestBlob(path)
 }
 
 /** 阅读进度入库（切讲时调用）；成功后同步模块级缓存保持 toggleFav 合并正确，失败 throw 由调用方 toast。 */

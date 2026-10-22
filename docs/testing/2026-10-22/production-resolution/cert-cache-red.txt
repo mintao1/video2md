@@ -1,0 +1,88 @@
+FF............FF                                                         [100%]
+=================================== FAILURES ===================================
+____ test_repeated_requests_and_new_adapter_share_fresh_public_certificate _____
+
+transport = ({'now': 100, 'headers': {'cache-control': 'public, max-age=60'}, 'status': 200, 'body': {'fixture': '-----BEGIN CERTI...//www.googleapis.com/oauth2/v1/certs')>], [<httpx.Client object at 0x10a00ff50>, <httpx.Client object at 0x10a333a40>])
+
+    def test_repeated_requests_and_new_adapter_share_fresh_public_certificate(transport):
+        _, calls, clients = transport
+        first = providers._GoogleHttpxRequest('http://proxy-a').__call__(URL)
+        second = providers._GoogleHttpxRequest('http://proxy-a').__call__(URL)
+        assert first.data == second.data
+>       assert len(calls) == 1
+E       AssertionError: assert 2 == 1
+E        +  where 2 = len([<Request('GET', 'https://www.googleapis.com/oauth2/v1/certs')>, <Request('GET', 'https://www.googleapis.com/oauth2/v1/certs')>])
+
+backend/tests/test_google_cert_cache.py:40: AssertionError
+__________________ test_expiry_and_age_never_serve_stale_keys __________________
+
+transport = ({'now': 109, 'headers': {'cache-control': 'public, max-age=60', 'age': '50'}, 'status': 200, 'body': {'fixture': '---...2/v1/certs')>, <Request('GET', 'https://www.googleapis.com/oauth2/v1/certs')>], [<httpx.Client object at 0x10a331be0>])
+
+    def test_expiry_and_age_never_serve_stale_keys(transport):
+        state, calls, _ = transport
+        state['headers']['age'] = '50'
+        request = providers._GoogleHttpxRequest('')
+        request(URL)
+        state['now'] = 109
+        request(URL)
+>       assert len(calls) == 1
+E       AssertionError: assert 2 == 1
+E        +  where 2 = len([<Request('GET', 'https://www.googleapis.com/oauth2/v1/certs')>, <Request('GET', 'https://www.googleapis.com/oauth2/v1/certs')>])
+
+backend/tests/test_google_cert_cache.py:51: AssertionError
+_________ test_proxy_isolation_and_concurrent_cold_cache_single_fetch __________
+
+transport = ({'now': 100, 'headers': {'cache-control': 'public, max-age=60'}, 'status': 200, 'body': {'fixture': '-----BEGIN CERTI...<httpx.Client object at 0x10a3d0410>, <httpx.Client object at 0x10a37bef0>, <httpx.Client object at 0x10a37b1d0>, ...])
+
+    def test_proxy_isolation_and_concurrent_cold_cache_single_fetch(transport):
+        _, calls, _ = transport
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            list(pool.map(lambda _: providers._GoogleHttpxRequest('proxy-a')(URL), range(8)))
+>       assert len(calls) == 1
+E       AssertionError: assert 8 == 1
+E        +  where 8 = len([<Request('GET', 'https://www.googleapis.com/oauth2/v1/certs')>, <Request('GET', 'https://www.googleapis.com/oauth2/v1...', 'https://www.googleapis.com/oauth2/v1/certs')>, <Request('GET', 'https://www.googleapis.com/oauth2/v1/certs')>, ...])
+
+backend/tests/test_google_cert_cache.py:87: AssertionError
+_ test_google_auth_rechecks_audience_expiry_and_signature_on_certificate_hits __
+
+transport = ({'now': 100, 'headers': {'cache-control': 'public, max-age=60'}, 'status': 200, 'body': {'fixture': '-----BEGIN CERTI...30>, <httpx.Client object at 0x10a61cc20>, <httpx.Client object at 0x10a61d520>, <httpx.Client object at 0x10a61cc80>])
+
+    def test_google_auth_rechecks_audience_expiry_and_signature_on_certificate_hits(transport):
+        from datetime import datetime, timedelta, timezone
+    
+        from cryptography import x509
+        from cryptography.hazmat.primitives import hashes, serialization
+        from cryptography.hazmat.primitives.asymmetric import rsa
+        from cryptography.x509.oid import NameOID
+        from google.auth import crypt, jwt
+    
+        state, calls, _ = transport
+        key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+        name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, 'offline fixture')])
+        now = datetime.now(timezone.utc)
+        cert = x509.CertificateBuilder().subject_name(name).issuer_name(name).public_key(key.public_key()).serial_number(1).not_valid_before(now-timedelta(days=1)).not_valid_after(now+timedelta(days=1)).sign(key,hashes.SHA256())
+        state['body'] = {'fixture': cert.public_bytes(serialization.Encoding.PEM).decode()}
+        pem = key.private_bytes(serialization.Encoding.PEM,serialization.PrivateFormat.PKCS8,serialization.NoEncryption())
+        signer = crypt.RSASigner.from_string(pem, key_id='fixture')
+        claims = {'iss':'https://accounts.google.com','aud':'client-a','sub':'fixture','iat':int(time.time())-5,'exp':int(time.time())+60}
+        provider = providers.GoogleProvider('client-a')
+        token = jwt.encode(signer, claims).decode()
+        assert provider._verify(token)['sub'] == 'fixture'
+        for bad in ({**claims,'aud':'other'}, {**claims,'exp':int(time.time())-1}):
+            with pytest.raises(ValueError):
+                provider._verify(jwt.encode(signer,bad).decode())
+        parts = token.split('.')
+        parts[1] = parts[1][:-2] + ('aa' if not parts[1].endswith('aa') else 'bb')
+        with pytest.raises(ValueError):
+            provider._verify('.'.join(parts))
+>       assert len(calls) == 1
+E       AssertionError: assert 4 == 1
+E        +  where 4 = len([<Request('GET', 'https://www.googleapis.com/oauth2/v1/certs')>, <Request('GET', 'https://www.googleapis.com/oauth2/v1...('GET', 'https://www.googleapis.com/oauth2/v1/certs')>, <Request('GET', 'https://www.googleapis.com/oauth2/v1/certs')>])
+
+backend/tests/test_google_cert_cache.py:120: AssertionError
+=========================== short test summary info ============================
+FAILED backend/tests/test_google_cert_cache.py::test_repeated_requests_and_new_adapter_share_fresh_public_certificate
+FAILED backend/tests/test_google_cert_cache.py::test_expiry_and_age_never_serve_stale_keys
+FAILED backend/tests/test_google_cert_cache.py::test_proxy_isolation_and_concurrent_cold_cache_single_fetch
+FAILED backend/tests/test_google_cert_cache.py::test_google_auth_rechecks_audience_expiry_and_signature_on_certificate_hits
+4 failed, 12 passed in 0.43s

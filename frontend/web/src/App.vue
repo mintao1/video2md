@@ -5,7 +5,7 @@ import ToastHost from './components/common/ToastHost.vue'
 <template>
   <RouterView v-slot="{ Component }">
     <Suspense>
-      <component :is="Component" :key="$route.fullPath" />
+      <component :is="Component" :key="$route.name === 'tasks' ? $route.path : $route.fullPath" />
       <template #fallback>
         <main class="min-h-screen bg-surface flex items-center justify-center text-outline">正在加载…</main>
       </template>

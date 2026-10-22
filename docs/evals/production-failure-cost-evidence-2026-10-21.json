@@ -1,0 +1,126 @@
+{
+  "kind": "production",
+  "release": "video2md:0.2.0-integration-20261021m",
+  "run_id": "3c05faf8",
+  "observed_date": "2026-10-21",
+  "note": "Historical failure evidence retained. Local regression fixes do not rewrite production acceptance.",
+  "results": [
+    {
+      "id": "failure-cost-001",
+      "status": "fail",
+      "metrics": {
+        "entries": [
+          {
+            "entry": 1,
+            "failed_stages": [
+              "ocr",
+              "clips"
+            ],
+            "llm_calls_after_failure": 2,
+            "blocked_before_model": false
+          },
+          {
+            "entry": 2,
+            "failed_stages": [
+              "clips"
+            ],
+            "llm_calls_after_failure": 2,
+            "blocked_before_model": false
+          }
+        ],
+        "release": "video2md:0.2.0-integration-20261021m",
+        "run_id": "3c05faf8"
+      },
+      "evidence_refs": [
+        {
+          "path": "../testing/2026-10-21/bilibili-production-retest/production-final.json",
+          "sha256": "1eeb1ad8d59ebc508ea0c79cee204f30a87faed08f908b9516a2ef3d285bf0ec"
+        },
+        {
+          "path": "../testing/2026-10-21/bilibili-production-retest/runtime-telemetry.json",
+          "sha256": "c34ffa46ef86219890afc5661761d0a62a6c4472b46667690ae1f0bbaf8113da"
+        }
+      ]
+    },
+    {
+      "id": "failure-cost-002",
+      "status": "fail",
+      "metrics": {
+        "attempts": [],
+        "recorded_usage": {
+          "input_tokens": 19169,
+          "output_tokens": 23495,
+          "cached_tokens": 9344
+        },
+        "limitation": "Two empty production attempts did not preserve usage; exact missing debit remains unknown.",
+        "release": "video2md:0.2.0-integration-20261021m",
+        "run_id": "3c05faf8"
+      },
+      "evidence_refs": [
+        {
+          "path": "../testing/2026-10-21/bilibili-production-retest/retry-usage-repro.txt",
+          "sha256": "9b14575e68383de63ef6d4634fb7e0ffd6fa47a95bd0c34ed2ba85ebc96d5e4a"
+        },
+        {
+          "path": "../testing/2026-10-21/bilibili-production-retest/runtime-telemetry.json",
+          "sha256": "c34ffa46ef86219890afc5661761d0a62a6c4472b46667690ae1f0bbaf8113da"
+        }
+      ]
+    },
+    {
+      "id": "failure-cost-003",
+      "status": "fail",
+      "metrics": {
+        "observations": [
+          {
+            "attempt_id": "observed-timeout-1",
+            "outcome": "ReadTimeout"
+          },
+          {
+            "attempt_id": "observed-timeout-2",
+            "outcome": "ReadTimeout"
+          },
+          {
+            "attempt_id": "final-recovery",
+            "outcome": "success"
+          }
+        ],
+        "limitation": "Final recovery is not three consecutive stable logins.",
+        "release": "video2md:0.2.0-integration-20261021m",
+        "run_id": "3c05faf8"
+      },
+      "evidence_refs": [
+        {
+          "path": "../testing/2026-10-21/bilibili-production-retest/results.json",
+          "sha256": "95301136fd1dff3eaa538e4f89e56fe2c016ae8012427376ea6d2e9b2f979d63"
+        },
+        {
+          "path": "../testing/2026-10-21/bilibili-production-retest/13-oauth-timeout.png",
+          "sha256": "6bf0cd3293cbf1ec5f09cbe96a1c65128f060eae752f85d37fd29c48a24d5d83"
+        }
+      ]
+    },
+    {
+      "id": "failure-cost-004",
+      "status": "not-tested",
+      "metrics": {
+        "application_cost_usd": 0.013502,
+        "amount_source": "application_attribution_only",
+        "supplier_rows": [],
+        "limitation": "No supplier settled debit/export was retrieved. Formula agreement is not supplier reconciliation.",
+        "release": "video2md:0.2.0-integration-20261021m",
+        "run_id": "3c05faf8"
+      },
+      "evidence_refs": [
+        {
+          "path": "../testing/2026-10-21/bilibili-production-retest/billing-evidence.json",
+          "sha256": "cd2f80d5f200f8730bb1e2180daeae8a9982967d2da073fdb46a4432c02217d9"
+        },
+        {
+          "path": "../testing/2026-10-21/bilibili-production-retest/billing-reconciliation.json",
+          "sha256": "e7668e2963fb686bfad01ed0c3bd55ebf65ffd075aebc49175fd65e48f0c898b"
+        }
+      ]
+    }
+  ]
+}

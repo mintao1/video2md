@@ -1,0 +1,10 @@
+{
+  "kind": "public_reader_shell_http_supplement",
+  "run_id": "dd586072",
+  "url": "https://ferosse.tech/read/dd586072",
+  "status": 200,
+  "content_type": "text/html; charset=utf-8",
+  "html_bytes": 1095,
+  "html_sha256": "574b22cc43d199e409e4488ff47c880827cf88f24e24fe7f8c5d0a8024f9bea0",
+  "authenticated_note_render_verified_separately": true
+}

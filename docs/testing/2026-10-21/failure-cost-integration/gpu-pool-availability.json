@@ -1,0 +1,64 @@
+{
+  "job_id": "4a244f52e4d5",
+  "job_status": "error",
+  "error_codes": [],
+  "error_markers": [
+    "quota",
+    "kaggle"
+  ],
+  "providers": [
+    {
+      "name": "modal",
+      "enabled": false,
+      "healthy": false,
+      "cooldown_remaining_s": 0,
+      "capabilities": [
+        "asr",
+        "clips",
+        "ocr"
+      ]
+    },
+    {
+      "name": "colab",
+      "enabled": true,
+      "healthy": true,
+      "cooldown_remaining_s": 78405,
+      "capabilities": [
+        "asr",
+        "clips",
+        "ocr"
+      ]
+    },
+    {
+      "name": "kaggle",
+      "enabled": true,
+      "healthy": true,
+      "cooldown_remaining_s": 0,
+      "capabilities": [
+        "asr",
+        "clips",
+        "ocr"
+      ]
+    },
+    {
+      "name": "zerogpu",
+      "enabled": false,
+      "healthy": false,
+      "cooldown_remaining_s": 0,
+      "capabilities": [
+        "asr"
+      ]
+    },
+    {
+      "name": "aliyun",
+      "enabled": false,
+      "healthy": false,
+      "cooldown_remaining_s": 0,
+      "capabilities": [
+        "asr",
+        "clips",
+        "ocr"
+      ]
+    }
+  ]
+}

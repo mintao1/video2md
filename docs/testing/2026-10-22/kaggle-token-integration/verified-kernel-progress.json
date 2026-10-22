@@ -1,0 +1,4 @@
+{
+  "state": "queued",
+  "detail": "Warning: Your Kaggle API key is readable by other users on this system! To fix this, you can run 'chmod 600 /home/router"
+}

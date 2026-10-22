@@ -1,0 +1,90 @@
+{
+  "scope": "原评审问题修复与生产模型计费验收，另记录复验新发现",
+  "checks": [
+    {
+      "issue": "上一轮B站合集TLS/412解析失败",
+      "status": "PASS",
+      "evidence": [
+        "source-outage-fallback.txt",
+        "pagelist-fallback-probe.txt",
+        "production-final.json"
+      ]
+    },
+    {
+      "issue": "解析期间缺少等待反馈及重复提交保护",
+      "status": "PASS",
+      "evidence": [
+        "production-modal-pending.png",
+        "reader-regression-results.json"
+      ]
+    },
+    {
+      "issue": "任务页同路由新建入口无法保持导入面板",
+      "status": "PASS",
+      "evidence": [
+        "import-navigation-fixed.png",
+        "import-navigation-red.txt",
+        "import-navigation-green.txt"
+      ]
+    },
+    {
+      "issue": "真实模型生产用量与费用",
+      "status": "PASS",
+      "run_id": "be188f78",
+      "evidence": [
+        "billing-final.txt",
+        "billing-reconciliation.json",
+        "billing-evidence.json"
+      ]
+    },
+    {
+      "issue": "阅读器媒体逐项加载、失败标识及大文件传输",
+      "status": "PASS",
+      "evidence": [
+        "reader-incremental-loading.png",
+        "frontend-media-ranges-tests.txt",
+        "media-transport-diagnosis.json",
+        "reader-final.json",
+        "reader-range-playback.json",
+        "reader-recovered-clip-playback.json"
+      ]
+    },
+    {
+      "issue": "前端两次判定登录过期",
+      "status": "OBSERVED_NOT_DIAGNOSED",
+      "evidence": [
+        "evidence.json"
+      ]
+    }
+  ],
+  "local_test_incident": "测试导入隔离失误曾误写本地开发JSON；后续已隔离，无法确认恢复所有误写前的值。生产数据未受影响。详情见local-test-isolation.json。",
+  "status": "PASS_SCOPED_WITH_RECORDED_OBSERVATIONS",
+  "model_billing": {
+    "run_id": "be188f78",
+    "status": "done",
+    "source": "https://www.bilibili.com/video/BV1vV411k7GB/",
+    "parts_selected": [
+      1,
+      2
+    ],
+    "model": "glm-5.3-flash",
+    "input_tokens": 15939,
+    "output_tokens": 15841,
+    "gpu_stage_seconds": 1276.45,
+    "attributed_cost_usd": 0.010311,
+    "duplicate_increment_usd": 0
+  },
+  "verification": {
+    "backend_tests": 114,
+    "frontend_integration_tests": 42,
+    "frontend_regression_tests": 1,
+    "build": "PASS",
+    "production_file_hashes": 27
+  },
+  "full_report": "evidence.json",
+  "operational_limits": [
+    "公开B站BV分P视频降级，未保证付费或受限视频及所有清晰度。",
+    "公网链路较慢，已通过本次分段读取实测。",
+    "成本为应用按生产单价归因，供应商现金账单未核验。"
+  ]
+}

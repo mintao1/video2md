@@ -1,0 +1,21 @@
+{
+  "ok": true,
+  "model": "glm-5.3-flash",
+  "usage": {
+    "prompt_tokens": 23,
+    "completion_tokens": 54,
+    "total_tokens": 77,
+    "prompt_tokens_details": {
+      "audio_tokens": null,
+      "cached_tokens": 0
+    },
+    "completion_tokens_details": {
+      "accepted_prediction_tokens": null,
+      "audio_tokens": null,
+      "reasoning_tokens": 51,
+      "rejected_prediction_tokens": null
+    }
+  },
+  "attempts": 1,
+  "base_url": "https://opencode.ai/inference/go/openai/v1"
+}

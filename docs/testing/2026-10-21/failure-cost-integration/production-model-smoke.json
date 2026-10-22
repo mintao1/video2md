@@ -1,0 +1,45 @@
+{
+  "kind": "production_model_connectivity_probe",
+  "task_run_created": false,
+  "task_ledger_included": false,
+  "provider_host": "opencode.ai",
+  "model": "glm-5.3-flash",
+  "status": "success",
+  "response_nonempty": true,
+  "attempts": 1,
+  "attempt_usage": [
+    {
+      "attempt": 1,
+      "outcome": "success",
+      "http_status": 200,
+      "usage": {
+        "prompt_tokens": 30,
+        "completion_tokens": 45,
+        "total_tokens": 75,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cached_tokens": 0
+        },
+        "completion_tokens_details": {
+          "accepted_prediction_tokens": null,
+          "audio_tokens": null,
+          "reasoning_tokens": 38,
+          "rejected_prediction_tokens": null
+        }
+      }
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 30,
+    "completion_tokens": 45,
+    "total_tokens": 75,
+    "prompt_tokens_details": {
+      "cached_tokens": 0
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 38
+    }
+  },
+  "usage_complete": true,
+  "elapsed_s": 3.512
+}

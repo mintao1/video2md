@@ -1,0 +1,14 @@
+{
+  "base_image": "video2md:0.2.0-ocr-guard-20261022d",
+  "image": "video2md:0.2.0-cert-cache-20261022e",
+  "changed_file": "acctkit/providers.py",
+  "source_sha256": "7bacacd567ed7dd34e23b47d5e8fb0cc9c72cb1ceba39d0d4a9f707594cbd3d3",
+  "runtime_dependency_added": false,
+  "authentication_checks_preserved": [
+    "signature",
+    "audience",
+    "issuer",
+    "expiry"
+  ],
+  "public_cert_cache_cap_seconds": 3600
+}

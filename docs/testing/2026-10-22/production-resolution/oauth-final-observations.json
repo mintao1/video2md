@@ -1,0 +1,49 @@
+{
+  "release": "video2md:0.2.0-note-embeds-20261022f",
+  "observations": [
+    {
+      "attempt_id": "final-ui-login-1",
+      "outcome": "success",
+      "login_started_at": "2026-10-22T04:36:12+08:00",
+      "callback_at": "2026-10-22T04:36:29+08:00",
+      "me_at": "2026-10-22T04:36:31+08:00",
+      "refresh_at": "2026-10-22T04:37:06+08:00",
+      "elapsed_s": 19.0,
+      "me_status": 200,
+      "refresh_status": 200,
+      "screenshot": "login-f-1.png"
+    },
+    {
+      "attempt_id": "final-ui-login-2",
+      "outcome": "success",
+      "login_started_at": "2026-10-22T04:38:04+08:00",
+      "callback_at": "2026-10-22T04:38:19+08:00",
+      "me_at": "2026-10-22T04:38:21+08:00",
+      "refresh_at": "2026-10-22T04:39:17+08:00",
+      "elapsed_s": 17.0,
+      "me_status": 200,
+      "refresh_status": 200,
+      "screenshot": "login-f-2.png"
+    },
+    {
+      "attempt_id": "final-ui-login-3",
+      "outcome": "success",
+      "login_started_at": "2026-10-22T04:39:35+08:00",
+      "callback_at": "2026-10-22T04:39:51+08:00",
+      "me_at": "2026-10-22T04:39:53+08:00",
+      "refresh_at": "2026-10-22T04:40:13+08:00",
+      "elapsed_s": 18.0,
+      "me_status": 200,
+      "refresh_status": 200,
+      "screenshot": "login-f-3.png"
+    }
+  ],
+  "relay": {
+    "active_units": [
+      "video2md-oauth-relay.service"
+    ],
+    "retired_unit_enabled": false,
+    "listener_host": "127.0.0.1"
+  },
+  "historical_slower_attempts_retained_in": "auth-http-current.json"
+}

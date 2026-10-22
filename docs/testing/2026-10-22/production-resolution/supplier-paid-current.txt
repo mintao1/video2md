@@ -1,0 +1,7 @@
+      - generic: Go renewal
+      - generic: XPIMO8IF-0003
+    - generic: Paid
+    - generic: ·
+    - time: Oct 5, 2026
+    - paragraph: CN¥67.72 CNY
+    - button "Download invoice XPIMO8IF-0003":

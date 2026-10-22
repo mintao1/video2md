@@ -1,0 +1,7 @@
+{
+  "old_image": "video2md:0.2.0-ocr-guard-20261022d",
+  "new_image": "video2md:0.2.0-cert-cache-20261022e",
+  "only_image_changed": true,
+  "all_environment_and_volumes_preserved": true,
+  "force_conflicts": false
+}

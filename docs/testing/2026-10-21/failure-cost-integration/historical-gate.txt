@@ -1,0 +1,5 @@
+FAIL
+- failure-cost-001: absent, unverified or inconsistent evidence
+- failure-cost-002: absent, unverified or inconsistent evidence
+- failure-cost-003: absent, unverified or inconsistent evidence
+- failure-cost-004: absent, unverified or inconsistent evidence

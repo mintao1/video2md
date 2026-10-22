@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useQueueStore, type QueueFilter } from '../stores/queue'
 import { useToastStore } from '../stores/toast'
@@ -19,6 +19,22 @@ const router = useRouter()
 
 const importOpen = ref(false)
 const quickUrl = ref('')
+const submitting = ref(false)
+const quickError = ref('')
+const importError = ref('')
+watch(importOpen, (open) => { if (open) importError.value = '' })
+
+function submissionMessage(error: unknown): string {
+  return error instanceof Error && error.message
+    ? `提交失败：${error.message}`
+    : '提交失败，请稍后重试'
+}
+
+function openImportFromRoute(): void {
+  if (route.query.openImport !== '1') return
+  importOpen.value = true
+  void router.replace({ query: {} })
+}
 
 const filterOptions = computed(() => [
   { key: 'all', label: '全部任务', count: queue.counts.all },
@@ -36,11 +52,10 @@ onMounted(async () => {
   }
   queue.startProgressTick()
   // 从 BottomNav 中央按钮进入时自动打开导入面板
-  if (route.query.openImport === '1') {
-    importOpen.value = true
-    router.replace({ query: {} })
-  }
+  openImportFromRoute()
 })
+
+watch(() => route.query.openImport, openImportFromRoute)
 
 onUnmounted(() => queue.stopProgressTick())
 
@@ -50,14 +65,33 @@ async function quickSubmit() {
     toast.show('请先粘贴视频链接')
     return
   }
-  await queue.createRun(url)
-  quickUrl.value = ''
-  toast.show('已加入转换队列')
+  if (submitting.value) return
+  quickError.value = ''
+  submitting.value = true
+  try {
+    await queue.createRun(url)
+    quickUrl.value = ''
+    toast.show('已加入转换队列')
+  } catch (error) {
+    quickError.value = submissionMessage(error)
+  } finally {
+    submitting.value = false
+  }
 }
 
 async function startConvert(payload: { url: string; title?: string }) {
-  await queue.createRun(payload.url, payload.title)
-  toast.show('已加入转换队列，稍后可在教材库查看')
+  if (submitting.value) return
+  importError.value = ''
+  submitting.value = true
+  try {
+    await queue.createRun(payload.url, payload.title)
+    importOpen.value = false
+    toast.show('已加入转换队列，稍后可在教材库查看')
+  } catch (error) {
+    importError.value = submissionMessage(error)
+  } finally {
+    submitting.value = false
+  }
 }
 
 function onRead(run: RunListItem) {
@@ -83,6 +117,7 @@ function setFilter(key: string) {
             <span class="material-symbols-outlined text-outline text-[18px] ml-1">link</span>
             <input
               v-model="quickUrl"
+              :disabled="submitting"
               type="text"
               placeholder="粘贴 B站 / YouTube / 播客等音视频链接..."
               class="bg-transparent flex-1 text-on-surface font-body-md text-body-md focus:outline-none placeholder:text-outline text-[13px] px-1 min-w-0"
@@ -90,13 +125,19 @@ function setFilter(key: string) {
             />
             <button
               type="button"
+              :disabled="submitting"
+              :aria-busy="submitting"
               class="px-3 py-1.5 rounded-md bg-primary text-on-primary font-label-md text-label-md font-semibold flex items-center gap-1 shadow-sm active:scale-95 transition-transform shrink-0"
               @click="quickSubmit"
             >
               <span class="material-symbols-outlined text-[16px]">auto_awesome</span>
-              <span>开始解析</span>
+              <span>{{ submitting ? '正在解析…' : '开始解析' }}</span>
             </button>
           </div>
+          <p v-if="submitting && !importOpen" role="status" aria-live="polite" class="text-sm text-on-surface-variant">
+            正在读取视频与合集信息，请稍候。解析成功后会自动加入队列。
+          </p>
+          <p v-if="quickError" role="alert" class="text-sm text-red-700">{{ quickError }}</p>
           <div class="flex items-center justify-between pt-0.5 px-0.5">
             <div class="flex items-center gap-1 text-[11px] text-outline font-label-sm">
               <span class="material-symbols-outlined text-[14px] text-primary">bolt</span>
@@ -104,6 +145,7 @@ function setFilter(key: string) {
             </div>
             <button
               type="button"
+              :disabled="submitting"
               class="px-2.5 py-1 rounded-md bg-surface-container text-on-surface-variant hover:text-on-surface font-label-sm text-[12px] font-semibold flex items-center gap-1 border border-outline-variant/30 active:scale-95 transition-transform shrink-0"
               @click="importOpen = true"
             >
@@ -169,7 +211,7 @@ function setFilter(key: string) {
       </div>
     </main>
 
-    <ImportModal v-model="importOpen" @start="startConvert" @draft="toast.show('草稿已保存（mock）')" />
+    <ImportModal v-model="importOpen" :error="importError" :busy="submitting" @start="startConvert" @draft="toast.show('草稿已保存（mock）')" />
     <BottomNav />
   </div>
 </template>

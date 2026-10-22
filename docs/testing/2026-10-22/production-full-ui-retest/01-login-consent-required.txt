@@ -1,0 +1,20 @@
+Browser tab: 1, Title: "视书 · Textbook Library", URL: "https://ferosse.tech/".
+1 AXWebArea 视书 · Textbook Library, URL: ferosse.tech/
+	2 container
+		3 text menu_book
+		4 heading 视书, Value: 1
+			5 text 视书
+		6 text 视频一键转成可精读的教材
+		7 text 从视频到结构化知识，让每一次观看都沉淀为可搜索、可复习、可分享的内容。
+		8 heading 开始使用视书, Value: 2
+			9 text 开始使用视书
+		10 text 登录后创建教材、管理任务并继续阅读 请先阅读并同意《用户服务协议》与《隐私保护政策》
+		11 button 使用 Google 账号继续
+		12 checkbox (settable, integer) Description: 我已阅读并同意 《用户服务协议》 与 《隐私保护政策》, Value: 0
+		13 text 我已阅读并同意 
+		14 link Description: 《用户服务协议》, Value: ferosse.tech/terms
+		15 text  与 
+		16 link Description: 《隐私保护政策》, Value: ferosse.tech/privacy
+		17 text 登录凭据由 Google 安全处理，视书不会获取或保存你的 Google 密码。
+
+The focused UI element is 11 button 使用 Google 账号继续

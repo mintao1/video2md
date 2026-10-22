@@ -1,0 +1,14 @@
+PASS token file plus authenticated username metadata accepted
+PASS provider task namespace reads authenticated username
+PASS health never returns token contents
+PASS blank token does not satisfy missing legacy key
+PASS token environment and username override empty legacy file
+PASS task namespace honors environment username over empty legacy file
+PASS token without namespace username is not ready
+PASS complete legacy credentials remain valid
+PASS empty legacy object remains rejected
+PASS credential parse diagnostics omit secret material
+PASS credential parse diagnostics omit secret material
+PASS access_token is projected to the official CLI path
+PASS legacy-only secrets can omit the optional access token
+PASS credential files are group-readable only

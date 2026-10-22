@@ -1,0 +1,32 @@
+  🧭 balanced 选举 asr → colab （score 0.85 = 优先级 1.00·配额水位 0.50·延迟 1.00）
+  ☁️ Colab GPU 转录（会话 v2md-whisper）…
+  ⏳ 创建 Colab T4 会话 v2md-whisper（免费档 GPU 以配额为准）…
+  ⏳ 会话内安装 faster-whisper>=1.1,<2 av<19 nvidia-cublas-cu12 nvidia-cudnn-cu12==9.*…
+INFO:     127.0.0.1:37166 - "GET /ping HTTP/1.1" 200 OK
+INFO:     127.0.0.1:37168 - "GET /status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54570 - "GET /ping HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54582 - "GET /status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54380 - "GET /status HTTP/1.1" 200 OK
+    … Colab 执行中 121s
+  ✅ Colab 往返 138s
+  ♻️ 队列还有排队任务，保留 Colab 会话给下一条复用
+INFO:     127.0.0.1:51194 - "POST /transcribe HTTP/1.1" 200 OK
+  🧭 balanced 选举 ocr → colab （score 0.85 = 优先级 1.00·配额水位 0.50·延迟 1.00）
+  ⏳ 会话内安装 rapidocr + onnxruntime…
+INFO:     127.0.0.1:33986 - "GET /ping HTTP/1.1" 200 OK
+INFO:     127.0.0.1:34002 - "GET /status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:48604 - "GET /ping HTTP/1.1" 200 OK
+INFO:     127.0.0.1:48616 - "GET /status HTTP/1.1" 200 OK
+  ✅ Colab 往返 89s
+  ✅ Colab OCR 往返 89s（5 帧）
+  ♻️ 队列还有排队任务，保留 Colab 会话给下一条复用
+INFO:     127.0.0.1:58640 - "POST /ocr HTTP/1.1" 200 OK
+  🧭 balanced 选举 clips → colab （score 0.85 = 优先级 1.00·配额水位 0.50·延迟 1.00）
+INFO:     127.0.0.1:57146 - "GET /ping HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57162 - "GET /status HTTP/1.1" 200 OK
+    … Colab 剪辑 1/1 段
+  ✅ Colab 剪辑往返 105s（1/1 段）
+  ♻️ 队列还有排队任务，保留 Colab 会话给下一条复用
+INFO:     127.0.0.1:57938 - "POST /clips HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46412 - "GET /ping HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46418 - "GET /status HTTP/1.1" 200 OK

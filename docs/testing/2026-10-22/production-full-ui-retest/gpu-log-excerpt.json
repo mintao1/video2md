@@ -1,0 +1,8 @@
+{
+  "kind": "supplemental_readonly_gpu_log_excerpt",
+  "exit_code": 0,
+  "lines": [
+    "INFO:     127.0.0.1:36700 - \"POST /clips HTTP/1.1\" 200 OK",
+    "INFO:     127.0.0.1:41140 - \"POST /clips HTTP/1.1\" 200 OK"
+  ]
+}

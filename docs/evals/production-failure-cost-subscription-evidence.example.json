@@ -1,0 +1,212 @@
+{
+  "kind": "synthetic",
+  "release": "synthetic-release",
+  "run_id": "synthetic-run",
+  "results": [
+    {
+      "id": "failure-cost-001",
+      "status": "pass",
+      "metrics": {
+        "entries": [
+          {
+            "entry": 1,
+            "failed_stages": [
+              "ocr"
+            ],
+            "llm_calls_after_failure": 0,
+            "blocked_before_model": true
+          },
+          {
+            "entry": 2,
+            "failed_stages": [
+              "clips"
+            ],
+            "llm_calls_after_failure": 0,
+            "blocked_before_model": true
+          },
+          {
+            "entry": 3,
+            "failed_stages": [],
+            "llm_calls": 2
+          }
+        ],
+        "release": "synthetic-release",
+        "run_id": "synthetic-run"
+      },
+      "evidence_refs": [
+        {
+          "path": "synthetic-proof.json",
+          "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+        }
+      ]
+    },
+    {
+      "id": "failure-cost-002",
+      "status": "pass",
+      "metrics": {
+        "attempts": [
+          {
+            "input_tokens": 100,
+            "output_tokens": 40,
+            "cached_tokens": 80,
+            "request_id": "request-1",
+            "run_id": "synthetic-run",
+            "usage_source": "provider_response",
+            "outcome": "empty"
+          },
+          {
+            "input_tokens": 200,
+            "output_tokens": 60,
+            "cached_tokens": 120,
+            "request_id": "request-2",
+            "run_id": "synthetic-run",
+            "usage_source": "provider_response",
+            "outcome": "success"
+          }
+        ],
+        "recorded_usage": {
+          "input_tokens": 300,
+          "output_tokens": 100,
+          "cached_tokens": 200
+        },
+        "release": "synthetic-release",
+        "run_id": "synthetic-run"
+      },
+      "evidence_refs": [
+        {
+          "path": "synthetic-proof.json",
+          "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+        }
+      ]
+    },
+    {
+      "id": "failure-cost-003",
+      "status": "pass",
+      "metrics": {
+        "observations": [
+          {
+            "attempt_id": "oauth-0",
+            "outcome": "success",
+            "elapsed_s": 2,
+            "me_status": 200,
+            "refresh_status": 200
+          },
+          {
+            "attempt_id": "oauth-1",
+            "outcome": "success",
+            "elapsed_s": 2,
+            "me_status": 200,
+            "refresh_status": 200
+          },
+          {
+            "attempt_id": "oauth-2",
+            "outcome": "success",
+            "elapsed_s": 2,
+            "me_status": 200,
+            "refresh_status": 200
+          }
+        ],
+        "release": "synthetic-release",
+        "run_id": "synthetic-run",
+        "relay": {
+          "active_units": [
+            "video2md-oauth-relay.service"
+          ],
+          "retired_unit_enabled": false,
+          "listener_host": "127.0.0.1"
+        }
+      },
+      "evidence_refs": [
+        {
+          "path": "synthetic-proof.json",
+          "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+        }
+      ]
+    },
+    {
+      "id": "failure-cost-004",
+      "status": "pass",
+      "metrics": {
+        "provider": "synthetic-provider",
+        "provider_export_id": "synthetic-export",
+        "account_ref": "synthetic-account",
+        "currency": "USD",
+        "scope": "run-isolated",
+        "amount_source": "provider_subscription_usage",
+        "application_requests": [
+          {
+            "input_tokens": 100,
+            "output_tokens": 40,
+            "cached_tokens": 80,
+            "request_id": "request-1",
+            "run_id": "synthetic-run",
+            "account_ref": "synthetic-account",
+            "occurred_at": "2026-10-21T12:00:00+00:00"
+          },
+          {
+            "input_tokens": 200,
+            "output_tokens": 60,
+            "cached_tokens": 120,
+            "request_id": "request-2",
+            "run_id": "synthetic-run",
+            "account_ref": "synthetic-account",
+            "occurred_at": "2026-10-21T12:00:00+00:00"
+          }
+        ],
+        "supplier_rows": [
+          {
+            "input_tokens": 100,
+            "output_tokens": 40,
+            "cached_tokens": 80,
+            "request_id": "request-1",
+            "run_id": "synthetic-run",
+            "debit_usd": 0,
+            "account_ref": "synthetic-account",
+            "subscription_id": "synthetic-plan",
+            "included_in_subscription": true,
+            "occurred_at": "2026-10-21T12:00:00+00:00"
+          },
+          {
+            "input_tokens": 200,
+            "output_tokens": 60,
+            "cached_tokens": 120,
+            "request_id": "request-2",
+            "run_id": "synthetic-run",
+            "debit_usd": 0,
+            "account_ref": "synthetic-account",
+            "subscription_id": "synthetic-plan",
+            "included_in_subscription": true,
+            "occurred_at": "2026-10-21T12:00:00+00:00"
+          }
+        ],
+        "application_cost_usd": 0.0001,
+        "release": "synthetic-release",
+        "run_id": "synthetic-run",
+        "settlement_status": "settled",
+        "billing_mode": "subscription",
+        "subscription_invoice": {
+          "invoice_id": "synthetic-invoice",
+          "subscription_id": "synthetic-plan",
+          "account_ref": "synthetic-account",
+          "currency": "USD",
+          "status": "paid",
+          "amount_paid_usd": 10,
+          "period_start": "2026-10-01T00:00:00+00:00",
+          "period_end": "2026-11-01T00:00:00+00:00",
+          "document_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+        }
+      },
+      "evidence_refs": [
+        {
+          "path": "synthetic-proof.json",
+          "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+        },
+        {
+          "path": "synthetic-invoice.json",
+          "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+          "role": "supplier_invoice"
+        }
+      ]
+    }
+  ]
+}

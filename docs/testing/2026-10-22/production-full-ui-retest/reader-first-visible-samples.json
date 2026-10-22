@@ -1,0 +1,52 @@
+[
+  {
+    "elapsed_ms": 0,
+    "dom": {
+      "decodedImages": 9,
+      "imageCount": 9,
+      "loadingCount": 23,
+      "videos": [],
+      "visibility": "visible"
+    }
+  },
+  {
+    "elapsed_ms": 49186,
+    "dom": {
+      "decodedImages": 13,
+      "imageCount": 13,
+      "loadingCount": 19,
+      "videos": [],
+      "visibility": "visible"
+    }
+  },
+  {
+    "elapsed_ms": 79565,
+    "dom": {
+      "decodedImages": 14,
+      "imageCount": 14,
+      "loadingCount": 18,
+      "videos": [],
+      "visibility": "visible"
+    }
+  },
+  {
+    "elapsed_ms": 138701,
+    "dom": {
+      "decodedImages": 16,
+      "imageCount": 16,
+      "loadingCount": 16,
+      "videos": [],
+      "visibility": "visible"
+    }
+  },
+  {
+    "elapsed_ms": 183430,
+    "dom": {
+      "decodedImages": 16,
+      "imageCount": 16,
+      "loadingCount": 16,
+      "videos": [],
+      "visibility": "visible"
+    }
+  }
+]

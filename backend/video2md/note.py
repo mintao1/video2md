@@ -37,7 +37,23 @@ def looks_like_refusal(text: str) -> bool:
 
 
 def sanitize_embeds(body: str, valid: set[str]) -> str:
-    """剥离指向不存在帧的 ![[attachments/…]]（LLM 幻觉防线），孤立斜体图注随删。"""
+    """Canonicalize model frame references, then remove hallucinated frames.
+
+    A model may omit attachments/ or put a frame inside a paragraph. Give known
+    frames their own line so authorization and clip insertion see the same name.
+    Unknown paths still pass through the existing rejection below.
+    """
+    source = body
+    def normalize(match: re.Match) -> str:
+        target = match.group(1)
+        name = target.removeprefix('attachments/').split('|', 1)[0]
+        if not name.lower().endswith(('.jpg', '.jpeg', '.png', '.webp')):
+            return match.group(0)
+        before = '\n' if match.start() and source[match.start() - 1] != '\n' else ''
+        after = '\n' if match.end() < len(source) and source[match.end()] != '\n' else ''
+        return before + f'![[attachments/{name}]]' + after
+
+    body = re.sub(r'!\[\[([^\]\n]+)\]\]', normalize, source)
     if not valid:
         return re.sub(r"!\[\[attachments/[^\]]+\]\]\n?", "", body)
     lines, out, i = body.split("\n"), [], 0

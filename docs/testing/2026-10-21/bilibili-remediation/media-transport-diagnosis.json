@@ -1,0 +1,49 @@
+{
+  "application_body_checks": [
+    {
+      "name": "p002-video-c04-0003.mp4",
+      "file_bytes": 404815,
+      "response_bytes": 404815
+    },
+    {
+      "name": "p002-video-c08-0007.mp4",
+      "file_bytes": 709839,
+      "response_bytes": 709839
+    },
+    {
+      "name": "p002-video-c21-0020.mp4",
+      "file_bytes": 617573,
+      "response_bytes": 617573
+    }
+  ],
+  "public_transfer_example": {
+    "name": "p002-video-c08-0007.mp4",
+    "status": 200,
+    "bytes_sent": 73452,
+    "expected_bytes": 709839,
+    "next_attempt_bytes_sent": 0
+  },
+  "google_certificate_public_probe": [
+    {
+      "status": 200,
+      "duration_s": 4.545
+    },
+    {
+      "status": 200,
+      "duration_s": 4.812
+    },
+    {
+      "status": 200,
+      "duration_s": 4.812
+    }
+  ],
+  "auth_changed": false,
+  "range_policy": {
+    "chunk_bytes": 65536,
+    "attempts_per_chunk": 2,
+    "authorization_preserved": true,
+    "file_version_checked": true,
+    "no_retry_for_http_permission_errors": true
+  },
+  "external_transport_root_cause": "尚未定位到具体网络节点；通过分段重试降低整文件重传风险。"
+}

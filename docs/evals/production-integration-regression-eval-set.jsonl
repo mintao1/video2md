@@ -1,0 +1,22 @@
+{"id":"pir-001","finding":"API 子进程找不到 yt-dlp","seam":"API 进程启动环境","pass":"API 使用当前 Python 环境的 bin 目录并能执行 yt-dlp --version","forbidden":"镜像已安装 yt-dlp 但 API PATH 不可见"}
+{"id":"pir-002","finding":"受控视频错误继承失效代理","seam":"视频解析子进程环境","pass":"V2MD_DIRECT_HOSTS 精确命中的 URL 移除代理，其他海外 URL 保留代理","forbidden":"同源测试视频发往 127.0.0.1:17898"}
+{"id":"pir-003","finding":"容器数据卷无写权限","seam":"Kubernetes Pod 启动门禁","pass":"initContainer 在业务进程启动前把 data 与 vault 交给 uid 10001","forbidden":"依赖人工 chmod 或业务容器以 root 运行"}
+{"id":"pir-004","finding":"重试任务残留旧 lease","seam":"POST /runs/{id}/resume","pass":"恢复同一 run_id 时原子清空 claimed_by 和 claimed_at 后重新入队","forbidden":"终止 Pod 的 lease 阻塞重试或重试创建新 run"}
+{"id":"pir-005","finding":"通用 MP4 下载格式不兼容","seam":"下载器公开格式选择契约","pass":"720p 优选不可用时回退 best 并生成非空 MP4","forbidden":"Requested format is not available"}
+{"id":"pir-006","finding":"Colab PyAV、Whisper、CUDA 依赖冲突","seam":"Colab worker 冷启动","pass":"PyAV<19、faster-whisper<2、CUDA 运行库及 LD_LIBRARY_PATH 同时满足","forbidden":"metadata_errors TypeError 或 libcublas.so.12 missing"}
+{"id":"pir-007","finding":"clips 下载 ffmpeg 长时间挂起","seam":"Colab clips worker","pass":"优先系统 ffmpeg，下载回退具有不超过 30 秒的网络超时","forbidden":"无界等待外部 ffmpeg 下载"}
+{"id":"pir-008","finding":"LLM 请求误走旧代理","seam":"生产 LLM HTTP 客户端","pass":"LLM 网关主机位于 NO_PROXY 并能收到上游 HTTP 业务响应","forbidden":"SSL WRONG_VERSION_NUMBER 或请求到 127.0.0.1:17898"}
+{"id":"pir-009","finding":"前端静默吞掉任务创建错误","seam":"可见提交表单","pass":"错误可见、表单保持打开、URL 保留且不显示成功提示","forbidden":"失败后静默关闭或丢失输入"}
+{"id":"pir-010","finding":"Colab 终态未及时关机","seam":"GPU session 生命周期","pass":"终态且无 queue/lease 后在保温窗口加一次巡检内停止 session","forbidden":"终态后仍有活动 Colab session"}
+{"id":"pir-011","finding":"重试可能重复创建或扣费","seam":"run 幂等与计费账本","pass":"相同规范 URL 的重试复用 run_id 且没有重复 usage/cost","forbidden":"多个 run、重复 usage 或重复 cost"}
+{"id":"pir-012","finding":"登录后未显式输入链接","seam":"生产浏览器","pass":"Google 登录成功后测试显式清空并输入批准 URL","forbidden":"剪贴板内容自动提交"}
+{"id":"pir-013","finding":"视频下载主链不可用","seam":"生产下载阶段","pass":"批准 URL 下载为非空本地视频后才启动模型","forbidden":"下载失败仍启动模型或产生费用"}
+{"id":"pir-014","finding":"Colab ASR 不可用","seam":"GPU ASR 接口","pass":"返回至少一段带时间戳的转录及 provider=colab","forbidden":"空转录被判成功"}
+{"id":"pir-015","finding":"Colab OCR 不可用","seam":"GPU OCR 接口","pass":"抽帧数大于零且每帧结果有明确状态","forbidden":"零帧被判成功"}
+{"id":"pir-016","finding":"Colab clips 不可用","seam":"GPU clips 接口","pass":"请求片段数等于成功或显式失败片段数且不会无限等待","forbidden":"部分丢失或无终态"}
+{"id":"pir-017","finding":"LLM 网络不可达","seam":"LLM 网关传输层","pass":"在有界超时内收到上游 HTTP 响应","forbidden":"代理 TLS 错误、DNS 失败或无限超时"}
+{"id":"pir-018","finding":"LLM 渠道被禁用","seam":"LLM 推理业务层","pass":"至少一个配置模型返回有效响应并报告正 token 用量","forbidden":"所有模型均 403 但任务被判成功"}
+{"id":"pir-019","finding":"最终教材未生成","seam":"任务产物与阅读器","pass":"终态为 done/partial，教材 Markdown 非空且阅读器可打开","forbidden":"空教材或 error 状态被判交付成功"}
+{"id":"pir-020","finding":"LLM tokens 为零","seam":"run usage 与模型响应","pass":"真实 LLM 成功时输入与输出 token 均为正并归属同一 run","forbidden":"模型成功但 token 为零"}
+{"id":"pir-021","finding":"cost 为零被误判为通过","seam":"生产计费门禁","pass":"真实模型调用、正 usage、已结算 cost 和月度汇总四项同时成立","forbidden":"以零费用作为计费成功证据"}
+{"id":"pir-022","finding":"GPU usage 与真实执行时长不符","seam":"GPU 响应与 run usage 账本","pass":"账本 gpu_s 覆盖所有实际由 GPU 服务执行的阶段，允许绝对误差 1 秒或相对误差 5%；本地 CPU clips 不虚构 GPU 用量","forbidden":"只记录 API 请求开销、漏记 GPU 阶段或把本地 CPU 阶段计为 GPU"}

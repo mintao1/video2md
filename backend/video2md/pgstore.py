@@ -221,6 +221,15 @@ class PostgresTaskStore:
         except Exception:
             pass
 
+    def release_claim_for_retry(self, run_id: str) -> bool:
+        """Clear a terminal run's dead process lease before it is enqueued again."""
+        with self.pool.connection() as conn:
+            row = conn.execute(
+                "UPDATE v2md_runs SET claimed_by='', updated=now() "
+                "WHERE run_id=%s AND status='created' RETURNING 1", (run_id,)
+            ).fetchone()
+        return row is not None
+
     def steal_if_unclaimed(self, run_id: str, lease_s: float, proc: str) -> dict | None:
         """崩溃残档接管入口：无主或租约过期才钉名，抢到即持行锁窗口内复核。
 

@@ -23,6 +23,7 @@ import httpx
 # ---------------------------------------------------------------- 参数（provider extra 可覆盖）
 SESSION = "v2md-whisper"
 BIN_OVERRIDE = ""
+CLI_HOME = ""  # Per-tenant CLI home; never change the parent process environment.
 KEEP_SESSION = False
 ALLOW_CPU_FALLBACK = True  # direct adapter opts out unless explicitly enabled
 
@@ -32,7 +33,7 @@ QUEUE_URL = ""      # video2md serve /queue；空 = 不感知队列（用完即�
 
 MAX_WAIT_S = 2700
 
-AUTOSTOP_IDLE_S = 60   # 队列+在途连续空闲这么久才关会话（接管原 serve 的看门狗职责）
+AUTOSTOP_IDLE_S = 30   # 短暂复用窗口；计时资源不得因“可能还有任务”长期常驻
 
 
 
@@ -187,12 +188,13 @@ try:
         raise RuntimeError("源视频缺失：未上传且 direct_url 下载失败/未提供")
 
     # johnvansickle 静态构建自带 nvenc；下载失败退回系统 ffmpeg（CPU）
-    FF = (glob.glob("/content/ffmpeg-*-amd64-static/ffmpeg") or [None])[0]
+    FF = (glob.glob("/content/ffmpeg-*-amd64-static/ffmpeg") or [None])[0] or shutil.which("ffmpeg")
     if not FF:
         try:
-            urllib.request.urlretrieve(
-                "https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz",
-                "/content/ff.tar.xz")
+            with urllib.request.urlopen(
+                    "https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz",
+                    timeout=30) as src, open("/content/ff.tar.xz", "wb") as dst:
+                shutil.copyfileobj(src, dst)
             subprocess.run(["tar", "-xf", "/content/ff.tar.xz", "-C", "/content/"],
                            check=True, capture_output=True)
             FF = glob.glob("/content/ffmpeg-*-amd64-static/ffmpeg")[0]
@@ -269,6 +271,13 @@ def _colab_bin() -> str:
 
 
 
+def _colab_env() -> dict[str, str]:
+    env = dict(os.environ)
+    if CLI_HOME:
+        env["HOME"] = CLI_HOME
+    return env
+
+
 def _colab(args: list[str], timeout: int = 600, retries: int = 1, stdin: str | None = None) -> str:
     """官方 google-colab-cli 子进程。按已知坑兜底：
     exec --timeout 只管远端内核不管本地进程 → 用 subprocess timeout 双保险；
@@ -276,7 +285,7 @@ def _colab(args: list[str], timeout: int = 600, retries: int = 1, stdin: str | N
     for attempt in range(retries + 1):
         try:
             p = subprocess.run([_colab_bin(), *args], capture_output=True, text=True,
-                               timeout=timeout, input=stdin)
+                               timeout=timeout, input=stdin, env=_colab_env())
         except subprocess.TimeoutExpired:
             if attempt < retries:
                 continue
@@ -330,7 +339,8 @@ def _ensure_colab_session(deps_pkg: str = "") -> None:
 
 def _colab_session_active(max_age: float = 10.0) -> bool:
     try:
-        out = subprocess.run([_colab_bin(), "sessions"], capture_output=True, text=True, timeout=8)
+        out = subprocess.run([_colab_bin(), "sessions"], capture_output=True, text=True, timeout=8,
+                             env=_colab_env())
         return f"[{SESSION}]" in (out.stdout + out.stderr)
     except Exception:
         return False
@@ -344,7 +354,7 @@ def _colab_stop_session(reason: str = "") -> bool:
         for _attempt in range(2):
             try:
                 response = subprocess.run([_colab_bin(), "stop", "-s", SESSION],
-                                          capture_output=True, text=True, timeout=120)
+                                          capture_output=True, text=True, timeout=120, env=_colab_env())
             except (OSError, subprocess.TimeoutExpired):
                 continue
             if response.returncode == 0:
@@ -362,7 +372,7 @@ def _colab_stop_session(reason: str = "") -> bool:
 
 def _colab_token_check(margin_min: int = 15) -> tuple[bool, str]:
     """Colab OAuth token 体检：余量 ≥ margin 直接过；不足就当场刷新（走当前进程代理环境）。"""
-    p = Path.home() / ".config/colab-cli/token.json"
+    p = (Path(CLI_HOME) if CLI_HOME else Path.home()) / ".config/colab-cli/token.json"
     if not p.exists():
         return False, "token.json 不存在：先交互式跑一次 colab 完成授权"
     try:
@@ -441,14 +451,24 @@ def _lease_fresh(max_age: float = 180.0) -> bool:
         return False
 
 
+def session_action(*, inflight: bool, queued: bool, lease_fresh: bool,
+                   idle_seconds: float, warm_grace_s: float = AUTOSTOP_IDLE_S) -> str:
+    """Return the bounded lifecycle action for the Colab session."""
+    if inflight or queued or lease_fresh:
+        return "keep"
+    return "stop" if idle_seconds >= warm_grace_s else "keep"
+
+
 
 def _session_epilogue() -> None:
-    """任务收尾：队列有货就保温（省下一条 1–2min 冷启动），见底即关（不烧闲置配额）。"""
+    """任务收尾：有协同看门狗时短保温；无协同时立即关闭，避免泄漏计时会话。"""
     _lease_release()
     if KEEP_SESSION:
         return
     if _more_jobs_waiting():
         print("  ♻️ 队列还有排队任务，保留 Colab 会话给下一条复用")
+    elif QUEUE_URL and LEASE_FILE:
+        print(f"  ♻️ Colab 进入 {AUTOSTOP_IDLE_S}s 有界保温窗")
     else:
         _colab_stop_session("任务结束且队列见底")
 
@@ -465,14 +485,20 @@ def autostop_watchdog(is_inflight, idle_s: int | None = None) -> None:
     idle_since: float | None = None
     while True:
         time.sleep(15)
-        busy = bool(is_inflight()) or _more_jobs_waiting()
-        if busy:
+        inflight = bool(is_inflight())
+        queued = _more_jobs_waiting()
+        lease = _lease_fresh()
+        if inflight or queued or lease:
             idle_since = None
             continue
         idle_since = idle_since or time.time()
-        if time.time() - idle_since >= idle_need and not _lease_fresh() and _colab_session_active():
-            _colab_stop_session("队列空闲自动关闭，省配额")
-            idle_since = None
+        action = session_action(inflight=inflight, queued=queued, lease_fresh=lease,
+                                idle_seconds=time.time() - idle_since,
+                                warm_grace_s=idle_need)
+        if action == "stop" and _colab_session_active():
+            # 只有确认 stop 成功才重置；失败则下一次 15s 巡检立即重试。
+            if _colab_stop_session("队列空闲自动关闭，省配额"):
+                idle_since = None
 
 
 

@@ -1,0 +1,21 @@
+{
+  "verified_at": "2026-10-22T02:12:39.292308+08:00",
+  "dataset_items": 12,
+  "positive_examples": 12,
+  "counterexamples": 56,
+  "new_python_regressions": 182,
+  "related_python_tests_passed": 310,
+  "frontend_component_tests_passed": 6,
+  "lint_passed": true,
+  "production_snapshot_gate_exit": 1,
+  "remaining_case_ids": [
+    "kfi-007",
+    "kfi-011",
+    "kfi-012"
+  ],
+  "historical_evidence_replayed": true,
+  "new_paid_calls": 0,
+  "new_production_deployments": 0,
+  "github_actions_dispatched": false,
+  "production_ledger_changed": false
+}

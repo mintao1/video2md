@@ -1,0 +1,82 @@
+- banner:
+  - button "返回教材库":
+    - generic: arrow_back
+  - heading "学PPT该学哪些技能：会做巧做好用漂亮" [level=1]
+  - paragraph: 第 2 / 2 讲 · 进度 100%
+  - button "打开目录":
+    - generic: format_list_bulleted
+- main:
+  - article:
+    - blockquote:
+      - paragraph: "[!info] 视频信息"
+      - list:
+        - text: ▶️ 来源：
+        - link "p002-video":
+          - /url: https://www.bilibili.com/video/BV1vV411k7GB/?p=2
+        - text: · P2 · 时长 00:01:18
+        - listitem: 📝 字幕文稿：[[transcripts/PPT制作软件选择与Office版本建议-transcript.txt|完整转录]]（whisper turbo · 置信度 0.94）
+        - listitem: 🎞 插图：3 帧 · OCR 命中 78（remote）
+    - blockquote:
+      - paragraph: "[!tip]- 章节导航"
+      - list:
+        - listitem: "[00:03] 制作 PPT 该用什么软件"
+        - listitem: "[00:29] 微软 Office 该用哪个版本"
+        - listitem: "[00:55] 不差钱可以考虑 Office 365"
+    - separator
+    - paragraph: 在布衣公子《一分钟PPT技能》系列的这一集中，主题是“该使用什么软件”（画面）。短短一分多钟里，布衣公子回答了新手最常问的两个问题：制作 PPT 该选哪款软件？微软 Office 又该用哪个版本？
+    - img "p002-video-f04-0003.jpg"
+    - status: 媒体加载中：p002-video-c04-0003.mp4
+    - text: "*片头：布衣公子《一分钟PPT技能》系列之“该使用什么软件”*"
+    - heading "制作 PPT 该用什么软件（00:03）" [level=2]
+    - paragraph:
+      - text: 大家好，我是布衣公子。制作 PPT 该用什么软件呢？
+      - strong: 基本上大部分人使用的都是微软的 PowerPoint
+      - text: ，另外还有国产的 WPS 和苹果的 Keynote[^1]。
+    - paragraph:
+      - status: 媒体加载中：p002-video-f08-0007.jpg
+      - status: 媒体加载中：p002-video-c08-0007.mp4
+      - emphasis: 幻灯片并列出 PowerPoint、WPS、Keynote 三款常用工具，同时打出“工具技能/产品技能”的课程框架
+    - paragraph:
+      - text: 布衣公子本人推荐大家使用微软的 Office，理由有两点：
+      - strong: 一是它在功能和效率上比较出色，二是使用的人数相对较多
+      - text: 。那么，微软 Office 有多个版本，该选哪一个呢？
+    - heading "微软 Office 该用哪个版本（00:29）" [level=2]
+    - paragraph:
+      - text: 布衣公子的建议是：
+      - strong: 至少使用微软的 2013 版
+      - text: ，因为它相比之前的版本在功能上有一个很大的提升，比如取色器[^2]、合并形状、智能参考线，以及母版中的橙色参考线等等。
+    - paragraph:
+      - status: 媒体加载中：p002-video-f21-0020.jpg
+      - status: 媒体加载中：p002-video-c21-0020.mp4
+      - emphasis: 幻灯片逐条列出 2013、2016、2019 各版本的新增功能
+    - paragraph: 结合幻灯片上的清单，各版本的亮点如下（画面）：
+    - list:
+      - strong: 2013 版
+      - text: ：超酷必备的取色器功能；合并形状功能可实现图形互裁、图片互裁、图形与文本框裁剪、图片与文本框裁剪等。
+      - strong: 2013/2016/2019 版
+      - text: ：智能参考线会自动出现，以提示对齐或等距分布；还可在母版中绘制橙色的参考线，实现幻灯片跨页对齐。
+      - strong: 2016 版
+      - text: ：主要新增了屏幕录制功能。
+      - strong: 2019 版
+      - text: ：主要新增了在线图标和墨迹功能。
+    - blockquote:
+      - paragraph: "[!warning] 注意 取色器、合并形状、智能参考线这些高效功能都是 2013 版才引入的提升，版本过旧就无法使用，因此布衣公子建议至少升级到 2013 版。"
+    - heading "不差钱可以考虑 Office 365（00:55）" [level=2]
+    - paragraph:
+      - text: 如果说您不差钱的话，可以考虑
+      - strong: Office 365
+      - text: 。它是年度订阅版，也就是一年付一次费用。布衣公子认为它主要有三个比较酷的功能：
+      - strong: 一个是平滑切换，一个是缩放定位，还有一个是 3D 模型
+      - text: 。当然，更多关于 Office 365 的介绍，大家可以到网上搜索了解。
+    - paragraph: 最后，布衣公子向大家道别：“感谢大家，再会。”片尾画面概括了这套课程的追求——“会做·基础操作，巧做·高效技巧，好用·一目了然，漂亮·赏心悦目”（画面），并打出了“THANKS 感谢您选择了布衣公子作品”的字样（画面）。
+    - paragraph: "[^1]: Keynote：苹果公司推出的演示文稿软件，与微软 PowerPoint、国产 WPS 属于同类工具。 [^2]: 取色器：可从页面上拾取颜色并应用到所选对象的工具，便于统一整套 PPT 的配色。"
+- contentinfo:
+  - button "chevron_left 上一讲":
+    - generic: chevron_left
+    - generic: 上一讲
+  - button "account_tree 目录":
+    - generic: account_tree
+    - generic: 目录
+  - button "下一讲 chevron_right" [disabled]:
+    - generic: 下一讲
+    - generic: chevron_right

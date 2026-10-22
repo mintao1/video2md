@@ -1,0 +1,14 @@
+✔ queued cannot expose a stale read/download action (609.782417ms)
+✔ running cannot expose a stale read/download action (0.673459ms)
+✔ zero model usage and a long remote wait remain pending settlement (0.470792ms)
+✔ failed clips with no readable artifact expose recovery instead of a book (0.349333ms)
+✔ healthy completed output still exposes reading and its settled attribution (0.3025ms)
+✔ only an explicit frontend URL submission creates the collection task (6.073041ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3735.185708

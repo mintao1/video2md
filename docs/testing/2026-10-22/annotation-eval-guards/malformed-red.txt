@@ -1,0 +1,139 @@
+FFFFF                                                                    [100%]
+=================================== FAILURES ===================================
+_____ test_malformed_jsonl_rows_fail_closed_without_disclosing_input[None] _____
+
+tmp_path = PosixPath('/private/var/folders/1b/7r5v_kjj689_65rpwv0hxg8h0000gn/T/pytest-of-linmintao/pytest-132/test_malformed_jsonl_rows_fail0')
+row = None
+
+    @pytest.mark.parametrize("row", [None, [], "SECRET_CANARY", 7, True])
+    def test_malformed_jsonl_rows_fail_closed_without_disclosing_input(tmp_path, row):
+        path = tmp_path / "bad.jsonl"
+        path.write_text(json.dumps(row) + "\n")
+        result = subprocess.run([sys.executable, str(SCRIPT), "--dataset", str(path)],
+                                capture_output=True, text=True)
+        assert result.returncode == 1
+        assert "SECRET_CANARY" not in result.stdout + result.stderr
+>       assert "Traceback" not in result.stderr
+E       assert 'Traceback' not in "Traceback (...bute 'get'\n"
+E         
+E         'Traceback' is contained here:
+E           Traceback (most recent call last):
+E         ? +++++++++
+E             File "/Users/linmintao/Desktop/开发项目/云端部署/video2md/scripts/check_resolution_annotations.py", line 252, in <module>
+E               raise SystemExit(main())
+E                                ^^^^^^...
+E         
+E         ...Full output truncated (10 lines hidden), use '-vv' to show
+
+tests/test_resolution_annotations.py:192: AssertionError
+_____ test_malformed_jsonl_rows_fail_closed_without_disclosing_input[row1] _____
+
+tmp_path = PosixPath('/private/var/folders/1b/7r5v_kjj689_65rpwv0hxg8h0000gn/T/pytest-of-linmintao/pytest-132/test_malformed_jsonl_rows_fail1')
+row = []
+
+    @pytest.mark.parametrize("row", [None, [], "SECRET_CANARY", 7, True])
+    def test_malformed_jsonl_rows_fail_closed_without_disclosing_input(tmp_path, row):
+        path = tmp_path / "bad.jsonl"
+        path.write_text(json.dumps(row) + "\n")
+        result = subprocess.run([sys.executable, str(SCRIPT), "--dataset", str(path)],
+                                capture_output=True, text=True)
+        assert result.returncode == 1
+        assert "SECRET_CANARY" not in result.stdout + result.stderr
+>       assert "Traceback" not in result.stderr
+E       assert 'Traceback' not in "Traceback (...bute 'get'\n"
+E         
+E         'Traceback' is contained here:
+E           Traceback (most recent call last):
+E         ? +++++++++
+E             File "/Users/linmintao/Desktop/开发项目/云端部署/video2md/scripts/check_resolution_annotations.py", line 252, in <module>
+E               raise SystemExit(main())
+E                                ^^^^^^...
+E         
+E         ...Full output truncated (10 lines hidden), use '-vv' to show
+
+tests/test_resolution_annotations.py:192: AssertionError
+_ test_malformed_jsonl_rows_fail_closed_without_disclosing_input[SECRET_CANARY] _
+
+tmp_path = PosixPath('/private/var/folders/1b/7r5v_kjj689_65rpwv0hxg8h0000gn/T/pytest-of-linmintao/pytest-132/test_malformed_jsonl_rows_fail2')
+row = 'SECRET_CANARY'
+
+    @pytest.mark.parametrize("row", [None, [], "SECRET_CANARY", 7, True])
+    def test_malformed_jsonl_rows_fail_closed_without_disclosing_input(tmp_path, row):
+        path = tmp_path / "bad.jsonl"
+        path.write_text(json.dumps(row) + "\n")
+        result = subprocess.run([sys.executable, str(SCRIPT), "--dataset", str(path)],
+                                capture_output=True, text=True)
+        assert result.returncode == 1
+        assert "SECRET_CANARY" not in result.stdout + result.stderr
+>       assert "Traceback" not in result.stderr
+E       assert 'Traceback' not in "Traceback (...bute 'get'\n"
+E         
+E         'Traceback' is contained here:
+E           Traceback (most recent call last):
+E         ? +++++++++
+E             File "/Users/linmintao/Desktop/开发项目/云端部署/video2md/scripts/check_resolution_annotations.py", line 252, in <module>
+E               raise SystemExit(main())
+E                                ^^^^^^...
+E         
+E         ...Full output truncated (10 lines hidden), use '-vv' to show
+
+tests/test_resolution_annotations.py:192: AssertionError
+______ test_malformed_jsonl_rows_fail_closed_without_disclosing_input[7] _______
+
+tmp_path = PosixPath('/private/var/folders/1b/7r5v_kjj689_65rpwv0hxg8h0000gn/T/pytest-of-linmintao/pytest-132/test_malformed_jsonl_rows_fail3')
+row = 7
+
+    @pytest.mark.parametrize("row", [None, [], "SECRET_CANARY", 7, True])
+    def test_malformed_jsonl_rows_fail_closed_without_disclosing_input(tmp_path, row):
+        path = tmp_path / "bad.jsonl"
+        path.write_text(json.dumps(row) + "\n")
+        result = subprocess.run([sys.executable, str(SCRIPT), "--dataset", str(path)],
+                                capture_output=True, text=True)
+        assert result.returncode == 1
+        assert "SECRET_CANARY" not in result.stdout + result.stderr
+>       assert "Traceback" not in result.stderr
+E       assert 'Traceback' not in "Traceback (...bute 'get'\n"
+E         
+E         'Traceback' is contained here:
+E           Traceback (most recent call last):
+E         ? +++++++++
+E             File "/Users/linmintao/Desktop/开发项目/云端部署/video2md/scripts/check_resolution_annotations.py", line 252, in <module>
+E               raise SystemExit(main())
+E                                ^^^^^^...
+E         
+E         ...Full output truncated (10 lines hidden), use '-vv' to show
+
+tests/test_resolution_annotations.py:192: AssertionError
+_____ test_malformed_jsonl_rows_fail_closed_without_disclosing_input[True] _____
+
+tmp_path = PosixPath('/private/var/folders/1b/7r5v_kjj689_65rpwv0hxg8h0000gn/T/pytest-of-linmintao/pytest-132/test_malformed_jsonl_rows_fail4')
+row = True
+
+    @pytest.mark.parametrize("row", [None, [], "SECRET_CANARY", 7, True])
+    def test_malformed_jsonl_rows_fail_closed_without_disclosing_input(tmp_path, row):
+        path = tmp_path / "bad.jsonl"
+        path.write_text(json.dumps(row) + "\n")
+        result = subprocess.run([sys.executable, str(SCRIPT), "--dataset", str(path)],
+                                capture_output=True, text=True)
+        assert result.returncode == 1
+        assert "SECRET_CANARY" not in result.stdout + result.stderr
+>       assert "Traceback" not in result.stderr
+E       assert 'Traceback' not in "Traceback (...bute 'get'\n"
+E         
+E         'Traceback' is contained here:
+E           Traceback (most recent call last):
+E         ? +++++++++
+E             File "/Users/linmintao/Desktop/开发项目/云端部署/video2md/scripts/check_resolution_annotations.py", line 252, in <module>
+E               raise SystemExit(main())
+E                                ^^^^^^...
+E         
+E         ...Full output truncated (10 lines hidden), use '-vv' to show
+
+tests/test_resolution_annotations.py:192: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_resolution_annotations.py::test_malformed_jsonl_rows_fail_closed_without_disclosing_input[None]
+FAILED tests/test_resolution_annotations.py::test_malformed_jsonl_rows_fail_closed_without_disclosing_input[row1]
+FAILED tests/test_resolution_annotations.py::test_malformed_jsonl_rows_fail_closed_without_disclosing_input[SECRET_CANARY]
+FAILED tests/test_resolution_annotations.py::test_malformed_jsonl_rows_fail_closed_without_disclosing_input[7]
+FAILED tests/test_resolution_annotations.py::test_malformed_jsonl_rows_fail_closed_without_disclosing_input[True]
+5 failed, 309 deselected in 0.70s

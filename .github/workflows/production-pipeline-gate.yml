@@ -1,0 +1,62 @@
+name: Production pipeline evidence gate
+
+on:
+  workflow_dispatch:
+    inputs:
+      evidence_file:
+        description: Repository path to sanitized production stage evidence for the tested release
+        required: true
+        type: string
+
+      failure_cost_evidence_file:
+        description: Sanitized current-release evidence for all four failure/cost findings
+        required: true
+        type: string
+      expected_release:
+        description: Exact deployed image or revision tested by failure/cost evidence
+        required: true
+        type: string
+      kaggle_followup_evidence_file:
+        description: Sanitized evidence for all twelve Kaggle and billing follow-up findings
+        required: true
+        type: string
+      expected_gpu_release:
+        description: Exact GPU Router image or revision tested by follow-up evidence
+        required: true
+        type: string
+      expected_run_id:
+        description: Business run submitted through the frontend under acceptance
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  verify-every-stage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require all 24 observed production stages (no paid calls)
+        env:
+          EVIDENCE_FILE: ${{ inputs.evidence_file }}
+        run: python3 scripts/check_production_pipeline_stages.py "$EVIDENCE_FILE"
+      - name: Require dependency, retry, OAuth and supplier debit evidence (no paid calls)
+        if: ${{ always() }}
+        env:
+          FAILURE_COST_EVIDENCE: ${{ inputs.failure_cost_evidence_file }}
+          EXPECTED_RELEASE: ${{ inputs.expected_release }}
+        run: python3 scripts/check_production_failure_cost.py "$FAILURE_COST_EVIDENCE" --expected-release "$EXPECTED_RELEASE"
+      - name: Require all twelve Kaggle and billing follow-up cases (no paid calls)
+        if: ${{ always() }}
+        env:
+          FOLLOWUP_EVIDENCE: ${{ inputs.kaggle_followup_evidence_file }}
+          EXPECTED_RELEASE: ${{ inputs.expected_release }}
+          EXPECTED_GPU_RELEASE: ${{ inputs.expected_gpu_release }}
+          EXPECTED_RUN_ID: ${{ inputs.expected_run_id }}
+        run: >-
+          python3 scripts/check_kaggle_followup.py "$FOLLOWUP_EVIDENCE"
+          --expected-release "$EXPECTED_RELEASE"
+          --expected-gpu-release "$EXPECTED_GPU_RELEASE"
+          --expected-run-id "$EXPECTED_RUN_ID"

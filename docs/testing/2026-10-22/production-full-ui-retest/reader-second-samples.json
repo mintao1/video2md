@@ -1,0 +1,32 @@
+[
+  {
+    "elapsed_ms": 2,
+    "dom": {
+      "decodedImages": 0,
+      "imageCount": 0,
+      "loadingCount": 36,
+      "videos": [],
+      "visibility": "visible"
+    }
+  },
+  {
+    "elapsed_ms": 53056,
+    "dom": {
+      "decodedImages": 0,
+      "imageCount": 0,
+      "loadingCount": 36,
+      "videos": [],
+      "visibility": "visible"
+    }
+  },
+  {
+    "elapsed_ms": 89115,
+    "dom": {
+      "decodedImages": 1,
+      "imageCount": 1,
+      "loadingCount": 35,
+      "videos": [],
+      "visibility": "visible"
+    }
+  }
+]

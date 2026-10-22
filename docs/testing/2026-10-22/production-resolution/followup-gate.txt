@@ -1,0 +1,2 @@
+FAIL
+- kfi-012: missing, blocked or inconsistent evidence

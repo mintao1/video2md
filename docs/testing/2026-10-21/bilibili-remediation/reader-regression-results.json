@@ -1,0 +1,21 @@
+{
+  "integration": {
+    "passed": 42,
+    "failed": 0
+  },
+  "regression": {
+    "passed": 1,
+    "failed": 0
+  },
+  "build": "PASS",
+  "cases": [
+    "ready image publishes before slow video",
+    "pending and failed labels differ",
+    "chapter leave revokes blob URLs and ignores late response",
+    "network transfer retries once; permanent HTTP errors do not retry",
+    "truncated range retries the same offset, exact reconstructed bytes",
+    "ETag change rejects mixed versions",
+    "transport retry bound and HTTP permission errors",
+    "actual FastAPI 206 response retains owner check"
+  ]
+}

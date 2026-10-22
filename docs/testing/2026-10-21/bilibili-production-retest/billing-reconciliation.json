@@ -1,0 +1,41 @@
+{
+  "run_id": "3c05faf8",
+  "status": "partial",
+  "usage": {
+    "gpu_s": 1460.57,
+    "llm_in_tok": 19169,
+    "llm_out_tok": 23495,
+    "llm_cached_in_tok": 9344
+  },
+  "expected_cost_usd": 0.013502,
+  "actual_cost_usd": 0.013502,
+  "cost_formula_matches": true,
+  "monthly_deltas": {
+    "spend_usd": 0.013502,
+    "llm_in_tok": 19169,
+    "llm_out_tok": 23495,
+    "gpu_s": 1460.57,
+    "runs_n": 1
+  },
+  "monthly_matches_run": true,
+  "all_two_notes_present": false,
+  "partial_failures": {
+    "ocr": [
+      "1"
+    ],
+    "note": [
+      "1",
+      "2"
+    ],
+    "clips": [
+      "1",
+      "2"
+    ]
+  },
+  "successful_stage_gpu_seconds": 354.994,
+  "failed_remote_stage_wall_seconds": 1105.677,
+  "all_remote_stage_wall_seconds_estimate": 1460.671,
+  "all_remote_stage_wall_matches_usage_within_1s": true,
+  "gpu_scope": "Remote stage wall-clock time; free GPU policy. Not hardware busy sampling.",
+  "billing_scope": "Application cost attribution, not supplier cash invoice reconciliation."
+}

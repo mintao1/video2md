@@ -1,0 +1,74 @@
+{
+  "kind": "provider_ui_export_redacted",
+  "items_total": 97,
+  "truncated": false,
+  "sha256": "29cfd66ab4e286a84b4411723f188e89a1c766fe7064eb0e2493569134661cc1",
+  "requests": [
+    {
+      "requestID": "01a160ed-a3e5-7ec6-b960-556718485e55",
+      "sessionID": "video2md-8c5d87f3",
+      "model": "glm-5.3-flash",
+      "statusCode": 200,
+      "inputTokens": 3319,
+      "outputTokens": 80,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "cost": 0.00053785
+    },
+    {
+      "requestID": "01a160ec-3cab-7852-8bd6-6fc5c8ee6bd4",
+      "sessionID": "video2md-8c5d87f3",
+      "model": "glm-5.3-flash",
+      "statusCode": 200,
+      "inputTokens": 15303,
+      "outputTokens": 3222,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "cost": 0.00390645
+    },
+    {
+      "requestID": "01a160ec-30e8-77e0-b750-b195c67d9d11",
+      "sessionID": "video2md-8c5d87f3",
+      "model": "glm-5.3-flash",
+      "statusCode": 200,
+      "inputTokens": 3177,
+      "outputTokens": 90,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "cost": 0.00052155
+    },
+    {
+      "requestID": "01a160eb-232a-726b-b481-66502ca831ad",
+      "sessionID": "video2md-8c5d87f3",
+      "model": "glm-5.3-flash",
+      "statusCode": 200,
+      "inputTokens": 13063,
+      "outputTokens": 3099,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "cost": 0.00350895
+    },
+    {
+      "requestID": "01a160e0-992d-7e7d-a5ac-dcbf983dd37a",
+      "sessionID": "video2md-8c5d87f3",
+      "model": "glm-5.3-flash",
+      "statusCode": 200,
+      "inputTokens": 32239,
+      "outputTokens": 4000,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "cost": 0.00683585
+    },
+    {
+      "requestID": "01a160df-b1c1-79d6-b5d4-99828383b6f7",
+      "sessionID": "video2md-8c5d87f3",
+      "model": "glm-5.3-flash",
+      "statusCode": 200,
+      "inputTokens": 32239,
+      "outputTokens": 4000,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "cost": 0.00683585
+    }
+  ]
+}

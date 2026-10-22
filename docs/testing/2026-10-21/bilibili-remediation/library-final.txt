@@ -1,0 +1,115 @@
+- banner:
+  - generic: menu_book
+  - generic: 视书
+  - generic: · Textbook Library
+  - button "通知":
+    - generic: notifications
+  - link "M":
+    - /url: /profile
+  - button "退出登录": 退出
+- main:
+  - generic: search
+  - textbox "搜索已生成的教材、科目或知识点..."
+  - button "auto_stories 全部教材 (2)":
+    - generic: auto_stories
+    - generic: 全部教材
+    - generic: (2)
+  - button "计算机 / AI":
+    - generic: 计算机 / AI
+  - button "数学基础":
+    - generic: 数学基础
+  - button "商业管理":
+    - generic: 商业管理
+  - button "语言学习":
+    - generic: 语言学习
+  - button "bookmark 收藏夹":
+    - generic: bookmark
+    - generic: 收藏夹
+  - generic: menu_book
+  - generic: 最近在读 · 进度 100%
+  - generic: 已转录 2/2 讲
+  - generic: auto_stories
+  - paragraph: 学PPT该学哪些技能
+  - generic: auto_awesome
+  - generic: 学PPT该学哪些技能：会做巧做好用漂亮
+  - paragraph: https://www.bilibili.com/video/BV1vV411k7GB/
+  - button "play_circle 继续阅读":
+    - generic: play_circle
+    - generic: 继续阅读
+  - button "查看全书目录":
+    - generic: account_tree
+  - heading "智能教材架" [level=2]
+  - generic: 共 2 本
+  - button "网格视图":
+    - generic: grid_view
+  - button "列表视图":
+    - generic: view_agenda
+  - article:
+    - generic: auto_stories
+    - paragraph: 学PPT该学哪些技能
+    - generic: 2 讲
+    - generic: 已完成
+    - generic: school
+    - generic: B站
+    - button "收藏本书":
+      - generic: bookmark_border
+    - heading "学PPT该学哪些技能：会做巧做好用漂亮" [level=3]
+    - paragraph: https://www.bilibili.com/video/BV1vV411k7GB/
+    - generic: 已转录 2/2 讲
+    - generic: 100%
+    - button "menu_book 继续阅读":
+      - generic: menu_book
+      - generic: 继续阅读
+    - button "format_list_bulleted 目录 (2)":
+      - generic: format_list_bulleted
+      - generic: 目录 (2)
+    - button "download":
+      - generic: download
+    - button "share":
+      - generic: share
+  - article:
+    - generic: auto_stories
+    - paragraph: 数据库索引原理与查询
+    - generic: 1 讲
+    - generic: 已完成
+    - generic: school
+    - generic: ferosse.tech
+    - button "收藏本书":
+      - generic: bookmark_border
+    - heading "数据库索引原理与查询优化" [level=3]
+    - paragraph: https://ferosse.tech/test-assets/billing-index-lesson.mp4
+    - generic: 已转录 1/1 讲
+    - generic: 100%
+    - button "menu_book 继续阅读":
+      - generic: menu_book
+      - generic: 继续阅读
+    - button "format_list_bulleted 目录 (1)":
+      - generic: format_list_bulleted
+      - generic: 目录 (1)
+    - button "download":
+      - generic: download
+    - button "share":
+      - generic: share
+  - generic: cloud_sync
+  - generic: 全端书籍与笔记自动同步已开启
+  - generic: 上次同步于 16:33
+  - button "立即同步 sync":
+    - generic: 立即同步
+    - generic: sync
+- navigation:
+  - link "motion_photos_on 排队处理":
+    - /url: /tasks
+    - generic: motion_photos_on
+    - generic: 排队处理
+  - link "local_library 教材库":
+    - /url: /library
+    - generic: local_library
+    - generic: 教材库
+  - link "add 新建转换":
+    - /url: /tasks?openImport=1
+    - generic: add
+    - generic: 新建转换
+  - link "person 我的":
+    - /url: /profile
+    - generic: person
+    - generic: 我的

@@ -1,0 +1,16 @@
+........................................................................ [ 47%]
+........................................................................ [ 94%]
+.....F...                                                                [100%]
+=================================== FAILURES ===================================
+_____________ test_test_files_are_actually_in_required_ci_commands _____________
+
+    def test_test_files_are_actually_in_required_ci_commands():
+        workflow = yaml.safe_load((ROOT / '.github/workflows/ci.yml').read_text())
+        commands = '\n'.join(step.get('run', '') for step in workflow['jobs']['test']['steps'])
+>       assert 'tests/test_kaggle_followup_eval_set.py' in commands
+E       AssertionError: assert 'tests/test_kaggle_followup_eval_set.py' in '\n\nsudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg\nuv sync --frozen\nuv run pytest te...thon3 tests/test_rescue_pg.py\n\nbash scripts/smoke_ci.sh\nbash scripts/smoke_proxy.sh\nbash scripts/smoke_replicas.sh'
+
+backend/tests/test_kaggle_followup_eval_set.py:97: AssertionError
+=========================== short test summary info ============================
+FAILED backend/tests/test_kaggle_followup_eval_set.py::test_test_files_are_actually_in_required_ci_commands
+1 failed, 152 passed in 0.21s

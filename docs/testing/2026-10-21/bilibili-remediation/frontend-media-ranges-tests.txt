@@ -1,0 +1,63 @@
+
+> web@0.0.0 test:integration
+> node --test tests/*.integration.test.mjs
+
+<Suspense> is an experimental feature and its API will likely change.
+✔ consuming the import query preserves task state while reader query changes still remount (46.213208ms)
+✔ brand home owns the OAuth entry and the standalone login page stays deleted (12.4195ms)
+✔ production brand-login evaluation set forbids standalone and mock login regressions (12.706292ms)
+✔ every authentication exit targets the brand home instead of a standalone login route (20.638417ms)
+✔ production source contains no mock API or mock authentication route (3.135ms)
+4:53:22 PM [vite] (client) Re-optimizing dependencies because vite config has changed
+✔ resumes at the failed range and reconstructs the exact authenticated video (983.051625ms)
+✔ rejects a changed file without mixing two versions (1.271584ms)
+✔ bounds transport retries and preserves HTTP permission failures (0.530583ms)
+▶ queue store → HTTP client → FastAPI
+  ✔ loads only the signed-in owner’s tasks and real progress (66.1545ms)
+  ✔ keeps tasks unchanged when time passes without backend progress (112.799792ms)
+  ✔ observes a backend completion during automatic refresh (33.312916ms)
+  ✔ cancels a queued task persistently through HTTP (20.334875ms)
+  ✔ does not present cancellation as a resumable pause (24.282ms)
+  ✔ rejects cancellation of a finished task without changing its status (10.885917ms)
+  ✔ rejects another owner’s cancellation and preserves their task (9.55575ms)
+  ✔ rejects requests without usable credentials (7.246042ms)
+  ✔ keeps a deleted task absent after a fresh backend list (13.2665ms)
+  ✔ rejects retrying a completed task (8.456875ms)
+  ✔ persists queue promotion and returns its new position (12.927959ms)
+  ✔ retries a cancelled task and persists its queued state (16.304583ms)
+  ✔ rejects deleting active work or changing another owner’s task (7.152709ms)
+✔ queue store → HTTP client → FastAPI (2358.042125ms)
+▶ library live adapter → FastAPI preferences and notes
+  ✔ persists favorites and progress across independent list requests (12.998541ms)
+  ✔ does not disclose Alice’s preferences to Bob (8.052209ms)
+  ✔ loads actual note content from the backend (5.597875ms)
+✔ library live adapter → FastAPI preferences and notes (26.77375ms)
+✔ fetches referenced media as an authenticated binary response (8.801541ms)
+✔ reports unavailable bundles instead of a fake successful download (5.152209ms)
+✔ persists private LLM settings through the live API without returning or caching its key (13.592875ms)
+✔ preserves real run usage and redacted failure diagnostics through HTTP, adapter and rendered card (153.312875ms)
+✔ loads actual monthly billing details and renders per-run usage instead of an inert placeholder (15.222208ms)
+✔ keeps a billed partial run without a note out of the library and disables reading (9.785792ms)
+✔ reuses a queued submission without duplicating the frontend row (11.42675ms)
+✔ renders API rejection persistently inside the still-open import sheet (29.000209ms)
+✔ preserves tasks and billing on an actual HTTP 422 rejection and renders its message (10.848666ms)
+✔ preserves tasks and billing on an actual HTTP 429 rejection and renders its message (11.334541ms)
+WebSocket server error: Port 24678 is already in use
+4:53:22 PM [vite] (client) Re-optimizing dependencies because vite config has changed
+✔ keeps invalid and fractional chapter parameters inside the note array (964.199833ms)
+✔ renders Obsidian image and video references as actual media elements (7.705583ms)
+✔ escapes unavailable media names and refuses arbitrary external URLs (7.434833ms)
+✔ shows a ready image while a slower clip is still loading, then reports a failed clip (0.73575ms)
+✔ releases loaded URLs and ignores late media after leaving a chapter (3.339334ms)
+✔ retries a broken media transfer once without retrying HTTP rejections (0.341083ms)
+WebSocket server error: Port 24678 is already in use
+✔ an unresolved submission visibly waits, blocks duplicates, then restores the input on failure (1269.997208ms)
+✔ the import sheet exposes pending feedback and disables its submit action (1.126833ms)
+ℹ tests 42
+ℹ suites 2
+ℹ pass 42
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3134.428625

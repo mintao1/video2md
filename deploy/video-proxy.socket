@@ -1,0 +1,9 @@
+[Unit]
+Description=Video2MD container-only video proxy socket
+
+[Socket]
+ListenStream=172.18.0.1:17897
+Accept=no
+
+[Install]
+WantedBy=sockets.target

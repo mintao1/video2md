@@ -1,0 +1,12 @@
+✔ pua-001 submits explicitly entered URL key and model and clears the key after success (400.045333ms)
+✔ pua-002 reopens persisted settings without echoing or locally storing the key (2.057375ms)
+✔ pua-001 save errors never display success or discard the entered configuration (1.338541ms)
+✔ pua-001 missing initial key or unavailable settings cannot submit a save (1.239667ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 779.365833

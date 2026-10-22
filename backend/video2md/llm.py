@@ -18,11 +18,13 @@ import json
 import re
 import time
 from pathlib import Path
+from urllib.parse import urlsplit
+from uuid import uuid4
 
 import httpx
 
 from .config import ENV
-from .util import current_log, redact
+from .util import current_log, current_run_id, redact
 
 _PROMPT_DIR = Path(__file__).parent / "prompts"
 
@@ -107,58 +109,95 @@ def chat(system: str, user: str, *, task: str, temperature: float, max_tokens: i
     if not base or not key:
         raise SystemExit("LLM_BASE_URL / LLM_API_KEY 未配置：写入 .env 或环境变量")
     use_model = model or (settings.get("model") if settings else None) or LLM_MODEL
+    headers = {"Authorization": f"Bearer {key}", "User-Agent": "video2md/0.2.0"}
+    if urlsplit(base).hostname == "opencode.ai":
+        # Identify the real application, and share one session across a run's
+        # stages/retries. No account identity or credentials go into this header.
+        headers["x-opencode-session"] = f"video2md-{current_run_id() or uuid4().hex}"
     payload = {"model": use_model, "temperature": temperature, "max_tokens": max_tokens,
                "stream": True, "stream_options": {"include_usage": True},
                "messages": [{"role": "system", "content": system},
                             {"role": "user", "content": user}]}
-    meta: dict = {}
+    combined: dict = {}
+    status, text = "failed", ""
+    made_attempts = 0
     last_err = ""
     t0 = time.monotonic()
-    for attempt in range(attempts):
-        meta = {}
-        try:
-            with httpx.Client(transport=_TRANSPORT) as client:
-                with client.stream("POST", f"{base}/chat/completions", json=payload,
-                                   headers={"Authorization": f"Bearer {key}"},
-                                   timeout=httpx.Timeout(30.0, read=600.0)) as r:
-                    if r.status_code != 200:
-                        r.read()
-                        # 中转不认识 stream_options → 摘掉重建 payload 重试：
-                        #   400 点名字段（旧中转）；5xx 甩锅上游（mimo 实测 2026-10-13：
-                        #   流式带 stream_options 回 500 "Upstream Response Error"，
-                        #   同请求摘掉即 200）——摘掉只丢 usage 尾 chunk，无害，至多摘一次
-                        if "stream_options" in payload and (
-                                (r.status_code == 400 and "stream_options" in r.text)
-                                or r.status_code >= 500):
-                            payload.pop("stream_options")
-                            last_err = f"HTTP {r.status_code}: 摘掉 stream_options 重试"
-                            continue
-                        # 429/5xx 可重试；其余 4xx（401/403/参数错）重试无意义，响亮失败
-                        if r.status_code != 429 and r.status_code < 500:
-                            detail = "请检查 API URL、Key、模型和上游余额" if settings else r.text[:300]
-                            raise RuntimeError(f"LLM 请求失败 HTTP {r.status_code}: {detail}")
-                        last_err = f"HTTP {r.status_code}" if settings else f"HTTP {r.status_code}: {r.text[:200]}"
-                    else:
-                        text, parse_err = "", ""
-                        try:
-                            text = _collect_stream(r, meta)
-                        except Exception as exc:
-                            # 非流式兼容路径的畸形 JSON 等：当中转故障处理，进统一重试
-                            parse_err = f"回包解析失败：{redact(str(exc).replace(key, '<REDACTED>'))[:150]}"
-                        if text.strip():
-                            _llm_observed(task, "ok", t0, attempt + 1, meta, span_rec,
-                                          system, user, text, use_model)
-                            return text
-                        # 空回包/畸形回包：中转把上游异常包成 HTTP 200（实测 2026-09-22：
-                        # 524 后重试拿到 200 空流）。视同可重试错误，不静默返回空串
-                        last_err = parse_err or "空回包（HTTP 200 但零内容）"
-        except httpx.HTTPError as exc:
-            last_err = redact(str(exc).replace(key, '<REDACTED>'))[:300]
-        if attempt < attempts - 1:
-            print(f"  ⚠ LLM {task} 第 {attempt + 1} 次调用失败（{last_err[:80]}），30s 后重试")
-            _sleep(30)
-    _llm_observed(task, "failed", t0, attempts, meta, span_rec, system, user, "", use_model)
-    raise RuntimeError(f"LLM {task} 连续 {attempts} 次失败：{last_err}")
+    try:
+        for attempt in range(attempts):
+            meta: dict = {"attempt": attempt + 1, "outcome": "failed"}
+            made_attempts = attempt + 1
+            try:
+                with httpx.Client(transport=_TRANSPORT) as client:
+                    with client.stream("POST", f"{base}/chat/completions", json=payload,
+                                       headers=headers,
+                                       timeout=httpx.Timeout(30.0, read=600.0)) as r:
+                        meta["http_status"] = r.status_code
+                        if r.status_code != 200:
+                            r.read()
+                            # 中转不认识 stream_options → 摘掉重建 payload 重试：
+                            #   400 点名字段（旧中转）；5xx 甩锅上游（mimo 实测 2026-10-13：
+                            #   流式带 stream_options 回 500 "Upstream Response Error"，
+                            #   同请求摘掉即 200）——摘掉只丢 usage 尾 chunk，无害，至多摘一次
+                            if "stream_options" in payload and (
+                                    (r.status_code == 400 and "stream_options" in r.text)
+                                    or r.status_code >= 500):
+                                payload.pop("stream_options")
+                                last_err = f"HTTP {r.status_code}: 摘掉 stream_options 重试"
+                                continue
+                            # 429/5xx 可重试；其余 4xx（401/403/参数错）重试无意义，响亮失败
+                            if r.status_code != 429 and r.status_code < 500:
+                                detail = "请检查 API URL、Key、模型和上游余额" if settings else r.text[:300]
+                                raise RuntimeError(f"LLM 请求失败 HTTP {r.status_code}: {detail}")
+                            last_err = f"HTTP {r.status_code}" if settings else f"HTTP {r.status_code}: {r.text[:200]}"
+                        else:
+                            text, parse_err = "", ""
+                            try:
+                                text = _collect_stream(r, meta)
+                            except Exception as exc:
+                                # 非流式兼容路径的畸形 JSON 等：当中转故障处理，进统一重试
+                                parse_err = f"回包解析失败：{redact(str(exc).replace(key, '<REDACTED>'))[:150]}"
+                            if text.strip():
+                                status = "ok"
+                                meta["outcome"] = "success"
+                                return text
+                            # 空回包/畸形回包：中转把上游异常包成 HTTP 200（实测 2026-09-22：
+                            # 524 后重试拿到 200 空流）。视同可重试错误，不静默返回空串
+                            meta["outcome"] = "parse_failure" if parse_err else "empty"
+                            last_err = parse_err or "空回包（HTTP 200 但零内容）"
+            except httpx.HTTPError as exc:
+                last_err = redact(str(exc).replace(key, '<REDACTED>'))[:300]
+            finally:
+                _accumulate_llm_meta(combined, meta)
+            if attempt < attempts - 1:
+                print(f"  ⚠ LLM {task} 第 {attempt + 1} 次调用失败（{last_err[:80]}），30s 后重试")
+                _sleep(30)
+        raise RuntimeError(f"LLM {task} 连续 {attempts} 次失败：{last_err}")
+
+    finally:
+        _llm_observed(task, status, t0, made_attempts, combined, span_rec,
+                      system, user, text if status == "ok" else "", use_model)
+
+
+def _accumulate_llm_meta(combined: dict, attempt: dict) -> None:
+    """One final usage snapshot per HTTP attempt, including failed/empty attempts.
+
+    SSE usage chunks are cumulative within a request; _collect_stream keeps the
+    last snapshot. Sum only across requests and never invent missing usage.
+    """
+    def add(target: dict, source: dict) -> None:
+        for key, value in source.items():
+            if isinstance(value, dict):
+                add(target.setdefault(key, {}), value)
+            elif type(value) is int:
+                target[key] = target.get(key, 0) + value
+
+    observed = {key: attempt[key] for key in ("attempt", "outcome", "http_status", "usage") if key in attempt}
+    combined.setdefault("attempt_usage", []).append(observed)
+    if attempt.get("usage"):
+        add(combined.setdefault("usage", {}), attempt["usage"])
+    if "ttft_ms" in attempt and "ttft_ms" not in combined:
+        combined["ttft_ms"] = attempt["ttft_ms"]
 
 
 
@@ -173,6 +212,9 @@ def _llm_observed(task: str, status: str, t0: float, attempts: int, meta: dict,
     if span_rec is not None:
         span_rec["model"] = model or LLM_MODEL
         span_rec["attempts"] = attempts
+        span_rec["attempt_usage"] = meta.get("attempt_usage", [])
+        span_rec["usage_complete"] = bool(span_rec["attempt_usage"]) and all(
+            bool(item.get("usage")) for item in span_rec["attempt_usage"])
         span_rec["prompt_chars"] = len(system) + len(user)
         span_rec["completion_chars"] = len(text)
         if meta.get("ttft_ms") is not None:
@@ -190,7 +232,8 @@ def _llm_observed(task: str, status: str, t0: float, attempts: int, meta: dict,
     observability.metric_llm(task, status, secs, in_tok, out_tok)
     if in_tok or out_tok:  # P2-2 用量归因：run 上下文内累计（CLI/测试直调不记）
         from .runs import bump_usage
-        bump_usage(llm_in_tok=in_tok, llm_out_tok=out_tok)
+        cached = (usage.get("prompt_tokens_details") or {}).get("cached_tokens", 0)
+        bump_usage(llm_in_tok=in_tok, llm_out_tok=out_tok, llm_cached_in_tok=int(cached or 0))
 
 
 

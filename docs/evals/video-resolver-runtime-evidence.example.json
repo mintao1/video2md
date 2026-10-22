@@ -1,0 +1,6 @@
+{"results":[
+  {"id":"vrr-001","passed":false,"observed":"pending: record sanitized executable path class and version"},
+  {"id":"vrr-002","passed":false,"observed":"pending: resolve the controlled MP4 in the production API container"},
+  {"id":"vrr-003","passed":false,"observed":"pending: record a redacted run id and persistence count"},
+  {"id":"vrr-004","passed":false,"observed":"pending: record run-bound usage, cost and refresh idempotency"}
+]}

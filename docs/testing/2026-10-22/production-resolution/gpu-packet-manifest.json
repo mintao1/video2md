@@ -1,0 +1,9 @@
+{
+  "base_image": "gpu-router:0.2.3-ocr-input-20261022d",
+  "image": "gpu-router:0.2.3-ocr-packet-20261022e",
+  "changed_methods": [
+    "ocr"
+  ],
+  "worker_unchanged": true,
+  "source_sha256": "784e74db4679807ff53aa4caf40e14febb16ebd709dd874f2215512ef4dd8369"
+}

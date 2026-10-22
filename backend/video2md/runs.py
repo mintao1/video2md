@@ -5,6 +5,7 @@ import contextlib
 import fcntl
 import hashlib
 import json
+import math
 import os
 import re
 import sys
@@ -342,14 +343,20 @@ def _run_stage(run: dict, stage: str, args: dict) -> None:
 # 落记录（_drive finally → settle_cost）——阶段 merge 不逐次带出（省写放大）。
 # 诚实口径：①崩溃丢未结算 usage（恢复重投会重新累计，不重复计费）；②GPU 按「远程调用
 # 墙钟时长」记（含传输/排队，是上界不是 GPU 占用真值——P1-6 同款上界纪律）；
-# ③重投/续跑幂等：记录已有 cost_usd 不重算。
+# ③每批累计仅消费一次；续跑新增消耗叠加到历史结算。
 # 结算单价，模块级可测（import 位置在函数定义之后——E402 已豁免）
-from .config import PRICE_GPU_MIN, PRICE_LLM_IN_MTOK, PRICE_LLM_OUT_MTOK  # noqa: E402
+from .config import (  # noqa: E402
+    PRICE_GPU_MIN,
+    PRICE_LLM_CACHED_IN_MTOK,
+    PRICE_LLM_IN_MTOK,
+    PRICE_LLM_OUT_MTOK,
+)
 
 _USAGE: dict[str, dict] = {}
 
 
-def bump_usage(*, llm_in_tok: int = 0, llm_out_tok: int = 0, gpu_s: float = 0.0) -> None:
+def bump_usage(*, llm_in_tok: int = 0, llm_out_tok: int = 0, gpu_s: float = 0.0,
+               llm_cached_in_tok: int = 0) -> None:
     """当前 run 的用量累计（ContextVar 定位 run；未绑定=CLI/测试直调，静默跳过）。"""
     rid = current_run_id()
     if not rid:
@@ -358,26 +365,62 @@ def bump_usage(*, llm_in_tok: int = 0, llm_out_tok: int = 0, gpu_s: float = 0.0)
     u["llm_in_tok"] += int(llm_in_tok)
     u["llm_out_tok"] += int(llm_out_tok)
     u["gpu_s"] = round(u["gpu_s"] + float(gpu_s), 3)
+    if llm_cached_in_tok:
+        u["llm_cached_in_tok"] = u.get("llm_cached_in_tok", 0) + min(max(0, int(llm_cached_in_tok)), int(llm_in_tok))
+
+
+def _add_usage_settlement(run: dict, delta: dict) -> dict:
+    """Add one newly consumed batch, preserving prior usage and correction audits."""
+    prior = run.get("usage") or {}
+    usage = {**prior}
+    for key in ("llm_in_tok", "llm_out_tok", "llm_cached_in_tok"):
+        usage[key] = int(prior.get(key, 0)) + int(delta.get(key, 0))
+    usage["gpu_s"] = round(float(prior.get("gpu_s", 0)) + float(delta.get("gpu_s", 0)), 3)
+    cached = min(delta.get("llm_cached_in_tok", 0), delta.get("llm_in_tok", 0))
+    cost_delta = ((delta.get("llm_in_tok", 0) - cached) / 1e6 * PRICE_LLM_IN_MTOK
+                  + cached / 1e6 * PRICE_LLM_CACHED_IN_MTOK
+                  + delta.get("llm_out_tok", 0) / 1e6 * PRICE_LLM_OUT_MTOK
+                  + delta.get("gpu_s", 0) / 60 * PRICE_GPU_MIN)
+    pricing = {"llm_in_mtok": PRICE_LLM_IN_MTOK, "llm_out_mtok": PRICE_LLM_OUT_MTOK,
+               "llm_cached_in_mtok": PRICE_LLM_CACHED_IN_MTOK, "gpu_min": PRICE_GPU_MIN,
+               "gpu_policy": ENV.get("V2MD_GPU_PRICE_POLICY", "metered"), "currency": "USD"}
+    run["cost_usd"] = round(float(run.get("cost_usd") or 0) + cost_delta, 6)
+    run["usage"] = usage
+    run["cost_pricing"] = pricing
+    run.setdefault("usage_settlements", []).append({
+        "id": uuid.uuid4().hex, "at": datetime.now().isoformat(),
+        "usage_delta": dict(delta), "attribution_usd": cost_delta, "pricing": pricing})
+    return run
 
 
 def settle_cost(run_id: str) -> dict | None:
-    """终态结算：usage × 单价表 → cost_usd + usage 随 run 记录落盘（幂等）。
+    """Consume the current batch once; a resumed run adds to its prior settlement.
 
-    单价读 config 常量（结算时刻的价）；全 0 时 cost_usd=0 但 usage 仍落——
-    先记账后定价，历史 run 可离线重估价（usage 是原始凭据）。
+    A previous cost is not an idempotency key: retries can make new paid calls.
+    Removing the current accumulator makes repeated settlement a no-op. PG locks
+    the selected row while merging so concurrent metadata/usage cannot be lost.
     """
     u = _USAGE.pop(run_id, None)
     if not u or not any(u.values()):
         return None
+    run: dict | None
+    be = _runs_backend()
+    if be is not None:
+        from psycopg.types.json import Json
+        with be.pool.connection() as conn, conn.transaction():
+            row = conn.execute("SELECT record FROM v2md_runs WHERE run_id=%s FOR UPDATE",
+                               (run_id,)).fetchone()
+            if row is None:
+                return None
+            run = _add_usage_settlement(row[0], u)
+            conn.execute("UPDATE v2md_runs SET record=%s::jsonb, updated=now() WHERE run_id=%s",
+                         (Json(run), run_id))
+            return run
     with _runs_file_lock():
         run = _load_runs().get(run_id)
-        if not run or run.get("cost_usd") is not None:
-            return run  # 幂等：重投/已结算不重复计费
-        run["usage"] = u
-        run["cost_usd"] = round(
-            u["llm_in_tok"] / 1e6 * PRICE_LLM_IN_MTOK
-            + u["llm_out_tok"] / 1e6 * PRICE_LLM_OUT_MTOK
-            + u["gpu_s"] / 60 * PRICE_GPU_MIN, 6)
+        if not run:
+            return None
+        run = _add_usage_settlement(run, u)
         _runs_merge(run)
         return run
 
@@ -429,7 +472,37 @@ def _check_cancel(run_id: str) -> None:
         raise SystemExit("用户取消（cancelled）：条目循环头拦截")
 
 
+def _stage_proof(stage: str, art: dict, tmp: Path, args: dict, elapsed: float, gpu_s: float) -> dict:
+    """Persist only measurements, never media content, transcript or credentials."""
+    proof: dict = {"duration_s": round(elapsed, 6), "gpu_seconds": round(gpu_s, 3)}
+    if stage == "download" and art.get("video"):
+        proof["bytes"] = Path(art["video"]).stat().st_size
+    elif stage == "transcribe":
+        segs = art.get("segs") or []
+        proof.update(segments=len(segs), transcript_nonempty=any(str(s.get("text") or "").strip() for s in segs),
+                     timestamped_segments=bool(segs) and all(
+                         math.isfinite(float(s.get("start", -1))) and math.isfinite(float(s.get("end", -1)))
+                         and 0 <= float(s.get("start", -1)) <= float(s.get("end", -1)) <= float(art.get("duration", 0)) + 1
+                         for s in segs))
+    elif stage == "frames":
+        cands = art.get("candidates") or []
+        paths = [_cand_path(rel, tmp) for _, rel in cands]
+        proof.update(candidate_count=len(cands), max_frames=frame_pool_size(int(args.get("max_frames") or 60),
+                     art.get("ocr_engine") or "remote"), files_nonempty=bool(paths) and all(p.is_file() and p.stat().st_size > 0 for p in paths),
+                     timestamps_valid=bool(cands) and all(math.isfinite(float(t)) and 0 <= float(t) <= float(art.get("duration", 0)) for t, _ in cands))
+    elif stage == "ocr":
+        proof.update(frames_requested=len(art.get("candidates") or []),
+                     frames_completed=len(art.get("ocr_raw") or []))
+    elif stage == "select":
+        proof.update(selected_count=len(art.get("selected") or []), mode=art.get("selection_mode"))
+    elif stage == "clips":
+        proof.update(device="gpu" if gpu_s > 0 else "cpu", requested=len(art.get("published") or []),
+                     completed=sum(bool(value) for value in (art.get("clips") or {}).values()))
+    return proof
+
+
 def _run_stage_inner(run: dict, stage: str, args: dict, log: "RunLog") -> None:
+    started = time.monotonic()
     tmp = Path(run["tmp"])
     tmp.mkdir(parents=True, exist_ok=True)  # 目录丢了（系统清理/上轮异常中断）会让 download 直接 ENOENT
     failed: list[str] = []
@@ -450,7 +523,8 @@ def _run_stage_inner(run: dict, stage: str, args: dict, log: "RunLog") -> None:
         # （实测 2e6466b7：download 全成 → transcribe 熔 → 重驱动若逐条重下载+重转录，
         # 每条多花 5min 只为撞同一个 colab 回收）。各阶段函数本有产物守卫，这里只是
         # 把「跳过」提前到循环头、与 skipped 同款留痕。
-        if ok_field and art.get(ok_field):
+        cached_ocr_failed = stage == "ocr" and any(row[3] for row in art.get("ocr_raw", []) or [])
+        if ok_field and art.get(ok_field) and not cached_ocr_failed:
             print(f"    ⏭ 条目 {idx}/{len(run['entries'])} {stage} 已有产物，跳过")
             continue
         print(f"    · 条目 {idx}/{len(run['entries'])}：{stage}")
@@ -459,6 +533,8 @@ def _run_stage_inner(run: dict, stage: str, args: dict, log: "RunLog") -> None:
         etmp = tmp if len(run["entries"]) == 1 else tmp / f"e{idx:02d}"
         etmp.mkdir(parents=True, exist_ok=True)
         err_msg = ""
+        entry_started = time.monotonic()
+        gpu_before = _USAGE.get(run["run_id"], {}).get("gpu_s", 0)
         eid = entry.get("id") or entry.get("url", "")[-24:]
         # span 名保持低基数（动态值进 attribute 不进名字——Langfuse 按名过滤/建 evaluator）
         with log.span(f"entry {idx}/{len(run['entries'])} {stage}") as sp:
@@ -473,6 +549,14 @@ def _run_stage_inner(run: dict, stage: str, args: dict, log: "RunLog") -> None:
             if err_msg:
                 sp["force_status"] = "failed"  # span 记失败，但条目级失败不阻断其余条目
                 sp["error"] = err_msg[:200]
+        if not err_msg:
+            try:
+                proof = _stage_proof(stage, art, etmp, args, time.monotonic() - entry_started,
+                                     _USAGE.get(run["run_id"], {}).get("gpu_s", 0) - gpu_before)
+            except Exception as exc:
+                # Missing measurements block acceptance, not otherwise valid production work.
+                proof = {"measurement_error": type(exc).__name__}
+            art.setdefault("stage_metrics", {})[stage] = proof
         if not err_msg:
             streak, last_sig = 0, ""  # 成功即重置：熔断只数「连续」同因失败
             continue
@@ -497,7 +581,8 @@ def _run_stage_inner(run: dict, stage: str, args: dict, log: "RunLog") -> None:
                        if not (a := run["artifacts"].get(e["url"], {})).get("skipped")
                        and not (a.get("note") and Path(a["note"]).is_file())]
         all_failed = bool(non_skipped) and not any(a.get(ok_field) for a in non_skipped)
-    run["stages"][stage] = {"ts": datetime.now().isoformat(timespec="seconds")}
+    run["stages"][stage] = {"ts": datetime.now().isoformat(timespec="seconds"),
+                             "duration_s": round(time.monotonic() - started, 6)}
     if failed:
         # 部分失败必须留痕：job 只回 status=done 会把「少几篇」吞掉（14P 合集丢 2 集，无人知）
         run["stages"][stage]["failed_entries"] = failed
@@ -659,7 +744,7 @@ def _cand_path(rel: str, tmp: Path) -> Path:
 
 @_stage
 def _stage_ocr(run, entry, art, tmp, args):
-    if art.get("ocr_raw") is not None:
+    if art.get("ocr_raw") is not None and not any(row[3] for row in art["ocr_raw"]):
         print("    ⏭ 已 OCR，跳过")
         return
     if not art.get("candidates") or not art.get("segs"):
@@ -668,8 +753,12 @@ def _stage_ocr(run, entry, art, tmp, args):
     # 注意用 `or` 而不是 .get(k, 默认)：调用方未填时传的是空串，空串不走默认值，
     # 会把 ocr 静默切到 gemini（实测：整批 OCR 命中 0，因为空串 != "vision"）
     # remote：V2MD_OCR_REMOTE 指向 GPU 路由（或任意参考服务端）时默认外移
-    ocr_engine = args.get("ocr") or ("remote" if ENV.get("V2MD_OCR_REMOTE") else "vision")
+    from .colab import remote_for_user
+
+    ocr_engine = args.get("ocr") or ("remote" if remote_for_user(ENV.get("V2MD_OCR_REMOTE", "")) else "vision")
     ocr_items, ocr_raw = ocr_candidates(cands, ocr_engine)
+    if len(ocr_raw) != len(cands) or any(row[3] for row in ocr_raw):
+        raise SystemExit("OCR 帧处理失败或结果不完整，暂不进行模型生成；请补跑失败条目")
     art["ocr_items"] = [[t, txt, c] for t, txt, c in ocr_items]
     art["ocr_raw"] = [[t, txt, c, err] for t, txt, c, err in ocr_raw]
     slug = sanitize_filename(Path(art["video"]).stem)[:32] if not art.get("images") \
@@ -729,10 +818,13 @@ def _stage_select(run, entry, art, tmp, args):
             # 实测：单条 61 分钟视频上选帧 LLM 返回空，整篇笔记无图。
             print("    ⚠ LLM 选帧结果为空或全部不在候选清单内，降级为本地启发式选帧")
     if not picked:
+        art["selection_mode"] = "heuristic_fallback"
         sel = select_content_frames([(t, p) for t, p, _n in named_list],
                                     [tuple(x) for x in art.get("ocr_raw", [])],
                                     art["segs"], int(args.get("max_frames") or 60))
         picked = [(t, p, name_of[p]) for t, p in sel]
+    else:
+        art["selection_mode"] = "llm" if not art.get("images") else "image_post"
     picked.sort(key=lambda x: x[0])
     manifest, published = publish_named(picked, [tuple(x) for x in art.get("ocr_items", [])])
     art.update(selected=[{"name": n, "t": t} for t, _p, n in picked],
@@ -755,14 +847,16 @@ def _stage_clips(run, entry, art, tmp, args):
         print("    ⏭ 无选中帧，跳过节段")
         art["clips_done"] = True
         return
-    clips_remote = (ENV.get("V2MD_CLIPS_REMOTE") or "").strip()
+    from .colab import remote_for_user
+
+    clips_remote = remote_for_user((ENV.get("V2MD_CLIPS_REMOTE") or "").strip())
     if clips_remote.lower() in ("colab", "colab-cli") or clips_remote.startswith(("http://", "https://")):
         # GPU 算力池/参考服务端：远端失败即本条目失败，异常上抛、不回退本地——
         # 本地 CPU 重剪是整条管线最大头（实测占 97min/条），静默回退会把批次拖垮；
         # 故障转移由池子在 provider 间完成，全局故障由本层熔断收口。
         clips = remote_cut_clips(published, Path(art["video"]), art["duration"],
                                  segs=art.get("segs"), tmp=tmp,
-                                 base=ENV["V2MD_CLIPS_REMOTE"],
+                                 base=clips_remote,
                                  direct_url=entry.get("direct_url") or "")
     else:
         clips = cut_clip_files(published, Path(art["video"]), art["duration"],

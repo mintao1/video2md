@@ -1,0 +1,20 @@
+{
+  "kind": "summary_of_initial_tool_outputs",
+  "backend": {
+    "passed": 112,
+    "failed": 1,
+    "failure": "new evidence loader did not reject docs/testing symlink resolving to a private directory inside the checkout"
+  },
+  "frontend": {
+    "passed": 10,
+    "failed": 4,
+    "new_component_tests_failed": 4,
+    "failure": "custom host renderer did not provide the Vue SSR context required by the compiled component"
+  },
+  "lint": [
+    "EXE001",
+    "RUF007"
+  ],
+  "resolution": "new public evidence boundary checks the resolved repository-relative path; fixture supplies SSR context; executable mode and pairwise iteration fixed",
+  "production_change": false
+}

@@ -1,0 +1,18 @@
+........................................................................ [ 60%]
+...........................F....................                         [100%]
+=================================== FAILURES ===================================
+____ test_paid_cny_receipt_and_usd_request_usage_are_independently_accepted ____
+
+    def test_paid_cny_receipt_and_usd_request_usage_are_independently_accepted():
+        e = receipt_example()
+>       assert labels(e) == set()
+E       AssertionError: assert {'failure-cost-004'} == set()
+E         
+E         Extra items in the left set:
+E         'failure-cost-004'
+E         Use -v to get more diff
+
+backend/tests/test_production_failure_cost_eval_set.py:328: AssertionError
+=========================== short test summary info ============================
+FAILED backend/tests/test_production_failure_cost_eval_set.py::test_paid_cny_receipt_and_usd_request_usage_are_independently_accepted
+1 failed, 119 passed in 0.39s

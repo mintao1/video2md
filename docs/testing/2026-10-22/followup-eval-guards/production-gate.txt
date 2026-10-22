@@ -1,0 +1,4 @@
+FAIL
+- kfi-007: missing, blocked or inconsistent evidence
+- kfi-011: missing, blocked or inconsistent evidence
+- kfi-012: missing, blocked or inconsistent evidence

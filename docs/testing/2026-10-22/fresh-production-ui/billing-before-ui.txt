@@ -1,0 +1,18 @@
+Browser tab: 1, Title: "视书 · Textbook Library", URL: "https://ferosse.tech/profile/colab".
+0 AXWebArea 视书 · Textbook Library, URL: ferosse.tech/profile/colab
+	1 container app
+		2 container
+			3 link Description: 返回我的, Value: ferosse.tech/profile
+			4 heading Colab 授权, Value: 1
+				5 text Colab 授权
+			6 text 连接 Google 账号，用于云端转写、画面识别与视频剪辑。
+			7 text 此授权供当前服务共用。更换账号会影响这台服务后续的转换任务，仅服务管理员可操作。
+			8 text 需要服务管理员权限
+			9 text 请联系服务管理员完成授权。
+		10 container
+			11 link Description: motion_photos_on 排队处理, Value: ferosse.tech/tasks
+			12 link Description: local_library 教材库, Value: ferosse.tech/library
+			13 link Description: add 新建转换, Value: ferosse.tech/tasks?openImport=1
+			14 link Description: person 我的, Value: ferosse.tech/profile
+
+The focused UI element is 0 AXWebArea 视书 · Textbook Library, URL: ferosse.tech/profile/colab

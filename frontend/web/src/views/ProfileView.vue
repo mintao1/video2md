@@ -8,6 +8,7 @@ import BottomNav from '../components/common/BottomNav.vue'
 import ProfileCard from '../components/profile/ProfileCard.vue'
 import LlmSettingsCard from '../components/profile/LlmSettingsCard.vue'
 import QuotaDashboard from '../components/profile/QuotaDashboard.vue'
+import BillingPanel from '../components/profile/BillingPanel.vue'
 import SvipPromoBanner from '../components/profile/SvipPromoBanner.vue'
 import VipMembershipSheet from '../components/profile/VipMembershipSheet.vue'
 
@@ -16,6 +17,19 @@ const profile = useProfileStore()
 const toast = useToastStore()
 
 const vipOpen = ref(false)
+const billingOpen = ref(false)
+const billing = ref<import('../types').CostReport | null>(null)
+const billingLoading = ref(false)
+const billingError = ref('')
+async function toggleBilling() {
+  billingOpen.value = !billingOpen.value
+  if (!billingOpen.value) return
+  billingLoading.value = true
+  billingError.value = ''
+  try { billing.value = await import('../api').then((api) => api.getCost()) }
+  catch { billingError.value = '费用明细加载失败，请检查网络后重新打开。' }
+  finally { billingLoading.value = false }
+}
 // AUTH=off development has no token and nothing to sign out of.
 const canSignOut = Boolean(getToken())
 
@@ -64,9 +78,22 @@ function onNotionToggle() {
           <span class="material-symbols-outlined text-outline" aria-hidden="true">chevron_right</span>
         </RouterLink>
 
+        <a href="https://www.kaggle.com/account/login" target="_blank" rel="noopener noreferrer"
+          class="bg-surface-container-lowest rounded-xl shadow-sm p-space-md flex items-center justify-between gap-space-md hover:bg-surface-container-low transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
+          <div class="flex items-center gap-space-md min-w-0">
+            <span class="material-symbols-outlined text-primary shrink-0" aria-hidden="true">login</span>
+            <div class="flex flex-col min-w-0">
+              <span class="font-title-sm text-title-sm text-on-surface">Kaggle 登录</span>
+              <span class="text-body-sm text-outline">前往 Kaggle 官网登录（新标签页）</span>
+            </div>
+          </div>
+          <span class="material-symbols-outlined text-outline shrink-0" aria-hidden="true">open_in_new</span>
+        </a>
+
         <!-- 配额 -->
         <div class="flex flex-col gap-space-sm">
-          <QuotaDashboard :quota="profile.quota" />
+          <QuotaDashboard :quota="profile.quota" @details="toggleBilling" />
+          <BillingPanel v-if="billingOpen" :report="billing" :loading="billingLoading" :error="billingError" />
           <SvipPromoBanner :plan="user.plan" @upgrade="vipOpen = true" />
         </div>
 

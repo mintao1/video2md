@@ -37,6 +37,22 @@ spec:
       # same image and secret file as the API, so a new revision cannot start against
       # an older schema.
       initContainers:
+        - name: fix-volume-permissions
+          image: video2md:0.2.0-hotfix-20261021j
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            runAsNonRoot: false
+            runAsUser: 0
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+              add: ["CHOWN"]
+          command: ["sh", "-lc", "mkdir -p /app/data/logs /vault && chown -R 10001:10001 /app/data /vault"]
+          volumeMounts:
+            - name: data
+              mountPath: /app/data
+            - name: vault
+              mountPath: /vault
         - name: migrate
           image: video2md:0.2.0-hotfix-20261021g
           imagePullPolicy: IfNotPresent
@@ -68,7 +84,7 @@ spec:
         - name: api
           # registry 全名（D2 预构建收官）：制品=CI tag 构建产物（GHCR 灾备副本同 ID）。
           # 服务器落地流：gh run download artifact → gunzip | ctr import（无 packages 凭证通道）。
-          image: video2md:0.2.0-hotfix-20261021g
+          image: video2md:0.2.0-failure-cost-20261021b
           imagePullPolicy: IfNotPresent
           securityContext:
             allowPrivilegeEscalation: false
@@ -82,6 +98,17 @@ spec:
               value: 0.0.0.0        # kubelet 探针可达；公网面=iptables 8790 白名单（同 gpu_router 9700 模式）
             - name: V2MD_TRUST_XFF
               value: "on"
+            # 2026-10-21 用户确认实际成本：免费 Colab 记零费用，仍保留 GPU 秒数。
+            - name: V2MD_GPU_PRICE_POLICY
+              value: free
+            - name: V2MD_PRICE_GPU_MIN
+              value: "0"
+            - name: V2MD_PRICE_LLM_IN_MTOK
+              value: "0.15"
+            - name: V2MD_PRICE_LLM_OUT_MTOK
+              value: "0.50"
+            - name: V2MD_PRICE_LLM_CACHED_IN_MTOK
+              value: "0.03"
             - name: V2MD_ENV
               value: production
             - name: V2MD_AUTH
@@ -124,6 +151,8 @@ spec:
               value: http://127.0.0.1:9700
             - name: V2MD_CLIPS_REMOTE
               value: http://127.0.0.1:9700
+            - name: V2MD_COLAB_USERS_DIR
+              value: /app/data/colab-users
             - name: V2MD_CLIPS_SOURCE
               value: remote
             - name: OTEL_EXPORTER_OTLP_ENDPOINT
@@ -132,6 +161,10 @@ spec:
               value: video2md
             - name: V2MD_PROXY_DOMESTIC
               value: "1"
+            - name: V2MD_DIRECT_HOSTS
+              value: "ferosse.tech,.ferosse.tech"
+            - name: NO_PROXY
+              value: "127.0.0.1,localhost,10.0.0.7,10.43.,.svc,ferosse.tech,.ferosse.tech,api2.niubi.win,opencode.ai"
             - name: V2MD_WATCHDOG_ACTION
               value: exit   # 标 error 后退出（码 70），重启自愈并恢复队列
             - name: OBSIDIAN_VAULT

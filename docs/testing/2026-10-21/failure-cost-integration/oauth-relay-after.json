@@ -1,0 +1,19 @@
+{
+  "services": [
+    {
+      "MainPID": "0",
+      "NRestarts": "0",
+      "Id": "oauth-relay.service",
+      "ActiveState": "inactive",
+      "UnitFileState": "disabled"
+    },
+    {
+      "MainPID": "756584",
+      "NRestarts": "0",
+      "Id": "video2md-oauth-relay.service",
+      "ActiveState": "active",
+      "UnitFileState": "enabled"
+    }
+  ],
+  "listener_loopback_only": true
+}

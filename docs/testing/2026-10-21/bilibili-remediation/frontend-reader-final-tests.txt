@@ -1,0 +1,58 @@
+
+> web@0.0.0 test:integration
+> node --test tests/*.integration.test.mjs
+
+<Suspense> is an experimental feature and its API will likely change.
+✔ consuming the import query preserves task state while reader query changes still remount (31.184459ms)
+✔ brand home owns the OAuth entry and the standalone login page stays deleted (14.841959ms)
+✔ production brand-login evaluation set forbids standalone and mock login regressions (9.234583ms)
+✔ every authentication exit targets the brand home instead of a standalone login route (36.289541ms)
+✔ production source contains no mock API or mock authentication route (7.258042ms)
+▶ queue store → HTTP client → FastAPI
+  ✔ loads only the signed-in owner’s tasks and real progress (75.340375ms)
+  ✔ keeps tasks unchanged when time passes without backend progress (109.990875ms)
+  ✔ observes a backend completion during automatic refresh (33.397416ms)
+  ✔ cancels a queued task persistently through HTTP (13.783208ms)
+  ✔ does not present cancellation as a resumable pause (42.634833ms)
+  ✔ rejects cancellation of a finished task without changing its status (10.628167ms)
+  ✔ rejects another owner’s cancellation and preserves their task (7.366875ms)
+  ✔ rejects requests without usable credentials (5.798083ms)
+  ✔ keeps a deleted task absent after a fresh backend list (10.792833ms)
+  ✔ rejects retrying a completed task (6.687875ms)
+  ✔ persists queue promotion and returns its new position (10.79625ms)
+  ✔ retries a cancelled task and persists its queued state (17.241334ms)
+  ✔ rejects deleting active work or changing another owner’s task (7.850334ms)
+✔ queue store → HTTP client → FastAPI (2227.254291ms)
+▶ library live adapter → FastAPI preferences and notes
+  ✔ persists favorites and progress across independent list requests (13.715375ms)
+  ✔ does not disclose Alice’s preferences to Bob (7.965166ms)
+  ✔ loads actual note content from the backend (5.709416ms)
+✔ library live adapter → FastAPI preferences and notes (27.518542ms)
+✔ fetches referenced media as an authenticated binary response (8.790084ms)
+✔ reports unavailable bundles instead of a fake successful download (6.289833ms)
+✔ persists private LLM settings through the live API without returning or caching its key (12.06225ms)
+✔ preserves real run usage and redacted failure diagnostics through HTTP, adapter and rendered card (172.148208ms)
+✔ loads actual monthly billing details and renders per-run usage instead of an inert placeholder (18.668042ms)
+✔ keeps a billed partial run without a note out of the library and disables reading (11.376459ms)
+✔ reuses a queued submission without duplicating the frontend row (13.042083ms)
+✔ renders API rejection persistently inside the still-open import sheet (30.252333ms)
+✔ preserves tasks and billing on an actual HTTP 422 rejection and renders its message (13.401625ms)
+✔ preserves tasks and billing on an actual HTTP 429 rejection and renders its message (12.766208ms)
+4:42:03 PM [vite] (client) Re-optimizing dependencies because vite config has changed
+✔ keeps invalid and fractional chapter parameters inside the note array (535.983917ms)
+✔ renders Obsidian image and video references as actual media elements (9.803042ms)
+✔ escapes unavailable media names and refuses arbitrary external URLs (98.621625ms)
+✔ shows a ready image while a slower clip is still loading, then reports a failed clip (56.995834ms)
+✔ releases loaded URLs and ignores late media after leaving a chapter (14.735042ms)
+✔ retries a broken media transfer once without retrying HTTP rejections (0.728209ms)
+WebSocket server error: Port 24678 is already in use
+✔ an unresolved submission visibly waits, blocks duplicates, then restores the input on failure (1184.0245ms)
+✔ the import sheet exposes pending feedback and disables its submit action (0.728791ms)
+ℹ tests 39
+ℹ suites 2
+ℹ pass 39
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3159.798209

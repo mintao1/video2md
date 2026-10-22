@@ -1,0 +1,23 @@
+{
+  "passed": true,
+  "provider_source_sha256": "515efec650b80ef1a69fb5d1cbbcfbf90241255daa6fd0078ed66a6d3af239d3",
+  "isolated_dataset_and_kernel": true,
+  "control_id": "743be9c14d7043ef936aea246a35023c",
+  "cuda_available": true,
+  "cuda_devices": 2,
+  "cuda_device_names": [
+    "Tesla T4",
+    "Tesla T4"
+  ],
+  "nvidia_exit_code": 0,
+  "kernel_status": "done",
+  "requested_control_id": "743be9c14d7043ef936aea246a35023c",
+  "fresh_control_id_matches": true,
+  "rapidocr_version": "3.10.0",
+  "onnxruntime_version": "1.31.0",
+  "result_count": 1,
+  "nonempty_chars": 100,
+  "error_count": 0,
+  "upload_file_count": 2,
+  "elapsed_s": 95.98
+}

@@ -1,0 +1,12 @@
+{
+  "accepted_user_criterion": "subscription_paid_receipt_plus_request_usage_reconciliation",
+  "status": "pass",
+  "invoice_id": "XPIMO8IF-0003",
+  "receipt_currency": "CNY",
+  "amount_paid": 67.72,
+  "request_count": 5,
+  "token_attribution_currency": "USD",
+  "token_attribution": 0.007342,
+  "per_request_cash_debit_claimed": false,
+  "limitation": "Four application spans correlated by unique usage fingerprint; selection counts reconstructed from recorded total residual."
+}

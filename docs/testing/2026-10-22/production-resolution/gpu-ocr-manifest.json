@@ -1,0 +1,9 @@
+{
+  "base_image": "gpu-router:0.2.3-asr-decoder-20261022c",
+  "image": "gpu-router:0.2.3-ocr-input-20261022d",
+  "changed_methods": [
+    "ocr"
+  ],
+  "changed_worker_body": "_KERNEL_OCR",
+  "source_sha256": "5fb8a8a86e918d5a34152b68db344bc70316947ba47e369b522ed42eba22b42c"
+}

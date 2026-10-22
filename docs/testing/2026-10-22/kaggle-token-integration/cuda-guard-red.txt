@@ -1,0 +1,9 @@
+PASS generated worker contains input resolver
+FAIL generated GPU worker verifies actual CUDA allocation
+PASS generated resolver reads input for lesson
+PASS generated resolver reads input for datasets/fixture/lesson
+PASS generated resolver reads input for fixture/lesson
+PASS missing expected dataset rejects another owner
+PASS GPU task explicitly requests supported T4 accelerator
+PASS CPU diagnostic does not request accelerator
+PASS zero-exit CLI push rejection cannot reuse stale kernel output

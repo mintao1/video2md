@@ -1,0 +1,113 @@
+{
+  "audit": [
+    {
+      "ts": "2026-10-22T03:42:51",
+      "method": "GET",
+      "path": "/auth/google/login",
+      "code": 302
+    },
+    {
+      "ts": "2026-10-22T03:43:45",
+      "method": "GET",
+      "path": "/auth/google/callback",
+      "code": 302
+    },
+    {
+      "ts": "2026-10-22T03:46:08",
+      "method": "GET",
+      "path": "/auth/google/login",
+      "code": 302
+    },
+    {
+      "ts": "2026-10-22T03:46:47",
+      "method": "GET",
+      "path": "/auth/google/callback",
+      "code": 302
+    },
+    {
+      "ts": "2026-10-22T03:49:31",
+      "method": "GET",
+      "path": "/auth/google/login",
+      "code": 302
+    },
+    {
+      "ts": "2026-10-22T03:50:59",
+      "method": "GET",
+      "path": "/auth/google/callback",
+      "code": 302
+    },
+    {
+      "ts": "2026-10-22T03:58:42",
+      "method": "GET",
+      "path": "/auth/google/login",
+      "code": 302
+    },
+    {
+      "ts": "2026-10-22T03:59:01",
+      "method": "GET",
+      "path": "/auth/google/callback",
+      "code": 302
+    },
+    {
+      "ts": "2026-10-22T04:00:59",
+      "method": "GET",
+      "path": "/auth/google/login",
+      "code": 302
+    },
+    {
+      "ts": "2026-10-22T04:01:14",
+      "method": "GET",
+      "path": "/auth/google/callback",
+      "code": 302
+    },
+    {
+      "ts": "2026-10-22T04:02:02",
+      "method": "GET",
+      "path": "/auth/google/login",
+      "code": 302
+    },
+    {
+      "ts": "2026-10-22T04:02:23",
+      "method": "GET",
+      "path": "/auth/google/callback",
+      "code": 302
+    },
+    {
+      "ts": "2026-10-22T04:36:12",
+      "method": "GET",
+      "path": "/auth/google/login",
+      "code": 302
+    },
+    {
+      "ts": "2026-10-22T04:36:29",
+      "method": "GET",
+      "path": "/auth/google/callback",
+      "code": 302
+    },
+    {
+      "ts": "2026-10-22T04:38:04",
+      "method": "GET",
+      "path": "/auth/google/login",
+      "code": 302
+    },
+    {
+      "ts": "2026-10-22T04:38:19",
+      "method": "GET",
+      "path": "/auth/google/callback",
+      "code": 302
+    },
+    {
+      "ts": "2026-10-22T04:39:35",
+      "method": "GET",
+      "path": "/auth/google/login",
+      "code": 302
+    },
+    {
+      "ts": "2026-10-22T04:39:51",
+      "method": "GET",
+      "path": "/auth/google/callback",
+      "code": 302
+    }
+  ],
+  "api_sha256": "ad062f1928146856fb0739d8be570fa7a9123fe1eb77c7c4fe74bee53acfe360"
+}

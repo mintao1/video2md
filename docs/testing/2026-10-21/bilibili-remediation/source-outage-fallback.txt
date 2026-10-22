@@ -1,0 +1,1 @@
+{"pass": true, "simulated_proxy_failure": "connection_refused_on_process_local_override", "collection_parts": 100, "public_api_fallback": true, "download_bytes": 3017797, "seconds": 1.872, "production_configuration_changed": false}

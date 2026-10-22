@@ -1,0 +1,12 @@
+{
+  "base_image": "gpu-router:0.2.3-kaggle-token-20261022a",
+  "image": "gpu-router:0.2.3-kaggle-token-20261022b",
+  "changed_methods": [
+    "_script",
+    "task_submit"
+  ],
+  "changed_worker_header": true,
+  "source_sha256": "2a21634c180ebe3ec0937553e8342c5466b79962289f1806b8315cc2e856a8ef",
+  "method_source": "../gpu-router/backend/gpu_router/providers/kaggle.py",
+  "other_runtime_methods_unchanged": true
+}

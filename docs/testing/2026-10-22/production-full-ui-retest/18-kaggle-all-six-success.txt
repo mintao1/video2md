@@ -1,0 +1,231 @@
+Browser tab: 7, Title: "gpu-router-job", URL: "https://www.kaggle.com/code/mintaolin/gpu-router-job/output".
+1 AXWebArea gpu-router-job, URL: kaggle.com/code/mintaolin/gpu-router-job/output
+	2 container
+		3 container root
+			4 container Main Kaggle page navigation
+				5 button Navigation menu
+				6 link Description: Skip to content, Value: kaggle.com/code/mintaolin/gpu-router-job/output#site-content
+				7 link Description: Return to Kaggle home page, Value: kaggle.com/
+				8 pop up button Create on Kaggle
+					9 text Create
+				10 container
+					11 container
+						12 content list
+							13 container Home List Item
+								14 link Description: Home, Value: kaggle.com/
+							15 container Competitions List Item
+								16 link Description: Competitions, Value: kaggle.com/competitions
+							17 container Benchmarks List Item
+								18 link Description: Benchmarks, Value: kaggle.com/benchmarks
+							19 container Arenas List Item
+								20 link Description: Arenas, Value: kaggle.com/arenas
+							21 container Game Arena List Item
+								22 link Description: Game Arena, Value: kaggle.com/game-arena
+						23 content list
+							24 container Data Hub List Item
+								25 container
+									26 link (collapsed) Description: Data Hub, Value: kaggle.com/code/mintaolin/gpu-router-job/output#, Secondary Actions: Expand
+									27 button Expand
+						28 content list
+							29 container More on Kaggle List Item
+								30 container
+									31 link (collapsed) Description: More on Kaggle, Value: kaggle.com/code/mintaolin/gpu-router-job/output#, Secondary Actions: Expand
+									32 button Expand
+					33 content list
+						34 container Your Work List Item
+							35 container
+								36 link Description: Your Work, Value: kaggle.com/work
+								37 button (expanded) Description: Collapse Your Work, Help: Collapse
+						38 container Collapse Viewed List Item
+							39 container
+								40 link (expanded) Description: Collapse Viewed, Value: kaggle.com/code/mintaolin/gpu-router-job/output#, Secondary Actions: Collapse
+								41 button Collapse Viewed
+						42 content list
+							43 container gpu-router-job List Item
+								44 link Description: gpu-router-job, Value: kaggle.com/code/mintaolin/gpu-router-job
+						45 container Collapse Edited List Item
+							46 container
+								47 link (expanded) Description: Collapse Edited, Value: kaggle.com/code/mintaolin/gpu-router-job/output#, Secondary Actions: Collapse
+								48 button Collapse Edited
+						49 content list
+							50 container gpu-router-job List Item
+								51 link Description: gpu-router-job, Value: kaggle.com/code/mintaolin/gpu-router-job
+					52 button (expanded) Open Active Events dialog View Active Events, Secondary Actions: Collapse
+						236 container Open Active Events dialog
+							237 text auto_awesome_motion
+						57 text View Active Events
+			58 container Main menu, search and your account
+				59 container
+					60 text field (settable) :r6:
+					61 button Mintao Lin
+						62 image
+			63 container site-content
+				64 container
+					65 text Kaggle uses cookies from Google to deliver and enhance the quality of its services and to analyze traffic.
+					66 link Description: Learn more, Value: kaggle.com/cookies
+					67 text OK, Got it.
+				68 link Description: Mintao Lin's profile, Value: kaggle.com/mintaolin
+				69 text Mintao Lin · 
+				70 container Description: 6 minutes ago, Help: Thu Oct 22 2026 07:53:14 GMT+0800 (中国标准时间)
+					71 text 6m ago
+				72 text  ·  9 views  ·  Private
+				73 container
+					74 button Upvote
+					75 button 0 votes
+				76 button Share
+				77 link Description: Edit, Value: kaggle.com/code/mintaolin/gpu-router-job/edit/run/360944554
+				78 pop up button (collapsed) Download, Secondary Actions: Expand
+				79 button More options for this notebook
+				80 heading gpu-router-job, Value: 1
+					81 text gpu-router-job
+				82 button Edit title
+				83 tab group
+					84 tab (selectable, settable, boolean) Description: Notebook, 1 of 6, Value: 0
+					85 tab (selectable, settable, boolean) Description: Input, 2 of 6, Value: 0
+					86 tab (selected, settable, boolean) Description: Output, 3 of 6, Value: 1
+					87 tab (selectable, settable, boolean) Description: Logs, 4 of 6, Value: 0
+					88 tab (selectable, settable, boolean) Description: Comments (0), 5 of 6, Value: 0
+					89 tab (selectable, settable, boolean) Description: Settings, 6 of 6, Value: 0
+				90 heading Output Data, Value: 2
+					91 text Output Data
+				92 container data
+					93 heading clip-src.mp4(35.77 MB), Value: 4
+						94 text clip-src.mp4 ( 35.77 MB )
+					95 button Download
+					96 button Hide tree
+					97 container
+						98 button
+						99 container
+							100 slider
+							101 button
+						102 button
+						103 pop up button
+						104 slider 视频时间进度条
+					105 container
+						106 heading Output, Value: 2
+							107 text Output
+						108 button Output actions
+						109 content list
+							110 container
+								111 button (collapsed) arrow_right, Help: Expand clips_out, Secondary Actions: Expand
+								112 text clips_out
+							113 container
+								114 container Collapse clip-src.mp4
+								115 text clip-src.mp4
+							116 container
+								117 container Expand clips.tar
+								118 text clips.tar
+							119 container
+								120 container Expand clips_result.json
+								121 text clips_result.json
+							122 container
+								123 container Expand status.json
+								124 text status.json
+				125 container
+					126 text Download notebook output
+					127 text field (disabled) Download notebook output, Value: kaggle kernels output mintaolin/gpu-router-job -p /path/to/dest, ID: :r8:
+					128 button Copy
+					129 button View CLI documentation
+		130 container Status for gpu-router-job: Successful. Click to open gpu-router-job in new window List Item gpu-router-io List Item Status for gpu-router-job: Successful. Click to open gpu-router-job in new window List Item gpu-router-io List Item Status for gpu-router-job: Successful. Click to open gpu-router-job in new window List Item gpu-router-io List Item Status for gpu-router-job: Successful. Click to open gpu-router-job in new window List Item gpu-router-io List Item Status for gpu-router-job: Successful. Click to open gpu-router-job in new window List Item gpu-router-io List Item Status for gpu-router-job: Successful. Click to open gpu-router-job in new window List Item gpu-router-io List Item undefined List Item
+			131 container active-events-panel
+				132 content list
+					133 container Status for gpu-router-job: Successful. Click to open gpu-router-job in new window List Item
+						134 link Status for gpu-router-job: Successful. Click to open gpu-router-job in new window
+							238 text open_in_new
+							137 text gpu-router-job
+							138 text Version #32 with GPU T4 x2
+							239 text Successful
+						142 text 4m
+						143 button More options for gpu-router-job
+					144 container gpu-router-io List Item
+						145 link gpu-router-io
+							146 text gpu-router-io
+							147 text gpu-router job
+							148 text Successful
+						149 text 4m
+						150 button More options for undefined
+					151 container Status for gpu-router-job: Successful. Click to open gpu-router-job in new window List Item
+						152 link Status for gpu-router-job: Successful. Click to open gpu-router-job in new window
+							153 text open_in_new
+							154 text gpu-router-job
+							155 text Version #31 with GPU T4 x2
+							156 text Successful
+						157 text 9m
+						158 button More options for gpu-router-job
+					159 container gpu-router-io List Item
+						160 link gpu-router-io
+							161 text gpu-router-io
+							162 text gpu-router job
+							163 text Successful
+						164 text 9m
+						165 button More options for undefined
+					166 container Status for gpu-router-job: Successful. Click to open gpu-router-job in new window List Item
+						167 link Status for gpu-router-job: Successful. Click to open gpu-router-job in new window
+							168 text open_in_new
+							169 text gpu-router-job
+							170 text Version #30 with GPU T4 x2
+							171 text Successful
+						172 text 16m
+						173 button More options for gpu-router-job
+					174 container gpu-router-io List Item
+						175 link gpu-router-io
+							176 text gpu-router-io
+							177 text gpu-router job
+							178 text Successful
+						179 text 16m
+						180 button More options for undefined
+					181 container Status for gpu-router-job: Successful. Click to open gpu-router-job in new window List Item
+						182 link Status for gpu-router-job: Successful. Click to open gpu-router-job in new window
+							183 text open_in_new
+							184 text gpu-router-job
+							185 text Version #29 with GPU T4 x2
+							186 text Successful
+						187 text 19m
+						188 button More options for gpu-router-job
+					189 container gpu-router-io List Item
+						190 link gpu-router-io
+							191 text gpu-router-io
+							192 text gpu-router job
+							193 text Successful
+						194 text 19m
+						195 button More options for undefined
+					196 container Status for gpu-router-job: Successful. Click to open gpu-router-job in new window List Item
+						197 link Status for gpu-router-job: Successful. Click to open gpu-router-job in new window
+							198 text open_in_new
+							199 text gpu-router-job
+							200 text Version #28 with GPU T4 x2
+							201 text Successful
+						202 text 23m
+						203 button More options for gpu-router-job
+					204 container gpu-router-io List Item
+						205 link gpu-router-io
+							206 text gpu-router-io
+							207 text gpu-router job
+							208 text Successful
+						209 text 23m
+						210 button More options for undefined
+					211 container Status for gpu-router-job: Successful. Click to open gpu-router-job in new window List Item
+						212 link Status for gpu-router-job: Successful. Click to open gpu-router-job in new window
+							213 text open_in_new
+							214 text gpu-router-job
+							215 text Version #27 with GPU T4 x2
+							216 text Successful
+						217 text 26m
+						218 button More options for gpu-router-job
+					219 container gpu-router-io List Item
+						220 link gpu-router-io
+							221 text gpu-router-io
+							222 text gpu-router job
+							223 text Successful
+						224 text 26m
+						225 button More options for undefined
+				226 content list
+					227 container undefined List Item
+						228 link Open Active Events dialog 0 Active Events
+							240 container Open Active Events dialog
+								241 text auto_awesome_motion
+							233 container
+								234 text 0  Active Events
+						235 button Collapse Active Events dialog
+
+The focused UI element is 134 link Status for gpu-router-job: Successful. Click to open gpu-router-job in new window

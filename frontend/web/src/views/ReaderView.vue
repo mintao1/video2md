@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 import { getBooks, getNotes, getMedia, saveProgress } from '../api'
-import { chapterIndex, mediaMarkdown, mediaNames } from '../reader'
+import { chapterIndex, mediaMarkdown, mediaNames, startMediaLoad } from '../reader'
 import { useToastStore } from '../stores/toast'
 import type { Book, TocChapter } from '../types'
 import EmptyState from '../components/common/EmptyState.vue'
@@ -24,29 +24,27 @@ const idx = ref(0) // 0-based 当前讲
 const loading = ref(true)
 const loadError = ref('')
 const mediaUrls = ref<Record<string, string>>({})
+const pendingMedia = ref<string[]>([])
 let loadVersion = 0
-let mediaVersion = 0
+let stopMedia = () => {}
 
 function releaseMedia() {
-  for (const url of Object.values(mediaUrls.value)) URL.revokeObjectURL(url)
+  stopMedia()
   mediaUrls.value = {}
+  pendingMedia.value = []
 }
 
-watch(() => [runId.value, notes.value[idx.value]?.md] as const, async ([id, md]) => {
-  const version = ++mediaVersion
+watch(() => [runId.value, notes.value[idx.value]?.md] as const, ([id, md]) => {
   releaseMedia()
-  const entries = await Promise.all(mediaNames(md ?? '').map(async (name) => {
-    try { return [name, URL.createObjectURL(await getMedia(id, name))] as const }
-    catch { return null }
-  }))
-  const urls = Object.fromEntries(entries.filter((entry) => entry !== null))
-  if (version === mediaVersion) mediaUrls.value = urls
-  else for (const url of Object.values(urls)) URL.revokeObjectURL(url)
+  pendingMedia.value = mediaNames(md ?? '')
+  stopMedia = startMediaLoad(pendingMedia.value, (name) => getMedia(id, name), (name, url) => {
+    if (url) mediaUrls.value = { ...mediaUrls.value, [name]: url }
+    pendingMedia.value = pendingMedia.value.filter((item) => item !== name)
+  })
 })
 
 onBeforeUnmount(() => {
   loadVersion++
-  mediaVersion++
   releaseMedia()
 })
 const tocOpen = ref(false)
@@ -71,7 +69,7 @@ const chapters = computed<TocChapter[]>(() =>
 function renderMd(md: string): string {
   // md 源自外部视频转录经 LLM 生成 → v-html 必须过 DOMPurify（防注入，token 在 localStorage）
   const fragment = DOMPurify.sanitize(
-    marked.parse(mediaMarkdown(md, mediaUrls.value), { async: false }) as string,
+    marked.parse(mediaMarkdown(md, mediaUrls.value, pendingMedia.value), { async: false }) as string,
     { RETURN_DOM_FRAGMENT: true },
   )
   // DOMPurify intentionally strips blob: URIs. Restore only object URLs created

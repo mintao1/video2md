@@ -1,0 +1,13 @@
+# Integration hotfix only: dependencies must match the tested base image.
+# Build the frontend first. Normal releases continue to use the root Dockerfile.
+ARG BASE_IMAGE=video2md:0.2.0-hotfix-20261021l
+FROM ${BASE_IMAGE}
+ARG SOURCE_SHA256
+LABEL org.opencontainers.image.version="0.2.0-integration-20261021g" \
+      org.opencontainers.image.revision="" \
+      com.video2md.patch-manifest-sha256="${SOURCE_SHA256}"
+USER 0
+RUN rm -rf /app/web-dist && mkdir -p /app/web-dist
+COPY backend/video2md/ /app/video2md/
+COPY frontend/web/dist/ /app/web-dist/
+USER 10001

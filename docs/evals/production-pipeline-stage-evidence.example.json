@@ -1,0 +1,393 @@
+{
+  "schema_version": 2,
+  "kind": "synthetic",
+  "run_id": "synthetic-run",
+  "notice": "Synthetic numbers for offline validator tests only. Not a production report or an approved price list.",
+  "results": [
+    {
+      "id": "pps-001",
+      "status": "pass",
+      "observed": "Synthetic positive example for pps-001",
+      "evidence_refs": [
+        "synthetic:offline-fixture"
+      ],
+      "metrics": {
+        "run_id": "synthetic-run",
+        "logout_observed": true,
+        "oauth_login_succeeded": true,
+        "authenticated_page_visible": true,
+        "session_survives_reload": true
+      }
+    },
+    {
+      "id": "pps-002",
+      "status": "pass",
+      "observed": "Synthetic positive example for pps-002",
+      "evidence_refs": [
+        "synthetic:offline-fixture"
+      ],
+      "metrics": {
+        "run_id": "synthetic-run",
+        "cleared": true,
+        "entered_explicitly": true,
+        "submitted": true,
+        "approved_url": "https://ferosse.tech/test-assets/model-billing-smoke.mp4",
+        "visible_url": "https://ferosse.tech/test-assets/model-billing-smoke.mp4"
+      }
+    },
+    {
+      "id": "pps-003",
+      "status": "pass",
+      "observed": "Synthetic positive example for pps-003",
+      "evidence_refs": [
+        "synthetic:offline-fixture"
+      ],
+      "metrics": {
+        "run_id": "synthetic-run",
+        "bytes": 1024,
+        "duration_s": 2,
+        "completed_before_model": true
+      }
+    },
+    {
+      "id": "pps-004",
+      "status": "pass",
+      "observed": "Synthetic positive example for pps-004",
+      "evidence_refs": [
+        "synthetic:offline-fixture"
+      ],
+      "metrics": {
+        "run_id": "synthetic-run",
+        "provider": "colab",
+        "segments": 2,
+        "timestamped_segments": true,
+        "transcript_nonempty": true,
+        "duration_s": 120
+      }
+    },
+    {
+      "id": "pps-005",
+      "status": "pass",
+      "observed": "Synthetic positive example for pps-005",
+      "evidence_refs": [
+        "synthetic:offline-fixture"
+      ],
+      "metrics": {
+        "run_id": "synthetic-run",
+        "provider": "colab",
+        "frames_requested": 5,
+        "frames_completed": 5,
+        "duration_s": 60
+      }
+    },
+    {
+      "id": "pps-006",
+      "status": "pass",
+      "observed": "Synthetic positive example for pps-006",
+      "evidence_refs": [
+        "synthetic:offline-fixture"
+      ],
+      "metrics": {
+        "run_id": "synthetic-run",
+        "device": "cpu",
+        "requested": 1,
+        "completed": 1,
+        "duration_s": 1,
+        "gpu_seconds": 0
+      }
+    },
+    {
+      "id": "pps-007",
+      "status": "pass",
+      "observed": "Synthetic positive example for pps-007",
+      "evidence_refs": [
+        "synthetic:offline-fixture"
+      ],
+      "metrics": {
+        "run_id": "synthetic-run",
+        "gpu_s": 180
+      }
+    },
+    {
+      "id": "pps-008",
+      "status": "pass",
+      "observed": "Synthetic positive example for pps-008",
+      "evidence_refs": [
+        "synthetic:offline-fixture"
+      ],
+      "metrics": {
+        "run_id": "synthetic-run",
+        "queue_idle": true,
+        "closed": true,
+        "idle_elapsed_s": 40,
+        "warm_window_s": 30,
+        "poll_interval_s": 15
+      }
+    },
+    {
+      "id": "pps-009",
+      "status": "pass",
+      "observed": "Synthetic positive example for pps-009",
+      "evidence_refs": [
+        "synthetic:offline-fixture"
+      ],
+      "metrics": {
+        "run_id": "synthetic-run",
+        "model_called": true,
+        "http_status": 200,
+        "inference_succeeded": true,
+        "content_nonempty": true,
+        "refusal_detected": false
+      }
+    },
+    {
+      "id": "pps-010",
+      "status": "pass",
+      "observed": "Synthetic positive example for pps-010",
+      "evidence_refs": [
+        "synthetic:offline-fixture"
+      ],
+      "metrics": {
+        "run_id": "synthetic-run",
+        "llm_in_tok": 1000,
+        "llm_out_tok": 500,
+        "gpu_s": 180,
+        "owner_matches": true
+      }
+    },
+    {
+      "id": "pps-011",
+      "status": "pass",
+      "observed": "Synthetic positive example for pps-011",
+      "evidence_refs": [
+        "synthetic:offline-fixture"
+      ],
+      "metrics": {
+        "run_id": "synthetic-run",
+        "llm_in_mtok": 1,
+        "llm_out_mtok": 2,
+        "gpu_min": 0.1,
+        "approved": true
+      }
+    },
+    {
+      "id": "pps-012",
+      "status": "pass",
+      "observed": "Synthetic positive example for pps-012",
+      "evidence_refs": [
+        "synthetic:offline-fixture"
+      ],
+      "metrics": {
+        "run_id": "synthetic-run",
+        "settled": true,
+        "cost_usd": 0.302,
+        "settlement_count": 1
+      }
+    },
+    {
+      "id": "pps-013",
+      "status": "pass",
+      "observed": "Synthetic positive example for pps-013",
+      "evidence_refs": [
+        "synthetic:offline-fixture"
+      ],
+      "metrics": {
+        "run_id": "synthetic-run",
+        "book_visible": true,
+        "markdown_chars": 600,
+        "reader_loads": true,
+        "media_references_safe": true,
+        "bundle_state": "available",
+        "book_count_before": 0,
+        "book_count_after": 1
+      }
+    },
+    {
+      "id": "pps-014",
+      "status": "pass",
+      "observed": "Synthetic positive example for pps-014",
+      "evidence_refs": [
+        "synthetic:offline-fixture"
+      ],
+      "metrics": {
+        "run_id": "synthetic-run",
+        "backend_status": "done",
+        "ui_status": "done",
+        "feedback_visible": true
+      }
+    },
+    {
+      "id": "pps-015",
+      "status": "pass",
+      "observed": "Synthetic positive example for pps-015",
+      "evidence_refs": [
+        "synthetic:offline-fixture"
+      ],
+      "metrics": {
+        "run_id": "synthetic-run",
+        "task_count_before": 3,
+        "task_count_after": 4,
+        "historical_retry": false,
+        "feedback_visible": true,
+        "run_persisted": true,
+        "owner_matches": true,
+        "submit_log_present": true,
+        "running_stage_observed": true
+      }
+    },
+    {
+      "id": "pps-016",
+      "status": "pass",
+      "observed": "Synthetic positive example for pps-016",
+      "evidence_refs": [
+        "synthetic:offline-fixture"
+      ],
+      "metrics": {
+        "run_id": "synthetic-run",
+        "resolved": true,
+        "url": "https://ferosse.tech/test-assets/model-billing-smoke.mp4",
+        "elapsed_s": 1,
+        "timeout_s": 30
+      }
+    },
+    {
+      "id": "pps-017",
+      "status": "pass",
+      "observed": "Synthetic positive example for pps-017",
+      "evidence_refs": [
+        "synthetic:offline-fixture"
+      ],
+      "metrics": {
+        "run_id": "synthetic-run",
+        "candidate_count": 5,
+        "max_frames": 60,
+        "files_nonempty": true,
+        "timestamps_valid": true
+      }
+    },
+    {
+      "id": "pps-018",
+      "status": "pass",
+      "observed": "Synthetic positive example for pps-018",
+      "evidence_refs": [
+        "synthetic:offline-fixture"
+      ],
+      "metrics": {
+        "run_id": "synthetic-run",
+        "selected_count": 1,
+        "all_in_manifest": true,
+        "mode": "llm",
+        "fallback_reason_visible": false
+      }
+    },
+    {
+      "id": "pps-019",
+      "status": "pass",
+      "observed": "Synthetic positive example for pps-019",
+      "evidence_refs": [
+        "synthetic:offline-fixture"
+      ],
+      "metrics": {
+        "run_id": "synthetic-run",
+        "owner_matches": true,
+        "isolated_window": true,
+        "before": {
+          "runs_n": 3,
+          "llm_in_tok": 2000,
+          "llm_out_tok": 1000,
+          "gpu_s": 300,
+          "spend_usd": 1
+        },
+        "after": {
+          "runs_n": 4,
+          "llm_in_tok": 3000,
+          "llm_out_tok": 1500,
+          "gpu_s": 480,
+          "spend_usd": 1.302
+        }
+      }
+    },
+    {
+      "id": "pps-020",
+      "status": "pass",
+      "observed": "Synthetic positive example for pps-020",
+      "evidence_refs": [
+        "synthetic:offline-fixture"
+      ],
+      "metrics": {
+        "run_id": "synthetic-run",
+        "details_opens": true,
+        "usage_visible": true,
+        "cost_visible": true,
+        "values_match_ledger": true
+      }
+    },
+    {
+      "id": "pps-021",
+      "status": "pass",
+      "observed": "Synthetic positive example for pps-021",
+      "evidence_refs": [
+        "synthetic:offline-fixture"
+      ],
+      "metrics": {
+        "run_id": "synthetic-run",
+        "failure_observed": true,
+        "run_id_visible": true,
+        "failure_stage_visible": true,
+        "failure_reason_visible": true,
+        "retry_available": true,
+        "secrets_redacted": true
+      }
+    },
+    {
+      "id": "pps-022",
+      "status": "pass",
+      "observed": "Synthetic positive example for pps-022",
+      "evidence_refs": [
+        "synthetic:offline-fixture"
+      ],
+      "metrics": {
+        "run_id": "synthetic-run",
+        "retry_observed": true,
+        "same_run": true,
+        "task_count_delta": 0,
+        "token_delta": 0,
+        "gpu_s_delta": 0,
+        "cost_delta": 0
+      }
+    },
+    {
+      "id": "pps-023",
+      "status": "pass",
+      "observed": "Synthetic positive example for pps-023",
+      "evidence_refs": [
+        "synthetic:offline-fixture"
+      ],
+      "metrics": {
+        "run_id": "synthetic-run",
+        "over_budget_attempted": true,
+        "rejected": true,
+        "error_visible": true,
+        "model_calls_delta": 0,
+        "cost_delta": 0
+      }
+    },
+    {
+      "id": "pps-024",
+      "status": "pass",
+      "observed": "Synthetic positive example for pps-024",
+      "evidence_refs": [
+        "synthetic:offline-fixture"
+      ],
+      "metrics": {
+        "run_id": "synthetic-run",
+        "rejected_submission_observed": true,
+        "error_visible": true,
+        "modal_remains_open": true,
+        "url_preserved": true,
+        "success_toast_visible": false,
+        "new_runs": 0
+      }
+    }
+  ]
+}

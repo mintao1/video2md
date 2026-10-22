@@ -1,0 +1,31 @@
+{
+  "run_id": "3c05faf8",
+  "status": "confirmed_historical_discrepancy",
+  "provider_request_count": 7,
+  "provider_canonical_usage": {
+    "llm_in_tok": 37863,
+    "llm_out_tok": 31495,
+    "llm_cached_in_tok": 18688
+  },
+  "application_recorded_usage": {
+    "gpu_s": 1460.57,
+    "llm_in_tok": 19169,
+    "llm_out_tok": 23495,
+    "llm_cached_in_tok": 9344
+  },
+  "missing_usage": {
+    "llm_in_tok": 18694,
+    "llm_out_tok": 8000,
+    "llm_cached_in_tok": 9344
+  },
+  "provider_attribution_usd": "0.01918439",
+  "application_attribution_usd": 0.013502,
+  "attribution_difference_usd": "0.00568239",
+  "supplier_cash_debit_inferred_from_token_cost": false,
+  "normalization": "OpenCode export inputTokens excludes cacheReadTokens/cacheWriteTokens; canonical input includes them. Observed rows have cacheWriteTokens=0.",
+  "evidence": [
+    "supplier-usage-redacted.json",
+    "app-usage-before-retry.json"
+  ],
+  "backfilled": false
+}

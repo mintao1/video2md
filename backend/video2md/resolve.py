@@ -9,9 +9,12 @@ import shutil
 import subprocess
 import time
 from pathlib import Path
+from urllib.parse import urlsplit
 
 import httpx
 
+from .bilibili import accepts_url as _bilibili_public_url
+from .bilibili import resolve_public_video
 from .util import redact
 
 # backwards-compatible single-entry wrapper
@@ -457,11 +460,34 @@ _DIRECT_HOST_RE = re.compile(
     r"|douyinvod\.com|douyinpic\.com|xiaohongshu\.com|xhscdn\.com)", re.I)
 
 
+def _explicit_direct_host(url: str) -> bool:
+    """Match the operator's exact/suffix direct-host allowlist."""
+    host = (urlsplit(url or "").hostname or "").rstrip(".").casefold()
+    if not host:
+        return False
+    for raw in (os.environ.get("V2MD_DIRECT_HOSTS") or "").split(","):
+        entry = raw.strip().rstrip(".").casefold()
+        if not entry:
+            continue
+        if entry.startswith("."):
+            suffix = entry[1:]
+            if host == suffix or host.endswith(entry):
+                return True
+        elif host == entry:
+            return True
+    return False
+
+
 
 def _subprocess_env(url: str) -> dict | None:
     """yt-dlp 子进程的代理环境。国内站默认剥代理直连；境外站默认继承父进程。
     配了 V2MD_PROXY 时显式注入（容器/服务器场景父进程可能没代理环境）；
     V2MD_PROXY_DOMESTIC=1 时国内站也走代理（机房 IP 被风控的云上场景）。"""
+    if _explicit_direct_host(url):
+        env = dict(os.environ)
+        for k in _PROXY_KEYS:
+            env.pop(k, None)
+        return env
     domestic = bool(_DIRECT_HOST_RE.search(url or ""))
     domestic_forced_proxy = domestic and \
         (os.environ.get("V2MD_PROXY_DOMESTIC") or "").lower() in ("1", "true", "on")
@@ -493,9 +519,14 @@ def resolve_url(url: str) -> list[dict]:
     err = ""
     backoff = [3, 10, 30]
     for attempt in range(4):  # 4×60s+43s 退避 ≈ 最坏 283s，仍在工作流 /runs 300s 读超时内
-        p = subprocess.run([ytdlp, "--flat-playlist", "--dump-single-json", "--simulate",
-                            "--no-warnings", url], capture_output=True, text=True, timeout=60,
-                           env=_subprocess_env(url))
+        try:
+            p = subprocess.run([ytdlp, "--flat-playlist", "--dump-single-json", "--simulate",
+                                "--no-warnings", url], capture_output=True, text=True, timeout=60,
+                               env=_subprocess_env(url))
+        except subprocess.TimeoutExpired:
+            if _bilibili_public_url(url):
+                return resolve_public_video(url)
+            raise
         if p.returncode == 0:
             break
         err = _clean_ytdlp_err(p.stderr)
@@ -508,6 +539,8 @@ def resolve_url(url: str) -> list[dict]:
             raise RuntimeError("小红书页面无可解析视频（可能是图文笔记或触发反爬；请提供 Chrome cookies）")
         if "Unsupported URL" in err or "Video unavailable" in err:
             raise RuntimeError(f"链接解析失败：{redact(err)}")  # 永久性错误不重试
+        if _bilibili_public_url(url):
+            return resolve_public_video(url)
         if attempt < len(backoff):
             time.sleep(backoff[attempt])
     else:

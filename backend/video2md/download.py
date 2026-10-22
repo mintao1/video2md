@@ -8,12 +8,21 @@ from pathlib import Path
 
 import httpx
 
+from .bilibili import accepts_url as _bilibili_public_url
+from .bilibili import download_public_video, resolve_public_video
 from .resolve import _DOUYIN_UA, _clean_ytdlp_err, _download_direct, _subprocess_env
 from .util import redact, sanitize_filename
+
+_FORMAT_SELECTOR = "bv*[height<=720]+ba/b[height<=720]/best"
 
 
 def download_entry(entry: dict, tmp: Path) -> tuple[Path, str]:
     """下载一个已解析的条目；输出名带 entry id/分P序号，避免多条目附件碰撞。"""
+    if entry.get("bilibili"):
+        eid = sanitize_filename(entry.get("id") or "video")[:40]
+        idx = entry.get("playlist_index")
+        prefix = f"p{idx:03d}-{eid}" if isinstance(idx, int) else eid
+        return download_public_video(entry, tmp / f"{prefix}.mp4"), entry.get("uploader", "")
     ytdlp = shutil.which("yt-dlp") or next(
         (str(p) for p in (Path("/Library/Frameworks/Python.framework/Versions/3.14/bin/yt-dlp"),
                           Path.home() / "Library/Frameworks/Python.framework/Versions/3.14/bin/yt-dlp",
@@ -30,12 +39,26 @@ def download_entry(entry: dict, tmp: Path) -> tuple[Path, str]:
                                     headers=entry.get("headers")), entry.get("uploader", "")
         except Exception as exc:
             sys.exit(f"❌ 直链下载失败: {redact(str(exc)[-200:])}")
-    common = ["-f", "bv*[height<=720]+ba/b[height<=720]", "--merge-output-format", "mp4",
+    common = ["-f", _FORMAT_SELECTOR, "--merge-output-format", "mp4",
               "--concurrent-fragments", "8", "-o", str(tmp / f"{prefix}.%(ext)s"),
               "--no-playlist", "--no-simulate", "--print", "META|%(uploader)s|%(channel)s"]
     url = entry["url"]
-    p = subprocess.run([ytdlp, *common, url], capture_output=True, text=True,
-                       env=_subprocess_env(url))
+    def public_bilibili_fallback() -> tuple[Path, str]:
+        entries = resolve_public_video(url)
+        if len(entries) != 1:
+            raise RuntimeError("B站下载需要明确的分P链接")
+        path = download_public_video(entries[0], tmp / f"{prefix}.mp4")
+        return path, entries[0].get("uploader") or entry.get("uploader", "")
+
+    try:
+        p = subprocess.run([ytdlp, *common, url], capture_output=True, text=True,
+                           env=_subprocess_env(url), timeout=60 if _bilibili_public_url(url) else None)
+    except subprocess.TimeoutExpired:
+        if _bilibili_public_url(url):
+            return public_bilibili_fallback()
+        raise
+    if p.returncode != 0 and _bilibili_public_url(url):
+        return public_bilibili_fallback()
     if p.returncode != 0:
         p = subprocess.run([ytdlp, "--cookies-from-browser", "chrome", *common, url],
                            capture_output=True, text=True, env=_subprocess_env(url))

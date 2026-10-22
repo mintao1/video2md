@@ -1,30 +1,22 @@
 #!/usr/bin/env python3
 """test_llm.py — llm.py 离线单测：模板渲染 / chat 重试纪律 / 选帧解析 / 写盘组装。
 
-运行：python3 test_llm.py（无网络：httpx MockTransport 拦截；重试 sleep 打桩）。
+运行：pytest tests/test_llm.py（无网络：httpx MockTransport 拦截；重试 sleep 打桩）。
 """
 import json
-import sys
-import types
-from pathlib import Path
-
-# Mock platform_otel_sdk 以避免收集期 ImportError（该 SDK 不在 video2md venv 中）
-_mock_sdk = types.ModuleType("platform_otel_sdk")
-_mock_sdk._RUNS = {}
-_mock_sdk._RunTrace = type("_RunTrace", (), {})
-_mock_sdk.get_tracer = lambda *a, **k: None
-sys.modules["platform_otel_sdk"] = _mock_sdk
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # backend/（包根）
 
 import httpx
 
-from video2md import llm
 
-llm._sleep = lambda _s: None  # 重试间隔不真等
+def test_llm(monkeypatch):
+    # Import after collection so the API suite can install isolated paths and
+    # credentials first. The SDK is a declared dependency; a global fake breaks
+    # API startup when this file is collected before the contract suite.
+    from video2md import llm
 
-
-def test_llm():
+    for name in ('_TRANSPORT', 'LLM_BASE', 'LLM_KEY', '_FAKE_LLM'):
+        monkeypatch.setattr(llm, name, getattr(llm, name))
+    monkeypatch.setattr(llm, '_sleep', lambda _: None)
     # Other contract tests intentionally set V2MD_FAKE_LLM=1 for safety. This
     # test exercises the real HTTP/mock transport path, so isolate that module
     # switch from process-wide test ordering.

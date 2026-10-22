@@ -1,0 +1,840 @@
+{
+  "kind": "production",
+  "release": "video2md:0.2.0-failure-cost-20261021b",
+  "gpu_release": "gpu-router:0.2.3-kaggle-token-20261022b",
+  "run_id": "dd586072",
+  "observed_at": "2026-10-21T17:49:40.535290+00:00",
+  "scope": "historical_snapshot_replay_not_live_verification",
+  "results": [
+    {
+      "id": "kfi-001",
+      "status": "pass",
+      "metrics": {
+        "authenticated": true,
+        "auth_method": "ACCESS_TOKEN",
+        "token_value_recorded": false,
+        "token_file_present": true,
+        "token_readable": true,
+        "username_present": true
+      },
+      "evidence_refs": [
+        {
+          "path": "../testing/2026-10-22/followup-eval-guards/case-observations.json",
+          "role": "case_source",
+          "sha256": "89fb2531b71e76914caffd640066492df5ab3740a8178e424ce2fc737b171eca"
+        },
+        {
+          "path": "../testing/2026-10-22/kaggle-token-integration/token-validation.json",
+          "role": "observation",
+          "sha256": "986cbc96d967100f247e7239b1ba26079ea11bbe01c6a34ba492da6c55ee5d55"
+        },
+        {
+          "path": "../testing/2026-10-22/kaggle-token-integration/runtime-credentials.json",
+          "role": "observation",
+          "sha256": "066a48fe1fea1e60dcad0a3660c0668868c5a92a5a16f1f20866bf936c59ac9e"
+        }
+      ]
+    },
+    {
+      "id": "kfi-002",
+      "status": "pass",
+      "metrics": {
+        "kernel_status": "done",
+        "elapsed_s": 59.074,
+        "llm_calls": 0,
+        "fresh_control_id_matches": true,
+        "control_id": "9b45e22d74f440178985d0615a2b5d9f",
+        "input_files": [
+          "/kaggle/input/datasets/<account>/gpu-router-io/clip-src.mp4",
+          "/kaggle/input/datasets/<account>/gpu-router-io/clip_job.json"
+        ],
+        "nvidia_binary": "/opt/bin/nvidia-smi",
+        "nvidia_devices": [
+          "/dev/nvidia1",
+          "/dev/nvidia0",
+          "/dev/nvidiactl",
+          "/dev/nvidia-uvm-tools",
+          "/dev/nvidia-uvm"
+        ],
+        "cuda_available": true,
+        "cuda_devices": 2,
+        "cuda_device_names": [
+          "Tesla T4",
+          "Tesla T4"
+        ],
+        "gpu_names": [
+          "Tesla T4",
+          "Tesla T4"
+        ],
+        "nvidia_exit_code": 0,
+        "requested_control_id": "9b45e22d74f440178985d0615a2b5d9f"
+      },
+      "evidence_refs": [
+        {
+          "path": "../testing/2026-10-22/followup-eval-guards/case-observations.json",
+          "role": "case_source",
+          "sha256": "89fb2531b71e76914caffd640066492df5ab3740a8178e424ce2fc737b171eca"
+        },
+        {
+          "path": "../testing/2026-10-22/kaggle-token-integration/kaggle-layout-verified-gpu.json",
+          "role": "cuda_probe",
+          "sha256": "7aa19ed6cddb5c79ce56cb92d5b6d3d1a92617d9e876107154bd62594be3a404"
+        },
+        {
+          "path": "../testing/2026-10-22/kaggle-token-integration/patch-manifest-b.json",
+          "role": "gpu_manifest",
+          "sha256": "d005e38064988f4e6d41e701ade1b766dc9223515ddd871803fe43a18e152fe0"
+        },
+        {
+          "path": "../testing/2026-10-22/kaggle-token-integration/runtime-b-source.json",
+          "role": "gpu_runtime",
+          "sha256": "b6362b5624ab9a39319f999f313f273f309a127228ceb9af6c54c5eb3e353406"
+        }
+      ]
+    },
+    {
+      "id": "kfi-003",
+      "status": "pass",
+      "metrics": {
+        "authenticated": true,
+        "actions": [
+          "login",
+          "input",
+          "submit"
+        ],
+        "input_url": "https://www.bilibili.com/video/BV1LV411r77C/",
+        "submitted_url": "https://www.bilibili.com/video/BV1LV411r77C/",
+        "submit_count": 1,
+        "run_id": "dd586072",
+        "task_count_before": 9,
+        "task_count_after": 10
+      },
+      "evidence_refs": [
+        {
+          "path": "../testing/2026-10-22/followup-eval-guards/case-observations.json",
+          "role": "case_source",
+          "sha256": "89fb2531b71e76914caffd640066492df5ab3740a8178e424ce2fc737b171eca"
+        },
+        {
+          "path": "../testing/2026-10-22/kaggle-token-integration/bilibili-explicit-after-verification.png",
+          "role": "observation",
+          "sha256": "1ccf650a24d63a34d32139943ce1f1b6a8dca22befc99b5c86f421057ab71b36"
+        },
+        {
+          "path": "../testing/2026-10-22/kaggle-token-integration/bilibili-submitted-after-verification.png",
+          "role": "observation",
+          "sha256": "e3ba61f7f56976aa62782f8a60405841f87956c6e1be464346a2be034c2d3ac7"
+        },
+        {
+          "path": "../testing/2026-10-22/kaggle-token-integration/submitted-state.json",
+          "role": "observation",
+          "sha256": "704b0ed4fe7740fe089155b010a165f8a7b205aab80d8cdb88f8dc0d462e030b"
+        }
+      ]
+    },
+    {
+      "id": "kfi-004",
+      "status": "pass",
+      "metrics": {
+        "run_id": "dd586072",
+        "status": "running",
+        "total": 2,
+        "entries": [
+          {
+            "index": 1,
+            "url": "https://www.bilibili.com/video/BV1LV411r77C/?p=1",
+            "skipped": false,
+            "from_run": null,
+            "note": null,
+            "done": {
+              "download": true,
+              "transcribe": false,
+              "frames": false,
+              "ocr": false,
+              "select": false,
+              "clips": false,
+              "note": false
+            }
+          },
+          {
+            "index": 2,
+            "url": "https://www.bilibili.com/video/BV1LV411r77C/?p=2",
+            "skipped": false,
+            "from_run": null,
+            "note": null,
+            "done": {
+              "download": true,
+              "transcribe": false,
+              "frames": false,
+              "ocr": false,
+              "select": false,
+              "clips": false,
+              "note": false
+            }
+          }
+        ],
+        "stages": {
+          "download": {}
+        },
+        "claimed_scope": "selected_first_two"
+      },
+      "evidence_refs": [
+        {
+          "path": "../testing/2026-10-22/followup-eval-guards/case-observations.json",
+          "role": "case_source",
+          "sha256": "89fb2531b71e76914caffd640066492df5ab3740a8178e424ce2fc737b171eca"
+        },
+        {
+          "path": "../testing/2026-10-22/kaggle-token-integration/dd586072-progress.json",
+          "role": "observation",
+          "sha256": "5dd5c824a6d28b20e2ad6a2ad893431cb161e8460df7aec50d58c25d6ec8201a"
+        }
+      ]
+    },
+    {
+      "id": "kfi-005",
+      "status": "pass",
+      "metrics": {
+        "run_id": "dd586072",
+        "remote_status": "queued",
+        "business_status": "running",
+        "claimed_delivery_success": false,
+        "completed_new_books": 0,
+        "llm_calls_after_block": 0,
+        "cost_finalized": false,
+        "gpu_seconds_semantics": "remote_call_wall_clock"
+      },
+      "evidence_refs": [
+        {
+          "path": "../testing/2026-10-22/followup-eval-guards/case-observations.json",
+          "role": "case_source",
+          "sha256": "89fb2531b71e76914caffd640066492df5ab3740a8178e424ce2fc737b171eca"
+        },
+        {
+          "path": "../testing/2026-10-22/kaggle-token-integration/final-state.json",
+          "role": "observation",
+          "sha256": "b87829fba0f639f05f4a0b2dfebd023da20d4fbab954d48ea8faeef5f7950d21"
+        },
+        {
+          "path": "../testing/2026-10-22/kaggle-token-integration/kaggle-after-cleanup-state.txt",
+          "role": "observation",
+          "sha256": "7c07407f3e74263e755089424bf84be6c160f727694d573a03b8025cde06ebce"
+        }
+      ]
+    },
+    {
+      "id": "kfi-006",
+      "status": "pass",
+      "metrics": {
+        "auxiliary_jobs": [
+          {
+            "kernel": "gpu-router-job",
+            "version": 6,
+            "status": "cancelled",
+            "observed_terminal": true,
+            "observation_s": 1200.72
+          },
+          {
+            "kernel": "gpu-router-diag-accelerator",
+            "version": 1,
+            "status": "cancelled",
+            "observed_terminal": true,
+            "observation_s": 509
+          }
+        ],
+        "business_job": {
+          "kernel": "gpu-router-job",
+          "version": 7,
+          "status": "queued"
+        },
+        "max_observation_s": 1800,
+        "observer_stopped": true
+      },
+      "evidence_refs": [
+        {
+          "path": "../testing/2026-10-22/followup-eval-guards/case-observations.json",
+          "role": "case_source",
+          "sha256": "89fb2531b71e76914caffd640066492df5ab3740a8178e424ce2fc737b171eca"
+        },
+        {
+          "path": "../testing/2026-10-22/kaggle-token-integration/kaggle-after-cleanup-state.txt",
+          "role": "observation",
+          "sha256": "7c07407f3e74263e755089424bf84be6c160f727694d573a03b8025cde06ebce"
+        },
+        {
+          "path": "../testing/2026-10-22/kaggle-token-integration/kaggle-after-cleanup.png",
+          "role": "observation",
+          "sha256": "340f4d6d177a333a9ad6b9b7272acab2c407bb0e7b4d6f349c72483826da2607"
+        },
+        {
+          "path": "../testing/2026-10-22/kaggle-token-integration/observer-cleanup.json",
+          "role": "observation",
+          "sha256": "5126d58e967d473c684bce38614d07e92055adc944b3174e1468b18e7aac4c2b"
+        },
+        {
+          "path": "../testing/2026-10-22/kaggle-token-integration/verified-route-after-cleanup.json",
+          "role": "observation",
+          "sha256": "686cb590fd5dbaef8290e5377542313e624d215e6a68f2cf94922f8a1c71458e"
+        }
+      ]
+    },
+    {
+      "id": "kfi-007",
+      "status": "blocked",
+      "metrics": {
+        "run_id": "dd586072",
+        "status": "running",
+        "books": []
+      },
+      "evidence_refs": [
+        {
+          "path": "../testing/2026-10-22/followup-eval-guards/case-observations.json",
+          "role": "case_source",
+          "sha256": "89fb2531b71e76914caffd640066492df5ab3740a8178e424ce2fc737b171eca"
+        },
+        {
+          "path": "../testing/2026-10-22/kaggle-token-integration/dd586072-progress.json",
+          "role": "observation",
+          "sha256": "5dd5c824a6d28b20e2ad6a2ad893431cb161e8460df7aec50d58c25d6ec8201a"
+        },
+        {
+          "path": "../testing/2026-10-22/kaggle-token-integration/bilibili-current-state.png",
+          "role": "observation",
+          "sha256": "b318ffd73fb2a4a3c231439ed028b37422ecd1bb890d7ddb5e490bba2f2fbcac"
+        }
+      ]
+    },
+    {
+      "id": "kfi-008",
+      "status": "pass",
+      "metrics": {
+        "run_id": "3c05faf8",
+        "truncated": false,
+        "rows": [
+          {
+            "run_id": "3c05faf8",
+            "request_id": "01a15eb6-835f-7416-9b41-b4535e01ff47",
+            "usage_observed": true
+          },
+          {
+            "run_id": "3c05faf8",
+            "request_id": "01a15eb5-32e5-7607-98a9-fe3ccb842567",
+            "usage_observed": true
+          },
+          {
+            "run_id": "3c05faf8",
+            "request_id": "01a15eb5-227c-7230-b806-051f000500c6",
+            "usage_observed": true
+          },
+          {
+            "run_id": "3c05faf8",
+            "request_id": "01a15eb4-8b84-7d31-9b57-3b7757b5fecb",
+            "usage_observed": true
+          },
+          {
+            "run_id": "3c05faf8",
+            "request_id": "01a15ea5-9408-78bf-8c34-1b1e02224eb5",
+            "usage_observed": true
+          },
+          {
+            "run_id": "3c05faf8",
+            "request_id": "01a15ea4-ac95-7cf0-9c4c-03b640fc5d86",
+            "usage_observed": true
+          },
+          {
+            "run_id": "3c05faf8",
+            "request_id": "01a15ea3-c77c-7def-a9a1-1f6a55e033de",
+            "usage_observed": true
+          }
+        ],
+        "headers_in_public_evidence": false,
+        "private_original_preserved": true
+      },
+      "evidence_refs": [
+        {
+          "path": "../testing/2026-10-22/followup-eval-guards/case-observations.json",
+          "role": "case_source",
+          "sha256": "89fb2531b71e76914caffd640066492df5ab3740a8178e424ce2fc737b171eca"
+        },
+        {
+          "path": "../testing/2026-10-22/kaggle-token-integration/supplier-usage-24h-redacted.json",
+          "role": "observation",
+          "sha256": "b3a70f7a60fd67f281d14d587ba95f115eec56a9f9304eb5c1cd6b2cf0ec6eb5"
+        }
+      ]
+    },
+    {
+      "id": "kfi-009",
+      "status": "pass",
+      "metrics": {
+        "kind": "independent_provider_export_reconciliation",
+        "run_id": "be188f78",
+        "provider_request_count": 5,
+        "requests": [
+          {
+            "request_id": "01a15d88-9a83-7cbc-80d0-aae3401a3786",
+            "input_tokens": 827,
+            "output_tokens": 856,
+            "cached_tokens": 0,
+            "attribution_usd": "0.00055205"
+          },
+          {
+            "request_id": "01a15d87-e64c-7cfe-9c68-4e914ed691de",
+            "input_tokens": 2152,
+            "output_tokens": 7071,
+            "cached_tokens": 0,
+            "attribution_usd": "0.0038583"
+          },
+          {
+            "request_id": "01a15d87-c817-7bde-b9ba-bbdb3a75d1a7",
+            "input_tokens": 691,
+            "output_tokens": 982,
+            "cached_tokens": 0,
+            "attribution_usd": "0.00059465"
+          },
+          {
+            "request_id": "01a15d87-2b81-7d35-8a57-4c48d71e804a",
+            "input_tokens": 1533,
+            "output_tokens": 5944,
+            "cached_tokens": 0,
+            "attribution_usd": "0.00320195"
+          },
+          {
+            "request_id": "01a15d7e-fadf-7b84-8663-dc413bbf817f",
+            "input_tokens": 10736,
+            "output_tokens": 988,
+            "cached_tokens": 0,
+            "attribution_usd": "0.0021044"
+          }
+        ],
+        "provider_usage": {
+          "llm_in_tok": 15939,
+          "llm_out_tok": 15841,
+          "llm_cached_in_tok": 0
+        },
+        "application_usage": {
+          "llm_in_tok": 15939,
+          "llm_out_tok": 15841,
+          "llm_cached_in_tok": 0
+        },
+        "missing_usage": {
+          "llm_in_tok": 0,
+          "llm_out_tok": 0,
+          "llm_cached_in_tok": 0
+        },
+        "usage_matches": true,
+        "provider_attribution_usd": "0.01031135",
+        "application_attribution_usd": "0.010311",
+        "attribution_matches": true,
+        "supplier_cash_verified": false,
+        "provider_export_sha256": "1da5cd296c772b48942f8269aebe404de0a1895058e2649934ddc79f2eb6d87d"
+      },
+      "evidence_refs": [
+        {
+          "path": "../testing/2026-10-22/followup-eval-guards/case-observations.json",
+          "role": "case_source",
+          "sha256": "89fb2531b71e76914caffd640066492df5ab3740a8178e424ce2fc737b171eca"
+        },
+        {
+          "path": "../testing/2026-10-22/kaggle-token-integration/provider-reconciliation-healthy.json",
+          "role": "observation",
+          "sha256": "ccb524ed79d6ec2b0b6a151267dfd778a46b8d26770babae6830769703039a28"
+        }
+      ]
+    },
+    {
+      "id": "kfi-010",
+      "status": "pass",
+      "metrics": {
+        "kind": "independent_provider_export_reconciliation",
+        "run_id": "3c05faf8",
+        "provider_request_count": 7,
+        "requests": [
+          {
+            "request_id": "01a15eb6-835f-7416-9b41-b4535e01ff47",
+            "input_tokens": 1463,
+            "output_tokens": 414,
+            "cached_tokens": 0,
+            "attribution_usd": "0.00042645"
+          },
+          {
+            "request_id": "01a15eb5-32e5-7607-98a9-fe3ccb842567",
+            "input_tokens": 5944,
+            "output_tokens": 13181,
+            "cached_tokens": 0,
+            "attribution_usd": "0.0074821"
+          },
+          {
+            "request_id": "01a15eb5-227c-7230-b806-051f000500c6",
+            "input_tokens": 875,
+            "output_tokens": 335,
+            "cached_tokens": 0,
+            "attribution_usd": "0.00029875"
+          },
+          {
+            "request_id": "01a15eb4-8b84-7d31-9b57-3b7757b5fecb",
+            "input_tokens": 1540,
+            "output_tokens": 5634,
+            "cached_tokens": 0,
+            "attribution_usd": "0.003048"
+          },
+          {
+            "request_id": "01a15ea5-9408-78bf-8c34-1b1e02224eb5",
+            "input_tokens": 9347,
+            "output_tokens": 3931,
+            "cached_tokens": 9344,
+            "attribution_usd": "0.00224627"
+          },
+          {
+            "request_id": "01a15ea4-ac95-7cf0-9c4c-03b640fc5d86",
+            "input_tokens": 9347,
+            "output_tokens": 4000,
+            "cached_tokens": 9344,
+            "attribution_usd": "0.00228077"
+          },
+          {
+            "request_id": "01a15ea3-c77c-7def-a9a1-1f6a55e033de",
+            "input_tokens": 9347,
+            "output_tokens": 4000,
+            "cached_tokens": 0,
+            "attribution_usd": "0.00340205"
+          }
+        ],
+        "provider_usage": {
+          "llm_in_tok": 37863,
+          "llm_out_tok": 31495,
+          "llm_cached_in_tok": 18688
+        },
+        "application_usage": {
+          "llm_in_tok": 19169,
+          "llm_out_tok": 23495,
+          "llm_cached_in_tok": 9344
+        },
+        "missing_usage": {
+          "llm_in_tok": 18694,
+          "llm_out_tok": 8000,
+          "llm_cached_in_tok": 9344
+        },
+        "usage_matches": false,
+        "provider_attribution_usd": "0.01918439",
+        "application_attribution_usd": "0.013502",
+        "attribution_matches": false,
+        "supplier_cash_verified": false,
+        "provider_export_sha256": "1da5cd296c772b48942f8269aebe404de0a1895058e2649934ddc79f2eb6d87d",
+        "historical_bill_backfilled": false,
+        "claimed_fixed": false
+      },
+      "evidence_refs": [
+        {
+          "path": "../testing/2026-10-22/followup-eval-guards/case-observations.json",
+          "role": "case_source",
+          "sha256": "89fb2531b71e76914caffd640066492df5ab3740a8178e424ce2fc737b171eca"
+        },
+        {
+          "path": "../testing/2026-10-22/kaggle-token-integration/provider-reconciliation-original.json",
+          "role": "observation",
+          "sha256": "55aa19ddf7b632629e171d1061cdba4f84d071298ea52069725f0e7fb1bedbb2"
+        }
+      ]
+    },
+    {
+      "id": "kfi-011",
+      "status": "not-tested",
+      "metrics": {
+        "run_id": "3c05faf8",
+        "applied": false,
+        "before_usage": {
+          "llm_in_tok": 19169,
+          "llm_out_tok": 23495,
+          "llm_cached_in_tok": 9344
+        },
+        "after": {
+          "kind": "independent_provider_export_reconciliation",
+          "run_id": "3c05faf8",
+          "provider_request_count": 7,
+          "requests": [
+            {
+              "request_id": "01a15eb6-835f-7416-9b41-b4535e01ff47",
+              "input_tokens": 1463,
+              "output_tokens": 414,
+              "cached_tokens": 0,
+              "attribution_usd": "0.00042645"
+            },
+            {
+              "request_id": "01a15eb5-32e5-7607-98a9-fe3ccb842567",
+              "input_tokens": 5944,
+              "output_tokens": 13181,
+              "cached_tokens": 0,
+              "attribution_usd": "0.0074821"
+            },
+            {
+              "request_id": "01a15eb5-227c-7230-b806-051f000500c6",
+              "input_tokens": 875,
+              "output_tokens": 335,
+              "cached_tokens": 0,
+              "attribution_usd": "0.00029875"
+            },
+            {
+              "request_id": "01a15eb4-8b84-7d31-9b57-3b7757b5fecb",
+              "input_tokens": 1540,
+              "output_tokens": 5634,
+              "cached_tokens": 0,
+              "attribution_usd": "0.003048"
+            },
+            {
+              "request_id": "01a15ea5-9408-78bf-8c34-1b1e02224eb5",
+              "input_tokens": 9347,
+              "output_tokens": 3931,
+              "cached_tokens": 9344,
+              "attribution_usd": "0.00224627"
+            },
+            {
+              "request_id": "01a15ea4-ac95-7cf0-9c4c-03b640fc5d86",
+              "input_tokens": 9347,
+              "output_tokens": 4000,
+              "cached_tokens": 9344,
+              "attribution_usd": "0.00228077"
+            },
+            {
+              "request_id": "01a15ea3-c77c-7def-a9a1-1f6a55e033de",
+              "input_tokens": 9347,
+              "output_tokens": 4000,
+              "cached_tokens": 0,
+              "attribution_usd": "0.00340205"
+            }
+          ],
+          "provider_usage": {
+            "llm_in_tok": 37863,
+            "llm_out_tok": 31495,
+            "llm_cached_in_tok": 18688
+          },
+          "application_usage": {
+            "llm_in_tok": 19169,
+            "llm_out_tok": 23495,
+            "llm_cached_in_tok": 9344
+          },
+          "missing_usage": {
+            "llm_in_tok": 18694,
+            "llm_out_tok": 8000,
+            "llm_cached_in_tok": 9344
+          },
+          "usage_matches": false,
+          "provider_attribution_usd": "0.01918439",
+          "application_attribution_usd": "0.013502",
+          "attribution_matches": false,
+          "supplier_cash_verified": false,
+          "provider_export_sha256": "1da5cd296c772b48942f8269aebe404de0a1895058e2649934ddc79f2eb6d87d"
+        },
+        "audit": null,
+        "second_apply_changed": null,
+        "unrelated_runs_changed": null,
+        "cash_charge_created": null
+      },
+      "evidence_refs": [
+        {
+          "path": "../testing/2026-10-22/followup-eval-guards/case-observations.json",
+          "role": "case_source",
+          "sha256": "89fb2531b71e76914caffd640066492df5ab3740a8178e424ce2fc737b171eca"
+        },
+        {
+          "path": "../testing/2026-10-22/kaggle-token-integration/provider-reconciliation-original.json",
+          "role": "observation",
+          "sha256": "55aa19ddf7b632629e171d1061cdba4f84d071298ea52069725f0e7fb1bedbb2"
+        },
+        {
+          "path": "../testing/2026-10-22/kaggle-token-integration/result-summary.json",
+          "role": "observation",
+          "sha256": "01f24b8ad9c75539785ee124d2bbdaf19b87c7c9d702322a4dd67c09720f21d2"
+        }
+      ]
+    },
+    {
+      "id": "kfi-012",
+      "status": "fail",
+      "metrics": {
+        "matrix": {
+          "kind": "production",
+          "release": "video2md:0.2.0-failure-cost-20261021b",
+          "run_id": "f1fff0b8",
+          "observed_date": "2026-10-22",
+          "note": "OAuth passed real UI and refresh acceptance. Three other production findings remain open. Historical evidence is preserved.",
+          "results": [
+            {
+              "id": "failure-cost-001",
+              "status": "not-tested",
+              "metrics": {
+                "release": "video2md:0.2.0-failure-cost-20261021b",
+                "run_id": "f1fff0b8",
+                "entries": [
+                  {
+                    "entry": 1,
+                    "failed_stages": [
+                      "transcribe"
+                    ],
+                    "llm_calls_after_failure": 0,
+                    "blocked_before_model": true
+                  },
+                  {
+                    "entry": 2,
+                    "failed_stages": [
+                      "transcribe"
+                    ],
+                    "llm_calls_after_failure": 0,
+                    "blocked_before_model": true
+                  }
+                ],
+                "limitation": "Real UI run stopped at ASR. It does not exercise OCR/clips failures plus a healthy control."
+              },
+              "evidence_refs": [
+                {
+                  "path": "../testing/2026-10-22/production-ui-followup/final-state.json",
+                  "sha256": "b5e6fa4352a8130e27e15c1695eaad7b77e39623721eeccc399ff634d8bd3503"
+                },
+                {
+                  "path": "../testing/2026-10-22/production-ui-followup/bilibili-terminal.png",
+                  "sha256": "d268446d944108e62c6ea661d315fb9f588fc579becca39f342094938fe719e1"
+                }
+              ]
+            },
+            {
+              "id": "failure-cost-002",
+              "status": "not-tested",
+              "metrics": {
+                "release": "video2md:0.2.0-failure-cost-20261021b",
+                "run_id": "f1fff0b8",
+                "attempts": [],
+                "recorded_usage": {
+                  "input_tokens": 0,
+                  "output_tokens": 0,
+                  "cached_tokens": 0
+                },
+                "limitation": "No model request occurred. Current-release isolated retry replay passed previously; this new UI run cannot close real empty-response retry acceptance."
+              },
+              "evidence_refs": [
+                {
+                  "path": "../testing/2026-10-22/production-ui-followup/final-state.json",
+                  "sha256": "b5e6fa4352a8130e27e15c1695eaad7b77e39623721eeccc399ff634d8bd3503"
+                }
+              ]
+            },
+            {
+              "id": "failure-cost-003",
+              "status": "pass",
+              "metrics": {
+                "release": "video2md:0.2.0-failure-cost-20261021b",
+                "run_id": "f1fff0b8",
+                "observations": [
+                  {
+                    "attempt_id": "ui-login-1",
+                    "outcome": "success",
+                    "login_started_at": "2026-10-22T00:21:27+08:00",
+                    "callback_at": "2026-10-22T00:21:42+08:00",
+                    "me_at": "2026-10-22T00:21:50+08:00",
+                    "refresh_at": "2026-10-22T00:22:10+08:00",
+                    "me_status": 200,
+                    "refresh_status": 200,
+                    "elapsed_s": 23.0,
+                    "ui_library_screenshot": "login-1.png"
+                  },
+                  {
+                    "attempt_id": "ui-login-2",
+                    "outcome": "success",
+                    "login_started_at": "2026-10-22T00:22:33+08:00",
+                    "callback_at": "2026-10-22T00:22:50+08:00",
+                    "me_at": "2026-10-22T00:22:58+08:00",
+                    "refresh_at": "2026-10-22T00:23:23+08:00",
+                    "me_status": 200,
+                    "refresh_status": 200,
+                    "elapsed_s": 25.0,
+                    "ui_library_screenshot": "login-2.png"
+                  },
+                  {
+                    "attempt_id": "ui-login-3",
+                    "outcome": "success",
+                    "login_started_at": "2026-10-22T00:23:53+08:00",
+                    "callback_at": "2026-10-22T00:24:10+08:00",
+                    "me_at": "2026-10-22T00:24:15+08:00",
+                    "refresh_at": "2026-10-22T00:24:39+08:00",
+                    "me_status": 200,
+                    "refresh_status": 200,
+                    "elapsed_s": 22.0,
+                    "ui_library_screenshot": "login-3.png"
+                  }
+                ],
+                "relay": {
+                  "active_units": [
+                    "video2md-oauth-relay.service"
+                  ],
+                  "retired_unit_enabled": false,
+                  "listener_host": "127.0.0.1"
+                }
+              },
+              "evidence_refs": [
+                {
+                  "path": "../testing/2026-10-22/production-ui-followup/oauth-evidence.json",
+                  "sha256": "3dd56bc132a353d12a41f4869df1a47545680c8f04132e56694fe6130d6ee0d2"
+                },
+                {
+                  "path": "../testing/2026-10-22/production-ui-followup/me-http-evidence.json",
+                  "sha256": "1cd638d96544a33deb49cbcc5279fffbd903064feb01155b7fce44d37cc826bc"
+                },
+                {
+                  "path": "../testing/2026-10-22/production-ui-followup/deployment.json",
+                  "sha256": "79ba9974d6ae55daef2a78949242520161282b1b7090ef38ab3b7c84dbbe2d19"
+                },
+                {
+                  "path": "../testing/2026-10-22/production-ui-followup/login-1.png",
+                  "sha256": "b743a6d7ba70b786cddc539e8434050b9a25922472576eaf09ac05dd136ab3a9"
+                },
+                {
+                  "path": "../testing/2026-10-22/production-ui-followup/login-2.png",
+                  "sha256": "0d75297cb6974f919408304aa756c6f3d613e956f94403c1d87f2265d639f5fc"
+                },
+                {
+                  "path": "../testing/2026-10-22/production-ui-followup/login-3.png",
+                  "sha256": "059959172969fc4ae7faa402a50fa7353ead0884e2c29a81f0250c05bb5d8ab7"
+                }
+              ]
+            },
+            {
+              "id": "failure-cost-004",
+              "status": "not-tested",
+              "metrics": {
+                "release": "video2md:0.2.0-failure-cost-20261021b",
+                "run_id": "f1fff0b8",
+                "application_cost_usd": 0,
+                "amount_source": "application_attribution_only",
+                "supplier_rows": [],
+                "limitation": "Official provider landing page opened, Go navigation timed out; no independent settled invoice/usage retrieved. Zero application cost is not supplier cash reconciliation."
+              },
+              "evidence_refs": [
+                {
+                  "path": "../testing/2026-10-22/production-ui-followup/final-state.json",
+                  "sha256": "b5e6fa4352a8130e27e15c1695eaad7b77e39623721eeccc399ff634d8bd3503"
+                },
+                {
+                  "path": "../testing/2026-10-22/production-ui-followup/billing-detail.png",
+                  "sha256": "7e8a75d0bf9f64032c5aab59cb5769255aba97a681d8d577f9999bf61a5753aa"
+                }
+              ]
+            }
+          ]
+        },
+        "expected_release": "video2md:0.2.0-failure-cost-20261021b",
+        "run_id": "dd586072"
+      },
+      "evidence_refs": [
+        {
+          "path": "../testing/2026-10-22/followup-eval-guards/case-observations.json",
+          "role": "case_source",
+          "sha256": "89fb2531b71e76914caffd640066492df5ab3740a8178e424ce2fc737b171eca"
+        },
+        {
+          "path": "production-failure-cost-evidence-2026-10-22.json",
+          "role": "failure_cost_matrix",
+          "sha256": "84af2405504f324b7df773f2d2a9e0756ea13ad5cdc4ee53eb1c4b032775db67"
+        }
+      ]
+    }
+  ]
+}

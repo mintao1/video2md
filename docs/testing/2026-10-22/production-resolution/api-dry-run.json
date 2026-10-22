@@ -1,0 +1,10 @@
+{
+  "old_last_applied_duplicate_env_names": {
+    "V2MD_ENV": 2
+  },
+  "bookkeeping_repaired_to_live_snapshot": true,
+  "live_spec_unchanged_by_metadata_repair": true,
+  "only_image_changes": true,
+  "all_environment_preserved": true,
+  "force_conflicts": false
+}

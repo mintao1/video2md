@@ -1,0 +1,3 @@
+FAIL OPEN failure-cost-001: absent, unverified or inconsistent evidence
+FAIL OPEN failure-cost-002: absent, unverified or inconsistent evidence
+FAIL OPEN media-readiness: bounded real measurement not demonstrated

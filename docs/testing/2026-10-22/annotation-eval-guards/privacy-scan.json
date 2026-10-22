@@ -1,0 +1,11 @@
+{
+  "scope": "new annotation dataset, checker, tests, CI, docs and local results only",
+  "files_scanned": 17,
+  "patterns": [
+    "Kaggle access token",
+    "private key block",
+    "long Bearer credential"
+  ],
+  "private_originals_read": false,
+  "findings": []
+}

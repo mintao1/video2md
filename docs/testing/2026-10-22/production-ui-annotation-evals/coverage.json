@@ -1,0 +1,81 @@
+{
+  "kind": "offline_historical_replay",
+  "results": [
+    {
+      "id": "pua-001",
+      "annotation_index": 1,
+      "checks": {
+        "settings_save": null
+      },
+      "accepted": false,
+      "status": "incomplete"
+    },
+    {
+      "id": "pua-002",
+      "annotation_index": 2,
+      "checks": {
+        "settings_privacy": null
+      },
+      "accepted": false,
+      "status": "incomplete"
+    },
+    {
+      "id": "pua-003",
+      "annotation_index": 3,
+      "checks": {
+        "runtime": true
+      },
+      "accepted": true,
+      "status": "pass"
+    },
+    {
+      "id": "pua-004",
+      "annotation_index": 4,
+      "checks": {
+        "ocr": true
+      },
+      "accepted": true,
+      "status": "pass"
+    },
+    {
+      "id": "pua-005",
+      "annotation_index": 5,
+      "checks": {
+        "assets": true,
+        "ready": false
+      },
+      "accepted": false,
+      "status": "fail"
+    },
+    {
+      "id": "pua-006",
+      "annotation_index": 6,
+      "checks": {
+        "timely": false
+      },
+      "accepted": false,
+      "status": "fail"
+    },
+    {
+      "id": "pua-007",
+      "annotation_index": 7,
+      "checks": {
+        "ready": false,
+        "timely": false
+      },
+      "accepted": false,
+      "status": "fail"
+    },
+    {
+      "id": "pua-008",
+      "annotation_index": 8,
+      "checks": {
+        "playback": false,
+        "dedup": true
+      },
+      "accepted": false,
+      "status": "fail"
+    }
+  ],
+  "new_production_acceptance": false
+}

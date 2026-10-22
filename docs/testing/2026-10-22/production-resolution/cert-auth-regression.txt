@@ -1,0 +1,19 @@
+........................................................................ [ 52%]
+..................................................................       [100%]
+=============================== warnings summary ===============================
+backend/.venv/lib/python3.12/site-packages/starlette/testclient.py:53
+  /Users/linmintao/Desktop/开发项目/云端部署/video2md/backend/.venv/lib/python3.12/site-packages/starlette/testclient.py:53: DeprecationWarning: The anyio.abc.BlockingPortal alias is deprecated, use anyio.from_thread.BlockingPortal instead.
+    _PortalFactoryType = Callable[[], AbstractContextManager[anyio.abc.BlockingPortal]]
+
+tests/test_api_contract.py::test_auth_google_callback_happy_path
+tests/test_api_contract.py::test_auth_google_redirect_round_trip
+tests/test_api_contract.py::test_auth_google_callback_state_rejected
+tests/test_api_contract.py::test_auth_google_callback_state_rejected
+tests/test_api_contract.py::test_auth_google_callback_state_rejected
+tests/test_api_contract.py::test_auth_google_callback_exchange_rejected
+tests/test_api_contract.py::test_auth_google_callback_verify_fails
+  /Users/linmintao/Desktop/开发项目/云端部署/video2md/backend/.venv/lib/python3.12/site-packages/starlette/testclient.py:455: DeprecationWarning: Setting per-request cookies=<...> is being deprecated, because the expected behaviour on cookie persistence is ambiguous. Set cookies directly on the client instance instead.
+    return super().request(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+138 passed, 8 warnings in 4.92s

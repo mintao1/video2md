@@ -1,0 +1,182 @@
+I001 [*] Import block is un-sorted or un-formatted
+  --> backend/scripts/otel_replay.py:49:1
+   |
+47 |   sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+48 |
+49 | / from opentelemetry.sdk.resources import Resource
+50 | | from opentelemetry.sdk.trace import TracerProvider
+51 | | from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+52 | | from opentelemetry.trace import (
+53 | |     NonRecordingSpan,
+54 | |     SpanContext,
+55 | |     Status,
+56 | |     StatusCode,
+57 | |     TraceFlags,
+58 | |     set_span_in_context,
+59 | | )
+60 | | from platform_otel_sdk._otel import _endpoint  # _endpoint 随 otel 迁移入 SDK（033ae72）
+61 | |
+62 | | from video2md.observability import _scalar_attrs
+   | |________________________________________________^
+63 |
+64 |   PROJ = Path(__file__).resolve().parents[2]
+   |
+help: Organize imports
+   |
+60 | from platform_otel_sdk._otel import _endpoint  # _endpoint 随 otel 迁移入 SDK（033ae72）
+   -
+61 | from video2md.observability import _scalar_attrs
+   |
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> backend/scripts/smoke_colab_cli.py:42:9
+   |
+40 |               "LANGFUSE_PK": "", "LANGFUSE_SK": "", "OTEL_EXPORTER_OTLP_ENDPOINT": "",
+41 |           })
+42 | /         from PIL import Image, ImageDraw, ImageFont
+43 | |
+44 | |         from video2md import artsink, colab
+45 | |         from video2md.clips import remote_cut_clips
+46 | |         from video2md.frames import ocr_candidates
+47 | |         from video2md.transcribe import transcribe
+   | |__________________________________________________^
+48 |
+49 |           frame = root / "validation.jpg"
+   |
+help: Organize imports
+   |
+42 |         from PIL import Image, ImageDraw, ImageFont
+   -
+43 |         from video2md import artsink, colab
+   |
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> backend/tests/test_api_contract.py:35:1
+   |
+33 |   })
+34 |
+35 | / import httpx  # noqa: E402
+36 | | import pytest  # noqa: E402
+37 | | from fastapi.testclient import TestClient  # noqa: E402
+38 | |
+39 | | from video2md import events, runs  # noqa: E402
+40 | | from video2md.api import app  # noqa: E402
+41 | | from video2md.auth import put_identity, resolve_principal  # noqa: E402  # acctkit 接线层
+42 | | from video2md.graph import resolve_run  # noqa: E402
+43 | | from video2md.runs import create_run  # noqa: E402
+   | |____________________________________^
+44 |
+45 |   # ---------------------------------------------------------------- fixtures / helpers
+   |
+help: Organize imports
+   |
+37 | from fastapi.testclient import TestClient  # noqa: E402
+   -
+38 | from video2md import events, runs  # noqa: E402
+   |
+
+I001 [*] Import block is un-sorted or un-formatted
+    --> backend/tests/test_api_contract.py:1365:5
+     |
+1363 |   def test_pg_unavailable_503_envelope(client, monkeypatch):
+1364 |       """P1-8：PG 超预算 → 快速 503（统一信封），不挂死不 500。"""
+1365 | /     from psycopg_pool import PoolTimeout
+1366 | |
+1367 | |     import video2md.api as _api
+     | |_______________________________^
+1368 |
+1369 |       class _DeadStore:
+     |
+help: Organize imports
+     |
+1364 |     """P1-8：PG 超预算 → 快速 503（统一信封），不挂死不 500。"""
+     -     from psycopg_pool import PoolTimeout
+     -
+1365 |     import video2md.api as _api
+1366 +     from psycopg_pool import PoolTimeout
+1367 |
+     |
+
+I001 [*] Import block is un-sorted or un-formatted
+    --> backend/tests/test_api_contract.py:1937:5
+     |
+1936 |   def test_llm_user_credentials_follow_graph_threads_without_leaking(llm_settings_path, monkeypatch):
+1937 | /     import json
+1938 | |     from concurrent.futures import ThreadPoolExecutor
+1939 | |
+1940 | |     from langgraph.graph import END, START, StateGraph
+1941 | |
+1942 | |     from video2md import llm, llm_settings
+     | |__________________________________________^
+1943 |
+1944 |       for uid in ("alice", "bob"):
+     |
+help: Organize imports
+     |
+1940 |     from langgraph.graph import END, START, StateGraph
+     -
+1941 |     from video2md import llm, llm_settings
+     |
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> backend/video2md/auth/__init__.py:7:1
+   |
+ 5 |   ② 把 FastAPI Request 降为 headers Mapping 喂引擎；③ re-export 保 api.py 既有 import 不动。
+ 6 |   """
+ 7 | / from __future__ import annotations
+ 8 | |
+ 9 | | from fastapi import (
+10 | |     Request,  # 接线层允许碰框架（acctkit 本体不碰）；勿用 TYPE_CHECKING 字符串注解——FastAPI 解析不到会把参数当 query 导致 422
+11 | | )
+12 | |
+13 | | from acctkit import AuthEngine, AuthError, Identity, NoCredentials, Principal, build_from_env  # noqa: F401
+14 | | from acctkit.store import IdentityStore, JsonFileStore  # noqa: F401
+15 | |
+16 | | from ..config import ENV, USERS_FILE
+   | |____________________________________^
+help: Organize imports
+   |
+8  |
+9  + from acctkit import AuthEngine, AuthError, Identity, NoCredentials, Principal, build_from_env  # noqa: F401
+10 + from acctkit.store import IdentityStore, JsonFileStore  # noqa: F401
+11 | from fastapi import (
+12 |     Request,  # 接线层允许碰框架（acctkit 本体不碰）；勿用 TYPE_CHECKING 字符串注解——FastAPI 解析不到会把参数当 query 导致 422
+13 | )
+   -
+   - from acctkit import AuthEngine, AuthError, Identity, NoCredentials, Principal, build_from_env  # noqa: F401
+   - from acctkit.store import IdentityStore, JsonFileStore  # noqa: F401
+14 |
+   |
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> backend/video2md/auth/pg_store.py:13:1
+   |
+11 |   输掉的一方收回自己的孤儿开户行、以先落库者为准（文件档靠 fcntl 锁内串行达到同一效果）。
+12 |   """
+13 | / from __future__ import annotations
+14 | |
+15 | | import uuid
+16 | | from datetime import datetime
+17 | | from typing import TYPE_CHECKING
+18 | |
+19 | | from psycopg.types.json import Json
+20 | |
+21 | | from acctkit.models import Identity, Principal
+22 | | from acctkit.store import IdentityStore
+   | |_______________________________________^
+23 |
+24 |   if TYPE_CHECKING:
+   |
+help: Organize imports
+   |
+18 |
+   - from psycopg.types.json import Json
+   -
+19 | from acctkit.models import Identity, Principal
+20 | from acctkit.store import IdentityStore
+21 + from psycopg.types.json import Json
+22 |
+   |
+
+Found 7 errors.
+[*] 7 fixable with the `--fix` option.

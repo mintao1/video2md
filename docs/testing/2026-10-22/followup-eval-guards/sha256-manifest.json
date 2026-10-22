@@ -1,0 +1,19 @@
+{
+  ".github/workflows/ci.yml": "24c61cf3724a0868744b9b906b52066db75f24547b841986826683430e252741",
+  ".github/workflows/production-pipeline-gate.yml": "da84a7f80af8a9066666e3029d203c5a9a1b105bba1d99991b4668c83d8a58ba",
+  "backend/tests/test_kaggle_followup_eval_set.py": "1c5c89603d02459ea7a501c13485ad98530a29679c5b536f778efaf324681206",
+  "docs/evals/kaggle-billing-followup-eval-set.jsonl": "bed64afc047f60de19e135bcfb0e6fb84f3318b2f3820781417426eaed3f2add",
+  "docs/evals/kaggle-billing-followup-evidence-2026-10-22.json": "efabc64ed235becfd2f4dc3c8045b17b346a3ad44e5fd84d04c01c6370078a10",
+  "docs/testing/2026-10-22/followup-eval-guards/build_evidence.py": "51d3277dd95db0e8c9567f72823989d7fdfe3fbd91de59f2772789654eb93731",
+  "docs/testing/2026-10-22/followup-eval-guards/case-observations.json": "89fb2531b71e76914caffd640066492df5ab3740a8178e424ce2fc737b171eca",
+  "docs/testing/2026-10-22/followup-eval-guards/final-followup-tests.txt": "edd10273b13a01385eada2b178dfa1eecf4ba73a405f3a9c4b5b72068daa2e0c",
+  "docs/testing/2026-10-22/followup-eval-guards/frontend-tests.txt": "e859f7ea311d1fe72a0e0879650aacf0ba80d0ecd618a641a3234abdff83d761",
+  "docs/testing/2026-10-22/followup-eval-guards/initial-tests.txt": "931d8933df7b8768964c3a06e44d936dbfd7462023c0a8292f1e9a27c53e2a5f",
+  "docs/testing/2026-10-22/followup-eval-guards/lint.txt": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18",
+  "docs/testing/2026-10-22/followup-eval-guards/production-gate.txt": "fac92ef84da039fa44c8cd5d3a4a517398367fa570d465c2b7cfb5a71aaae7f2",
+  "docs/testing/2026-10-22/followup-eval-guards/regression-tests.txt": "ad1594785c273262c1fecce4d2726d85991b2aecc53c978f9651e25ea46fb4a1",
+  "docs/testing/2026-10-22/followup-eval-guards/report.md": "22a59007f7baaa7d7a52f8308905793040e9a312fbe6e51501b5c97956db6bed",
+  "docs/testing/2026-10-22/followup-eval-guards/verification-summary.json": "a392bd8272d4d990130afc396c69c88880ec9407cdf8a8c4efaf93e2914c1833",
+  "frontend/web/tests/kaggle-followup.integration.test.mjs": "d8f8e98f88c43957fe112fe64d9938e2bf1b442ed85f470d7ee184931a3b8344",
+  "scripts/check_kaggle_followup.py": "c55c2509abe13dff69be3c85e526b2b6e2c520f7bd85e60eb5b2e5acaf1088e9"
+}

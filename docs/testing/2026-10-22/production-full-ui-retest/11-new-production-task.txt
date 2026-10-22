@@ -1,0 +1,119 @@
+Browser tab: 1, Title: "视书 · Textbook Library", URL: "https://ferosse.tech/tasks".
+1 AXWebArea 视书 · Textbook Library, URL: ferosse.tech/tasks
+	2 container app
+		3 container
+			4 text menu_book 视书 · Queue Processing
+			5 button 通知
+			6 link Description: M, Value: ferosse.tech/profile
+			7 button 退出登录
+		8 container
+			9 text link
+			110 text field (settable)
+			11 button auto_awesome 开始解析
+				12 text auto_awesome
+				111 text 开始解析
+			14 text bolt 支持合集、主页处理
+			15 button upload_file 更多导入方式
+				16 text upload_file
+				112 text 更多导入方式
+			18 button 全部任务 (13)
+				19 text 全部任务
+				113 text (13)
+			21 button 转码中 (1)
+				22 text 转码中
+				114 text (1)
+			24 button 排队中 (0)
+				25 text 排队中
+				115 text (0)
+			27 button 历史完成 (4)
+				28 text 历史完成
+				29 text (4)
+			30 button 转换失败 (8)
+				31 text 转换失败
+				32 text (8)
+			33 text stream 实时流水线队列 自动刷新 · 3s
+			34 button checklist 批量管理
+				35 text checklist
+				36 text 批量管理
+			116 text smart_display 处理中
+			117 heading 深度学习之神经网络的结构, Value: 3
+				118 text 深度学习之神经网络的结构
+			119 text link Bilibili 任务编号：8c5d87f3
+			120 button cancel 取消任务
+				121 text cancel
+				122 text 取消任务
+			37 text smart_display 转换完成
+			38 heading PPT 2019 教程开篇：五大章节课程结构总览, Value: 3
+				39 text PPT 2019 教程开篇：五大章节课程结构总览
+			40 text link Bilibili 任务编号：628f38fc 输入 122193 tokens 输出 6707 tokens GPU 1105.960 秒 费用 $0.021682
+			41 button menu_book 立即阅读
+				42 text menu_book
+				43 text 立即阅读
+			44 text smart_display 转换失败
+			45 heading 宿舍之麦麦和小海蛎第一次见面, Value: 3
+				46 text 宿舍之麦麦和小海蛎第一次见面
+			47 text link Bilibili 任务编号：1d13e1c9 失败阶段：download。 处理未完成，请重试或凭任务编号联系支持。 pause_circle 任务已结束，可重新排队
+			48 button 重试任务
+			49 text smart_display 转换完成
+			50 heading 用一张图片改造纯文本PPT排版, Value: 3
+				51 text 用一张图片改造纯文本PPT排版
+			52 text link Bilibili 任务编号：dd586072 输入 37018 tokens 输出 3579 tokens GPU 2548.759 秒 费用 $0.007342
+			53 button menu_book 立即阅读
+				54 text menu_book
+				55 text 立即阅读
+			56 text smart_display 转换失败
+			57 heading 如何用一张图片改变枯燥的纯文本排版？, Value: 3
+				58 text 如何用一张图片改变枯燥的纯文本排版？
+			59 text link Bilibili 任务编号：f1fff0b8 输入 0 tokens 输出 0 tokens GPU 0.089 秒 费用 $0.000000 失败阶段：transcribe。 处理未完成，请重试或凭任务编号联系支持。 pause_circle 任务已结束，可重新排队
+			60 button 重试任务
+			61 text smart_display 生成受阻
+			62 heading 如何用一张图片改变枯燥的纯文本排版？, Value: 3
+				63 text 如何用一张图片改变枯燥的纯文本排版？
+			64 text link Bilibili 任务编号：3c05faf8 输入 37863 tokens 输出 31495 tokens GPU 1460.570 秒 费用 $0.019184 失败阶段：clips。 视频剪辑未完成，暂时无法生成教材；请补跑失败条目。 尚未生成可读教材
+			65 button 补跑失败条目
+			66 text smart_display 转换完成
+			67 heading 学PPT该学哪些技能：会做巧做好用漂亮, Value: 3
+				68 text 学PPT该学哪些技能：会做巧做好用漂亮
+			69 text link Bilibili 任务编号：be188f78 输入 15939 tokens 输出 15841 tokens GPU 1276.450 秒 费用 $0.010311
+			70 button menu_book 立即阅读
+				71 text menu_book
+				72 text 立即阅读
+			73 text smart_display 转换完成
+			74 heading 数据库索引原理与查询优化, Value: 3
+				75 text 数据库索引原理与查询优化
+			76 text 任务编号：4df77d9c 输入 6498 tokens 输出 6919 tokens GPU 809.120 秒 费用 $0.004434
+			77 button menu_book 立即阅读
+				78 text menu_book
+				79 text 立即阅读
+			80 text smart_display 生成受阻
+			81 heading ferosse.tech, Value: 3
+				82 text ferosse.tech
+			83 text 任务编号：edfa1b1a 输入 2047 tokens 输出 8690 tokens GPU 331.228 秒 费用 $0.004652 失败阶段：note。 转录内容过短，未达到教材生成质量门槛；请使用内容更完整的视频。 尚未生成可读教材
+			84 button 补跑失败条目
+			85 text smart_display 转换失败
+			86 heading ferosse.tech, Value: 3
+				87 text ferosse.tech
+			88 text 任务编号：312e97ae 输入 0 tokens 输出 0 tokens GPU 204.669 秒 费用 $0.000000 失败阶段：note。 模型渠道拒绝访问，请检查渠道是否启用及账号权限。（HTTP 403） pause_circle 任务已结束，可重新排队
+			89 button 重试任务
+			90 text smart_display 转换失败
+			91 heading ferosse.tech, Value: 3
+				92 text ferosse.tech
+			93 text 任务编号：56835fed 输入 0 tokens 输出 0 tokens GPU 183.082 秒 费用 $0.000000 失败阶段：note。 模型渠道拒绝访问，请检查渠道是否启用及账号权限。（HTTP 403） pause_circle 任务已结束，可重新排队
+			94 button 重试任务
+			95 text smart_display 转换失败
+			96 heading ferosse.tech, Value: 3
+				97 text ferosse.tech
+			98 text 任务编号：aef9643a 输入 0 tokens 输出 0 tokens GPU 251.977 秒 费用 $0.000000 失败阶段：note。 模型渠道拒绝访问，请检查渠道是否启用及账号权限。（HTTP 403） pause_circle 任务已结束，可重新排队
+			99 button 重试任务
+			100 text smart_display 转换失败
+			101 heading ferosse.tech, Value: 3
+				102 text ferosse.tech
+			103 text 任务编号：9ad9ee9d 输入 0 tokens 输出 0 tokens GPU 0.038 秒 费用 $0.000000 失败阶段：note。 模型渠道拒绝访问，请检查渠道是否启用及账号权限。（HTTP 403） pause_circle 任务已结束，可重新排队
+			104 button 重试任务
+		105 container
+			106 link Description: motion_photos_on 1 排队处理, Value: ferosse.tech/tasks
+			107 link Description: local_library 教材库, Value: ferosse.tech/library
+			108 link Description: add 新建转换, Value: ferosse.tech/tasks?openImport=1
+			109 link Description: person 我的, Value: ferosse.tech/profile
+
+The focused UI element is 1 AXWebArea 视书 · Textbook Library, URL: ferosse.tech/tasks

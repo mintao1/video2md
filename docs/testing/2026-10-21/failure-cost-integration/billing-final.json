@@ -1,0 +1,18 @@
+{
+  "monthly_usage": {
+    "spend_usd": 0.032899,
+    "llm_in_tok": 43653,
+    "llm_out_tok": 54945,
+    "gpu_s": 4517.134,
+    "runs_n": 8
+  },
+  "monthly_spend_usd": 0.032899,
+  "prices": {
+    "llm_in_mtok": 0.15,
+    "llm_out_mtok": 0.5,
+    "gpu_min": 0.0,
+    "llm_cached_in_mtok": 0.03
+  },
+  "user_task_count": 8,
+  "active_runs": []
+}

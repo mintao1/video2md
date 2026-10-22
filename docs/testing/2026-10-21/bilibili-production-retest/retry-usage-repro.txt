@@ -1,0 +1,42 @@
+  ⚠ LLM retry-accounting 第 1 次调用失败（空回包（HTTP 200 但零内容）），30s 后重试
+{
+  "kind": "synthetic_zero_network_reproduction",
+  "empty_response_parser_preserves_usage": true,
+  "results": [
+    {
+      "case": "single_success_control",
+      "requests": 1,
+      "observations": 1,
+      "expected_usage": {
+        "llm_in_tok": 200,
+        "llm_out_tok": 60
+      },
+      "recorded_usage": {
+        "llm_in_tok": 200,
+        "llm_out_tok": 60
+      },
+      "passed": true
+    },
+    {
+      "case": "empty_200_then_success",
+      "requests": 2,
+      "observations": 1,
+      "expected_usage": {
+        "llm_in_tok": 300,
+        "llm_out_tok": 100
+      },
+      "recorded_usage": {
+        "llm_in_tok": 200,
+        "llm_out_tok": 60
+      },
+      "passed": false
+    }
+  ]
+}
+Traceback (most recent call last):
+  File "/Users/linmintao/Desktop/开发项目/云端部署/video2md/docs/testing/2026-10-21/bilibili-production-retest/repro_retry_usage.py", line 82, in <module>
+    assert all(row['passed'] for row in results), 'Retry usage is lost before successful completion'
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: Retry usage is lost before successful completion
+
+exit_code=1

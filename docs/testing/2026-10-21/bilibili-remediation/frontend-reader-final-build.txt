@@ -1,0 +1,33 @@
+
+> web@0.0.0 build
+> vue-tsc -b && vite build
+
+vite v8.3.4 building client environment for production...
+transforming...
+✓ 110 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                                    1.09 kB │ gzip:  0.57 kB
+dist/assets/ReaderView-CwC2hkkJ.css                1.62 kB │ gzip:  0.50 kB
+dist/assets/index-C3NKIgrj.css                    32.84 kB │ gzip:  6.68 kB
+dist/assets/auth-p7yLUNFd.js                       0.41 kB │ gzip:  0.30 kB
+dist/assets/LogoMark-DoFWiuYl.js                   0.44 kB │ gzip:  0.34 kB
+dist/assets/ProgressBar-D6iqivq6.js                0.48 kB │ gzip:  0.34 kB
+dist/assets/EmptyState-DtGXy9UQ.js                 1.04 kB │ gzip:  0.58 kB
+dist/assets/TermsView-Ceb0p9rB.js                  1.25 kB │ gzip:  0.96 kB
+dist/assets/PrivacyView-CpiwDP62.js                1.35 kB │ gzip:  1.00 kB
+dist/assets/BottomSheet-mJ9zMDCT.js                2.10 kB │ gzip:  1.02 kB
+dist/assets/TocSheet-CqkxrPpu.js                   2.55 kB │ gzip:  1.29 kB
+dist/assets/FilterChips-DQAgXpRw.js                3.31 kB │ gzip:  1.59 kB
+dist/assets/BrandView-DJ1wEQzU.js                  4.30 kB │ gzip:  2.41 kB
+dist/assets/BottomNav-COfUAbuX.js                  4.31 kB │ gzip:  1.91 kB
+dist/assets/ColabAuthView-ZIVdOFgz.js              4.83 kB │ gzip:  2.45 kB
+dist/assets/api-CaEMKuxs.js                        4.90 kB │ gzip:  2.16 kB
+dist/assets/LibraryView-CikAXTze.js               17.94 kB │ gzip:  6.21 kB
+dist/assets/QueueView-DGPxMHWu.js                 24.77 kB │ gzip:  7.67 kB
+dist/assets/ProfileView-Cau1LTJP.js               32.44 kB │ gzip: 10.00 kB
+dist/assets/index-DSa8XoXU.js                     53.64 kB │ gzip: 21.21 kB
+dist/assets/runtime-core.esm-bundler-CAlf-v5b.js  68.18 kB │ gzip: 26.47 kB
+dist/assets/ReaderView-HYuOxysg.js                80.10 kB │ gzip: 27.43 kB
+
+✓ built in 512ms

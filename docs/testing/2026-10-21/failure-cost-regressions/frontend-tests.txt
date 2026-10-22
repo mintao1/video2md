@@ -1,0 +1,67 @@
+
+> web@0.0.0 test:integration
+> node --test tests/*.integration.test.mjs
+
+<Suspense> is an experimental feature and its API will likely change.
+✔ consuming the import query preserves task state while reader query changes still remount (26.089625ms)
+✔ the actual QueueView opens on direct import and on repeated same-route navigation (1235.772959ms)
+✔ brand home owns the OAuth entry and the standalone login page stays deleted (8.945958ms)
+✔ production brand-login evaluation set forbids standalone and mock login regressions (3.378375ms)
+✔ every authentication exit targets the brand home instead of a standalone login route (8.414375ms)
+✔ production source contains no mock API or mock authentication route (4.200375ms)
+WebSocket server error: Port 24678 is already in use
+10:10:54 PM [vite] (client) Re-optimizing dependencies because vite config has changed
+✔ resumes at the failed range and reconstructs the exact authenticated video (957.963125ms)
+✔ rejects a changed file without mixing two versions (2.726958ms)
+✔ bounds transport retries and preserves HTTP permission failures (0.942791ms)
+✔ rejects an If-Range file change returned as a full 200 after the first chunk (1.01375ms)
+▶ queue store → HTTP client → FastAPI
+  ✔ loads only the signed-in owner’s tasks and real progress (217.229833ms)
+  ✔ keeps tasks unchanged when time passes without backend progress (112.540791ms)
+  ✔ observes a backend completion during automatic refresh (33.948375ms)
+  ✔ cancels a queued task persistently through HTTP (12.680708ms)
+  ✔ does not present cancellation as a resumable pause (9.30575ms)
+  ✔ rejects cancellation of a finished task without changing its status (7.464958ms)
+  ✔ rejects another owner’s cancellation and preserves their task (7.046041ms)
+  ✔ rejects requests without usable credentials (6.009209ms)
+  ✔ keeps a deleted task absent after a fresh backend list (10.276917ms)
+  ✔ rejects retrying a completed task (10.587ms)
+  ✔ persists queue promotion and returns its new position (11.412291ms)
+  ✔ retries a cancelled task and persists its queued state (15.972209ms)
+  ✔ rejects deleting active work or changing another owner’s task (8.743625ms)
+✔ queue store → HTTP client → FastAPI (2499.314625ms)
+▶ library live adapter → FastAPI preferences and notes
+  ✔ persists favorites and progress across independent list requests (15.229792ms)
+  ✔ does not disclose Alice’s preferences to Bob (10.99825ms)
+  ✔ loads actual note content from the backend (8.848417ms)
+✔ library live adapter → FastAPI preferences and notes (35.288542ms)
+✔ fetches referenced media as an authenticated binary response (10.767167ms)
+✔ the actual getMedia adapter uses authenticated ranges through FastAPI for MP4 (24.766291ms)
+✔ reports unavailable bundles instead of a fake successful download (7.749792ms)
+✔ persists private LLM settings through the live API without returning or caching its key (18.955792ms)
+✔ preserves real run usage and redacted failure diagnostics through HTTP, adapter and rendered card (179.965416ms)
+✔ loads actual monthly billing details and renders per-run usage instead of an inert placeholder (16.129333ms)
+✔ keeps a billed partial run without a note out of the library and disables reading (10.923625ms)
+✔ reuses a queued submission without duplicating the frontend row (12.778375ms)
+✔ renders API rejection persistently inside the still-open import sheet (26.327958ms)
+✔ preserves tasks and billing on an actual HTTP 422 rejection and renders its message (11.803542ms)
+✔ preserves tasks and billing on an actual HTTP 429 rejection and renders its message (12.895416ms)
+WebSocket server error: Port 24678 is already in use
+10:10:54 PM [vite] (client) Re-optimizing dependencies because vite config has changed
+✔ keeps invalid and fractional chapter parameters inside the note array (920.006333ms)
+✔ renders Obsidian image and video references as actual media elements (23.27375ms)
+✔ escapes unavailable media names and refuses arbitrary external URLs (23.273958ms)
+✔ shows a ready image while a slower clip is still loading, then reports a failed clip (1.245209ms)
+✔ releases loaded URLs and ignores late media after leaving a chapter (3.422ms)
+✔ retries a broken media transfer once without retrying HTTP rejections (0.257167ms)
+WebSocket server error: Port 24678 is already in use
+✔ an unresolved submission visibly waits, blocks duplicates, then restores the input on failure (1269.272833ms)
+✔ the import sheet exposes pending feedback and disables its submit action (0.894958ms)
+ℹ tests 45
+ℹ suites 2
+ℹ pass 45
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3436.913958

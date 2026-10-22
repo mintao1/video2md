@@ -1,0 +1,79 @@
+{
+  "kind": "production",
+  "overall_verdict": "FAIL",
+  "authentication": {
+    "logout_observed": true,
+    "oauth_login_succeeded": true,
+    "note": "Initial expired session was reauthenticated before submission; explicit logout/relogin was additionally exercised during background work. Two later exchange attempts timed out; final recovery succeeded."
+  },
+  "source_resolution": {
+    "provider": "bilibili",
+    "resolved": true,
+    "selected_parts": [
+      1,
+      2
+    ]
+  },
+  "submission": {
+    "feedback_visible": true,
+    "run_id": "3c05faf8",
+    "submit_log_present": true,
+    "url_entered_explicitly": true,
+    "url": "https://www.bilibili.com/video/BV1LV411r77C/",
+    "task_count_before": 7,
+    "task_count_after": 8
+  },
+  "execution": {
+    "status": "partial",
+    "running_stage_observed": true,
+    "model_called": true,
+    "model_inference_succeeded": true,
+    "run_id_visible": true,
+    "model": "glm-5.3-flash",
+    "successful_note_model_calls": 4,
+    "failure_reason_visible": true,
+    "failure_stage_visible": true,
+    "actual_clip_root_cause_visible": false
+  },
+  "billing": {
+    "usage": {
+      "gpu_s": 1460.57,
+      "llm_in_tok": 19169,
+      "llm_out_tok": 23495,
+      "llm_cached_in_tok": 9344
+    },
+    "cost_usd": 0.013502,
+    "monthly_rollup_includes_run": true,
+    "usage_visible": true,
+    "cost_visible": true,
+    "prices": {
+      "gpu_min": 0.0,
+      "currency": "USD",
+      "gpu_policy": "free",
+      "llm_in_mtok": 0.15,
+      "llm_out_mtok": 0.5,
+      "llm_cached_in_mtok": 0.03
+    },
+    "gpu_policy": "free",
+    "gpu_free_reason": "Production explicitly configures free Colab GPU; wall-clock remote usage is retained.",
+    "scope": "Application attribution only; empty-response retry usage has a reproduced accounting gap; supplier invoice not checked."
+  },
+  "artifact": {
+    "book_visible": false,
+    "markdown_nonempty": false,
+    "book_count_delta": 0,
+    "notes_count": 0
+  },
+  "references": [
+    "production-final.json",
+    "runtime-telemetry.json",
+    "terminal-task.txt",
+    "library-final.txt",
+    "billing-reconciliation.json",
+    "retry-usage-repro.txt"
+  ],
+  "limitations": [
+    "Production retry attempt usages are missing, so exact unrecorded spend is unknown.",
+    "Full collection, budget rejection, new textbook reading and export are not accepted by this run."
+  ]
+}

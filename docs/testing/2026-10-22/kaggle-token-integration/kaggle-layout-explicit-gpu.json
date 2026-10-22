@@ -1,0 +1,17 @@
+{
+  "kernel_status": "done",
+  "elapsed_s": 55.726,
+  "llm_calls": 0,
+  "fresh_control_id_matches": true,
+  "control_id": "2353a23e8dec43d0bf9aa8e7a44200d4",
+  "input_files": [
+    "/kaggle/input/datasets/<account>/gpu-router-io/clip-src.mp4",
+    "/kaggle/input/datasets/<account>/gpu-router-io/clip_job.json"
+  ],
+  "nvidia_binary": null,
+  "nvidia_devices": [],
+  "cuda_available": false,
+  "cuda_devices": 0,
+  "cuda_device_names": [],
+  "gpu_probe_error": "FileNotFoundError"
+}

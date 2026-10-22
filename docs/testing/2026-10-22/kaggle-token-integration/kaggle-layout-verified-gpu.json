@@ -1,0 +1,30 @@
+{
+  "kernel_status": "done",
+  "elapsed_s": 59.074,
+  "llm_calls": 0,
+  "fresh_control_id_matches": true,
+  "control_id": "9b45e22d74f440178985d0615a2b5d9f",
+  "input_files": [
+    "/kaggle/input/datasets/<account>/gpu-router-io/clip-src.mp4",
+    "/kaggle/input/datasets/<account>/gpu-router-io/clip_job.json"
+  ],
+  "nvidia_binary": "/opt/bin/nvidia-smi",
+  "nvidia_devices": [
+    "/dev/nvidia1",
+    "/dev/nvidia0",
+    "/dev/nvidiactl",
+    "/dev/nvidia-uvm-tools",
+    "/dev/nvidia-uvm"
+  ],
+  "cuda_available": true,
+  "cuda_devices": 2,
+  "cuda_device_names": [
+    "Tesla T4",
+    "Tesla T4"
+  ],
+  "gpu_names": [
+    "Tesla T4",
+    "Tesla T4"
+  ],
+  "nvidia_exit_code": 0
+}

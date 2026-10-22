@@ -1,0 +1,12 @@
+{
+  "base_image": "gpu-router:0.2.3-hotfix-20261021e",
+  "image": "gpu-router:0.2.3-kaggle-token-20261022a",
+  "patched_methods": [
+    "_creds_user",
+    "health"
+  ],
+  "base_sha256": "835a4211711ecc14745f2cbf468b2bc603aaa813775579379b2ea2db3909abb8",
+  "patched_sha256": "1feca7fd380f71e856ff92621e4c29f1e188702a250ed03f965cf57345737b88",
+  "method_source": "../gpu-router/backend/gpu_router/providers/kaggle.py",
+  "other_runtime_methods_unchanged": true
+}

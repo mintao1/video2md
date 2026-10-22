@@ -1,0 +1,15 @@
+[
+  {
+    "name": "video2md-api-6c69c4cc48-4fkkr",
+    "phase": "Running",
+    "containers": [
+      {
+        "name": "api",
+        "image": "docker.io/library/video2md:0.2.0-failure-cost-20261021b",
+        "imageID": "sha256:a8eee73440d8b4093602a38c5f3f77988a2c3e9cc1217c32735eea39e109be66",
+        "ready": true,
+        "restartCount": 0
+      }
+    ]
+  }
+]

@@ -1,0 +1,63 @@
+{
+  "kind": "production",
+  "run_id": "4df77d9c",
+  "authentication": {
+    "logout_observed": true,
+    "oauth_login_succeeded": true,
+    "logout_source": "../billing-retest/report.md: same continuous test campaign explicitly logged out and signed in; this model retest signed in again through Google, not a newly repeated logout"
+  },
+  "source_resolution": {
+    "resolved": true
+  },
+  "submission": {
+    "feedback_visible": true,
+    "run_id": "4df77d9c",
+    "submit_log_present": true,
+    "url_entered_explicitly": true,
+    "task_count_before": 5,
+    "task_count_after": 6
+  },
+  "execution": {
+    "status": "done",
+    "running_stage_observed": true,
+    "model_called": true,
+    "model_inference_succeeded": true,
+    "run_id_visible": true
+  },
+  "billing": {
+    "usage": {
+      "gpu_s": 809.12,
+      "llm_in_tok": 6498,
+      "llm_out_tok": 6919
+    },
+    "cost_usd": 0.004434,
+    "monthly_rollup_includes_run": true,
+    "usage_visible": true,
+    "cost_visible": true,
+    "prices": {
+      "gpu_min": 0.0,
+      "currency": "USD",
+      "gpu_policy": "free",
+      "llm_in_mtok": 0.15,
+      "llm_out_mtok": 0.5,
+      "llm_cached_in_mtok": 0.03
+    },
+    "gpu_policy": "free",
+    "gpu_free_reason": "User confirmed Colab free GPU has actual GPU cost zero; preserve measured remote-call wall time."
+  },
+  "artifact": {
+    "book_visible": true,
+    "markdown_nonempty": true,
+    "book_count_delta": 1
+  },
+  "evidence_refs": [
+    "production-lesson-entered.png",
+    "production-lesson-submitted.png",
+    "production-completed.png",
+    "production-billing-final.png",
+    "production-reader-media.png",
+    "lesson-result.json",
+    "production-final-readonly.json",
+    "billing-reconciliation.json"
+  ]
+}

@@ -1,0 +1,37 @@
+[
+  {
+    "email_present": false,
+    "file": "phone-verification-handoff.png",
+    "token_present": false
+  },
+  {
+    "email_present": false,
+    "file": "bilibili-explicit-after-verification.png",
+    "token_present": false
+  },
+  {
+    "email_present": false,
+    "file": "kaggle-queue-evidence.png",
+    "token_present": false
+  },
+  {
+    "email_present": false,
+    "file": "kaggle-after-cleanup.png",
+    "token_present": false
+  },
+  {
+    "email_present": false,
+    "file": "billing-before.png",
+    "token_present": false
+  },
+  {
+    "email_present": false,
+    "file": "bilibili-submitted-after-verification.png",
+    "token_present": false
+  },
+  {
+    "email_present": false,
+    "file": "bilibili-current-state.png",
+    "token_present": false
+  }
+]

@@ -1,0 +1,34 @@
+{
+  "observed_at": "2026-10-21T17:49:40.535290+00:00",
+  "api_release": "video2md:0.2.0-failure-cost-20261021b",
+  "gpu_release": "gpu-router:0.2.3-kaggle-token-20261022b",
+  "gpu_cuda_probe": {
+    "passed": true,
+    "device_count": 2,
+    "gpu_names": [
+      "Tesla T4",
+      "Tesla T4"
+    ],
+    "fresh_nonce_verified": true
+  },
+  "clips_route_passed": false,
+  "clips_route_observation_s": 1200.72,
+  "auxiliary_gpu_sessions_cancelled": true,
+  "active_business_run": "dd586072",
+  "business_status": "running_waiting_for_kaggle_gpu",
+  "downloaded_entries": 2,
+  "completed_new_books": 0,
+  "new_reconciliation_tests": 12,
+  "combined_reconciliation_and_gate_tests_passed": 111,
+  "provider_complete_export_rows": 136,
+  "provider_export_truncated": false,
+  "healthy_run_token_reconciliation": "pass",
+  "historical_run_token_reconciliation": "mismatch",
+  "historical_bill_backfilled": false,
+  "all_four_production_findings_closed": false,
+  "remaining_finding_ids": [
+    "failure-cost-001",
+    "failure-cost-002",
+    "failure-cost-004"
+  ]
+}

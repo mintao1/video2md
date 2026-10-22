@@ -1,0 +1,10 @@
+{
+  "browser_account_matches_token_account": true,
+  "phone_verified": false,
+  "gpu_quota_ui": "00:00 / 30 hrs",
+  "phone_dialog_open": true,
+  "recaptcha_present": true,
+  "user_handoff_required": true,
+  "sensitive_fields_entered_by_agent": false,
+  "source": "computer-use Settings AX observations and blank handoff screenshot"
+}

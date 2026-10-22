@@ -1,0 +1,434 @@
+{
+  "kind": "production",
+  "run_id": "4df77d9c",
+  "results": [
+    {
+      "id": "pps-001",
+      "status": "pass",
+      "observed": "同一持续验收中前轮已退出并重新登录；本轮从品牌页再次 Google 登录，刷新后保持会话。",
+      "metrics": {
+        "run_id": "4df77d9c",
+        "logout_observed": true,
+        "oauth_login_succeeded": true,
+        "authenticated_page_visible": true,
+        "session_survives_reload": true
+      },
+      "evidence_refs": [
+        "../billing-retest/report.md",
+        "production-login.png",
+        "production-library.png"
+      ]
+    },
+    {
+      "id": "pps-002",
+      "status": "pass",
+      "observed": "可见输入框清空后显式输入受控视频 URL 并提交。",
+      "metrics": {
+        "run_id": "4df77d9c",
+        "cleared": true,
+        "entered_explicitly": true,
+        "submitted": true,
+        "approved_url": "https://ferosse.tech/test-assets/billing-index-lesson.mp4",
+        "visible_url": "https://ferosse.tech/test-assets/billing-index-lesson.mp4"
+      },
+      "evidence_refs": [
+        "production-lesson-entered.png",
+        "production-lesson-submitted.png"
+      ]
+    },
+    {
+      "id": "pps-003",
+      "status": "pass",
+      "observed": "实际下载字节与静态输入一致，先于模型调用完成。",
+      "metrics": {
+        "run_id": "4df77d9c",
+        "bytes": 1054426,
+        "duration_s": 2.155531,
+        "gpu_seconds": 0,
+        "completed_before_model": true
+      },
+      "evidence_refs": [
+        "lesson-result.json",
+        "fixture-media.json"
+      ]
+    },
+    {
+      "id": "pps-004",
+      "status": "pass",
+      "observed": "Colab ASR 四段，文本非空且时间戳有效；duration_s 使用可归集远程调用墙钟时长，另保留完整阶段时长。",
+      "metrics": {
+        "run_id": "4df77d9c",
+        "provider": "colab",
+        "segments": 4,
+        "timestamped_segments": true,
+        "transcript_nonempty": true,
+        "duration_s": 147.762,
+        "stage_elapsed_s": 149.102674
+      },
+      "evidence_refs": [
+        "lesson-result.json",
+        "pool-log-lesson-final.txt"
+      ]
+    },
+    {
+      "id": "pps-005",
+      "status": "pass",
+      "observed": "Colab OCR 完成80/80；计量口径同ASR。",
+      "metrics": {
+        "run_id": "4df77d9c",
+        "provider": "colab",
+        "frames_requested": 80,
+        "frames_completed": 80,
+        "duration_s": 253.416,
+        "stage_elapsed_s": 253.470833
+      },
+      "evidence_refs": [
+        "lesson-result.json",
+        "pool-log-lesson-final.txt"
+      ]
+    },
+    {
+      "id": "pps-006",
+      "status": "pass",
+      "observed": "GPU剪辑8/8；计量包含远程等待/传输，不是硬件忙碌采样。",
+      "metrics": {
+        "run_id": "4df77d9c",
+        "device": "gpu",
+        "completed": 8,
+        "requested": 8,
+        "duration_s": 407.942,
+        "gpu_seconds": 407.942,
+        "stage_elapsed_s": 407.981739
+      },
+      "evidence_refs": [
+        "lesson-result.json"
+      ]
+    },
+    {
+      "id": "pps-007",
+      "status": "pass",
+      "observed": "三个远程阶段时长之和809.120秒，与run用量一致。",
+      "metrics": {
+        "run_id": "4df77d9c",
+        "gpu_s": 809.12
+      },
+      "evidence_refs": [
+        "lesson-result.json",
+        "billing-reconciliation.json"
+      ]
+    },
+    {
+      "id": "pps-008",
+      "status": "fail",
+      "observed": "会话已关闭，但最终记录更新时间至关闭约133.513秒，超过30+15秒门槛；没有充足细粒度队列日志缩小该界限，保守判失败。",
+      "metrics": {
+        "run_id": "4df77d9c",
+        "queue_idle": true,
+        "closed": true,
+        "idle_elapsed_s": 133.512569,
+        "idle_time_basis": "last run record update to session-close timestamp; conservative proxy, exact idle event absent",
+        "warm_window_s": 30,
+        "poll_interval_s": 15
+      },
+      "evidence_refs": [
+        "production-final-readonly.json",
+        "pool-log-lesson-final.txt",
+        "pool-lifecycle-config.json"
+      ]
+    },
+    {
+      "id": "pps-009",
+      "status": "pass",
+      "observed": "真实GLM调用成功且正文非空，无拒答。",
+      "metrics": {
+        "run_id": "4df77d9c",
+        "model_called": true,
+        "inference_succeeded": true,
+        "content_nonempty": true,
+        "http_status": 200,
+        "refusal_detected": false
+      },
+      "evidence_refs": [
+        "lesson-result.json",
+        "production-final-readonly.json"
+      ]
+    },
+    {
+      "id": "pps-010",
+      "status": "pass",
+      "observed": "同一owner真实输入/输出均为正，包含reasoning tokens。",
+      "metrics": {
+        "run_id": "4df77d9c",
+        "gpu_s": 809.12,
+        "llm_in_tok": 6498,
+        "llm_out_tok": 6919,
+        "owner_matches": true
+      },
+      "evidence_refs": [
+        "lesson-result.json",
+        "production-final-readonly.json"
+      ]
+    },
+    {
+      "id": "pps-011",
+      "status": "pass",
+      "observed": "用户确认免费GPU实际成本0，GLM按Go官方额度归因价。",
+      "metrics": {
+        "run_id": "4df77d9c",
+        "gpu_min": 0.0,
+        "currency": "USD",
+        "gpu_policy": "free",
+        "llm_in_mtok": 0.15,
+        "llm_out_mtok": 0.5,
+        "llm_cached_in_mtok": 0.03,
+        "approved": true,
+        "gpu_free_reason": "Colab免费算力，用户选择实际成本口径"
+      },
+      "evidence_refs": [
+        "report.md",
+        "production-final-readonly.json"
+      ]
+    },
+    {
+      "id": "pps-012",
+      "status": "pass",
+      "observed": "唯一run账本条目已结算，费用复算一致；count指现存账本条目数量，不代表底层写入次数。",
+      "metrics": {
+        "run_id": "4df77d9c",
+        "settled": true,
+        "cost_usd": 0.004434,
+        "settlement_count": 1
+      },
+      "evidence_refs": [
+        "billing-reconciliation.json",
+        "production-final-readonly.json"
+      ]
+    },
+    {
+      "id": "pps-013",
+      "status": "blocked",
+      "observed": "教材库新增1本，正文/图片/节段可阅读播放；当前vault模式没有可用整包导出，不能通过组合验收。",
+      "metrics": {
+        "run_id": "4df77d9c",
+        "book_visible": true,
+        "reader_loads": true,
+        "media_references_safe": true,
+        "markdown_chars": 2910,
+        "book_count_before": 0,
+        "book_count_after": 1,
+        "bundle_state": "unavailable_in_vault"
+      },
+      "evidence_refs": [
+        "production-library.png",
+        "production-reader-media.png",
+        "playback-proof.json",
+        "production-final-readonly.json",
+        "../../../../frontend/web/src/views/LibraryView.vue",
+        "../../../../backend/video2md/api.py"
+      ]
+    },
+    {
+      "id": "pps-014",
+      "status": "pass",
+      "observed": "后端done和前端完成状态一致。",
+      "metrics": {
+        "run_id": "4df77d9c",
+        "backend_status": "done",
+        "ui_status": "done",
+        "feedback_visible": true
+      },
+      "evidence_refs": [
+        "production-completed.png",
+        "lesson-result.json"
+      ]
+    },
+    {
+      "id": "pps-015",
+      "status": "pass",
+      "observed": "一次显式提交新增一条本人任务，日志中dedup=false，观察到处理阶段。",
+      "metrics": {
+        "run_id": "4df77d9c",
+        "task_count_before": 5,
+        "task_count_after": 6,
+        "historical_retry": false,
+        "feedback_visible": true,
+        "run_persisted": true,
+        "owner_matches": true,
+        "submit_log_present": true,
+        "running_stage_observed": true
+      },
+      "evidence_refs": [
+        "production-lesson-submitted.png",
+        "production-final-readonly.json",
+        "production-success-baseline.json"
+      ]
+    },
+    {
+      "id": "pps-016",
+      "status": "blocked",
+      "observed": "实际URL已解析并下载，但未独立采集resolver耗时，不能用下载耗时代替。",
+      "metrics": {
+        "run_id": "4df77d9c",
+        "resolved": true,
+        "url": "https://ferosse.tech/test-assets/billing-index-lesson.mp4",
+        "elapsed_s": null,
+        "timeout_s": null
+      },
+      "evidence_refs": [
+        "lesson-result.json",
+        "production-fixture-range.json"
+      ]
+    },
+    {
+      "id": "pps-017",
+      "status": "pass",
+      "observed": "80个候选帧小于120上限，文件非空、时间戳有效。",
+      "metrics": {
+        "run_id": "4df77d9c",
+        "duration_s": 1.965118,
+        "max_frames": 120,
+        "gpu_seconds": 0.0,
+        "files_nonempty": true,
+        "candidate_count": 80,
+        "timestamps_valid": true
+      },
+      "evidence_refs": [
+        "lesson-result.json"
+      ]
+    },
+    {
+      "id": "pps-018",
+      "status": "pass",
+      "observed": "LLM选中8个候选帧，均属于候选manifest。",
+      "metrics": {
+        "run_id": "4df77d9c",
+        "mode": "llm",
+        "duration_s": 0.010234,
+        "gpu_seconds": 0.0,
+        "selected_count": 8,
+        "all_in_manifest": true
+      },
+      "evidence_refs": [
+        "lesson-result.json",
+        "production-final-readonly.json"
+      ]
+    },
+    {
+      "id": "pps-019",
+      "status": "pass",
+      "observed": "隔离窗口同一owner月度差值精确匹配run。",
+      "metrics": {
+        "run_id": "4df77d9c",
+        "before": {
+          "spend_usd": 0.004652,
+          "llm_in_tok": 2047,
+          "llm_out_tok": 8690,
+          "gpu_s": 970.994,
+          "runs_n": 5
+        },
+        "after": {
+          "spend_usd": 0.009086,
+          "llm_in_tok": 8545,
+          "llm_out_tok": 15609,
+          "gpu_s": 1780.114,
+          "runs_n": 6
+        },
+        "owner_matches": true,
+        "isolated_window": true
+      },
+      "evidence_refs": [
+        "production-success-baseline.json",
+        "billing-reconciliation.json"
+      ]
+    },
+    {
+      "id": "pps-020",
+      "status": "pass",
+      "observed": "本人费用面板打开，run用量/费用与账本一致。",
+      "metrics": {
+        "run_id": "4df77d9c",
+        "details_opens": true,
+        "usage_visible": true,
+        "cost_visible": true,
+        "values_match_ledger": true
+      },
+      "evidence_refs": [
+        "production-billing-final.png",
+        "production-final-readonly.json"
+      ]
+    },
+    {
+      "id": "pps-021",
+      "status": "pass",
+      "observed": "负例来自本轮edfa1b1a短文本任务；显示编号、note阶段、原因和补跑入口，凭据脱敏。",
+      "metrics": {
+        "run_id": "4df77d9c",
+        "failure_run_id": "edfa1b1a",
+        "failure_observed": true,
+        "run_id_visible": true,
+        "failure_stage_visible": true,
+        "failure_reason_visible": true,
+        "retry_available": true,
+        "secrets_redacted": true
+      },
+      "evidence_refs": [
+        "production-quality-rejection-fixed.png",
+        "production-result.json"
+      ]
+    },
+    {
+      "id": "pps-022",
+      "status": "pass",
+      "observed": "前端再次提交同一完成URL复用原run，任务、token、GPU、费用无增量。",
+      "metrics": {
+        "run_id": "4df77d9c",
+        "retry_observed": true,
+        "same_run": true,
+        "task_count_delta": 0,
+        "token_delta": 0,
+        "gpu_s_delta": 0,
+        "cost_delta": 0
+      },
+      "evidence_refs": [
+        "reuse-reconciliation.json",
+        "lesson-after-reuse.json"
+      ]
+    },
+    {
+      "id": "pps-023",
+      "status": "pass",
+      "observed": "临时设置极小预算后前端提交，被429拒绝且无任务/模型/费用增量；随后恢复预算0。",
+      "metrics": {
+        "run_id": "4df77d9c",
+        "over_budget_attempted": true,
+        "rejected": true,
+        "error_visible": true,
+        "model_calls_delta": 0,
+        "cost_delta": 0
+      },
+      "evidence_refs": [
+        "production-budget-rejected.png",
+        "billing-reconciliation.json",
+        "budget-restored.json"
+      ]
+    },
+    {
+      "id": "pps-024",
+      "status": "pass",
+      "observed": "拒绝错误持续显示在打开的导入框内，原URL保留，无成功反馈或新增任务。",
+      "metrics": {
+        "run_id": "4df77d9c",
+        "rejected_submission_observed": true,
+        "error_visible": true,
+        "modal_remains_open": true,
+        "url_preserved": true,
+        "success_toast_visible": false,
+        "new_runs": 0
+      },
+      "evidence_refs": [
+        "production-budget-rejected.png",
+        "billing-reconciliation.json"
+      ]
+    }
+  ]
+}

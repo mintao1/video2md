@@ -1,0 +1,75 @@
+
+> web@0.0.0 test:integration
+> node --test tests/*.integration.test.mjs
+
+✔ brand home owns the OAuth entry and the standalone login page stays deleted (7.201583ms)
+✔ production brand-login evaluation set forbids standalone and mock login regressions (6.470916ms)
+✔ every authentication exit targets the brand home instead of a standalone login route (14.851708ms)
+✔ production source contains no mock API or mock authentication route (2.289834ms)
+▶ queue store → HTTP client → FastAPI
+  ✔ loads only the signed-in owner’s tasks and real progress (66.695542ms)
+  ✔ keeps tasks unchanged when time passes without backend progress (111.639958ms)
+  ✔ observes a backend completion during automatic refresh (34.953041ms)
+  ✔ cancels a queued task persistently through HTTP (14.840584ms)
+  ✔ does not present cancellation as a resumable pause (10.1535ms)
+  ✔ rejects cancellation of a finished task without changing its status (7.267166ms)
+  ✔ rejects another owner’s cancellation and preserves their task (6.457625ms)
+  ✔ rejects requests without usable credentials (4.823792ms)
+  ✔ keeps a deleted task absent after a fresh backend list (8.871125ms)
+  ✔ rejects retrying a completed task (6.302042ms)
+  ✔ persists queue promotion and returns its new position (9.414333ms)
+  ✔ retries a cancelled task and persists its queued state (13.949541ms)
+  ✔ rejects deleting active work or changing another owner’s task (7.358834ms)
+✔ queue store → HTTP client → FastAPI (1793.609541ms)
+▶ library live adapter → FastAPI preferences and notes
+  ✔ persists favorites and progress across independent list requests (12.602292ms)
+  ✔ does not disclose Alice’s preferences to Bob (9.164666ms)
+  ✔ loads actual note content from the backend (5.441917ms)
+✔ library live adapter → FastAPI preferences and notes (27.36025ms)
+✔ fetches referenced media as an authenticated binary response (13.886125ms)
+✔ reports unavailable bundles instead of a fake successful download (5.573541ms)
+✔ persists private LLM settings through the live API without returning or caching its key (13.136958ms)
+✔ preserves real run usage and redacted failure diagnostics through HTTP, adapter and rendered card (169.747ms)
+✔ loads actual monthly billing details and renders per-run usage instead of an inert placeholder (14.275583ms)
+✔ keeps a billed partial run without a note out of the library and disables reading (9.868542ms)
+✔ reuses a queued submission without duplicating the frontend row (11.106209ms)
+✔ renders API rejection persistently inside the still-open import sheet (28.042083ms)
+✔ preserves tasks and billing on an actual HTTP 422 rejection and renders its message (13.149708ms)
+✔ preserves tasks and billing on an actual HTTP 429 rejection and renders its message (13.2845ms)
+3:22:38 PM [vite] (client) Re-optimizing dependencies because vite config has changed
+✔ keeps invalid and fractional chapter parameters inside the note array (482.971917ms)
+✔ renders Obsidian image and video references as actual media elements (7.596416ms)
+✔ escapes unavailable media names and refuses arbitrary external URLs (6.174333ms)
+WebSocket server error: Port 24678 is already in use
+[Vue Router warn]: No match found for location with path "/profile"
+[Vue Router warn]: No match found for location with path "/library"
+[Vue Router warn]: No match found for location with path "/profile"
+[Vue Router warn]: No match found for location with path "/profile"
+[Vue Router warn]: No match found for location with path "/library"
+[Vue Router warn]: No match found for location with path "/profile"
+[Vue Router warn]: No match found for location with path "/profile"
+[Vue Router warn]: No match found for location with path "/library"
+[Vue Router warn]: No match found for location with path "/profile"
+✔ an unresolved submission visibly waits, blocks duplicates, then restores the input on failure (707.354875ms)
+✔ the import sheet exposes pending feedback and disables its submit action (0.775041ms)
+ℹ tests 35
+ℹ suites 2
+ℹ pass 35
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2631.205583
+
+> web@0.0.0 test:regression
+> node --test tests/*.regression.test.mjs
+
+✔ queue submission failures stay visible and preserve the form (2.38ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 51.768667

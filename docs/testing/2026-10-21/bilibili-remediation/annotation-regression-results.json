@@ -1,0 +1,858 @@
+{
+  "kind": "offline-regression-results",
+  "generated_local": "2026-10-21T20:47:23+08:00",
+  "annotation_count": 44,
+  "base_negative_case_count": 132,
+  "offline_replay": "PASS",
+  "production_acceptance": "NOT_RERUN; strict closure remains blocked",
+  "ci_configuration": "WIRED locally; remote CI not triggered; no branch protection claim",
+  "new_paid_model_calls": 0,
+  "production_deployed_this_turn": false,
+  "verification": {
+    "backend_combined_passed": 392,
+    "frontend_integration_passed": 45,
+    "frontend_regression_passed": 1,
+    "dataset_final_recheck_passed": 254,
+    "ruff": "PASS",
+    "diff_check": "PASS",
+    "strict_closure_exit_code": 1,
+    "strict_closure_expected_red": true
+  },
+  "dataset": "docs/evals/bilibili-production-review-eval-set.jsonl",
+  "dataset_sha256": "357c91dba2a8f23dba636ec06a4ed5115c19959ed6488ba111d62dea43abd6c9",
+  "checker_sha256": "03cff066bb802d13cfa139f091682856f742c45057200eb0788ae094fe416713",
+  "open_items": [
+    {
+      "annotation_index": 2,
+      "id": "bbr-002",
+      "reason": "8集样本的原始成功探针未留存；离线覆盖8/100集不替代该历史在线证据"
+    },
+    {
+      "annotation_index": 22,
+      "id": "bbr-022",
+      "reason": "重新登录已记录，但第二次登录过期原因和会话稳定性仍未定位"
+    },
+    {
+      "annotation_index": 44,
+      "id": "bbr-044",
+      "reason": "登录过期未定位；本地误写前的全部值未确认恢复"
+    }
+  ],
+  "cases": [
+    {
+      "annotation_index": 1,
+      "id": "bbr-001",
+      "scenario": "同一生产容器约5秒复现TLS EOF；分开检验通用代理、专用隧道与出口拒绝",
+      "criteria": "保留ConnectError、耗时、实际代理与TLS校验事实；不从一次失败猜最终根因",
+      "offline_replay": "PASS",
+      "negative_cases": 3,
+      "production_closure": "NOT_RETESTED_THIS_TURN",
+      "regressions": [
+        "backend/tests/test_bilibili_public_fallback.py",
+        "backend/tests/test_bilibili_review_operations.py"
+      ],
+      "evidence_refs": [
+        "docs/testing/2026-10-21/bilibili-collection-production/evidence.json"
+      ],
+      "note": ""
+    },
+    {
+      "annotation_index": 2,
+      "id": "bbr-002",
+      "scenario": "通用代理TLS断连、旧隧道端口未监听、网页直连412，公开接口展开100/8集",
+      "criteria": "离线覆盖100与8分P；区分网页412、API成功及缺失历史样本证据",
+      "offline_replay": "PASS",
+      "negative_cases": 3,
+      "production_closure": "OPEN",
+      "regressions": [
+        "backend/tests/test_bilibili_public_fallback.py",
+        "backend/tests/test_bilibili_review_operations.py"
+      ],
+      "evidence_refs": [
+        "docs/testing/2026-10-21/bilibili-collection-production/evidence.json",
+        "docs/testing/2026-10-21/bilibili-remediation/evidence.json",
+        "docs/testing/2026-10-21/bilibili-remediation/pagelist-fallback-probe.txt",
+        "docs/testing/2026-10-21/bilibili-remediation/source-probe.txt"
+      ],
+      "note": "8集样本的原始在线成功探针未留存；不能以100集探针冒充两个样本均完成在线验收。"
+    },
+    {
+      "annotation_index": 3,
+      "id": "bbr-003",
+      "scenario": "公开匿名MP4有效；网页失败降级，保留分P并刷新媒体地址",
+      "criteria": "只接受匿名MP4、合法CDN、正确分集与完整文件，不固化过期播放URL",
+      "offline_replay": "PASS",
+      "negative_cases": 3,
+      "production_closure": "NOT_RETESTED_THIS_TURN",
+      "regressions": [
+        "backend/tests/test_bilibili_public_fallback.py"
+      ],
+      "evidence_refs": [
+        "docs/testing/2026-10-21/bilibili-remediation/source-probe.txt"
+      ],
+      "note": ""
+    },
+    {
+      "annotation_index": 4,
+      "id": "bbr-004",
+      "scenario": "生产展开100集、下载两集约78秒；联合测试曾污染本地开发记录",
+      "criteria": "保留真实下载探针；新测试导入/联跑隔离，禁止把误写前值声称已恢复",
+      "offline_replay": "PASS",
+      "negative_cases": 3,
+      "production_closure": "NOT_RETESTED_THIS_TURN",
+      "regressions": [
+        "backend/tests/test_bilibili_public_fallback.py",
+        "backend/tests/test_bilibili_test_isolation.py"
+      ],
+      "evidence_refs": [
+        "docs/testing/2026-10-21/bilibili-remediation/local-test-isolation.json",
+        "docs/testing/2026-10-21/bilibili-remediation/source-probe.txt"
+      ],
+      "note": ""
+    },
+    {
+      "annotation_index": 5,
+      "id": "bbr-005",
+      "scenario": "等待显示正在解析、禁重复，失败保留链接；分P/权限/坏地址/截断均回归",
+      "criteria": "实际组件处理延迟Promise、重复提交与失败；解析和下载拒绝非法/不完整响应",
+      "offline_replay": "PASS",
+      "negative_cases": 3,
+      "production_closure": "NOT_RETESTED_THIS_TURN",
+      "regressions": [
+        "frontend/web/tests/submission-pending.integration.test.mjs",
+        "backend/tests/test_bilibili_public_fallback.py"
+      ],
+      "evidence_refs": [
+        "docs/testing/2026-10-21/bilibili-remediation/source-probe.txt",
+        "docs/testing/2026-10-21/bilibili-remediation/submission-after-fix.txt",
+        "docs/testing/2026-10-21/bilibili-remediation/production-modal-pending.png"
+      ],
+      "note": ""
+    },
+    {
+      "annotation_index": 6,
+      "id": "bbr-006",
+      "scenario": "发布前无运行任务、实例就绪，离线测试通过后进行真实复测",
+      "criteria": "发布检查不能接受未就绪、重启或镜像不一致；离线测试不冒充生产",
+      "offline_replay": "PASS",
+      "negative_cases": 3,
+      "production_closure": "NOT_RETESTED_THIS_TURN",
+      "regressions": [
+        "backend/tests/test_bilibili_review_operations.py"
+      ],
+      "evidence_refs": [
+        "docs/testing/2026-10-21/bilibili-remediation/deployment-status.json"
+      ],
+      "note": "发布前active=0为当时终端观察；此处只回放留存的就绪/镜像数据，运维防回退由独立检查覆盖。"
+    },
+    {
+      "annotation_index": 7,
+      "id": "bbr-007",
+      "scenario": "解析反馈已生效；fullPath重建页面导致同路由面板关闭",
+      "criteria": "消费openImport查询参数仍保留任务页实例；阅读器查询切章继续重建",
+      "offline_replay": "PASS",
+      "negative_cases": 3,
+      "production_closure": "NOT_RETESTED_THIS_TURN",
+      "regressions": [
+        "frontend/web/tests/import-navigation.integration.test.mjs",
+        "frontend/web/tests/submission-pending.integration.test.mjs"
+      ],
+      "evidence_refs": [
+        "docs/testing/2026-10-21/bilibili-remediation/evidence.json",
+        "docs/testing/2026-10-21/bilibili-remediation/submission-after-fix.txt",
+        "docs/testing/2026-10-21/bilibili-remediation/import-navigation-fixed.png"
+      ],
+      "note": ""
+    },
+    {
+      "annotation_index": 8,
+      "id": "bbr-008",
+      "scenario": "短暂公开API成功后再次412，不能把一次成功视作稳定修复",
+      "criteria": "view 412时使用pagelist，分页失败仍失败；保留首次真实失败",
+      "offline_replay": "PASS",
+      "negative_cases": 3,
+      "production_closure": "NOT_RETESTED_THIS_TURN",
+      "regressions": [
+        "backend/tests/test_bilibili_public_fallback.py"
+      ],
+      "evidence_refs": [
+        "docs/testing/2026-10-21/bilibili-remediation/pagelist-fallback-probe.txt",
+        "docs/testing/2026-10-21/bilibili-remediation/pre-download-fix.json"
+      ],
+      "note": ""
+    },
+    {
+      "annotation_index": 9,
+      "id": "bbr-009",
+      "scenario": "本机网页可用、服务器网页412；旧住宅出口7897未监听",
+      "criteria": "回环绑定、只转发B站相关域名，默认拒绝；不改变OS代理或关闭TLS",
+      "offline_replay": "PASS",
+      "negative_cases": 3,
+      "production_closure": "NOT_RETESTED_THIS_TURN",
+      "regressions": [
+        "backend/tests/test_bilibili_review_operations.py"
+      ],
+      "evidence_refs": [
+        "docs/testing/2026-10-21/bilibili-remediation/evidence.json"
+      ],
+      "note": ""
+    },
+    {
+      "annotation_index": 10,
+      "id": "bbr-010",
+      "scenario": "恢复住宅出口，生产展开100集；轻量分集接口及首集下载可用",
+      "criteria": "两项服务和回环监听真实留存；公开分集接口降级独立可用",
+      "offline_replay": "PASS",
+      "negative_cases": 3,
+      "production_closure": "NOT_RETESTED_THIS_TURN",
+      "regressions": [
+        "backend/tests/test_bilibili_public_fallback.py",
+        "backend/tests/test_bilibili_review_operations.py"
+      ],
+      "evidence_refs": [
+        "docs/testing/2026-10-21/bilibili-remediation/evidence.json",
+        "docs/testing/2026-10-21/bilibili-remediation/home-egress-services.json",
+        "docs/testing/2026-10-21/bilibili-remediation/pagelist-fallback-probe.txt",
+        "docs/testing/2026-10-21/bilibili-remediation/source-probe.txt"
+      ],
+      "note": ""
+    },
+    {
+      "annotation_index": 11,
+      "id": "bbr-011",
+      "scenario": "修复后的同路由导入面板显式提交原PPT合集，验证前两集",
+      "criteria": "只在可见前端明确输入后提交；保留面板并选择P1/P2",
+      "offline_replay": "PASS",
+      "negative_cases": 3,
+      "production_closure": "NOT_RETESTED_THIS_TURN",
+      "regressions": [
+        "frontend/web/tests/import-navigation.integration.test.mjs",
+        "frontend/web/tests/submission-pending.integration.test.mjs",
+        "frontend/web/tests/queue.integration.test.mjs"
+      ],
+      "evidence_refs": [
+        "docs/testing/2026-10-21/bilibili-remediation/billing-evidence.json",
+        "docs/testing/2026-10-21/bilibili-remediation/production-final-url-entered.png",
+        "docs/testing/2026-10-21/bilibili-remediation/import-navigation-fixed.png"
+      ],
+      "note": ""
+    },
+    {
+      "annotation_index": 12,
+      "id": "bbr-012",
+      "scenario": "be188f78创建，正确选第1/2集，任务6变7；等待全阶段结算",
+      "criteria": "只增加一个任务，条目分P与同一run归属一致",
+      "offline_replay": "PASS",
+      "negative_cases": 3,
+      "production_closure": "NOT_RETESTED_THIS_TURN",
+      "regressions": [
+        "backend/tests/test_api_contract.py",
+        "frontend/web/tests/queue.integration.test.mjs",
+        "backend/tests/test_bilibili_public_fallback.py"
+      ],
+      "evidence_refs": [
+        "docs/testing/2026-10-21/bilibili-remediation/billing-evidence.json",
+        "docs/testing/2026-10-21/bilibili-remediation/production-final.json",
+        "docs/testing/2026-10-21/bilibili-remediation/production-running.png"
+      ],
+      "note": ""
+    },
+    {
+      "annotation_index": 13,
+      "id": "bbr-013",
+      "scenario": "下载失败被服务器Chrome cookies缺失覆盖；增加超时与公开MP4回退",
+      "criteria": "B站原生下载失败或60秒超时仅回退正确分P，绝不读取服务器Chrome cookies",
+      "offline_replay": "PASS",
+      "negative_cases": 3,
+      "production_closure": "NOT_RETESTED_THIS_TURN",
+      "regressions": [
+        "backend/tests/test_bilibili_public_fallback.py"
+      ],
+      "evidence_refs": [
+        "docs/testing/2026-10-21/bilibili-remediation/evidence.json",
+        "docs/testing/2026-10-21/bilibili-remediation/pre-download-fix.json"
+      ],
+      "note": ""
+    },
+    {
+      "annotation_index": 14,
+      "id": "bbr-014",
+      "scenario": "首次失败两集均未下载，尚未进入GPU/LLM；原run重试",
+      "criteria": "失败快照保持error与无usage/cost，不允许伪造成功或新建run",
+      "offline_replay": "PASS",
+      "negative_cases": 3,
+      "production_closure": "NOT_RETESTED_THIS_TURN",
+      "regressions": [
+        "backend/tests/test_bilibili_public_fallback.py",
+        "backend/tests/test_api_contract.py"
+      ],
+      "evidence_refs": [
+        "docs/testing/2026-10-21/bilibili-remediation/pre-download-fix.json"
+      ],
+      "note": ""
+    },
+    {
+      "annotation_index": 15,
+      "id": "bbr-015",
+      "scenario": "从前端重试原be188f78，任务总数仍7，后端/前端回归通过",
+      "criteria": "重试保持同一run；终态用量与复用无重复账单",
+      "offline_replay": "PASS",
+      "negative_cases": 3,
+      "production_closure": "NOT_RETESTED_THIS_TURN",
+      "regressions": [
+        "backend/tests/test_api_contract.py",
+        "frontend/web/tests/queue.integration.test.mjs"
+      ],
+      "evidence_refs": [
+        "docs/testing/2026-10-21/bilibili-remediation/production-final.json",
+        "docs/testing/2026-10-21/bilibili-remediation/production-retry.png"
+      ],
+      "note": ""
+    },
+    {
+      "annotation_index": 16,
+      "id": "bbr-016",
+      "scenario": "两集下载成功，约116秒，已进入转写；等待反馈与入口可见",
+      "criteria": "两集均有真实字节数，下载与后续ASR阶段有测量值",
+      "offline_replay": "PASS",
+      "negative_cases": 3,
+      "production_closure": "NOT_RETESTED_THIS_TURN",
+      "regressions": [
+        "backend/tests/test_bilibili_public_fallback.py",
+        "backend/tests/test_api_contract.py",
+        "frontend/web/tests/submission-pending.integration.test.mjs",
+        "frontend/web/tests/import-navigation.integration.test.mjs"
+      ],
+      "evidence_refs": [
+        "docs/testing/2026-10-21/bilibili-remediation/production-final.json",
+        "docs/testing/2026-10-21/bilibili-remediation/production-running.png"
+      ],
+      "note": ""
+    },
+    {
+      "annotation_index": 17,
+      "id": "bbr-017",
+      "scenario": "第一集真实GPU转写4段、置信度0.91；第二集继续",
+      "criteria": "有效ASR具有正GPU阶段耗时和非空转录；不以空返回或假LLM计成功",
+      "offline_replay": "PASS",
+      "negative_cases": 3,
+      "production_closure": "NOT_RETESTED_THIS_TURN",
+      "regressions": [
+        "backend/tests/test_api_contract.py",
+        "backend/tests/test_transcript_quality_admission.py"
+      ],
+      "evidence_refs": [
+        "docs/testing/2026-10-21/bilibili-remediation/production-final.json",
+        "docs/testing/2026-10-21/bilibili-remediation/progress-06.json"
+      ],
+      "note": "未单独保留第一集结束、第二集仍在转写的瞬时JSON；由两集完成后的阶段指标回放。"
+    },
+    {
+      "annotation_index": 18,
+      "id": "bbr-018",
+      "scenario": "ASR 510/442字超过200字；候选帧80/78，进入OCR",
+      "criteria": "明确使用OCR之前的ASR快照，候选帧有非空文件和合法时间戳",
+      "offline_replay": "PASS",
+      "negative_cases": 3,
+      "production_closure": "NOT_RETESTED_THIS_TURN",
+      "regressions": [
+        "backend/tests/test_api_contract.py",
+        "backend/tests/test_transcript_quality_admission.py"
+      ],
+      "evidence_refs": [
+        "docs/testing/2026-10-21/bilibili-remediation/progress-06.json"
+      ],
+      "note": ""
+    },
+    {
+      "annotation_index": 19,
+      "id": "bbr-019",
+      "scenario": "独立进程故障注入：代理不可达仍约1.9秒展开100集并下载首集",
+      "criteria": "故障注入不改生产配置；公开API不继承失效代理，输出完整MP4",
+      "offline_replay": "PASS",
+      "negative_cases": 3,
+      "production_closure": "NOT_RETESTED_THIS_TURN",
+      "regressions": [
+        "backend/tests/test_bilibili_public_fallback.py",
+        "backend/tests/test_bilibili_review_operations.py"
+      ],
+      "evidence_refs": [
+        "docs/testing/2026-10-21/bilibili-remediation/source-outage-fallback.txt"
+      ],
+      "note": ""
+    },
+    {
+      "annotation_index": 20,
+      "id": "bbr-020",
+      "scenario": "第一集OCR 80/80，1222画面字符，第二集78帧继续",
+      "criteria": "帧请求数等于完成数，ASR与OCR快照不混淆",
+      "offline_replay": "PASS",
+      "negative_cases": 3,
+      "production_closure": "NOT_RETESTED_THIS_TURN",
+      "regressions": [
+        "backend/tests/test_api_contract.py",
+        "backend/tests/test_production_pipeline_stage_eval_set.py"
+      ],
+      "evidence_refs": [
+        "docs/testing/2026-10-21/bilibili-remediation/production-final.json",
+        "docs/testing/2026-10-21/bilibili-remediation/progress-11.json"
+      ],
+      "note": ""
+    },
+    {
+      "annotation_index": 21,
+      "id": "bbr-021",
+      "scenario": "生产文件和前端入口与清单相符；同一任务继续OCR",
+      "criteria": "重新计算清单哈希、来源文件与Web入口，不能只信匹配标记",
+      "offline_replay": "PASS",
+      "negative_cases": 3,
+      "production_closure": "NOT_RETESTED_THIS_TURN",
+      "regressions": [
+        "backend/tests/test_bilibili_review_operations.py"
+      ],
+      "evidence_refs": [
+        "docs/testing/2026-10-21/bilibili-remediation/production-final.json",
+        "docs/testing/2026-10-21/bilibili-remediation/release-verification.json"
+      ],
+      "note": ""
+    },
+    {
+      "annotation_index": 22,
+      "id": "bbr-022",
+      "scenario": "长任务登录过期，同一账号重新登录，后台任务继续",
+      "criteria": "重新认证保持同一run和任务计数；不把未定位过期原因描述为已解决",
+      "offline_replay": "PASS",
+      "negative_cases": 3,
+      "production_closure": "OPEN",
+      "regressions": [
+        "backend/tests/test_api_contract.py",
+        "frontend/web/tests/login-production.integration.test.mjs"
+      ],
+      "evidence_refs": [
+        "docs/testing/2026-10-21/bilibili-remediation/evidence.json"
+      ],
+      "note": "会话长期稳定性未重新实测；此条回放认证恢复事实，严格关闭模式仍阻断。"
+    },
+    {
+      "annotation_index": 23,
+      "id": "bbr-023",
+      "scenario": "OCR158/158，glm-5.3-flash每集选择3张，进入剪辑",
+      "criteria": "OCR全部完成，选择mode=llm且每集3张，真实模型非fake",
+      "offline_replay": "PASS",
+      "negative_cases": 3,
+      "production_closure": "NOT_RETESTED_THIS_TURN",
+      "regressions": [
+        "backend/tests/test_api_contract.py",
+        "backend/tests/test_llm.py"
+      ],
+      "evidence_refs": [
+        "docs/testing/2026-10-21/bilibili-remediation/production-final.json"
+      ],
+      "note": ""
+    },
+    {
+      "annotation_index": 24,
+      "id": "bbr-024",
+      "scenario": "选帧结束但剪辑仍在等待，不提前宣告最终结算",
+      "criteria": "处理中快照仍running、正文未生成；最终必须全部完结",
+      "offline_replay": "PASS",
+      "negative_cases": 3,
+      "production_closure": "NOT_RETESTED_THIS_TURN",
+      "regressions": [
+        "backend/tests/test_production_pipeline_stage_eval_set.py",
+        "backend/tests/test_api_contract.py"
+      ],
+      "evidence_refs": [
+        "docs/testing/2026-10-21/bilibili-remediation/production-final.json",
+        "docs/testing/2026-10-21/bilibili-remediation/progress-14.json"
+      ],
+      "note": ""
+    },
+    {
+      "annotation_index": 25,
+      "id": "bbr-025",
+      "scenario": "第一集3/3剪辑入库，第二集继续；实例就绪无重启",
+      "criteria": "最终请求与完成数一致、设备为GPU；不能把部分返回当全部成功",
+      "offline_replay": "PASS",
+      "negative_cases": 3,
+      "production_closure": "NOT_RETESTED_THIS_TURN",
+      "regressions": [
+        "backend/tests/test_api_contract.py",
+        "backend/tests/test_production_pipeline_stage_eval_set.py"
+      ],
+      "evidence_refs": [
+        "docs/testing/2026-10-21/bilibili-remediation/deployment-status.json",
+        "docs/testing/2026-10-21/bilibili-remediation/production-final.json"
+      ],
+      "note": ""
+    },
+    {
+      "annotation_index": 26,
+      "id": "bbr-026",
+      "scenario": "剪辑响应已成功但后端仍汇总；核对两篇正文与月账再结论",
+      "criteria": "两集剪辑全完成，非空正文与最终终态同时成立",
+      "offline_replay": "PASS",
+      "negative_cases": 3,
+      "production_closure": "NOT_RETESTED_THIS_TURN",
+      "regressions": [
+        "backend/tests/test_api_contract.py",
+        "backend/tests/test_production_pipeline_stage_eval_set.py"
+      ],
+      "evidence_refs": [
+        "docs/testing/2026-10-21/bilibili-remediation/production-final.json"
+      ],
+      "note": ""
+    },
+    {
+      "annotation_index": 27,
+      "id": "bbr-027",
+      "scenario": "任务done，两篇教材，15939输入/15841输出，费用0.010311",
+      "criteria": "真实成功调用、正用量、应用单价复算和月账差值全部一致",
+      "offline_replay": "PASS",
+      "negative_cases": 3,
+      "production_closure": "NOT_RETESTED_THIS_TURN",
+      "regressions": [
+        "backend/tests/test_api_contract.py",
+        "backend/tests/test_production_billing_eval_set.py"
+      ],
+      "evidence_refs": [
+        "docs/testing/2026-10-21/bilibili-remediation/production-final.json",
+        "docs/testing/2026-10-21/bilibili-remediation/production-completed.png"
+      ],
+      "note": ""
+    },
+    {
+      "annotation_index": 28,
+      "id": "bbr-028",
+      "scenario": "第一讲可开但引用媒体曾显示不可用，继续核查附件链路",
+      "criteria": "仅本人笔记实际引用、受允许根目录的文件可读取；最终媒体必须加载",
+      "offline_replay": "PASS",
+      "negative_cases": 3,
+      "production_closure": "NOT_RETESTED_THIS_TURN",
+      "regressions": [
+        "backend/tests/test_api_contract.py",
+        "frontend/web/tests/reader.integration.test.mjs"
+      ],
+      "evidence_refs": [
+        "docs/testing/2026-10-21/bilibili-remediation/media-transport-diagnosis.json",
+        "docs/testing/2026-10-21/bilibili-remediation/reader-final.json",
+        "docs/testing/2026-10-21/bilibili-remediation/reader-first.png"
+      ],
+      "note": ""
+    },
+    {
+      "annotation_index": 29,
+      "id": "bbr-029",
+      "scenario": "路径正常，下载中误显示不可用；Promise.all阻塞全部展示",
+      "criteria": "图片先就绪时立即显示，慢视频保留加载态，失败后才显示不可用",
+      "offline_replay": "PASS",
+      "negative_cases": 3,
+      "production_closure": "NOT_RETESTED_THIS_TURN",
+      "regressions": [
+        "frontend/web/tests/reader.integration.test.mjs"
+      ],
+      "evidence_refs": [
+        "docs/testing/2026-10-21/bilibili-remediation/reader-final.json",
+        "docs/testing/2026-10-21/bilibili-remediation/reader-incremental-loading.txt",
+        "docs/testing/2026-10-21/bilibili-remediation/reader-incremental-loading.png"
+      ],
+      "note": ""
+    },
+    {
+      "annotation_index": 30,
+      "id": "bbr-030",
+      "scenario": "首讲剪辑播完，38项回归通过；月账和重复提交无增量",
+      "criteria": "播放时间达到时长，费用差值与run一致，去重必须比较完整账本",
+      "offline_replay": "PASS",
+      "negative_cases": 3,
+      "production_closure": "NOT_RETESTED_THIS_TURN",
+      "regressions": [
+        "frontend/web/tests/reader.integration.test.mjs",
+        "frontend/web/tests/queue.integration.test.mjs",
+        "backend/tests/test_api_contract.py"
+      ],
+      "evidence_refs": [
+        "docs/testing/2026-10-21/bilibili-remediation/reader-range-playback.json",
+        "docs/testing/2026-10-21/bilibili-remediation/reader-range-playback.png"
+      ],
+      "note": ""
+    },
+    {
+      "annotation_index": 31,
+      "id": "bbr-031",
+      "scenario": "阅读器已发布、健康，计费门禁通过，费用页面再核对",
+      "criteria": "就绪/健康和匿名媒体保护齐备；生产摘要门禁不能替代未关闭项",
+      "offline_replay": "PASS",
+      "negative_cases": 3,
+      "production_closure": "NOT_RETESTED_THIS_TURN",
+      "regressions": [
+        "backend/tests/test_bilibili_review_operations.py",
+        "backend/tests/test_production_billing_eval_set.py"
+      ],
+      "evidence_refs": [
+        "docs/testing/2026-10-21/bilibili-remediation/billing-evidence.json",
+        "docs/testing/2026-10-21/bilibili-remediation/release-verification.json",
+        "docs/testing/2026-10-21/bilibili-remediation/billing-final.png"
+      ],
+      "note": ""
+    },
+    {
+      "annotation_index": 32,
+      "id": "bbr-032",
+      "scenario": "前端run/15939/15841/0.010311可见，教材1变2",
+      "criteria": "UI费用与真实账本、教材数增量相符",
+      "offline_replay": "PASS",
+      "negative_cases": 3,
+      "production_closure": "NOT_RETESTED_THIS_TURN",
+      "regressions": [
+        "frontend/web/tests/queue.integration.test.mjs",
+        "backend/tests/test_api_contract.py"
+      ],
+      "evidence_refs": [
+        "docs/testing/2026-10-21/bilibili-remediation/billing-evidence.json",
+        "docs/testing/2026-10-21/bilibili-remediation/billing-final.txt",
+        "docs/testing/2026-10-21/bilibili-remediation/library-final.txt",
+        "docs/testing/2026-10-21/bilibili-remediation/library-final.png",
+        "docs/testing/2026-10-21/bilibili-remediation/billing-final.png"
+      ],
+      "note": ""
+    },
+    {
+      "annotation_index": 33,
+      "id": "bbr-033",
+      "scenario": "附件200但0字节中断；文件存在；只读请求重试一次",
+      "criteria": "根据字节数识别截断，网络异常限次；权限/不存在不重试",
+      "offline_replay": "PASS",
+      "negative_cases": 3,
+      "production_closure": "NOT_RETESTED_THIS_TURN",
+      "regressions": [
+        "frontend/web/tests/reader.integration.test.mjs",
+        "frontend/web/tests/media-ranges.integration.test.mjs"
+      ],
+      "evidence_refs": [
+        "docs/testing/2026-10-21/bilibili-remediation/media-transport-diagnosis.json",
+        "docs/testing/2026-10-21/bilibili-remediation/media-access-before-retry.jsonl"
+      ],
+      "note": ""
+    },
+    {
+      "annotation_index": 34,
+      "id": "bbr-034",
+      "scenario": "网络异常重试回归通过；HTTP权限/不存在错误保留",
+      "criteria": "只重试TypeError传输故障，两次上限，403一次即失败且不改权限",
+      "offline_replay": "PASS",
+      "negative_cases": 3,
+      "production_closure": "NOT_RETESTED_THIS_TURN",
+      "regressions": [
+        "frontend/web/tests/reader.integration.test.mjs",
+        "frontend/web/tests/media-ranges.integration.test.mjs",
+        "backend/tests/test_api_contract.py"
+      ],
+      "evidence_refs": [
+        "docs/testing/2026-10-21/bilibili-remediation/media-transport-diagnosis.json"
+      ],
+      "note": ""
+    },
+    {
+      "annotation_index": 35,
+      "id": "bbr-035",
+      "scenario": "首图先显示、其余加载中；27个文件哈希一致实例健康",
+      "criteria": "独立展示先完成媒体；清单/实例检查不能用自报标志代替",
+      "offline_replay": "PASS",
+      "negative_cases": 3,
+      "production_closure": "NOT_RETESTED_THIS_TURN",
+      "regressions": [
+        "frontend/web/tests/reader.integration.test.mjs",
+        "backend/tests/test_bilibili_review_operations.py"
+      ],
+      "evidence_refs": [
+        "docs/testing/2026-10-21/bilibili-remediation/deployment-status.json",
+        "docs/testing/2026-10-21/bilibili-remediation/reader-incremental-loading.txt",
+        "docs/testing/2026-10-21/bilibili-remediation/release-verification.json",
+        "docs/testing/2026-10-21/bilibili-remediation/reader-incremental-loading.png"
+      ],
+      "note": ""
+    },
+    {
+      "annotation_index": 36,
+      "id": "bbr-036",
+      "scenario": "三图显示但一段视频仍失败，媒体暂不标通过；核查文件与HTTP",
+      "criteria": "分别检查磁盘/应用响应长度与公网截断，不把正文计费成功当阅读成功",
+      "offline_replay": "PASS",
+      "negative_cases": 3,
+      "production_closure": "NOT_RETESTED_THIS_TURN",
+      "regressions": [
+        "backend/tests/test_api_contract.py",
+        "frontend/web/tests/media-ranges.integration.test.mjs",
+        "frontend/web/tests/reader.integration.test.mjs"
+      ],
+      "evidence_refs": [
+        "docs/testing/2026-10-21/bilibili-remediation/media-transport-diagnosis.json",
+        "docs/testing/2026-10-21/bilibili-remediation/reader-final.json",
+        "docs/testing/2026-10-21/bilibili-remediation/media-access-before-retry.jsonl"
+      ],
+      "note": ""
+    },
+    {
+      "annotation_index": 37,
+      "id": "bbr-037",
+      "scenario": "MP4改带登录凭据64KB分段，只重试失败段并校验版本",
+      "criteria": "准确拼接字节、Range偏移、Content-Range/长度/ETag一致，拒绝文件混版",
+      "offline_replay": "PASS",
+      "negative_cases": 3,
+      "production_closure": "NOT_RETESTED_THIS_TURN",
+      "regressions": [
+        "frontend/web/tests/media-ranges.integration.test.mjs",
+        "backend/tests/test_api_contract.py"
+      ],
+      "evidence_refs": [
+        "docs/testing/2026-10-21/bilibili-remediation/media-transport-diagnosis.json"
+      ],
+      "note": ""
+    },
+    {
+      "annotation_index": 38,
+      "id": "bbr-038",
+      "scenario": "分段版上线，114/42回归通过；发布不重新调用模型",
+      "criteria": "隔离权限、版本与重试回归，已有run及账本不变",
+      "offline_replay": "PASS",
+      "negative_cases": 3,
+      "production_closure": "NOT_RETESTED_THIS_TURN",
+      "regressions": [
+        "frontend/web/tests/media-ranges.integration.test.mjs",
+        "backend/tests/test_api_contract.py",
+        "backend/tests/test_bilibili_review_operations.py"
+      ],
+      "evidence_refs": [
+        "docs/testing/2026-10-21/bilibili-remediation/evidence.json",
+        "docs/testing/2026-10-21/bilibili-remediation/production-final.json"
+      ],
+      "note": ""
+    },
+    {
+      "annotation_index": 39,
+      "id": "bbr-039",
+      "scenario": "三个视频首段206，网络慢，继续等待且模型费用不变",
+      "criteria": "实际FastAPI带Range返回206并鉴权；最终视频须就绪且费用无增量",
+      "offline_replay": "PASS",
+      "negative_cases": 3,
+      "production_closure": "NOT_RETESTED_THIS_TURN",
+      "regressions": [
+        "frontend/web/tests/media-ranges.integration.test.mjs",
+        "backend/tests/test_api_contract.py"
+      ],
+      "evidence_refs": [
+        "docs/testing/2026-10-21/bilibili-remediation/production-final.json",
+        "docs/testing/2026-10-21/bilibili-remediation/reader-final.json"
+      ],
+      "note": "原始206逐次日志未作为独立文件留存；实际206由API契约测试覆盖，生产最终视频及清单另有保存。"
+    },
+    {
+      "annotation_index": 40,
+      "id": "bbr-040",
+      "scenario": "累计10段约640KB，保留已成功分段，慢网络继续等",
+      "criteria": "中间分段失败只重试相同偏移，已成功分段不丢弃，未完成不得宣告播放成功",
+      "offline_replay": "PASS",
+      "negative_cases": 3,
+      "production_closure": "NOT_RETESTED_THIS_TURN",
+      "regressions": [
+        "frontend/web/tests/media-ranges.integration.test.mjs",
+        "frontend/web/tests/reader.integration.test.mjs"
+      ],
+      "evidence_refs": [
+        "docs/testing/2026-10-21/bilibili-remediation/media-transport-diagnosis.json",
+        "docs/testing/2026-10-21/bilibili-remediation/reader-final.json",
+        "docs/testing/2026-10-21/bilibili-remediation/reader-recovered-clip-playback.json"
+      ],
+      "note": "10段瞬时计数为原终端观察；反例及断点位置由确定性传输回归证明，不伪造累计字节日志。"
+    },
+    {
+      "annotation_index": 41,
+      "id": "bbr-041",
+      "scenario": "第一段重组后播到13秒，三图显示；其余仍下载",
+      "criteria": "单个完成即可播放，慢视频不阻塞已就绪内容",
+      "offline_replay": "PASS",
+      "negative_cases": 3,
+      "production_closure": "NOT_RETESTED_THIS_TURN",
+      "regressions": [
+        "frontend/web/tests/reader.integration.test.mjs",
+        "frontend/web/tests/media-ranges.integration.test.mjs"
+      ],
+      "evidence_refs": [
+        "docs/testing/2026-10-21/bilibili-remediation/reader-final.json",
+        "docs/testing/2026-10-21/bilibili-remediation/reader-range-playback.json",
+        "docs/testing/2026-10-21/bilibili-remediation/reader-range-playback.png"
+      ],
+      "note": ""
+    },
+    {
+      "annotation_index": 42,
+      "id": "bbr-042",
+      "scenario": "第二讲3图3视频均就绪、加载与不可用清零；恢复失败剪辑",
+      "criteria": "所有媒体必须真实就绪；恢复剪辑的播放时间达到27秒",
+      "offline_replay": "PASS",
+      "negative_cases": 3,
+      "production_closure": "NOT_RETESTED_THIS_TURN",
+      "regressions": [
+        "frontend/web/tests/reader.integration.test.mjs",
+        "frontend/web/tests/media-ranges.integration.test.mjs",
+        "backend/tests/test_api_contract.py"
+      ],
+      "evidence_refs": [
+        "docs/testing/2026-10-21/bilibili-remediation/reader-final.json",
+        "docs/testing/2026-10-21/bilibili-remediation/reader-recovered-clip-playback.json",
+        "docs/testing/2026-10-21/bilibili-remediation/reader-final.png"
+      ],
+      "note": ""
+    },
+    {
+      "annotation_index": 43,
+      "id": "bbr-043",
+      "scenario": "B站解析、等待/新建入口、媒体分段均上线，前2P生成2讲，计费/去重通过",
+      "criteria": "最终闭环由真实模型/正文/媒体/费用共同证明，离线通过不等于新生产验收",
+      "offline_replay": "PASS",
+      "negative_cases": 3,
+      "production_closure": "NOT_RETESTED_THIS_TURN",
+      "regressions": [
+        "backend/tests/test_bilibili_public_fallback.py",
+        "frontend/web/tests/submission-pending.integration.test.mjs",
+        "frontend/web/tests/import-navigation.integration.test.mjs",
+        "frontend/web/tests/reader.integration.test.mjs",
+        "frontend/web/tests/media-ranges.integration.test.mjs",
+        "backend/tests/test_api_contract.py"
+      ],
+      "evidence_refs": [
+        "docs/testing/2026-10-21/bilibili-remediation/billing-evidence.json",
+        "docs/testing/2026-10-21/bilibili-remediation/production-final.json",
+        "docs/testing/2026-10-21/bilibili-remediation/billing-final.png",
+        "docs/testing/2026-10-21/bilibili-remediation/reader-final.png"
+      ],
+      "note": ""
+    },
+    {
+      "annotation_index": 44,
+      "id": "bbr-044",
+      "scenario": "登录过期未定位；本地记录误写原值未完整恢复，生产不受影响",
+      "criteria": "未关闭项始终保留，隔离回归不冒充数据恢复；严格关闭模式保持失败",
+      "offline_replay": "PASS",
+      "negative_cases": 3,
+      "production_closure": "OPEN",
+      "regressions": [
+        "backend/tests/test_bilibili_test_isolation.py",
+        "backend/tests/test_api_contract.py"
+      ],
+      "evidence_refs": [
+        "docs/testing/2026-10-21/bilibili-remediation/evidence.json",
+        "docs/testing/2026-10-21/bilibili-remediation/local-test-isolation.json"
+      ],
+      "note": "登录原因与本地原值恢复均未关闭，不得仅修改status为PASS销项。"
+    }
+  ],
+  "references": [
+    "annotation-backend-regressions.txt",
+    "annotation-frontend-regressions.txt",
+    "annotation-final-dataset-regressions.txt",
+    "annotation-offline-replay-gate.txt",
+    "annotation-strict-closure-gate.txt"
+  ]
+}

@@ -1,0 +1,6 @@
+{
+  "module": "/app/gpu_plugins/v2md/providers/colab_machinery.py",
+  "warm_window_s": 30,
+  "watchdog_poll_s": 15,
+  "keep_session": false
+}

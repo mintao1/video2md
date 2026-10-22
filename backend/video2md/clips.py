@@ -63,6 +63,9 @@ def remote_cut_clips(published: list, video: Path, dur: float,
     """
     import httpx  # 延迟导入：CLI 直跑纯本地路径时不起 httpx 连接
 
+    from .colab import remote_for_user
+
+    base = remote_for_user(base)
     tasks = _clip_tasks(published, dur, segs)
     result: dict[str, str | None] = {k: v for k, v in tasks.items() if isinstance(v, str)}
     todo = [(k, v) for k, v in tasks.items() if not isinstance(v, str)]

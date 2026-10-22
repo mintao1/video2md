@@ -1,0 +1,129 @@
+- banner:
+  - generic: menu_book
+  - generic: 视书
+  - generic: · Queue Processing
+  - button "通知":
+    - generic: notifications
+  - link "M":
+    - /url: /profile
+  - button "退出登录": 退出
+- main:
+  - generic: link
+  - textbox "粘贴 B站 / YouTube / 播客等音视频链接...": https://www.bilibili.com/video/BV1vV411k7GB/
+  - button "auto_awesome 开始解析" [active]:
+    - generic: auto_awesome
+    - generic: 开始解析
+  - alert: "提交失败：链接解析失败（已重试 3 次）：ERROR: [BiliBili] 1vV411k7GB: Unable to download webpage: [SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1010) (caused by SSLError('[SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1010)')); please report this issue"
+  - generic: bolt
+  - generic: 支持合集、主页处理
+  - button "upload_file 更多导入方式":
+    - generic: upload_file
+    - generic: 更多导入方式
+  - button "全部任务 (6)":
+    - generic: 全部任务
+    - generic: (6)
+  - button "转码中 (0)":
+    - generic: 转码中
+    - generic: (0)
+  - button "排队中 (0)":
+    - generic: 排队中
+    - generic: (0)
+  - button "历史完成 (1)":
+    - generic: 历史完成
+    - generic: (1)
+  - button "转换失败 (5)":
+    - generic: 转换失败
+    - generic: (5)
+  - generic: stream
+  - generic: 实时流水线队列
+  - generic: 自动刷新 · 3s
+  - button "checklist 批量管理":
+    - generic: checklist
+    - generic: 批量管理
+  - generic: smart_display
+  - generic: 转换完成
+  - heading "数据库索引原理与查询优化" [level=3]
+  - generic: 任务编号：4df77d9c
+  - generic: 输入 6498 tokens
+  - generic: 输出 6919 tokens
+  - generic: GPU 809.120 秒
+  - generic: 费用 $0.004434
+  - button "menu_book 立即阅读":
+    - generic: menu_book
+    - text: 立即阅读
+  - generic: smart_display
+  - generic: 生成受阻
+  - heading "ferosse.tech" [level=3]
+  - generic: 任务编号：edfa1b1a
+  - generic: 输入 2047 tokens
+  - generic: 输出 8690 tokens
+  - generic: GPU 331.228 秒
+  - generic: 费用 $0.004652
+  - alert: 失败阶段：note。转录内容过短，未达到教材生成质量门槛；请使用内容更完整的视频。
+  - generic: 尚未生成可读教材
+  - button "补跑失败条目"
+  - generic: smart_display
+  - generic: 转换失败
+  - heading "ferosse.tech" [level=3]
+  - generic: 任务编号：312e97ae
+  - generic: 输入 0 tokens
+  - generic: 输出 0 tokens
+  - generic: GPU 204.669 秒
+  - generic: 费用 $0.000000
+  - alert: 失败阶段：note。模型渠道拒绝访问，请检查渠道是否启用及账号权限。（HTTP 403）
+  - generic: pause_circle
+  - generic: 任务已结束，可重新排队
+  - button "重试任务"
+  - generic: smart_display
+  - generic: 转换失败
+  - heading "ferosse.tech" [level=3]
+  - generic: 任务编号：56835fed
+  - generic: 输入 0 tokens
+  - generic: 输出 0 tokens
+  - generic: GPU 183.082 秒
+  - generic: 费用 $0.000000
+  - alert: 失败阶段：note。模型渠道拒绝访问，请检查渠道是否启用及账号权限。（HTTP 403）
+  - generic: pause_circle
+  - generic: 任务已结束，可重新排队
+  - button "重试任务"
+  - generic: smart_display
+  - generic: 转换失败
+  - heading "ferosse.tech" [level=3]
+  - generic: 任务编号：aef9643a
+  - generic: 输入 0 tokens
+  - generic: 输出 0 tokens
+  - generic: GPU 251.977 秒
+  - generic: 费用 $0.000000
+  - alert: 失败阶段：note。模型渠道拒绝访问，请检查渠道是否启用及账号权限。（HTTP 403）
+  - generic: pause_circle
+  - generic: 任务已结束，可重新排队
+  - button "重试任务"
+  - generic: smart_display
+  - generic: 转换失败
+  - heading "ferosse.tech" [level=3]
+  - generic: 任务编号：9ad9ee9d
+  - generic: 输入 0 tokens
+  - generic: 输出 0 tokens
+  - generic: GPU 0.038 秒
+  - generic: 费用 $0.000000
+  - alert: 失败阶段：note。模型渠道拒绝访问，请检查渠道是否启用及账号权限。（HTTP 403）
+  - generic: pause_circle
+  - generic: 任务已结束，可重新排队
+  - button "重试任务"
+- navigation:
+  - link "motion_photos_on 排队处理":
+    - /url: /tasks
+    - generic: motion_photos_on
+    - generic: 排队处理
+  - link "local_library 教材库":
+    - /url: /library
+    - generic: local_library
+    - generic: 教材库
+  - link "add 新建转换":
+    - /url: /tasks?openImport=1
+    - generic: add
+    - generic: 新建转换
+  - link "person 我的":
+    - /url: /profile
+    - generic: person
+    - generic: 我的

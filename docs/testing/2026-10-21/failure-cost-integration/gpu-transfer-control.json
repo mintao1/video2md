@@ -1,0 +1,17 @@
+{
+  "transport_control": {
+    "session_created": true,
+    "json": {
+      "bytes": 14,
+      "sha256": "c775500ea34eded73c2a3c3bede193f0d839e6c14b36f21b6cc31472e0720a91",
+      "source_and_download_match": true
+    },
+    "tar": {
+      "bytes": 10240,
+      "sha256": "a74fdb84a205b0aef720a410a2fbebeacc239c62c354ee19133e8eee2d882a0a",
+      "source_and_download_match": true
+    },
+    "session_stopped": true
+  },
+  "limitation": "Small transfer control passed; does not reproduce historical 22-clip archive loss."
+}

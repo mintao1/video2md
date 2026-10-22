@@ -1,0 +1,429 @@
+{
+  "observed_at": "2026-10-21T20:43:03.480874+00:00",
+  "run_id": "dd586072",
+  "status": "done",
+  "note_count": 2,
+  "notes": [
+    {
+      "chars": 2941,
+      "markdown_bytes": 5929,
+      "sha256": "2c969d405b7267fe9dce04f2c7cbc59bfb9bcea4a989e18d894618b5b9c8e11a"
+    },
+    {
+      "chars": 3101,
+      "markdown_bytes": 5987,
+      "sha256": "c4374f3749176e9cafce8028427012b3a5d2a8844f8d37d43ab0c759b8b2010f"
+    }
+  ],
+  "media": [
+    {
+      "name": "p001-BV1LV411r77C_p1-f04-0003.jpg",
+      "exists": true,
+      "bytes": 31812,
+      "sha256": "c02c817df3b8cf7944ce6528ea5a59104b762c18c4c906c5fdbfcf74c8dde106"
+    },
+    {
+      "name": "p001-BV1LV411r77C_p1-c04-0003.mp4",
+      "exists": true,
+      "bytes": 867447,
+      "sha256": "e4bb48fa5a8579324fa83b5d0730da3347e6338c0fe55c549d50dd123e89b276",
+      "ffprobe_exit_code": 0,
+      "duration_s": 23.0,
+      "codecs": [
+        "h264",
+        "aac"
+      ]
+    },
+    {
+      "name": "p001-BV1LV411r77C_p1-f13-0012.jpg",
+      "exists": true,
+      "bytes": 38319,
+      "sha256": "22a5e5dd358da2600555c800b786cf72be68e1e82f6287426e5c3ea3db1be9fb"
+    },
+    {
+      "name": "p001-BV1LV411r77C_p1-c13-0012.mp4",
+      "exists": true,
+      "bytes": 1006558,
+      "sha256": "3112fadabe91e74b74e83e26ff9e9661b9f201fd77cbb6e2ca4e9dd26565eecf",
+      "ffprobe_exit_code": 0,
+      "duration_s": 26.3,
+      "codecs": [
+        "h264",
+        "aac"
+      ]
+    },
+    {
+      "name": "p001-BV1LV411r77C_p1-f34-0033.jpg",
+      "exists": true,
+      "bytes": 33560,
+      "sha256": "f6c4f684533ebea319a40f9047e044554d8a52e755d27569397fb446b03e9085"
+    },
+    {
+      "name": "p001-BV1LV411r77C_p1-c34-0033.mp4",
+      "exists": true,
+      "bytes": 661986,
+      "sha256": "0505da9af0cafb7c772a4add6db9bf17007ad61eacbe28d9684e3043864feb74",
+      "ffprobe_exit_code": 0,
+      "duration_s": 20.0,
+      "codecs": [
+        "h264",
+        "aac"
+      ]
+    },
+    {
+      "name": "p001-BV1LV411r77C_p1-f36-0035.jpg",
+      "exists": true,
+      "bytes": 50366,
+      "sha256": "99c17b06ecb650de587ae7631871d6bb7711e3274b477a0c28d7eeaf451a3a2a"
+    },
+    {
+      "name": "p001-BV1LV411r77C_p1-c36-0035.mp4",
+      "exists": true,
+      "bytes": 710431,
+      "sha256": "54bd3b375592586dd88c56537ef7c02d23af48c696b0c447ab6d4cfcd4046092",
+      "ffprobe_exit_code": 0,
+      "duration_s": 20.7,
+      "codecs": [
+        "h264",
+        "aac"
+      ]
+    },
+    {
+      "name": "p001-BV1LV411r77C_p1-f38-0036.jpg",
+      "exists": true,
+      "bytes": 18553,
+      "sha256": "51855da4d286736d8148e9b777da62ef3f3cb45b27bb1614b3d64894c6213528"
+    },
+    {
+      "name": "p001-BV1LV411r77C_p1-c38-0036.mp4",
+      "exists": true,
+      "bytes": 730008,
+      "sha256": "804720856e7f2e4d427f9dce45312c4a02131a9a86695a52b29ad7e5ce129a3b",
+      "ffprobe_exit_code": 0,
+      "duration_s": 21.7,
+      "codecs": [
+        "h264",
+        "aac"
+      ]
+    },
+    {
+      "name": "p001-BV1LV411r77C_p1-f53-0052.jpg",
+      "exists": true,
+      "bytes": 63493,
+      "sha256": "4aa38214fbc8866610db35fb56bbc60fcf9d807427b1ee2cb37b7c7bc658dedc"
+    },
+    {
+      "name": "p001-BV1LV411r77C_p1-c53-0052.mp4",
+      "exists": true,
+      "bytes": 733331,
+      "sha256": "eb95ae0be299540f7bdb7e913c0d4c99639bac75d68cae9beb157e31cf5900cf",
+      "ffprobe_exit_code": 0,
+      "duration_s": 24.456,
+      "codecs": [
+        "h264",
+        "aac"
+      ]
+    },
+    {
+      "name": "p002-BV1LV411r77C_p2-f01-0000.jpg",
+      "exists": true,
+      "bytes": 35624,
+      "sha256": "66a665b4b1ff36da3c60b07ad7d8c40ec55ecb1d40a4ec02ed318fb298b3c227"
+    },
+    {
+      "name": "p002-BV1LV411r77C_p2-c01-0000.mp4",
+      "exists": true,
+      "bytes": 469918,
+      "sha256": "96ecd30b8c0d6a1b6b68bbbd92df1ba7097dbd67e666c687bb27a5a782e6a1c4",
+      "ffprobe_exit_code": 0,
+      "duration_s": 17.0,
+      "codecs": [
+        "h264",
+        "aac"
+      ]
+    },
+    {
+      "name": "p002-BV1LV411r77C_p2-f15-0012.jpg",
+      "exists": true,
+      "bytes": 23464,
+      "sha256": "9e09be3f4e8be4007b923a52babb4ec6cb4d1ee79f78c00c766acd3b1d6fa4a9"
+    },
+    {
+      "name": "p002-BV1LV411r77C_p2-c15-0012.mp4",
+      "exists": true,
+      "bytes": 630348,
+      "sha256": "c79b5c9819b6afa7dfa0f4156dbc513d3be4bb7ed09b60fa90b58b600929f88c",
+      "ffprobe_exit_code": 0,
+      "duration_s": 22.0,
+      "codecs": [
+        "h264",
+        "aac"
+      ]
+    },
+    {
+      "name": "p002-BV1LV411r77C_p2-f21-0018.jpg",
+      "exists": true,
+      "bytes": 32506,
+      "sha256": "067210f484d94a01d486715120ac61f7f9a9d66c18019ca5aeebe3c5e7f212e8"
+    },
+    {
+      "name": "p002-BV1LV411r77C_p2-c21-0018.mp4",
+      "exists": true,
+      "bytes": 862488,
+      "sha256": "a261c25c91490c96518c77f5f90b8240a0b24bcd4b86fd1f4c9f787e4bea8e0d",
+      "ffprobe_exit_code": 0,
+      "duration_s": 30.0,
+      "codecs": [
+        "h264",
+        "aac"
+      ]
+    },
+    {
+      "name": "p002-BV1LV411r77C_p2-f34-0031.jpg",
+      "exists": true,
+      "bytes": 38390,
+      "sha256": "fd4cd4b6d1a4635f3ed62cd18cb93737ce9c754904b0d86c940ce60da354c290"
+    },
+    {
+      "name": "p002-BV1LV411r77C_p2-c34-0031.mp4",
+      "exists": true,
+      "bytes": 754713,
+      "sha256": "f681cf1e34c019096575625da17c38ffef6f4d620bfd0994a117be21c395840f",
+      "ffprobe_exit_code": 0,
+      "duration_s": 28.52,
+      "codecs": [
+        "h264",
+        "aac"
+      ]
+    },
+    {
+      "name": "p002-BV1LV411r77C_p2-f56-0053.jpg",
+      "exists": true,
+      "bytes": 24164,
+      "sha256": "eeb7bb7f76d213631df0cbd9350fc34e14207e84d7d18c44b21f8d945c869c31"
+    },
+    {
+      "name": "p002-BV1LV411r77C_p2-c56-0053.mp4",
+      "exists": true,
+      "bytes": 341768,
+      "sha256": "83dbf3df0b9a93f1a3762e978bfc5275b503ad0e0dc1fdf4e34bca14475f51d0",
+      "ffprobe_exit_code": 0,
+      "duration_s": 13.22,
+      "codecs": [
+        "h264",
+        "aac"
+      ]
+    }
+  ],
+  "llm_spans": [
+    {
+      "event": "llm:organize",
+      "status": "completed",
+      "durationMs": 20106,
+      "attempts": 1,
+      "attempt_usage": [
+        {
+          "usage": {
+            "total_tokens": 8172,
+            "prompt_tokens": 7014,
+            "completion_tokens": 1158,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 101
+            }
+          },
+          "attempt": 1,
+          "outcome": "success",
+          "http_status": 200
+        }
+      ],
+      "usage_complete": true,
+      "usage": {
+        "total_tokens": 8172,
+        "prompt_tokens": 7014,
+        "completion_tokens": 1158,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 101
+        }
+      }
+    },
+    {
+      "event": "llm:metadata",
+      "status": "completed",
+      "durationMs": 4144,
+      "attempts": 1,
+      "attempt_usage": [
+        {
+          "usage": {
+            "total_tokens": 1237,
+            "prompt_tokens": 1159,
+            "completion_tokens": 78,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            }
+          },
+          "attempt": 1,
+          "outcome": "success",
+          "http_status": 200
+        }
+      ],
+      "usage_complete": true,
+      "usage": {
+        "total_tokens": 1237,
+        "prompt_tokens": 1159,
+        "completion_tokens": 78,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0
+        }
+      }
+    },
+    {
+      "event": "llm:organize",
+      "status": "completed",
+      "durationMs": 23918,
+      "attempts": 1,
+      "attempt_usage": [
+        {
+          "usage": {
+            "total_tokens": 8568,
+            "prompt_tokens": 7164,
+            "completion_tokens": 1404,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 266
+            }
+          },
+          "attempt": 1,
+          "outcome": "success",
+          "http_status": 200
+        }
+      ],
+      "usage_complete": true,
+      "usage": {
+        "total_tokens": 8568,
+        "prompt_tokens": 7164,
+        "completion_tokens": 1404,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 266
+        }
+      }
+    },
+    {
+      "event": "llm:metadata",
+      "status": "completed",
+      "durationMs": 3117,
+      "attempts": 1,
+      "attempt_usage": [
+        {
+          "usage": {
+            "total_tokens": 1326,
+            "prompt_tokens": 1239,
+            "completion_tokens": 87,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            }
+          },
+          "attempt": 1,
+          "outcome": "success",
+          "http_status": 200
+        }
+      ],
+      "usage_complete": true,
+      "usage": {
+        "total_tokens": 1326,
+        "prompt_tokens": 1239,
+        "completion_tokens": 87,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0
+        }
+      }
+    }
+  ],
+  "usage_settlements": [
+    {
+      "at": "2026-10-22T02:47:50.291097",
+      "id": "ced4430b9c4d4524837de4247db98846",
+      "pricing": {
+        "gpu_min": 0.0,
+        "currency": "USD",
+        "gpu_policy": "free",
+        "llm_in_mtok": 0.15,
+        "llm_out_mtok": 0.5,
+        "llm_cached_in_mtok": 0.03
+      },
+      "usage_delta": {
+        "gpu_s": 383.854,
+        "llm_in_tok": 0,
+        "llm_out_tok": 0
+      },
+      "attribution_usd": 0.0
+    },
+    {
+      "at": "2026-10-22T03:12:22.726695",
+      "id": "1cb5a0f0c817435da7709ac07394d938",
+      "pricing": {
+        "gpu_min": 0.0,
+        "currency": "USD",
+        "gpu_policy": "free",
+        "llm_in_mtok": 0.15,
+        "llm_out_mtok": 0.5,
+        "llm_cached_in_mtok": 0.03
+      },
+      "usage_delta": {
+        "gpu_s": 893.542,
+        "llm_in_tok": 0,
+        "llm_out_tok": 0
+      },
+      "attribution_usd": 0.0
+    },
+    {
+      "at": "2026-10-22T03:49:53.629940",
+      "id": "8a1c546ba506421b9cce2c414791ab96",
+      "pricing": {
+        "gpu_min": 0.0,
+        "currency": "USD",
+        "gpu_policy": "free",
+        "llm_in_mtok": 0.15,
+        "llm_out_mtok": 0.5,
+        "llm_cached_in_mtok": 0.03
+      },
+      "usage_delta": {
+        "gpu_s": 610.576,
+        "llm_in_tok": 37018,
+        "llm_out_tok": 3579
+      },
+      "attribution_usd": 0.0073422
+    }
+  ],
+  "partial_failures": {},
+  "source_sha256": {
+    "api.py": "ad062f1928146856fb0739d8be570fa7a9123fe1eb77c7c4fe74bee53acfe360",
+    "graph.py": "dbac35ada94f314a57b5e355cdcd81d64e1b5dcb725f08479a6d444c95caf489",
+    "llm.py": "4825610b0cac0f54b5315ebdb98bb3ad7b6cd03756a790fb0991d3d547504a87",
+    "runs.py": "d43f578562d67e685ad729f3424bb01b475f586cb612df24c5d8e67603fc2edc",
+    "transcribe.py": "0d7595bb9b8ba4b439b9e682b4cd24e18d295d8ba6667da76f7bc2c8ddeda48a",
+    "note.py": "6db2c0f9a1a0214d5e21567e59f4b86256e9eb81da499a122018be5b27289ed9"
+  }
+}

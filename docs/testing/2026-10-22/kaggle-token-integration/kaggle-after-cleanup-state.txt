@@ -1,0 +1,24 @@
+					44 button (expanded) Event running 1 View Active Events, Secondary Actions: Collapse
+						49 text View Active Events
+					63 text 24m ago
+						206 text Version #7 with GPU T4 x2 Queued
+						207 text 6m
+						214 text 7m
+							114 text Version #1 with GPU T4 x2
+							115 text Cancelled
+						116 text 13m
+							122 text Version #1
+						124 text 13m
+							131 text Version #6 with GPU T4 x2
+							217 text Cancelled
+						135 text 28m
+						142 text 28m
+							148 text Version #5 with GPU T4 x2
+						150 text 31m
+							156 text Version #4
+							164 text Version #3
+							172 text Version #2
+							180 text Version #1
+						193 link Event running 1 1 Active Event
+								199 text 1  Active Event
+						200 button Collapse Active Events dialog

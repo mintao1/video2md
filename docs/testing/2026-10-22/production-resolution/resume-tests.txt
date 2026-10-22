@@ -1,0 +1,62 @@
+........................................................................ [ 51%]
+F...................................................................     [100%]
+=================================== FAILURES ===================================
+_______________________ test_usage_accumulate_and_settle _______________________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10e7194f0>
+tmp_path = PosixPath('/private/var/folders/1b/7r5v_kjj689_65rpwv0hxg8h0000gn/T/pytest-of-linmintao/pytest-104/test_usage_accumulate_and_sett0')
+
+    def test_usage_accumulate_and_settle(monkeypatch, tmp_path):
+        """归因链路单测：ContextVar 绑定→bump 累计→settle 按单价结算落记录（幂等）。"""
+        import video2md.runs as _runs_mod
+        import video2md.util as _util
+        from video2md import llm as _llm
+        monkeypatch.setattr(_runs_mod, "RUNS_FILE", tmp_path / "runs.json")
+        monkeypatch.setattr(_runs_mod, "_RUNS_LOCKFILE", _runs_mod.RUNS_FILE.with_suffix(".lock"))
+    
+        rid = "usetest"
+        with _runs_mod._runs_file_lock():
+            _runs_mod._runs_merge({"run_id": rid, "owner": "u", "status": "done",
+                                   "created": "2026-01-01", "artifacts": {}, "entries": []})
+        # 未绑定 run：bump 静默跳过（CLI/测试直调不记账）
+        _runs_mod.bump_usage(llm_in_tok=111)
+        assert not _runs_mod._USAGE
+        # 绑定后：llm 观测钩子与 GPU 钩子都累计
+        _util.bind_current_run(rid)
+        _llm._llm_observed("note", "completed", 0.0, 1, {"usage": {"prompt_tokens": 100,
+                                       "completion_tokens": 50}}, None, "s", "u", "text")
+        _runs_mod.bump_usage(gpu_s=90.0)
+        assert _runs_mod._USAGE[rid]["llm_in_tok"] == 100 and _runs_mod._USAGE[rid]["gpu_s"] == 90.0
+        # 结算：单价 in=2 / out=4 USD/MTok，GPU=0.03 USD/min → 100/1e6*2 + 50/1e6*4 + 1.5min*0.03
+        monkeypatch.setattr(_runs_mod, "PRICE_LLM_IN_MTOK", 2.0)
+        monkeypatch.setattr(_runs_mod, "PRICE_LLM_OUT_MTOK", 4.0)
+        monkeypatch.setattr(_runs_mod, "PRICE_GPU_MIN", 0.03)
+        settled = _runs_mod.settle_cost(rid)
+        assert settled["cost_usd"] == round(100 / 1e6 * 2 + 50 / 1e6 * 4 + 1.5 * 0.03, 6)
+        assert settled["usage"]["gpu_s"] == 90.0
+        # 幂等：终态已结算的记录，后续 usage 不再入账、不重复计费
+        _runs_mod.bump_usage(llm_in_tok=999)
+        again = _runs_mod.settle_cost(rid)
+>       assert again["cost_usd"] == settled["cost_usd"]
+E       assert 0.047398 == 0.0454
+
+tests/test_api_contract.py:1174: AssertionError
+=============================== warnings summary ===============================
+.venv/lib/python3.12/site-packages/starlette/testclient.py:53
+  /Users/linmintao/Desktop/开发项目/云端部署/video2md/backend/.venv/lib/python3.12/site-packages/starlette/testclient.py:53: DeprecationWarning: The anyio.abc.BlockingPortal alias is deprecated, use anyio.from_thread.BlockingPortal instead.
+    _PortalFactoryType = Callable[[], AbstractContextManager[anyio.abc.BlockingPortal]]
+
+tests/test_api_contract.py::test_auth_google_callback_happy_path
+tests/test_api_contract.py::test_auth_google_redirect_round_trip
+tests/test_api_contract.py::test_auth_google_callback_state_rejected
+tests/test_api_contract.py::test_auth_google_callback_state_rejected
+tests/test_api_contract.py::test_auth_google_callback_state_rejected
+tests/test_api_contract.py::test_auth_google_callback_exchange_rejected
+tests/test_api_contract.py::test_auth_google_callback_verify_fails
+  /Users/linmintao/Desktop/开发项目/云端部署/video2md/backend/.venv/lib/python3.12/site-packages/starlette/testclient.py:455: DeprecationWarning: Setting per-request cookies=<...> is being deprecated, because the expected behaviour on cookie persistence is ambiguous. Set cookies directly on the client instance instead.
+    return super().request(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_api_contract.py::test_usage_accumulate_and_settle - assert ...
+1 failed, 139 passed, 8 warnings in 4.40s

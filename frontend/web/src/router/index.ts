@@ -4,8 +4,7 @@ import { getToken, hasAnonymousSession } from '../api/client'
 const router = createRouter({
   history: createWebHistory(),
   routes: [
-    { path: '/login', name: 'login', component: () => import('../views/LoginView.vue') },
-    { path: '/', redirect: '/library' },
+    { path: '/', name: 'brand', component: () => import('../views/BrandView.vue') },
     {
       path: '/library',
       name: 'library',
@@ -40,12 +39,12 @@ const router = createRouter({
 router.beforeEach(async (to) => {
   if (to.name === 'terms' || to.name === 'privacy') return true
   const signedIn = Boolean(getToken()) || await hasAnonymousSession()
-  if (to.name === 'login') {
-    // The Google callback lands here with #id_token / #auth_error; LoginView consumes it.
+  if (to.name === 'brand') {
+    // The brand page owns sign-in and consumes the Google callback fragment.
     if (/(^|[#&])(id_token|auth_error)=/.test(to.hash)) return true
     return signedIn ? { name: 'library' } : true
   }
-  if (!signedIn) return { name: 'login', query: { redirect: to.fullPath } }
+  if (!signedIn) return { name: 'brand', query: { redirect: to.fullPath } }
   return true
 })
 

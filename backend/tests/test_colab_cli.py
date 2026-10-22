@@ -55,6 +55,114 @@ def test_direct_cli_transcription_ocr_clips_and_session_cleanup(cli):
     assert "No active sessions" in sessions(binary)
 
 
+def test_connected_tenant_routes_all_gpu_work_through_its_own_cli(cli, monkeypatch):
+    binary, audio, tmp = cli
+    monkeypatch.setitem(colab.ENV, "V2MD_COLAB_USERS_DIR", str(tmp / "tenants"))
+    directory = colab.credential_directory("alice")
+    directory.mkdir(parents=True)
+    (directory / "token.json").write_text("offline-tenant-token")
+    image = tmp / "tenant-frame.jpg"
+    image.write_bytes(b"jpeg-fixture")
+    original = subprocess.run
+    seen_homes = []
+
+    def record(*args, **kwargs):
+        seen_homes.append(kwargs.get("env", {}).get("HOME"))
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(colab.machinery.subprocess, "run", record)
+    with colab.session_scope(owner="alice"):
+        assert colab.remote_for_user("https://shared-pool.invalid") == "colab-cli"
+        assert transcribe(audio, "tiny", "en", tmp, "https://shared-pool.invalid")[0][0]["text"] == "CLI speech"
+        assert ocr_candidates([(1.0, image)], "remote", "https://shared-pool.invalid")[0]
+        assert remote_cut_clips([(image.name, "00:01")], audio, 3.0, [], tmp, "https://shared-pool.invalid")[image.name]
+    cli_homes = [home for home in seen_homes if home]
+    assert cli_homes and set(cli_homes) == {str(colab.tenant_home("alice"))}
+    assert not (tmp / "remote" / "active").exists()
+    assert colab.remote_for_user("https://shared-pool.invalid") == "https://shared-pool.invalid"
+    assert colab.machinery.CLI_HOME == ""
+
+
+def test_two_tenants_use_distinct_cli_homes_and_session_names(cli, monkeypatch):
+    _, audio, tmp = cli
+    monkeypatch.setitem(colab.ENV, "V2MD_COLAB_USERS_DIR", str(tmp / "tenants"))
+    observed = []
+    for uid in ("alice", "bob"):
+        directory = colab.credential_directory(uid)
+        directory.mkdir(parents=True)
+        (directory / "token.json").write_text("offline-token-" + uid)
+        with colab.session_scope(owner=uid):
+            colab._work(lambda: observed.append((colab.machinery.CLI_HOME, colab.machinery.SESSION)))
+    assert observed[0][0] != observed[1][0]
+    assert observed[0][1] != observed[1][1]
+    assert (colab.credential_directory("alice") / "token.json").read_text() == "offline-token-alice"
+
+
+def test_tenant_identity_propagates_into_graph_node_threads(cli, monkeypatch):
+    from langgraph.graph import END, START, StateGraph
+
+    _, _, tmp = cli
+    monkeypatch.setitem(colab.ENV, "V2MD_COLAB_USERS_DIR", str(tmp / "tenants"))
+    directory = colab.credential_directory("alice")
+    directory.mkdir(parents=True)
+    (directory / "token.json").write_text("offline-token")
+    observed = []
+
+    def gpu(state):
+        assert colab.remote_for_user("shared-pool") == "colab-cli"
+        colab._work(lambda: observed.append(colab.machinery.CLI_HOME))
+        return {}
+
+    builder = StateGraph(dict)
+    builder.add_node("gpu", gpu)
+    builder.add_edge(START, "gpu")
+    builder.add_edge("gpu", END)
+    with colab.session_scope(owner="alice"):
+        builder.compile().invoke({})
+    assert observed == [str(colab.tenant_home("alice"))]
+    assert colab._OWNER.get() == "" and colab._USE.get() is None
+
+
+def test_failed_tenant_directory_creation_restores_context(cli, monkeypatch):
+    _, _, tmp = cli
+    occupied = tmp / "not-a-directory"
+    occupied.write_text("occupied")
+    monkeypatch.setitem(colab.ENV, "V2MD_COLAB_USERS_DIR", str(occupied))
+    with pytest.raises(OSError), colab._session(owner="alice"):
+        pytest.fail("must not execute when the credential directory cannot be created")
+    assert colab._OWNER.get() == "" and colab.machinery.CLI_HOME == ""
+
+
+def test_unconnected_tenant_cannot_use_a_service_token(cli, monkeypatch):
+    _, _, tmp = cli
+    monkeypatch.setitem(colab.ENV, "V2MD_COLAB_USERS_DIR", str(tmp / "tenants"))
+    shared = tmp / "shared-home"
+    token = shared / ".config" / "colab-cli" / "token.json"
+    token.parent.mkdir(parents=True)
+    token.write_text("service-token")
+    monkeypatch.setattr(colab.Path, "home", classmethod(lambda cls: shared))
+    called = []
+    with colab.session_scope(owner="unconnected"):
+        with pytest.raises(RuntimeError, match="当前用户尚未连接 Colab"):
+            colab._work(lambda: called.append(True))
+    assert called == [] and token.read_text() == "service-token"
+
+
+def test_a_run_cannot_change_tenants_or_routes_midway(cli, monkeypatch):
+    _, _, tmp = cli
+    monkeypatch.setitem(colab.ENV, "V2MD_COLAB_USERS_DIR", str(tmp / "tenants"))
+    with colab.session_scope(owner="alice"):
+        assert colab.remote_for_user("pool") == "pool"
+        with pytest.raises(RuntimeError, match="不能切换租户"), colab.session_scope(owner="bob"):
+            pass
+        directory = colab.credential_directory("alice")
+        directory.mkdir(parents=True)
+        (directory / "token.json").write_text("new-token")
+        assert colab.remote_for_user("pool") == "pool"
+    with colab.session_scope(owner="alice"):
+        assert colab.remote_for_user("pool") == "colab-cli"
+
+
 def test_cli_failure_propagates_and_releases_session(cli, monkeypatch):
     binary, audio, tmp = cli
     monkeypatch.setenv("FAKE_COLAB_FAIL_EXEC", "1")

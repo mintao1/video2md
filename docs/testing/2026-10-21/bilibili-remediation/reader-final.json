@@ -1,0 +1,42 @@
+{
+  "chapter": " 第 2 / 2 讲 · 进度 100% ",
+  "images": [
+    {
+      "complete": true,
+      "name": "p002-video-f04-0003.jpg",
+      "width": 640
+    },
+    {
+      "complete": true,
+      "name": "p002-video-f08-0007.jpg",
+      "width": 640
+    },
+    {
+      "complete": true,
+      "name": "p002-video-f21-0020.jpg",
+      "width": 640
+    }
+  ],
+  "pending": 0,
+  "unavailable": false,
+  "videos": [
+    {
+      "duration": 13,
+      "error": null,
+      "name": "p002-video-c04-0003.mp4",
+      "readyState": 4
+    },
+    {
+      "duration": 27,
+      "error": null,
+      "name": "p002-video-c08-0007.mp4",
+      "readyState": 4
+    },
+    {
+      "duration": 27.933333,
+      "error": null,
+      "name": "p002-video-c21-0020.mp4",
+      "readyState": 4
+    }
+  ]
+}

@@ -20,7 +20,7 @@ export interface ApiError {
   }
 }
 
-/** GET /runs 列表项（mock 形状，字段名与 RunListOut 对齐） */
+/** GET /runs 列表项，字段名与 RunListOut 对齐。 */
 export interface RunListItem {
   run_id: string
   url: string
@@ -38,6 +38,10 @@ export interface RunListItem {
   quality_label?: string
   /** deliver 模式产物就绪标记 */
   bundle_ready?: boolean
+  readable?: boolean
+  usage?: RunUsage | null
+  cost_usd?: number | null
+  diagnostic?: { stage: string; message: string } | null
   error?: { code: string; message: string }
 }
 
@@ -57,7 +61,7 @@ export interface Book {
   source_badge: string
   source_kind: string
   pages: number
-  /** 封面页数单位（mock 档「页」；live 档 run 无页数概念，用讲数「讲」） */
+  /** 封面数量单位；run 无页数概念时使用讲数“讲”。 */
   pages_unit?: string
   footer_badge: string
   features: { icon: string; label: string; color: string }[]
@@ -109,8 +113,30 @@ export interface Quota {
   }
 }
 
-/** 短信验证码 mock 返回 */
-export interface SmsCodeOut {
-  sent: boolean
-  expires_in: number
+/** 服务端结算账本；费用为空表示尚未结算，零值不代表已完成定价。 */
+export interface RunUsage {
+  llm_in_tok: number
+  llm_out_tok: number
+  llm_cached_in_tok?: number
+  gpu_s: number
+}
+
+export interface CostReport {
+  month: string
+  spend_usd: number
+  budget_usd: number
+  usage: RunUsage & { runs_n: number }
+  prices: Record<string, number>
+  gpu_policy: 'metered' | 'free'
+  pricing_configured: boolean
+  runs: Array<{
+    run_id: string
+    title: string
+    status: RunStatus
+    created: string
+    deleted: boolean
+    usage: RunUsage | null
+    cost_usd: number | null
+    cost_pricing: Record<string, unknown> | null
+  }>
 }

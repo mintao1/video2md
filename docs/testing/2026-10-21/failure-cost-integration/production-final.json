@@ -1,0 +1,35 @@
+{
+  "active_runs": [],
+  "source_sha256": {
+    "api.py": "ad062f1928146856fb0739d8be570fa7a9123fe1eb77c7c4fe74bee53acfe360",
+    "llm.py": "4825610b0cac0f54b5315ebdb98bb3ad7b6cd03756a790fb0991d3d547504a87",
+    "graph.py": "dbac35ada94f314a57b5e355cdcd81d64e1b5dcb725f08479a6d444c95caf489"
+  },
+  "oauth_timeout_s": 15.0,
+  "model": "glm-5.3-flash",
+  "provider_host": "opencode.ai",
+  "google_proxy_host": "127.0.0.1",
+  "google_proxy_port": 18080,
+  "remote_modes": {
+    "V2MD_REMOTE": "http://127.0.0.1:9700",
+    "V2MD_OCR_REMOTE": "http://127.0.0.1:9700",
+    "V2MD_CLIPS_REMOTE": "http://127.0.0.1:9700"
+  },
+  "oauth_no_credential_probes": [
+    {
+      "attempt": 1,
+      "status": 400,
+      "elapsed_s": 3.495
+    },
+    {
+      "attempt": 2,
+      "status": 400,
+      "elapsed_s": 3.234
+    },
+    {
+      "attempt": 3,
+      "status": 400,
+      "elapsed_s": 1.732
+    }
+  ]
+}

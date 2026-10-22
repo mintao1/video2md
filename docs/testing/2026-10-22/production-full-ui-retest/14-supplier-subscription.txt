@@ -1,0 +1,73 @@
+Browser tab: 6, Title: "Go | OpenCode Console", URL: "https://opencode.ai/console/wrk_01KVDRA02ACZ6CR9XVVYQWQK3A/go".
+0 AXWebArea Go | OpenCode Console, URL: opencode.ai/console/wrk_01KVDRA02ACZ6CR9XVVYQWQK3A/go
+	3 container app
+		4 container
+			5 link opencode.ai/console/workspace
+			6 pop up button (collapsed) D Default, Help: Switch workspace: Default, ID: dropdownmenu-cl-0-trigger, Secondary Actions: Expand
+				7 text D
+				8 text Default
+			9 button Search console
+			10 pop up button (collapsed) M mintao1998@gmail.com, ID: dropdownmenu-cl-3-trigger, Secondary Actions: Expand
+				11 text M
+				12 text mintao1998@gmail.com
+		13 container
+			14 link Description: Overview, Value: opencode.ai/console/wrk_01KVDRA02ACZ6CR9XVVYQWQK3A
+			15 link Description: Logs, Value: opencode.ai/console/wrk_01KVDRA02ACZ6CR9XVVYQWQK3A/logs
+			16 link Description: Audit, Value: opencode.ai/console/wrk_01KVDRA02ACZ6CR9XVVYQWQK3A/audit
+			17 link Description: Go, Value: opencode.ai/console/wrk_01KVDRA02ACZ6CR9XVVYQWQK3A/go
+			18 link Description: Models, Value: opencode.ai/console/wrk_01KVDRA02ACZ6CR9XVVYQWQK3A/models
+			19 link Description: Providers, Value: opencode.ai/console/wrk_01KVDRA02ACZ6CR9XVVYQWQK3A/providers
+			20 link Description: Controls, Value: opencode.ai/console/wrk_01KVDRA02ACZ6CR9XVVYQWQK3A/controls
+			21 link Description: Integrations, Value: opencode.ai/console/wrk_01KVDRA02ACZ6CR9XVVYQWQK3A/integrations
+			22 link Description: Settings, Value: opencode.ai/console/wrk_01KVDRA02ACZ6CR9XVVYQWQK3A/settings
+		23 container
+			24 container Scrollable region
+				25 heading Go Subscription, Value: 2
+					26 text Go Subscription
+				27 container
+					28 text Low cost coding models for everyone ·
+					29 link Description: Learn more, Value: opencode.ai/v2/docs/console/go
+				30 image 48% of the subscription period remaining
+				31 container Paid period ends 2026/11/6 01:26:00
+					32 text Renews  in  14d 17h
+				33 button Manage subscription
+				34 container Connect OpenCode CLI
+					35 heading Connect OpenCode CLI, Value: 2
+						36 text Connect OpenCode CLI
+					37 text Sign in with the command for your version.
+					38 button Dismiss OpenCode CLI connection command
+					39 text V2
+					40 text opencode auth login opencode
+					41 button Copy
+					42 text V1
+					43 text opencode console login
+					44 button Copy
+					45 container
+						46 text Then run  /models  and select  an OpenCode Go model .
+				47 container Go usage limits
+					48 text Rolling usage 0% used
+					49 container 2026/10/22 08:45:41
+						50 text Resets in  1h 2m
+					51 progress indicator Description: Rolling usage, Value: 0
+					52 text Weekly usage 0% used
+					53 container 2026/10/26 08:00:00
+						54 text Resets in  4d 0h
+					55 progress indicator Description: Weekly usage, Value: 0
+					56 text Monthly usage 68% used
+					57 container 2026/11/6 01:26:00
+						58 text Resets in  14d 17h
+					59 progress indicator Description: Monthly usage, Value: 68
+				60 container Go subscription settings
+					61 text Providers
+					62 text Control data training and model regions.
+					63 link Description: Manage privacy, Value: opencode.ai/console/wrk_01KVDRA02ACZ6CR9XVVYQWQK3A/settings/privacy
+					64 text Extra Usage
+					65 text Use your balance after reaching the limits.
+					66 container switch-cl-6
+						67 switch (settable, boolean) Description: Use credit, Value: 0, ID: switch-cl-6-input
+						68 text Use credit
+					69 text $0.00 available credit
+					70 link Description: Buy credits, Value: opencode.ai/console/wrk_01KVDRA02ACZ6CR9XVVYQWQK3A/settings/billing
+	2 container Notifications alt+T
+
+The focused UI element is 0 AXWebArea Go | OpenCode Console, URL: opencode.ai/console/wrk_01KVDRA02ACZ6CR9XVVYQWQK3A/go

@@ -1,0 +1,10 @@
+{
+  "control_id": "90c0a368d02746fc9215f1a289980658",
+  "files": [
+    "ocr_job.json",
+    "frames/ocr-check.jpg"
+  ],
+  "kernel_status": "done",
+  "gpu_requested": false,
+  "elapsed_s": 38.432
+}

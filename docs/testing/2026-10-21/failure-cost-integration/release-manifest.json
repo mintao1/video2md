@@ -1,0 +1,12 @@
+{
+  "image": "video2md:0.2.0-failure-cost-20261021b",
+  "base_image": "video2md:0.2.0-failure-cost-20261021a",
+  "files": {
+    "backend/video2md/api.py": "ad062f1928146856fb0739d8be570fa7a9123fe1eb77c7c4fe74bee53acfe360",
+    "backend/video2md/graph.py": "dbac35ada94f314a57b5e355cdcd81d64e1b5dcb725f08479a6d444c95caf489",
+    "backend/video2md/llm.py": "4825610b0cac0f54b5315ebdb98bb3ad7b6cd03756a790fb0991d3d547504a87",
+    "backend/video2md/bilibili.py": "52e3b2924ea1a102b69d38ae0b2eae7d540e164cdc76d1a8d8124f44e341ff3c",
+    "backend/video2md/download.py": "8b8457125b84600bf555dbf15429206187d1538f60320be7afa6a524c8e19956"
+  },
+  "patch_sha256": "c0528fbb5e106752876daab656e600126c5997b0fe7c11947efc977873b3b40e"
+}

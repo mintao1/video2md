@@ -1,0 +1,17 @@
+{
+  "observed_at": "2026-10-21T16:39:48.999453+00:00",
+  "home": "/home/router",
+  "uid": 10001,
+  "kaggle_env_present": {
+    "KAGGLE_USERNAME": false,
+    "KAGGLE_KEY": false,
+    "KAGGLE_API_TOKEN": false
+  },
+  "credential_file": {
+    "path": "/home/router/.kaggle/kaggle.json",
+    "exists": true,
+    "valid_json": true,
+    "username_present": false,
+    "key_present": false
+  }
+}

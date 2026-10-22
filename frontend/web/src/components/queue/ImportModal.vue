@@ -2,7 +2,7 @@
 import { ref, watch } from 'vue'
 import BottomSheet from '../common/BottomSheet.vue'
 
-const props = defineProps<{ modelValue: boolean }>()
+const props = defineProps<{ modelValue: boolean; error?: string; busy?: boolean }>()
 const emit = defineEmits<{
   (e: 'update:modelValue', v: boolean): void
   (e: 'start', payload: { url: string; title?: string }): void
@@ -27,6 +27,7 @@ watch(
 )
 
 function start() {
+  if (props.busy) return
   validationError.value = ''
   if (source.value === 'link' && !url.value.trim()) {
     validationError.value = '请输入视频或音频链接'
@@ -41,7 +42,6 @@ function start() {
           ? '网盘提取视频'
           : undefined,
   })
-  emit('update:modelValue', false)
 }
 
 function saveDraft() {
@@ -68,6 +68,7 @@ function saveDraft() {
             { key: 'local', label: '本地 MP4', icon: 'upload_file' },
           ]"
           :key="s.key"
+          :disabled="busy"
           class="py-1.5 rounded-md font-label-md text-label-md flex items-center justify-center gap-1 transition-all"
           :class="
             source === s.key
@@ -89,18 +90,20 @@ function saveDraft() {
         <span class="material-symbols-outlined text-outline text-[20px]">link</span>
         <input
           v-model="url"
+          :disabled="busy"
           class="bg-transparent flex-1 text-on-surface font-body-md text-body-md focus:outline-none placeholder:text-outline min-w-0"
           placeholder="粘贴 Bilibili / YouTube / 夸克 / 百度网盘链接..."
           type="text"
         />
         <button
+          :disabled="busy"
           class="bg-primary text-on-primary font-label-md text-label-md px-3 py-1.5 rounded-lg shrink-0 shadow-sm active:scale-95 transition-transform"
           @click="url = ''"
         >
           清空
         </button>
       </div>
-      <p v-if="validationError" class="text-xs text-red-600 px-1" role="alert">{{ validationError }}</p>
+      <p v-if="validationError || error" class="text-xs text-red-600 px-1" role="alert">{{ validationError || error }}</p>
       <div
         v-else
         class="bg-surface-container-low rounded-xl p-space-md border border-outline-variant/30 flex flex-col items-center gap-space-xs shadow-sm"
@@ -112,6 +115,9 @@ function saveDraft() {
           {{ source === 'local' ? '点击选择本地 MP4 文件（mock：直接开始）' : '粘贴夸克/百度网盘分享链接' }}
         </span>
       </div>
+      <p v-if="busy" role="status" aria-live="polite" class="text-sm text-on-surface-variant">
+        正在读取视频与合集信息，请稍候。解析成功后会自动加入队列。
+      </p>
       <div class="flex items-center gap-space-xs text-[11px] text-outline px-1">
         <span class="material-symbols-outlined text-[14px]">info</span>
         <span>已自动读取剪贴板链接 · 支持分P全集一键解析</span>
@@ -223,17 +229,20 @@ function saveDraft() {
       <!-- 动作 -->
       <div class="flex items-center gap-space-sm pt-space-xs pb-1">
         <button
+          :disabled="busy"
           class="flex-1 py-3 rounded-xl bg-surface-container text-on-surface font-title-sm text-[14px] font-semibold active:scale-[0.98] transition-transform"
           @click="saveDraft"
         >
           保存草稿
         </button>
         <button
+          :disabled="busy"
+          :aria-busy="busy"
           class="flex-[2] py-3 rounded-xl bg-primary text-on-primary font-title-sm text-[14px] font-semibold shadow-md active:scale-[0.98] transition-transform flex items-center justify-center gap-1.5"
           @click="start"
         >
           <span class="material-symbols-outlined text-[18px]">rocket_launch</span>
-          立即开始转换排队
+          {{ busy ? '正在解析…' : '立即开始转换排队' }}
         </button>
       </div>
     </div>

@@ -1,0 +1,12 @@
+FAIL
+- prod-billing-success-terminal: run ended in error
+- prod-billing-inference: attempted or rejected model calls are not successful inference
+- prod-billing-failure-reason: failure reason is not visible to the user
+- prod-billing-failure-stage: failure stage is not visible to the user
+- prod-billing-run-visible: run_id is not visible to the user
+- prod-billing-tokens: both LLM token counters must be positive integers
+- prod-billing-usage-visible: run usage is not visible
+- prod-billing-cost-visible: settled cost is not visible
+- prod-billing-prices: production prices are missing or zero
+- prod-billing-artifact: generated textbook is unavailable or empty
+- prod-billing-book-delta: library did not gain exactly one textbook

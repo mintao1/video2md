@@ -1,0 +1,42 @@
+{
+  "kind": "monthly_increment_reconciliation",
+  "baseline": {
+    "spend_usd": 0.067605,
+    "llm_in_tok": 221558,
+    "llm_out_tok": 73231,
+    "gpu_s": 8171.942,
+    "runs_n": 12
+  },
+  "final": {
+    "spend_usd": 0.089751,
+    "llm_in_tok": 320898,
+    "llm_out_tok": 87722,
+    "gpu_s": 9520.711,
+    "runs_n": 13
+  },
+  "delta": {
+    "spend_usd": "0.022146",
+    "llm_in_tok": "99340",
+    "llm_out_tok": "14491",
+    "gpu_s": "1348.769",
+    "runs_n": "1"
+  },
+  "new_run": "8c5d87f3",
+  "expected": {
+    "gpu_s": 1348.769,
+    "llm_in_tok": 99340,
+    "llm_out_tok": 14491,
+    "llm_cached_in_tok": 0,
+    "spend_usd": 0.022146,
+    "runs_n": 1
+  },
+  "checks": {
+    "spend_usd": true,
+    "llm_in_tok": true,
+    "llm_out_tok": true,
+    "gpu_s": true,
+    "runs_n": true
+  },
+  "passed": true,
+  "cash_payment_claimed": false
+}

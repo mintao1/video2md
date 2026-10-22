@@ -1,0 +1,22 @@
+[
+  {
+    "namespace": "video2md",
+    "deployment": "video2md-api",
+    "generation": 59,
+    "ready": 1,
+    "updated": 1,
+    "images": [
+      "video2md:0.2.0-note-embeds-20261022f"
+    ]
+  },
+  {
+    "namespace": "gpu-router",
+    "deployment": "gpu-router",
+    "generation": 90,
+    "ready": 1,
+    "updated": 1,
+    "images": [
+      "gpu-router:0.2.3-ocr-layout-20261022g"
+    ]
+  }
+]

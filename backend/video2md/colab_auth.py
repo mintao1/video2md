@@ -1,7 +1,6 @@
-"""Browser entry for the CLI's remote copy/paste OAuth flow (service credentials)."""
+"""Google users connect their own Colab account through the CLI OAuth flow."""
 from __future__ import annotations
 
-import hashlib
 import json
 import os
 import secrets
@@ -14,7 +13,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, Field, SecretStr
 
 from .auth import Identity, current_identity
-from .colab import _session
+from .colab import _session, credential_directory
 from .config import ENV
 
 
@@ -36,24 +35,24 @@ def _allowed(request: Request, ident: Identity) -> bool:
         return ((ENV.get("V2MD_ENV") or "development") != "production"
                 and request.client is not None
                 and request.client.host in ("127.0.0.1", "::1", "localhost"))
-    return ident.uid in {s.strip() for s in (ENV.get("V2MD_COLAB_ADMIN_UIDS") or "").split(",") if s.strip()}
+    return bool(ident.uid) and ident.provider in ("google", "google_device")
 
 
 def _require(request: Request, ident: Identity) -> None:
     if not _allowed(request, ident):
-        raise HTTPException(403, "仅服务管理员可更换 Colab 账号，请配置 V2MD_COLAB_ADMIN_UIDS")
+        raise HTTPException(403, "请使用 Google 账号登录后连接自己的 Colab")
 
 
-def _directory() -> Path:
-    return Path.home() / ".config" / "colab-cli"
+def _directory(uid: str) -> Path:
+    return credential_directory(uid)
 
 
 def _pending(uid: str) -> Path:
-    return _directory() / ("web-oauth-" + hashlib.sha256(uid.encode()).hexdigest() + ".json")
+    return _directory(uid) / "web-oauth.json"
 
 
 def _write(path: Path, content: str) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
+    path.parent.mkdir(mode=0o750, parents=True, exist_ok=True)
     fd, name = tempfile.mkstemp(prefix=".oauth-", dir=path.parent)
     try:
         with os.fdopen(fd, "w") as fh:
@@ -72,23 +71,39 @@ def _flow(**kwargs):
                         resources.files("colab_cli").joinpath("oauth_config.json").read_text())
     flow = InstalledAppFlow.from_client_config(config, PUBLIC_SCOPES, **kwargs)
     flow.redirect_uri = REMOTE_REDIRECT_URI
+    proxy = (ENV.get("V2MD_GOOGLE_OAUTH_PROXY_URL") or "").strip()
+    if proxy:
+        flow.oauth2session.proxies.update({"http": proxy, "https": proxy})
     return flow
+
+
+def _credential_subject(credentials) -> str:
+    from google.auth.transport.requests import AuthorizedSession
+
+    with AuthorizedSession(credentials) as session:
+        proxy = (ENV.get("V2MD_GOOGLE_OAUTH_PROXY_URL") or "").strip()
+        if proxy:
+            session.proxies.update({"http": proxy, "https": proxy})
+        response = session.get("https://www.googleapis.com/oauth2/v2/userinfo", timeout=15)
+        response.raise_for_status()
+        return str(response.json().get("id") or "")
 
 
 @router.get("")
 def status(request: Request, ident: Identity = Depends(current_identity)) -> dict:
     allowed = _allowed(request, ident)
     return {"can_authorize": allowed,
-            "has_credentials": (_directory() / "token.json").is_file() if allowed else False}
+            "has_credentials": (_directory(ident.uid) / "token.json").is_file() if allowed else False}
 
 
 @router.post("/start")
 def start(request: Request, ident: Identity = Depends(current_identity)) -> dict:
     _require(request, ident)
     try:
-        with _session(wait=False):
+        with _session(wait=False, owner=ident.uid):
             flow = _flow(autogenerate_code_verifier=True)
-            url, state = flow.authorization_url(prompt="consent", token_usage="remote", access_type="offline")
+            hint = {"login_hint": ident.external_id} if ident.provider in ("google", "google_device") else {}
+            url, state = flow.authorization_url(prompt="consent", token_usage="remote", access_type="offline", **hint)
             flow_id = secrets.token_urlsafe(32)
             _write(_pending(ident.uid), json.dumps({"flow_id": flow_id, "state": state,
                    "verifier": flow.code_verifier, "expires": time.time() + _TTL}))
@@ -103,7 +118,7 @@ def start(request: Request, ident: Identity = Depends(current_identity)) -> dict
 def complete(body: CompleteBody, request: Request, ident: Identity = Depends(current_identity)) -> dict:
     _require(request, ident)
     try:
-        with _session(wait=False):
+        with _session(wait=False, owner=ident.uid):
             path = _pending(ident.uid)
             if not path.is_file():
                 raise HTTPException(400, "请先打开 Google 授权页")
@@ -119,7 +134,17 @@ def complete(body: CompleteBody, request: Request, ident: Identity = Depends(cur
                 raise HTTPException(400, "授权未完成，请重新打开授权页并填写新的授权码") from None
             if not flow.credentials.refresh_token:
                 raise HTTPException(400, "未获得持续授权，请重新授权并同意所需权限")
-            _write(_directory() / "token.json", flow.credentials.to_json())
+            if ident.provider in ("google", "google_device"):
+                try:
+                    subject = _credential_subject(flow.credentials)
+                except Exception:
+                    raise HTTPException(400, "无法核对 Colab 账号，请重新授权") from None
+                if not subject or subject != ident.external_id:
+                    raise HTTPException(400, "请选择与当前登录相同的 Google 账号授权 Colab")
+            granted = getattr(flow.credentials, "granted_scopes", None)
+            if granted is not None and "https://www.googleapis.com/auth/colaboratory" not in granted:
+                raise HTTPException(400, "尚未授予 Colab 权限，请重新授权并同意所需权限")
+            _write(_directory(ident.uid) / "token.json", flow.credentials.to_json())
         return {"has_credentials": True, "can_authorize": True}
     except BlockingIOError:
         raise HTTPException(409, "Colab 正在执行任务，请稍后提交授权码") from None

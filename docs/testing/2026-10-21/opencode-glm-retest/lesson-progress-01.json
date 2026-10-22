@@ -1,0 +1,156 @@
+{
+  "run_id": "4df77d9c",
+  "status": "running",
+  "created": "2026-10-21T13:30:05",
+  "stages": {
+    "download": {
+      "ts": "2026-10-21T13:30:07",
+      "duration_s": 2.157249
+    }
+  },
+  "usage": null,
+  "cost_usd": null,
+  "cost_pricing": null,
+  "tmp_cleaned": null,
+  "artifacts_burned": null,
+  "finished": null,
+  "artifacts": [
+    {
+      "stage_metrics": {
+        "download": {
+          "bytes": 1054426,
+          "duration_s": 2.155531,
+          "gpu_seconds": 0
+        }
+      },
+      "selection_mode": null,
+      "selected_count": 0,
+      "note_present": false,
+      "note_exists": false,
+      "title": null,
+      "markdown_chars": 0,
+      "clips_done": null
+    }
+  ],
+  "diagnostic": null,
+  "cost": {
+    "uid": "u_a550fcca296f",
+    "month": "2026-10-01T00:00:00",
+    "spend_usd": 0.004652,
+    "budget_usd": 0.0,
+    "usage": {
+      "spend_usd": 0.004652,
+      "llm_in_tok": 2047,
+      "llm_out_tok": 8690,
+      "gpu_s": 970.994,
+      "runs_n": 6
+    },
+    "gpu_policy": "free",
+    "runs": [
+      {
+        "run_id": "4df77d9c",
+        "title": "ferosse.tech",
+        "status": "running",
+        "created": "2026-10-21T13:30:05",
+        "deleted": false,
+        "usage": null,
+        "cost_usd": null,
+        "cost_pricing": null
+      },
+      {
+        "run_id": "edfa1b1a",
+        "title": "ferosse.tech",
+        "status": "partial",
+        "created": "2026-10-21T13:09:14",
+        "deleted": false,
+        "usage": {
+          "gpu_s": 331.228,
+          "llm_in_tok": 2047,
+          "llm_out_tok": 8690
+        },
+        "cost_usd": 0.004652,
+        "cost_pricing": {
+          "gpu_min": 0.0,
+          "currency": "USD",
+          "gpu_policy": "free",
+          "llm_in_mtok": 0.15,
+          "llm_out_mtok": 0.5,
+          "llm_cached_in_mtok": 0.03
+        }
+      },
+      {
+        "run_id": "312e97ae",
+        "title": "ferosse.tech",
+        "status": "error",
+        "created": "2026-10-21T11:20:09",
+        "deleted": false,
+        "usage": {
+          "gpu_s": 204.669,
+          "llm_in_tok": 0,
+          "llm_out_tok": 0
+        },
+        "cost_usd": 0.0,
+        "cost_pricing": null
+      },
+      {
+        "run_id": "56835fed",
+        "title": "ferosse.tech",
+        "status": "error",
+        "created": "2026-10-21T08:15:42",
+        "deleted": false,
+        "usage": {
+          "gpu_s": 183.082,
+          "llm_in_tok": 0,
+          "llm_out_tok": 0
+        },
+        "cost_usd": 0.0,
+        "cost_pricing": null
+      },
+      {
+        "run_id": "aef9643a",
+        "title": "ferosse.tech",
+        "status": "error",
+        "created": "2026-10-21T07:37:06",
+        "deleted": false,
+        "usage": {
+          "gpu_s": 251.977,
+          "llm_in_tok": 0,
+          "llm_out_tok": 0
+        },
+        "cost_usd": 0.0,
+        "cost_pricing": null
+      },
+      {
+        "run_id": "9ad9ee9d",
+        "title": "ferosse.tech",
+        "status": "error",
+        "created": "2026-10-21T06:03:35",
+        "deleted": false,
+        "usage": {
+          "gpu_s": 0.038,
+          "llm_in_tok": 0,
+          "llm_out_tok": 0
+        },
+        "cost_usd": 0.0,
+        "cost_pricing": null
+      }
+    ],
+    "pricing_configured": true,
+    "prices": {
+      "llm_in_mtok": 0.15,
+      "llm_out_mtok": 0.5,
+      "gpu_min": 0.0,
+      "llm_cached_in_mtok": 0.03
+    }
+  },
+  "span_log": [
+    {
+      "status": "completed",
+      "durationMs": 2152
+    },
+    {
+      "status": "completed",
+      "durationMs": 2158
+    }
+  ]
+}

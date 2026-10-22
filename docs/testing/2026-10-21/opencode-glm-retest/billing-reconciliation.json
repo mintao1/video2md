@@ -1,0 +1,26 @@
+{
+  "run_id": "4df77d9c",
+  "expected_cost_usd": 0.004434,
+  "actual_cost_usd": 0.004434,
+  "month_deltas": {
+    "llm_in_tok": 6498,
+    "llm_out_tok": 6919,
+    "gpu_s": 809.12,
+    "spend_usd": 0.004434,
+    "runs_n": 1
+  },
+  "budget_attempt_deltas": {
+    "llm_in_tok": 0,
+    "llm_out_tok": 0,
+    "gpu_s": 0,
+    "spend_usd": 0,
+    "runs_n": 0
+  },
+  "month_total": {
+    "spend_usd": 0.009086,
+    "llm_in_tok": 8545,
+    "llm_out_tok": 15609,
+    "gpu_s": 1780.114,
+    "runs_n": 6
+  }
+}

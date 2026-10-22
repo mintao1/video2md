@@ -1,0 +1,15 @@
+[
+  {
+    "name": "gpu-router-85f46484db-62ph7",
+    "phase": "Running",
+    "containers": [
+      {
+        "name": "router",
+        "ready": true,
+        "restart_count": 0,
+        "image": "docker.io/library/gpu-router:0.2.3-kaggle-token-20261022a",
+        "image_id": "sha256:6a9d3a40d83e6c5b1eaf62922334e9f34041d643e5ce184dcb9979aa2f12507a"
+      }
+    ]
+  }
+]

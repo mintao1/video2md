@@ -1,0 +1,118 @@
+.................FFFF                                                    [100%]
+=================================== FAILURES ===================================
+__________ test_ocr_frame_errors_cannot_be_promoted_to_success[rows0] __________
+
+rows = [[0, '', 0, 'decode failed']]
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x108fb4260>
+tmp_path = PosixPath('/private/var/folders/1b/7r5v_kjj689_65rpwv0hxg8h0000gn/T/pytest-of-linmintao/pytest-112/test_ocr_frame_errors_cannot_b0')
+
+    @pytest.mark.parametrize('rows', [[[0, '', 0, 'decode failed']],
+                                      [[0, 'ok', .9, None], [1, '', 0, 'decode failed']]])
+    def test_ocr_frame_errors_cannot_be_promoted_to_success(rows, monkeypatch, tmp_path):
+        from video2md import runs
+        art = {'candidates': [[i, f'f{i}.jpg'] for i in range(len(rows))],
+               'segs': [{'start':0,'end':2,'text':'healthy speech'}], 'video':'fixture.mp4'}
+        monkeypatch.setattr(runs, 'ocr_candidates', lambda *a, **kw: ([], rows))
+        with pytest.raises(SystemExit, match='OCR'):
+>           runs._stage_ocr({}, {'url':'fixture'}, art, tmp_path, {})
+
+tests/test_failure_cost_regressions.py:184: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+video2md/runs.py:774: in _stage_ocr
+    transcript, _ev = merge_timeline(art["segs"], ocr_items)
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+segs = [{'start': 0, 'end': 2, 'text': 'healthy speech'}], ocr_items = []
+
+    def merge_timeline(segs: list[dict], ocr_items: list[tuple[float, str, float]]) -> tuple[str, list]:
+>       events = [("voice", s["start"], s["text"], s["conf"]) for s in segs if s["text"]]
+                                                   ^^^^^^^^^
+E       KeyError: 'conf'
+
+video2md/frames.py:219: KeyError
+__________ test_ocr_frame_errors_cannot_be_promoted_to_success[rows1] __________
+
+rows = [[0, 'ok', 0.9, None], [1, '', 0, 'decode failed']]
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x108fa3740>
+tmp_path = PosixPath('/private/var/folders/1b/7r5v_kjj689_65rpwv0hxg8h0000gn/T/pytest-of-linmintao/pytest-112/test_ocr_frame_errors_cannot_b1')
+
+    @pytest.mark.parametrize('rows', [[[0, '', 0, 'decode failed']],
+                                      [[0, 'ok', .9, None], [1, '', 0, 'decode failed']]])
+    def test_ocr_frame_errors_cannot_be_promoted_to_success(rows, monkeypatch, tmp_path):
+        from video2md import runs
+        art = {'candidates': [[i, f'f{i}.jpg'] for i in range(len(rows))],
+               'segs': [{'start':0,'end':2,'text':'healthy speech'}], 'video':'fixture.mp4'}
+        monkeypatch.setattr(runs, 'ocr_candidates', lambda *a, **kw: ([], rows))
+        with pytest.raises(SystemExit, match='OCR'):
+>           runs._stage_ocr({}, {'url':'fixture'}, art, tmp_path, {})
+
+tests/test_failure_cost_regressions.py:184: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+video2md/runs.py:774: in _stage_ocr
+    transcript, _ev = merge_timeline(art["segs"], ocr_items)
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+segs = [{'start': 0, 'end': 2, 'text': 'healthy speech'}], ocr_items = []
+
+    def merge_timeline(segs: list[dict], ocr_items: list[tuple[float, str, float]]) -> tuple[str, list]:
+>       events = [("voice", s["start"], s["text"], s["conf"]) for s in segs if s["text"]]
+                                                   ^^^^^^^^^
+E       KeyError: 'conf'
+
+video2md/frames.py:219: KeyError
+_____ test_ocr_empty_text_without_error_is_valid_and_does_not_force_retry ______
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x108fb7410>
+tmp_path = PosixPath('/private/var/folders/1b/7r5v_kjj689_65rpwv0hxg8h0000gn/T/pytest-of-linmintao/pytest-112/test_ocr_empty_text_without_er0')
+
+    def test_ocr_empty_text_without_error_is_valid_and_does_not_force_retry(monkeypatch, tmp_path):
+        from video2md import runs
+        art = {'candidates': [[0, 'f.jpg']], 'segs': [{'start':0,'end':2,'text':'healthy speech'}],
+               'video':'fixture.mp4'}
+        monkeypatch.setattr(runs, 'ocr_candidates', lambda *a, **kw: ([], [[0,'',0,None]]))
+>       runs._stage_ocr({}, {'url':'fixture'}, art, tmp_path, {})
+
+tests/test_failure_cost_regressions.py:193: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+video2md/runs.py:774: in _stage_ocr
+    transcript, _ev = merge_timeline(art["segs"], ocr_items)
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+segs = [{'start': 0, 'end': 2, 'text': 'healthy speech'}], ocr_items = []
+
+    def merge_timeline(segs: list[dict], ocr_items: list[tuple[float, str, float]]) -> tuple[str, list]:
+>       events = [("voice", s["start"], s["text"], s["conf"]) for s in segs if s["text"]]
+                                                   ^^^^^^^^^
+E       KeyError: 'conf'
+
+video2md/frames.py:219: KeyError
+______________________ test_invalid_cached_ocr_is_retried ______________________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x108fa3200>
+tmp_path = PosixPath('/private/var/folders/1b/7r5v_kjj689_65rpwv0hxg8h0000gn/T/pytest-of-linmintao/pytest-112/test_invalid_cached_ocr_is_ret0')
+
+    def test_invalid_cached_ocr_is_retried(monkeypatch, tmp_path):
+        from video2md import runs
+        art = {'candidates': [[0,'f.jpg']], 'segs':[{'start':0,'end':2,'text':'speech'}],
+               'video':'fixture.mp4', 'ocr_raw':[[0,'',0,'old failure']]}
+        calls = []
+        monkeypatch.setattr(runs, 'ocr_candidates', lambda *a, **kw: calls.append(True) or ([],[[0,'',0,None]]))
+        runs._stage_ocr({}, {'url':'fixture'}, art, tmp_path, {})
+>       assert calls == [True] and art['ocr_raw'][0][3] is None
+E       assert ([] == [True]
+E         
+E         Right contains one more item: True
+E         Use -v to get more diff)
+
+tests/test_failure_cost_regressions.py:204: AssertionError
+----------------------------- Captured stdout call -----------------------------
+    ⏭ 已 OCR，跳过
+=========================== short test summary info ============================
+FAILED tests/test_failure_cost_regressions.py::test_ocr_frame_errors_cannot_be_promoted_to_success[rows0]
+FAILED tests/test_failure_cost_regressions.py::test_ocr_frame_errors_cannot_be_promoted_to_success[rows1]
+FAILED tests/test_failure_cost_regressions.py::test_ocr_empty_text_without_error_is_valid_and_does_not_force_retry
+FAILED tests/test_failure_cost_regressions.py::test_invalid_cached_ocr_is_retried
+4 failed, 17 passed in 0.43s

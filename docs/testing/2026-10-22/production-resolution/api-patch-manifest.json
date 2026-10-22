@@ -1,0 +1,13 @@
+{
+  "base_image": "video2md:0.2.0-failure-cost-20261021b",
+  "image": "video2md:0.2.0-resume-billing-20261022c",
+  "changed_functions": [
+    "runs._add_usage_settlement",
+    "runs.settle_cost",
+    "transcribe.remote_transcribe"
+  ],
+  "source_sha256": {
+    "transcribe.py": "0d7595bb9b8ba4b439b9e682b4cd24e18d295d8ba6667da76f7bc2c8ddeda48a",
+    "runs.py": "439127567b1b186d0c07cf006c26b27a18ae67b53390a0a59e38a3c98b316809"
+  }
+}

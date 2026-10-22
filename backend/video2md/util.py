@@ -119,7 +119,7 @@ def state_file_lock():
 
 
 # ---------------------------------------------------------------- run log（借鉴 ZCode 遥测模式）
-_SECRET_RE = re.compile(r"(sk-|app-|dataset-)[A-Za-z0-9_\-]{6,}")
+_SECRET_RE = re.compile(r"(oc_sk_|sk-|app-|dataset-)[A-Za-z0-9_\-]{6,}")
 
 
 

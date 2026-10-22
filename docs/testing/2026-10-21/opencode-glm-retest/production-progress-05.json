@@ -1,0 +1,210 @@
+{
+  "run_id": "edfa1b1a",
+  "status": "running",
+  "created": "2026-10-21T13:09:14",
+  "stages": {
+    "ocr": {
+      "ts": "2026-10-21T13:13:04",
+      "duration_s": 88.796997
+    },
+    "frames": {
+      "ts": "2026-10-21T13:11:35",
+      "duration_s": 1.342638
+    },
+    "select": {
+      "ts": "2026-10-21T13:13:12",
+      "duration_s": 0.00767
+    },
+    "download": {
+      "ts": "2026-10-21T13:09:16",
+      "duration_s": 1.826987
+    },
+    "transcribe": {
+      "ts": "2026-10-21T13:11:34",
+      "duration_s": 138.291473
+    }
+  },
+  "usage": null,
+  "cost_usd": null,
+  "cost_pricing": null,
+  "tmp_cleaned": null,
+  "artifacts_burned": null,
+  "finished": null,
+  "artifacts": [
+    {
+      "stage_metrics": {
+        "ocr": {
+          "duration_s": 88.795673,
+          "gpu_seconds": 88.765,
+          "frames_completed": 5,
+          "frames_requested": 5
+        },
+        "frames": {
+          "duration_s": 1.34102,
+          "max_frames": 120,
+          "gpu_seconds": 0.0,
+          "files_nonempty": true,
+          "candidate_count": 5,
+          "timestamps_valid": true
+        },
+        "select": {
+          "mode": "llm",
+          "duration_s": 0.005879,
+          "gpu_seconds": 0.0,
+          "selected_count": 2
+        },
+        "download": {
+          "bytes": 406492,
+          "duration_s": 1.825481,
+          "gpu_seconds": 0
+        },
+        "transcribe": {
+          "segments": 2,
+          "duration_s": 138.290035,
+          "gpu_seconds": 137.746,
+          "transcript_nonempty": true,
+          "timestamped_segments": true
+        }
+      },
+      "selection_mode": "llm",
+      "selected_count": 2,
+      "note_present": false,
+      "note_exists": false,
+      "title": null,
+      "markdown_chars": 0,
+      "clips_done": null
+    }
+  ],
+  "diagnostic": null,
+  "cost": {
+    "uid": "u_a550fcca296f",
+    "month": "2026-10-01T00:00:00",
+    "spend_usd": 0.0,
+    "budget_usd": 0.0,
+    "usage": {
+      "spend_usd": 0.0,
+      "llm_in_tok": 0,
+      "llm_out_tok": 0,
+      "gpu_s": 639.766,
+      "runs_n": 5
+    },
+    "gpu_policy": "free",
+    "runs": [
+      {
+        "run_id": "edfa1b1a",
+        "title": "ferosse.tech",
+        "status": "running",
+        "created": "2026-10-21T13:09:14",
+        "deleted": false,
+        "usage": null,
+        "cost_usd": null,
+        "cost_pricing": null
+      },
+      {
+        "run_id": "312e97ae",
+        "title": "ferosse.tech",
+        "status": "error",
+        "created": "2026-10-21T11:20:09",
+        "deleted": false,
+        "usage": {
+          "gpu_s": 204.669,
+          "llm_in_tok": 0,
+          "llm_out_tok": 0
+        },
+        "cost_usd": 0.0,
+        "cost_pricing": null
+      },
+      {
+        "run_id": "56835fed",
+        "title": "ferosse.tech",
+        "status": "error",
+        "created": "2026-10-21T08:15:42",
+        "deleted": false,
+        "usage": {
+          "gpu_s": 183.082,
+          "llm_in_tok": 0,
+          "llm_out_tok": 0
+        },
+        "cost_usd": 0.0,
+        "cost_pricing": null
+      },
+      {
+        "run_id": "aef9643a",
+        "title": "ferosse.tech",
+        "status": "error",
+        "created": "2026-10-21T07:37:06",
+        "deleted": false,
+        "usage": {
+          "gpu_s": 251.977,
+          "llm_in_tok": 0,
+          "llm_out_tok": 0
+        },
+        "cost_usd": 0.0,
+        "cost_pricing": null
+      },
+      {
+        "run_id": "9ad9ee9d",
+        "title": "ferosse.tech",
+        "status": "error",
+        "created": "2026-10-21T06:03:35",
+        "deleted": false,
+        "usage": {
+          "gpu_s": 0.038,
+          "llm_in_tok": 0,
+          "llm_out_tok": 0
+        },
+        "cost_usd": 0.0,
+        "cost_pricing": null
+      }
+    ],
+    "pricing_configured": true,
+    "prices": {
+      "llm_in_mtok": 0.15,
+      "llm_out_mtok": 0.5,
+      "gpu_min": 0.0,
+      "llm_cached_in_mtok": 0.03
+    }
+  },
+  "span_log": [
+    {
+      "status": "completed",
+      "durationMs": 1822
+    },
+    {
+      "status": "completed",
+      "durationMs": 1828
+    },
+    {
+      "status": "completed",
+      "durationMs": 138286
+    },
+    {
+      "status": "completed",
+      "durationMs": 138293
+    },
+    {
+      "status": "completed",
+      "durationMs": 1337
+    },
+    {
+      "status": "completed",
+      "durationMs": 1344
+    },
+    {
+      "status": "completed",
+      "durationMs": 88792
+    },
+    {
+      "status": "completed",
+      "durationMs": 88798
+    },
+    {
+      "status": "completed",
+      "durationMs": 2
+    },
+    {
+      "status": "completed",
+      "durationMs": 9
+    }
+  ]
+}

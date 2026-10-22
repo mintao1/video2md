@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
-import { request } from '../api/client'
+import { computed, onMounted, ref } from 'vue'
+import { useRoute } from 'vue-router'
+import { request, safeRedirect } from '../api/client'
 import BottomNav from '../components/common/BottomNav.vue'
 
 type Status = { can_authorize: boolean; has_credentials: boolean }
@@ -12,6 +13,9 @@ const message = ref('')
 const flowId = ref('')
 const authorizationUrl = ref('')
 const code = ref('')
+const route = useRoute()
+const next = computed(() => safeRedirect(route.query.next))
+const onboarding = computed(() => typeof route.query.next === 'string')
 
 async function load() {
   loading.value = true
@@ -68,7 +72,7 @@ async function complete() {
     status.value = await request<Status>('/settings/colab/complete', {
       method: 'POST', body: JSON.stringify({ flow_id: flowId.value, code: code.value.trim() }),
     })
-    message.value = 'Colab 授权已保存，后续转换任务将使用此 Google 账号。'
+    message.value = '你的 Colab 授权已保存，仅用于当前账号后续的转换任务。'
     flowId.value = ''
     authorizationUrl.value = ''
   } catch (err) {
@@ -92,21 +96,23 @@ onMounted(load)
         <span class="material-symbols-outlined" aria-hidden="true">arrow_back</span>返回我的
       </RouterLink>
       <h1 class="font-title-lg text-title-lg">Colab 授权</h1>
+      <p v-if="onboarding" class="text-body-sm text-on-surface-variant">Google 登录成功，连接自己的 Colab 后即可使用个人算力。</p>
       <section class="bg-surface-container-lowest rounded-xl shadow-sm p-space-lg flex flex-col gap-space-md" :aria-busy="loading || busy">
         <p class="text-body-md">连接 Google 账号，用于云端转写、画面识别与视频剪辑。</p>
-        <p class="text-body-sm text-on-surface-variant">此授权供当前服务共用。更换账号会影响这台服务后续的转换任务，仅服务管理员可操作。</p>
+        <p class="text-body-sm text-on-surface-variant">使用与当前登录相同的 Google 账号连接 Colab，授权和算力会话仅用于你的转换任务。</p>
+        <p class="text-body-sm text-outline">首次需要在 Google 页面同意 Colab 权限。连接后，再次登录视书可复用已保存的授权。</p>
         <p v-if="loading" role="status">正在读取授权状态…</p>
         <template v-else-if="status">
-          <p class="text-body-sm">{{ !status.can_authorize ? '需要服务管理员权限' : status.has_credentials ? '已保存授权凭证，可重新授权更换账号' : '尚未授权' }}</p>
+          <p class="text-body-sm">{{ !status.can_authorize ? '请先使用 Google 账号登录' : status.has_credentials ? '已连接我的 Colab，可重新授权' : '尚未连接我的 Colab' }}</p>
           <p v-if="status.has_credentials" class="text-body-sm text-outline">凭证有效性和 GPU 配额会在实际连接时检查。</p>
-          <p v-if="!status.can_authorize" class="text-body-sm text-outline">请联系服务管理员完成授权。</p>
+          <p v-if="!status.can_authorize" class="text-body-sm text-outline">登录后即可连接自己的 Colab，无需管理员授权。</p>
           <template v-else>
             <ol class="list-decimal pl-5 text-body-sm flex flex-col gap-space-sm">
               <li>打开 Google 授权页，登录并同意所需权限。</li>
               <li>复制 Google 页面显示的授权码，回到这里提交。授权流程有效期为 10 分钟。</li>
             </ol>
             <button type="button" :disabled="busy" class="rounded-xl bg-primary text-on-primary py-3 px-space-md disabled:opacity-50" @click="start">
-              {{ busy ? '处理中…' : flowId ? '重新开始授权' : '前往 Google 授权' }}
+              {{ busy ? '处理中…' : flowId ? '重新开始授权' : '连接我的 Google Colab' }}
             </button>
             <a v-if="authorizationUrl" :href="authorizationUrl" target="_blank" rel="noopener noreferrer" class="text-primary underline text-body-sm">如果新窗口未打开，点此打开 Google 授权页</a>
             <form v-if="flowId" class="flex flex-col gap-space-sm" @submit.prevent="complete">
@@ -119,6 +125,7 @@ onMounted(load)
         <p v-if="error" role="alert" class="text-error text-body-sm">{{ error }}</p>
         <p v-if="message" role="status" class="text-primary text-body-sm">{{ message }}</p>
         <button v-if="!loading && !status" type="button" class="text-primary" @click="load">重新加载</button>
+        <RouterLink v-if="onboarding" :to="next" class="text-primary text-center py-2">{{ status?.has_credentials ? '继续使用' : '稍后连接，继续使用' }}</RouterLink>
       </section>
     </main>
     <BottomNav />

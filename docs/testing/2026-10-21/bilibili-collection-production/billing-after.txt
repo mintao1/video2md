@@ -1,0 +1,57 @@
+费用明细
+
+本月成本归因 $0.009086 · 6 个任务
+
+免费 GPU：费用 $0，保留实际用量。 用量成本归因以服务商最终账单为准。
+
+当前单价（USD）：输入 0.15/百万 tokens，缓存输入 0.03/百万 tokens，输出 0.5/百万 tokens，GPU 0/分钟。
+
+月度合计：输入 8545 tokens，输出 15609 tokens，GPU 1780.114 秒。
+
+数据库索引原理与查询优化 · done
+
+任务编号：4df77d9c
+
+输入 6498 tokens（缓存 0），输出 6919 tokens，GPU 809.120 秒。
+
+费用 $0.004434
+
+ferosse.tech · partial
+
+任务编号：edfa1b1a
+
+输入 2047 tokens（缓存 0），输出 8690 tokens，GPU 331.228 秒。
+
+费用 $0.004652
+
+ferosse.tech · error
+
+任务编号：312e97ae
+
+输入 0 tokens（缓存 0），输出 0 tokens，GPU 204.669 秒。
+
+费用 $0.000000 · 历史记录未保存结算单价
+
+ferosse.tech · error
+
+任务编号：56835fed
+
+输入 0 tokens（缓存 0），输出 0 tokens，GPU 183.082 秒。
+
+费用 $0.000000 · 历史记录未保存结算单价
+
+ferosse.tech · error
+
+任务编号：aef9643a
+
+输入 0 tokens（缓存 0），输出 0 tokens，GPU 251.977 秒。
+
+费用 $0.000000 · 历史记录未保存结算单价
+
+ferosse.tech · error
+
+任务编号：9ad9ee9d
+
+输入 0 tokens（缓存 0），输出 0 tokens，GPU 0.038 秒。
+
+费用 $0.000000 · 历史记录未保存结算单价

@@ -1,0 +1,42 @@
+{
+  "timestamp_utc": "2026-10-21T13:17:16.456173+00:00",
+  "kind": "supplementary_anonymous_http",
+  "results": [
+    {
+      "path": "/healthz",
+      "status": 200
+    },
+    {
+      "path": "/me",
+      "status": 401
+    },
+    {
+      "path": "/runs",
+      "status": 401
+    },
+    {
+      "path": "/cost",
+      "status": 401
+    },
+    {
+      "path": "/docs",
+      "status": 403
+    },
+    {
+      "path": "/openapi.json",
+      "status": 403
+    },
+    {
+      "path": "/queue",
+      "status": 404
+    },
+    {
+      "path": "/privacy",
+      "status": 200
+    },
+    {
+      "path": "/terms",
+      "status": 200
+    }
+  ]
+}

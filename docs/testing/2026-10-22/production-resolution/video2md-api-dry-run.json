@@ -1,0 +1,7 @@
+{
+  "old_image": "video2md:0.2.0-cert-cache-20261022e",
+  "new_image": "video2md:0.2.0-note-embeds-20261022f",
+  "only_image_changed": true,
+  "all_environment_and_volumes_preserved": true,
+  "force_conflicts": false
+}

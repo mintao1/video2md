@@ -1,0 +1,42 @@
+{
+  "run_id": "dd586072",
+  "status": "running",
+  "total": 2,
+  "entries": [
+    {
+      "index": 1,
+      "url": "https://www.bilibili.com/video/BV1LV411r77C/?p=1",
+      "skipped": false,
+      "from_run": null,
+      "note": null,
+      "done": {
+        "download": true,
+        "transcribe": false,
+        "frames": false,
+        "ocr": false,
+        "select": false,
+        "clips": false,
+        "note": false
+      }
+    },
+    {
+      "index": 2,
+      "url": "https://www.bilibili.com/video/BV1LV411r77C/?p=2",
+      "skipped": false,
+      "from_run": null,
+      "note": null,
+      "done": {
+        "download": true,
+        "transcribe": false,
+        "frames": false,
+        "ocr": false,
+        "select": false,
+        "clips": false,
+        "note": false
+      }
+    }
+  ],
+  "stages": {
+    "download": {}
+  }
+}

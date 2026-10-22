@@ -1,7 +1,7 @@
 <template>
   <main class="min-h-screen bg-surface p-6 text-on-surface">
     <article class="mx-auto max-w-3xl rounded-2xl bg-white p-8 shadow-sm">
-      <RouterLink class="text-primary" to="/login">← 返回登录</RouterLink>
+      <RouterLink class="text-primary" to="/">← 返回品牌首页</RouterLink>
       <h1 class="mt-6 text-3xl font-semibold">用户服务协议</h1>
       <p class="mt-2 text-sm text-outline">更新日期：2026 年 10 月 21 日</p>
       <div class="mt-8 space-y-5 leading-7">

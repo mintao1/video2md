@@ -1,0 +1,216 @@
+F.FFFFFFF.F.FFF.                                                         [100%]
+=================================== FAILURES ===================================
+_ test_known_frames_normalize_to_standalone_authorized_attachment[False-![[frame.jpg]]] _
+
+reference = '![[frame.jpg]]', inline = False
+
+    @pytest.mark.parametrize('reference', ['![[frame.jpg]]','![[attachments/frame.jpg]]',
+                                          '![[frame.jpg|640]]','![[attachments/frame.jpg|640]]'])
+    @pytest.mark.parametrize('inline', [False, True])
+    def test_known_frames_normalize_to_standalone_authorized_attachment(reference, inline):
+        body = f'正文{reference}图注' if inline else f'正文\n{reference}\n*图注*'
+        result = sanitize_embeds(body, {'frame.jpg'})
+>       assert '![[attachments/frame.jpg]]' in result.splitlines()
+E       AssertionError: assert '![[attachments/frame.jpg]]' in ['正文', '![[frame.jpg]]', '*图注*']
+E        +  where ['正文', '![[frame.jpg]]', '*图注*'] = <built-in method splitlines of str object at 0x1082a23a0>()
+E        +    where <built-in method splitlines of str object at 0x1082a23a0> = '正文\n![[frame.jpg]]\n*图注*'.splitlines
+
+backend/tests/test_note_embed_regressions.py:14: AssertionError
+_ test_known_frames_normalize_to_standalone_authorized_attachment[False-![[frame.jpg|640]]] _
+
+reference = '![[frame.jpg|640]]', inline = False
+
+    @pytest.mark.parametrize('reference', ['![[frame.jpg]]','![[attachments/frame.jpg]]',
+                                          '![[frame.jpg|640]]','![[attachments/frame.jpg|640]]'])
+    @pytest.mark.parametrize('inline', [False, True])
+    def test_known_frames_normalize_to_standalone_authorized_attachment(reference, inline):
+        body = f'正文{reference}图注' if inline else f'正文\n{reference}\n*图注*'
+        result = sanitize_embeds(body, {'frame.jpg'})
+>       assert '![[attachments/frame.jpg]]' in result.splitlines()
+E       AssertionError: assert '![[attachments/frame.jpg]]' in ['正文', '![[frame.jpg|640]]', '*图注*']
+E        +  where ['正文', '![[frame.jpg|640]]', '*图注*'] = <built-in method splitlines of str object at 0x1082a1ed0>()
+E        +    where <built-in method splitlines of str object at 0x1082a1ed0> = '正文\n![[frame.jpg|640]]\n*图注*'.splitlines
+
+backend/tests/test_note_embed_regressions.py:14: AssertionError
+_ test_known_frames_normalize_to_standalone_authorized_attachment[False-![[attachments/frame.jpg|640]]] _
+
+reference = '![[attachments/frame.jpg|640]]', inline = False
+
+    @pytest.mark.parametrize('reference', ['![[frame.jpg]]','![[attachments/frame.jpg]]',
+                                          '![[frame.jpg|640]]','![[attachments/frame.jpg|640]]'])
+    @pytest.mark.parametrize('inline', [False, True])
+    def test_known_frames_normalize_to_standalone_authorized_attachment(reference, inline):
+        body = f'正文{reference}图注' if inline else f'正文\n{reference}\n*图注*'
+        result = sanitize_embeds(body, {'frame.jpg'})
+>       assert '![[attachments/frame.jpg]]' in result.splitlines()
+E       AssertionError: assert '![[attachments/frame.jpg]]' in ['正文']
+E        +  where ['正文'] = <built-in method splitlines of str object at 0x108261cb0>()
+E        +    where <built-in method splitlines of str object at 0x108261cb0> = '正文'.splitlines
+
+backend/tests/test_note_embed_regressions.py:14: AssertionError
+_ test_known_frames_normalize_to_standalone_authorized_attachment[True-![[frame.jpg]]] _
+
+reference = '![[frame.jpg]]', inline = True
+
+    @pytest.mark.parametrize('reference', ['![[frame.jpg]]','![[attachments/frame.jpg]]',
+                                          '![[frame.jpg|640]]','![[attachments/frame.jpg|640]]'])
+    @pytest.mark.parametrize('inline', [False, True])
+    def test_known_frames_normalize_to_standalone_authorized_attachment(reference, inline):
+        body = f'正文{reference}图注' if inline else f'正文\n{reference}\n*图注*'
+        result = sanitize_embeds(body, {'frame.jpg'})
+>       assert '![[attachments/frame.jpg]]' in result.splitlines()
+E       AssertionError: assert '![[attachments/frame.jpg]]' in ['正文![[frame.jpg]]图注']
+E        +  where ['正文![[frame.jpg]]图注'] = <built-in method splitlines of str object at 0x1082bd5f0>()
+E        +    where <built-in method splitlines of str object at 0x1082bd5f0> = '正文![[frame.jpg]]图注'.splitlines
+
+backend/tests/test_note_embed_regressions.py:14: AssertionError
+_ test_known_frames_normalize_to_standalone_authorized_attachment[True-![[attachments/frame.jpg]]] _
+
+reference = '![[attachments/frame.jpg]]', inline = True
+
+    @pytest.mark.parametrize('reference', ['![[frame.jpg]]','![[attachments/frame.jpg]]',
+                                          '![[frame.jpg|640]]','![[attachments/frame.jpg|640]]'])
+    @pytest.mark.parametrize('inline', [False, True])
+    def test_known_frames_normalize_to_standalone_authorized_attachment(reference, inline):
+        body = f'正文{reference}图注' if inline else f'正文\n{reference}\n*图注*'
+        result = sanitize_embeds(body, {'frame.jpg'})
+>       assert '![[attachments/frame.jpg]]' in result.splitlines()
+E       AssertionError: assert '![[attachments/frame.jpg]]' in ['正文![[attachments/frame.jpg]]图注']
+E        +  where ['正文![[attachments/frame.jpg]]图注'] = <built-in method splitlines of str object at 0x10829a830>()
+E        +    where <built-in method splitlines of str object at 0x10829a830> = '正文![[attachments/frame.jpg]]图注'.splitlines
+
+backend/tests/test_note_embed_regressions.py:14: AssertionError
+_ test_known_frames_normalize_to_standalone_authorized_attachment[True-![[frame.jpg|640]]] _
+
+reference = '![[frame.jpg|640]]', inline = True
+
+    @pytest.mark.parametrize('reference', ['![[frame.jpg]]','![[attachments/frame.jpg]]',
+                                          '![[frame.jpg|640]]','![[attachments/frame.jpg|640]]'])
+    @pytest.mark.parametrize('inline', [False, True])
+    def test_known_frames_normalize_to_standalone_authorized_attachment(reference, inline):
+        body = f'正文{reference}图注' if inline else f'正文\n{reference}\n*图注*'
+        result = sanitize_embeds(body, {'frame.jpg'})
+>       assert '![[attachments/frame.jpg]]' in result.splitlines()
+E       AssertionError: assert '![[attachments/frame.jpg]]' in ['正文![[frame.jpg|640]]图注']
+E        +  where ['正文![[frame.jpg|640]]图注'] = <built-in method splitlines of str object at 0x1082a2790>()
+E        +    where <built-in method splitlines of str object at 0x1082a2790> = '正文![[frame.jpg|640]]图注'.splitlines
+
+backend/tests/test_note_embed_regressions.py:14: AssertionError
+_ test_known_frames_normalize_to_standalone_authorized_attachment[True-![[attachments/frame.jpg|640]]] _
+
+reference = '![[attachments/frame.jpg|640]]', inline = True
+
+    @pytest.mark.parametrize('reference', ['![[frame.jpg]]','![[attachments/frame.jpg]]',
+                                          '![[frame.jpg|640]]','![[attachments/frame.jpg|640]]'])
+    @pytest.mark.parametrize('inline', [False, True])
+    def test_known_frames_normalize_to_standalone_authorized_attachment(reference, inline):
+        body = f'正文{reference}图注' if inline else f'正文\n{reference}\n*图注*'
+        result = sanitize_embeds(body, {'frame.jpg'})
+>       assert '![[attachments/frame.jpg]]' in result.splitlines()
+E       AssertionError: assert '![[attachments/frame.jpg]]' in ['正文![[attachments/frame.jpg|640]]图注']
+E        +  where ['正文![[attachments/frame.jpg|640]]图注'] = <built-in method splitlines of str object at 0x10829b1b0>()
+E        +    where <built-in method splitlines of str object at 0x10829b1b0> = '正文![[attachments/frame.jpg|640]]图注'.splitlines
+
+backend/tests/test_note_embed_regressions.py:14: AssertionError
+_ test_unknown_or_traversing_image_cannot_become_authorized_reference[![[unknown.jpg]]] _
+
+reference = '![[unknown.jpg]]'
+
+    @pytest.mark.parametrize('reference', ['![[unknown.jpg]]','![[attachments/unknown.jpg]]',
+        '![[../frame.jpg]]','![[attachments/../frame.jpg]]','![[https://evil.test/frame.jpg]]',
+        '![[folder/frame.jpg]]'])
+    def test_unknown_or_traversing_image_cannot_become_authorized_reference(reference):
+        result = sanitize_embeds(f'正文\n{reference}\n*图注*', {'frame.jpg'})
+>       assert '![[' not in result
+E       AssertionError: assert '![[' not in '正文\n![[unknown.jpg]]\n*图注*'
+E         
+E         '![[' is contained here:
+E           正文
+E           ![[unknown.jpg]]
+E         ? +++
+E           *图注*
+
+backend/tests/test_note_embed_regressions.py:26: AssertionError
+_ test_unknown_or_traversing_image_cannot_become_authorized_reference[![[../frame.jpg]]] _
+
+reference = '![[../frame.jpg]]'
+
+    @pytest.mark.parametrize('reference', ['![[unknown.jpg]]','![[attachments/unknown.jpg]]',
+        '![[../frame.jpg]]','![[attachments/../frame.jpg]]','![[https://evil.test/frame.jpg]]',
+        '![[folder/frame.jpg]]'])
+    def test_unknown_or_traversing_image_cannot_become_authorized_reference(reference):
+        result = sanitize_embeds(f'正文\n{reference}\n*图注*', {'frame.jpg'})
+>       assert '![[' not in result
+E       AssertionError: assert '![[' not in '正文\n![[../f....jpg]]\n*图注*'
+E         
+E         '![[' is contained here:
+E           正文
+E           ![[../frame.jpg]]
+E         ? +++
+E           *图注*
+
+backend/tests/test_note_embed_regressions.py:26: AssertionError
+_ test_unknown_or_traversing_image_cannot_become_authorized_reference[![[https://evil.test/frame.jpg]]] _
+
+reference = '![[https://evil.test/frame.jpg]]'
+
+    @pytest.mark.parametrize('reference', ['![[unknown.jpg]]','![[attachments/unknown.jpg]]',
+        '![[../frame.jpg]]','![[attachments/../frame.jpg]]','![[https://evil.test/frame.jpg]]',
+        '![[folder/frame.jpg]]'])
+    def test_unknown_or_traversing_image_cannot_become_authorized_reference(reference):
+        result = sanitize_embeds(f'正文\n{reference}\n*图注*', {'frame.jpg'})
+>       assert '![[' not in result
+E       AssertionError: assert '![[' not in '正文\n![[http....jpg]]\n*图注*'
+E         
+E         '![[' is contained here:
+E           正文
+E           ![[https://evil.test/frame.jpg]]
+E         ? +++
+E           *图注*
+
+backend/tests/test_note_embed_regressions.py:26: AssertionError
+_ test_unknown_or_traversing_image_cannot_become_authorized_reference[![[folder/frame.jpg]]] _
+
+reference = '![[folder/frame.jpg]]'
+
+    @pytest.mark.parametrize('reference', ['![[unknown.jpg]]','![[attachments/unknown.jpg]]',
+        '![[../frame.jpg]]','![[attachments/../frame.jpg]]','![[https://evil.test/frame.jpg]]',
+        '![[folder/frame.jpg]]'])
+    def test_unknown_or_traversing_image_cannot_become_authorized_reference(reference):
+        result = sanitize_embeds(f'正文\n{reference}\n*图注*', {'frame.jpg'})
+>       assert '![[' not in result
+E       AssertionError: assert '![[' not in '正文\n![[fold....jpg]]\n*图注*'
+E         
+E         '![[' is contained here:
+E           正文
+E           ![[folder/frame.jpg]]
+E         ? +++
+E           *图注*
+
+backend/tests/test_note_embed_regressions.py:26: AssertionError
+_________ test_empty_frame_allowlist_removes_bare_and_prefixed_images __________
+
+    def test_empty_frame_allowlist_removes_bare_and_prefixed_images():
+        result = sanitize_embeds('text ![[frame.jpg]]\n![[attachments/frame.jpg]]', set())
+>       assert '![[' not in result
+E       AssertionError: assert '![[' not in 'text ![[frame.jpg]]\n'
+E         
+E         '![[' is contained here:
+E           text ![[frame.jpg]]
+E         ?      +++
+
+backend/tests/test_note_embed_regressions.py:32: AssertionError
+=========================== short test summary info ============================
+FAILED backend/tests/test_note_embed_regressions.py::test_known_frames_normalize_to_standalone_authorized_attachment[False-![[frame.jpg]]]
+FAILED backend/tests/test_note_embed_regressions.py::test_known_frames_normalize_to_standalone_authorized_attachment[False-![[frame.jpg|640]]]
+FAILED backend/tests/test_note_embed_regressions.py::test_known_frames_normalize_to_standalone_authorized_attachment[False-![[attachments/frame.jpg|640]]]
+FAILED backend/tests/test_note_embed_regressions.py::test_known_frames_normalize_to_standalone_authorized_attachment[True-![[frame.jpg]]]
+FAILED backend/tests/test_note_embed_regressions.py::test_known_frames_normalize_to_standalone_authorized_attachment[True-![[attachments/frame.jpg]]]
+FAILED backend/tests/test_note_embed_regressions.py::test_known_frames_normalize_to_standalone_authorized_attachment[True-![[frame.jpg|640]]]
+FAILED backend/tests/test_note_embed_regressions.py::test_known_frames_normalize_to_standalone_authorized_attachment[True-![[attachments/frame.jpg|640]]]
+FAILED backend/tests/test_note_embed_regressions.py::test_unknown_or_traversing_image_cannot_become_authorized_reference[![[unknown.jpg]]]
+FAILED backend/tests/test_note_embed_regressions.py::test_unknown_or_traversing_image_cannot_become_authorized_reference[![[../frame.jpg]]]
+FAILED backend/tests/test_note_embed_regressions.py::test_unknown_or_traversing_image_cannot_become_authorized_reference[![[https://evil.test/frame.jpg]]]
+FAILED backend/tests/test_note_embed_regressions.py::test_unknown_or_traversing_image_cannot_become_authorized_reference[![[folder/frame.jpg]]]
+FAILED backend/tests/test_note_embed_regressions.py::test_empty_frame_allowlist_removes_bare_and_prefixed_images
+12 failed, 4 passed in 0.08s

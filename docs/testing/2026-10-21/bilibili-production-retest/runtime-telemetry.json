@@ -1,0 +1,352 @@
+{
+  "records": [
+    {
+      "ts": "2026-10-21T21:17:07",
+      "event": "graph:start"
+    },
+    {
+      "ts": "2026-10-21T21:17:07",
+      "event": "graph:node"
+    },
+    {
+      "ts": "2026-10-21T21:17:07",
+      "event": "graph:route"
+    },
+    {
+      "ts": "2026-10-21T21:17:07",
+      "event": "graph:state"
+    },
+    {
+      "ts": "2026-10-21T21:17:07",
+      "event": "graph:node"
+    },
+    {
+      "ts": "2026-10-21T21:17:07",
+      "event": "stage:download",
+      "status": "started"
+    },
+    {
+      "ts": "2026-10-21T21:17:07",
+      "event": "entry 1/2 download",
+      "status": "started"
+    },
+    {
+      "ts": "2026-10-21T21:17:11",
+      "event": "artifacts"
+    },
+    {
+      "ts": "2026-10-21T21:17:11",
+      "event": "entry 1/2 download",
+      "status": "completed",
+      "durationMs": 3714
+    },
+    {
+      "ts": "2026-10-21T21:17:11",
+      "event": "entry 2/2 download",
+      "status": "started"
+    },
+    {
+      "ts": "2026-10-21T21:17:12",
+      "event": "artifacts"
+    },
+    {
+      "ts": "2026-10-21T21:17:12",
+      "event": "entry 2/2 download",
+      "status": "completed",
+      "durationMs": 1101
+    },
+    {
+      "ts": "2026-10-21T21:17:12",
+      "event": "stage:download",
+      "status": "completed",
+      "durationMs": 4827
+    },
+    {
+      "ts": "2026-10-21T21:17:12",
+      "event": "graph:route"
+    },
+    {
+      "ts": "2026-10-21T21:17:12",
+      "event": "graph:state"
+    },
+    {
+      "ts": "2026-10-21T21:17:12",
+      "event": "graph:node"
+    },
+    {
+      "ts": "2026-10-21T21:17:12",
+      "event": "stage:transcribe",
+      "status": "started"
+    },
+    {
+      "ts": "2026-10-21T21:17:12",
+      "event": "entry 1/2 transcribe",
+      "status": "started"
+    },
+    {
+      "ts": "2026-10-21T21:19:49",
+      "event": "artifacts"
+    },
+    {
+      "ts": "2026-10-21T21:19:49",
+      "event": "entry 1/2 transcribe",
+      "status": "completed",
+      "durationMs": 156644
+    },
+    {
+      "ts": "2026-10-21T21:19:49",
+      "event": "entry 2/2 transcribe",
+      "status": "started"
+    },
+    {
+      "ts": "2026-10-21T21:21:05",
+      "event": "artifacts"
+    },
+    {
+      "ts": "2026-10-21T21:21:05",
+      "event": "entry 2/2 transcribe",
+      "status": "completed",
+      "durationMs": 76100
+    },
+    {
+      "ts": "2026-10-21T21:21:05",
+      "event": "stage:transcribe",
+      "status": "completed",
+      "durationMs": 232757
+    },
+    {
+      "ts": "2026-10-21T21:21:05",
+      "event": "graph:route"
+    },
+    {
+      "ts": "2026-10-21T21:21:05",
+      "event": "graph:state"
+    },
+    {
+      "ts": "2026-10-21T21:21:05",
+      "event": "graph:node"
+    },
+    {
+      "ts": "2026-10-21T21:21:05",
+      "event": "stage:frames",
+      "status": "started"
+    },
+    {
+      "ts": "2026-10-21T21:21:05",
+      "event": "entry 1/2 frames",
+      "status": "started"
+    },
+    {
+      "ts": "2026-10-21T21:21:08",
+      "event": "artifacts"
+    },
+    {
+      "ts": "2026-10-21T21:21:08",
+      "event": "entry 1/2 frames",
+      "status": "completed",
+      "durationMs": 3046
+    },
+    {
+      "ts": "2026-10-21T21:21:08",
+      "event": "entry 2/2 frames",
+      "status": "started"
+    },
+    {
+      "ts": "2026-10-21T21:21:10",
+      "event": "artifacts"
+    },
+    {
+      "ts": "2026-10-21T21:21:10",
+      "event": "entry 2/2 frames",
+      "status": "completed",
+      "durationMs": 2147
+    },
+    {
+      "ts": "2026-10-21T21:21:10",
+      "event": "stage:frames",
+      "status": "completed",
+      "durationMs": 5209
+    },
+    {
+      "ts": "2026-10-21T21:21:10",
+      "event": "graph:route"
+    },
+    {
+      "ts": "2026-10-21T21:21:10",
+      "event": "graph:state"
+    },
+    {
+      "ts": "2026-10-21T21:21:10",
+      "event": "graph:node"
+    },
+    {
+      "ts": "2026-10-21T21:21:10",
+      "event": "stage:ocr",
+      "status": "started"
+    },
+    {
+      "ts": "2026-10-21T21:21:10",
+      "event": "entry 1/2 ocr",
+      "status": "started"
+    },
+    {
+      "ts": "2026-10-21T21:23:45",
+      "event": "entry 1/2 ocr",
+      "status": "failed",
+      "durationMs": 155125,
+      "error": "远程 OCR 失败 HTTP 502: {\"detail\":{\"error\":\"[ocr] 所有 provider 均不可用 → colab: Colab 会话已消失（被回收或被其他进程关闭），请重试 | kaggle: Kaggle 凭证缺失：~/.kaggle/kaggle.json 或 KAGGLE_USERNAME/KEY | modal(跳过: 已禁用（配置或手动开关）) | aliyu"
+    },
+    {
+      "ts": "2026-10-21T21:23:45",
+      "event": "entry 2/2 ocr",
+      "status": "started"
+    },
+    {
+      "ts": "2026-10-21T21:25:52",
+      "event": "artifacts"
+    },
+    {
+      "ts": "2026-10-21T21:25:52",
+      "event": "entry 2/2 ocr",
+      "status": "completed",
+      "durationMs": 126796
+    },
+    {
+      "ts": "2026-10-21T21:25:52",
+      "event": "partial_failure"
+    },
+    {
+      "ts": "2026-10-21T21:25:52",
+      "event": "stage:ocr",
+      "status": "completed",
+      "durationMs": 281941
+    },
+    {
+      "ts": "2026-10-21T21:25:52",
+      "event": "graph:route"
+    },
+    {
+      "ts": "2026-10-21T21:25:52",
+      "event": "graph:state"
+    },
+    {
+      "ts": "2026-10-21T21:25:52",
+      "event": "graph:node"
+    },
+    {
+      "ts": "2026-10-21T21:25:52",
+      "event": "llm:select_frames",
+      "status": "started"
+    },
+    {
+      "ts": "2026-10-21T21:28:18",
+      "event": "llm:select_frames",
+      "status": "completed",
+      "durationMs": 146028,
+      "model": "glm-5.3-flash",
+      "usage": {
+        "prompt_tokens": 9347,
+        "completion_tokens": 3931,
+        "total_tokens": 13278,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cached_tokens": 9344
+        },
+        "completion_tokens_details": {
+          "accepted_prediction_tokens": null,
+          "audio_tokens": null,
+          "reasoning_tokens": 3467,
+          "rejected_prediction_tokens": null
+        }
+      },
+      "attempts": 3
+    },
+    {
+      "ts": "2026-10-21T21:28:18",
+      "event": "graph:route"
+    },
+    {
+      "ts": "2026-10-21T21:28:18",
+      "event": "graph:state"
+    },
+    {
+      "ts": "2026-10-21T21:28:18",
+      "event": "graph:node"
+    },
+    {
+      "ts": "2026-10-21T21:28:18",
+      "event": "stage:select",
+      "status": "started"
+    },
+    {
+      "ts": "2026-10-21T21:28:18",
+      "event": "entry 1/2 select",
+      "status": "started"
+    },
+    {
+      "ts": "2026-10-21T21:28:21",
+      "event": "artifacts"
+    },
+    {
+      "ts": "2026-10-21T21:28:21",
+      "event": "entry 1/2 select",
+      "status": "completed",
+      "durationMs": 2461
+    },
+    {
+      "ts": "2026-10-21T21:28:21",
+      "event": "entry 2/2 select",
+      "status": "started"
+    },
+    {
+      "ts": "2026-10-21T21:28:21",
+      "event": "artifacts"
+    },
+    {
+      "ts": "2026-10-21T21:28:21",
+      "event": "entry 2/2 select",
+      "status": "completed",
+      "durationMs": 6
+    },
+    {
+      "ts": "2026-10-21T21:28:21",
+      "event": "stage:select",
+      "status": "completed",
+      "durationMs": 2483
+    },
+    {
+      "ts": "2026-10-21T21:28:21",
+      "event": "graph:route"
+    },
+    {
+      "ts": "2026-10-21T21:28:21",
+      "event": "graph:state"
+    },
+    {
+      "ts": "2026-10-21T21:28:21",
+      "event": "graph:node"
+    },
+    {
+      "ts": "2026-10-21T21:28:21",
+      "event": "stage:clips",
+      "status": "started"
+    },
+    {
+      "ts": "2026-10-21T21:28:21",
+      "event": "entry 1/2 clips",
+      "status": "started"
+    },
+    {
+      "ts": "2026-10-21T21:41:37",
+      "event": "entry 1/2 clips",
+      "status": "failed",
+      "durationMs": 795727,
+      "error": "远程剪辑失败 HTTP 502: {\"detail\":{\"error\":\"[clips] 所有 provider 均不可用 → colab: colab download -s 失败: [colab] Download failed: File or directory not found: /con | modal(跳过: 已禁用（配置或手动开关）) | kaggle(跳过: 冷却中（剩 24s"
+    },
+    {
+      "ts": "2026-10-21T21:41:37",
+      "event": "entry 2/2 clips",
+      "status": "started"
+    }
+  ]
+}

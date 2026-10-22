@@ -1,0 +1,7 @@
+{
+  "backup_digest_matches_original": true,
+  "directory_mode_before": "0o700",
+  "directory_mode_after": "0o750",
+  "file_mode": "0o600",
+  "backup_content_changed": false
+}

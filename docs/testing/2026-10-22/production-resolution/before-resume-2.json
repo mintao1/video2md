@@ -1,0 +1,600 @@
+{
+  "observed_at": "2026-10-21T18:54:33.882503+00:00",
+  "kind": "read_only_server_state_not_ui",
+  "cost": {
+    "month": "2026-10-01T00:00:00",
+    "spend_usd": 0.038581,
+    "budget_usd": 0.0,
+    "usage": {
+      "spend_usd": 0.038581,
+      "llm_in_tok": 62347,
+      "llm_out_tok": 62945,
+      "gpu_s": 5561.864,
+      "runs_n": 10
+    },
+    "gpu_policy": "free",
+    "runs": [
+      {
+        "run_id": "dd586072",
+        "title": "如何用一张图片改变枯燥的纯文本排版？",
+        "status": "error",
+        "created": "2026-10-22T01:35:30",
+        "deleted": false,
+        "usage": {
+          "gpu_s": 1044.641,
+          "llm_in_tok": 0,
+          "llm_out_tok": 0,
+          "llm_cached_in_tok": 0
+        },
+        "cost_usd": 0.0,
+        "cost_pricing": {
+          "gpu_min": 0.0,
+          "currency": "USD",
+          "gpu_policy": "free",
+          "llm_in_mtok": 0.15,
+          "llm_out_mtok": 0.5,
+          "llm_cached_in_mtok": 0.03
+        }
+      },
+      {
+        "run_id": "f1fff0b8",
+        "title": "如何用一张图片改变枯燥的纯文本排版？",
+        "status": "error",
+        "created": "2026-10-22T00:29:20",
+        "deleted": false,
+        "usage": {
+          "gpu_s": 0.089,
+          "llm_in_tok": 0,
+          "llm_out_tok": 0
+        },
+        "cost_usd": 0.0,
+        "cost_pricing": {
+          "gpu_min": 0.0,
+          "currency": "USD",
+          "gpu_policy": "free",
+          "llm_in_mtok": 0.15,
+          "llm_out_mtok": 0.5,
+          "llm_cached_in_mtok": 0.03
+        }
+      },
+      {
+        "run_id": "3c05faf8",
+        "title": "如何用一张图片改变枯燥的纯文本排版？",
+        "status": "partial",
+        "created": "2026-10-21T21:17:07",
+        "deleted": false,
+        "usage": {
+          "gpu_s": 1460.57,
+          "llm_in_tok": 37863,
+          "llm_out_tok": 31495,
+          "llm_cached_in_tok": 18688
+        },
+        "cost_usd": 0.019184,
+        "cost_pricing": {
+          "gpu_min": 0.0,
+          "currency": "USD",
+          "gpu_policy": "free",
+          "llm_in_mtok": 0.15,
+          "llm_out_mtok": 0.5,
+          "llm_cached_in_mtok": 0.03
+        }
+      },
+      {
+        "run_id": "be188f78",
+        "title": "学PPT该学哪些技能：会做巧做好用漂亮",
+        "status": "done",
+        "created": "2026-10-21T15:44:32",
+        "deleted": false,
+        "usage": {
+          "gpu_s": 1276.45,
+          "llm_in_tok": 15939,
+          "llm_out_tok": 15841
+        },
+        "cost_usd": 0.010311,
+        "cost_pricing": {
+          "gpu_min": 0.0,
+          "currency": "USD",
+          "gpu_policy": "free",
+          "llm_in_mtok": 0.15,
+          "llm_out_mtok": 0.5,
+          "llm_cached_in_mtok": 0.03
+        }
+      },
+      {
+        "run_id": "4df77d9c",
+        "title": "数据库索引原理与查询优化",
+        "status": "done",
+        "created": "2026-10-21T13:30:05",
+        "deleted": false,
+        "usage": {
+          "gpu_s": 809.12,
+          "llm_in_tok": 6498,
+          "llm_out_tok": 6919
+        },
+        "cost_usd": 0.004434,
+        "cost_pricing": {
+          "gpu_min": 0.0,
+          "currency": "USD",
+          "gpu_policy": "free",
+          "llm_in_mtok": 0.15,
+          "llm_out_mtok": 0.5,
+          "llm_cached_in_mtok": 0.03
+        }
+      },
+      {
+        "run_id": "edfa1b1a",
+        "title": "ferosse.tech",
+        "status": "partial",
+        "created": "2026-10-21T13:09:14",
+        "deleted": false,
+        "usage": {
+          "gpu_s": 331.228,
+          "llm_in_tok": 2047,
+          "llm_out_tok": 8690
+        },
+        "cost_usd": 0.004652,
+        "cost_pricing": {
+          "gpu_min": 0.0,
+          "currency": "USD",
+          "gpu_policy": "free",
+          "llm_in_mtok": 0.15,
+          "llm_out_mtok": 0.5,
+          "llm_cached_in_mtok": 0.03
+        }
+      },
+      {
+        "run_id": "312e97ae",
+        "title": "ferosse.tech",
+        "status": "error",
+        "created": "2026-10-21T11:20:09",
+        "deleted": false,
+        "usage": {
+          "gpu_s": 204.669,
+          "llm_in_tok": 0,
+          "llm_out_tok": 0
+        },
+        "cost_usd": 0.0,
+        "cost_pricing": null
+      },
+      {
+        "run_id": "56835fed",
+        "title": "ferosse.tech",
+        "status": "error",
+        "created": "2026-10-21T08:15:42",
+        "deleted": false,
+        "usage": {
+          "gpu_s": 183.082,
+          "llm_in_tok": 0,
+          "llm_out_tok": 0
+        },
+        "cost_usd": 0.0,
+        "cost_pricing": null
+      },
+      {
+        "run_id": "aef9643a",
+        "title": "ferosse.tech",
+        "status": "error",
+        "created": "2026-10-21T07:37:06",
+        "deleted": false,
+        "usage": {
+          "gpu_s": 251.977,
+          "llm_in_tok": 0,
+          "llm_out_tok": 0
+        },
+        "cost_usd": 0.0,
+        "cost_pricing": null
+      },
+      {
+        "run_id": "9ad9ee9d",
+        "title": "ferosse.tech",
+        "status": "error",
+        "created": "2026-10-21T06:03:35",
+        "deleted": false,
+        "usage": {
+          "gpu_s": 0.038,
+          "llm_in_tok": 0,
+          "llm_out_tok": 0
+        },
+        "cost_usd": 0.0,
+        "cost_pricing": null
+      }
+    ],
+    "pricing_configured": true,
+    "prices": {
+      "llm_in_mtok": 0.15,
+      "llm_out_mtok": 0.5,
+      "gpu_min": 0.0,
+      "llm_cached_in_mtok": 0.03
+    }
+  },
+  "runs": [
+    {
+      "run_id": "dd586072",
+      "url": "https://www.bilibili.com/video/BV1LV411r77C/",
+      "title": "如何用一张图片改变枯燥的纯文本排版？",
+      "status": "error",
+      "created": "2026-10-22T01:35:30",
+      "queue_pos": null,
+      "total": 2,
+      "done_entries": 0,
+      "artifacts": null,
+      "usage": {
+        "gpu_s": 1044.641,
+        "llm_in_tok": 0,
+        "llm_out_tok": 0,
+        "llm_cached_in_tok": 0
+      },
+      "cost_usd": 0.0,
+      "cost_pricing": {
+        "gpu_min": 0.0,
+        "currency": "USD",
+        "gpu_policy": "free",
+        "llm_in_mtok": 0.15,
+        "llm_out_mtok": 0.5,
+        "llm_cached_in_mtok": 0.03
+      },
+      "diagnostic": {
+        "stage": "ocr",
+        "message": "处理未完成，请重试或凭任务编号联系支持。"
+      }
+    },
+    {
+      "run_id": "f1fff0b8",
+      "url": "https://www.bilibili.com/video/BV1LV411r77C/",
+      "title": "如何用一张图片改变枯燥的纯文本排版？",
+      "status": "error",
+      "created": "2026-10-22T00:29:20",
+      "queue_pos": null,
+      "total": 2,
+      "done_entries": 0,
+      "artifacts": null,
+      "usage": {
+        "gpu_s": 0.089,
+        "llm_in_tok": 0,
+        "llm_out_tok": 0
+      },
+      "cost_usd": 0.0,
+      "cost_pricing": {
+        "gpu_min": 0.0,
+        "currency": "USD",
+        "gpu_policy": "free",
+        "llm_in_mtok": 0.15,
+        "llm_out_mtok": 0.5,
+        "llm_cached_in_mtok": 0.03
+      },
+      "diagnostic": {
+        "stage": "transcribe",
+        "message": "处理未完成，请重试或凭任务编号联系支持。"
+      }
+    },
+    {
+      "run_id": "3c05faf8",
+      "url": "https://www.bilibili.com/video/BV1LV411r77C/",
+      "title": "如何用一张图片改变枯燥的纯文本排版？",
+      "status": "partial",
+      "created": "2026-10-21T21:17:07",
+      "queue_pos": null,
+      "total": 2,
+      "done_entries": 0,
+      "artifacts": null,
+      "usage": {
+        "gpu_s": 1460.57,
+        "llm_in_tok": 37863,
+        "llm_out_tok": 31495,
+        "llm_cached_in_tok": 18688
+      },
+      "cost_usd": 0.019184,
+      "cost_pricing": {
+        "gpu_min": 0.0,
+        "currency": "USD",
+        "gpu_policy": "free",
+        "llm_in_mtok": 0.15,
+        "llm_out_mtok": 0.5,
+        "llm_cached_in_mtok": 0.03
+      },
+      "diagnostic": {
+        "stage": "clips",
+        "message": "视频剪辑未完成，暂时无法生成教材；请补跑失败条目。"
+      }
+    },
+    {
+      "run_id": "be188f78",
+      "url": "https://www.bilibili.com/video/BV1vV411k7GB/",
+      "title": "学PPT该学哪些技能：会做巧做好用漂亮",
+      "status": "done",
+      "created": "2026-10-21T15:44:32",
+      "queue_pos": null,
+      "total": 2,
+      "done_entries": 2,
+      "artifacts": null,
+      "usage": {
+        "gpu_s": 1276.45,
+        "llm_in_tok": 15939,
+        "llm_out_tok": 15841
+      },
+      "cost_usd": 0.010311,
+      "cost_pricing": {
+        "gpu_min": 0.0,
+        "currency": "USD",
+        "gpu_policy": "free",
+        "llm_in_mtok": 0.15,
+        "llm_out_mtok": 0.5,
+        "llm_cached_in_mtok": 0.03
+      },
+      "diagnostic": null
+    },
+    {
+      "run_id": "4df77d9c",
+      "url": "https://ferosse.tech/test-assets/billing-index-lesson.mp4",
+      "title": "数据库索引原理与查询优化",
+      "status": "done",
+      "created": "2026-10-21T13:30:05",
+      "queue_pos": null,
+      "total": 1,
+      "done_entries": 1,
+      "artifacts": null,
+      "usage": {
+        "gpu_s": 809.12,
+        "llm_in_tok": 6498,
+        "llm_out_tok": 6919
+      },
+      "cost_usd": 0.004434,
+      "cost_pricing": {
+        "gpu_min": 0.0,
+        "currency": "USD",
+        "gpu_policy": "free",
+        "llm_in_mtok": 0.15,
+        "llm_out_mtok": 0.5,
+        "llm_cached_in_mtok": 0.03
+      },
+      "diagnostic": null
+    },
+    {
+      "run_id": "edfa1b1a",
+      "url": "https://ferosse.tech/test-assets/model-billing-smoke.mp4",
+      "title": "ferosse.tech",
+      "status": "partial",
+      "created": "2026-10-21T13:09:14",
+      "queue_pos": null,
+      "total": 1,
+      "done_entries": 0,
+      "artifacts": null,
+      "usage": {
+        "gpu_s": 331.228,
+        "llm_in_tok": 2047,
+        "llm_out_tok": 8690
+      },
+      "cost_usd": 0.004652,
+      "cost_pricing": {
+        "gpu_min": 0.0,
+        "currency": "USD",
+        "gpu_policy": "free",
+        "llm_in_mtok": 0.15,
+        "llm_out_mtok": 0.5,
+        "llm_cached_in_mtok": 0.03
+      },
+      "diagnostic": {
+        "stage": "note",
+        "message": "转录内容过短，未达到教材生成质量门槛；请使用内容更完整的视频。"
+      }
+    },
+    {
+      "run_id": "312e97ae",
+      "url": "https://ferosse.tech/test-assets/model-billing-smoke.mp4",
+      "title": "ferosse.tech",
+      "status": "error",
+      "created": "2026-10-21T11:20:09",
+      "queue_pos": null,
+      "total": 1,
+      "done_entries": 0,
+      "artifacts": null,
+      "usage": {
+        "gpu_s": 204.669,
+        "llm_in_tok": 0,
+        "llm_out_tok": 0
+      },
+      "cost_usd": 0.0,
+      "cost_pricing": null,
+      "diagnostic": {
+        "stage": "note",
+        "message": "模型渠道拒绝访问，请检查渠道是否启用及账号权限。（HTTP 403）"
+      }
+    },
+    {
+      "run_id": "56835fed",
+      "url": "https://ferosse.tech/test-assets/model-billing-smoke.mp4",
+      "title": "ferosse.tech",
+      "status": "error",
+      "created": "2026-10-21T08:15:42",
+      "queue_pos": null,
+      "total": 1,
+      "done_entries": 0,
+      "artifacts": null,
+      "usage": {
+        "gpu_s": 183.082,
+        "llm_in_tok": 0,
+        "llm_out_tok": 0
+      },
+      "cost_usd": 0.0,
+      "cost_pricing": null,
+      "diagnostic": {
+        "stage": "note",
+        "message": "模型渠道拒绝访问，请检查渠道是否启用及账号权限。（HTTP 403）"
+      }
+    },
+    {
+      "run_id": "aef9643a",
+      "url": "https://ferosse.tech/test-assets/model-billing-smoke.mp4",
+      "title": "ferosse.tech",
+      "status": "error",
+      "created": "2026-10-21T07:37:06",
+      "queue_pos": null,
+      "total": 1,
+      "done_entries": 0,
+      "artifacts": null,
+      "usage": {
+        "gpu_s": 251.977,
+        "llm_in_tok": 0,
+        "llm_out_tok": 0
+      },
+      "cost_usd": 0.0,
+      "cost_pricing": null,
+      "diagnostic": {
+        "stage": "note",
+        "message": "模型渠道拒绝访问，请检查渠道是否启用及账号权限。（HTTP 403）"
+      }
+    },
+    {
+      "run_id": "9ad9ee9d",
+      "url": "https://ferosse.tech/test-assets/model-billing-smoke.mp4",
+      "title": "ferosse.tech",
+      "status": "error",
+      "created": "2026-10-21T06:03:35",
+      "queue_pos": null,
+      "total": 1,
+      "done_entries": 0,
+      "artifacts": null,
+      "usage": {
+        "gpu_s": 0.038,
+        "llm_in_tok": 0,
+        "llm_out_tok": 0
+      },
+      "cost_usd": 0.0,
+      "cost_pricing": null,
+      "diagnostic": {
+        "stage": "note",
+        "message": "模型渠道拒绝访问，请检查渠道是否启用及账号权限。（HTTP 403）"
+      }
+    }
+  ],
+  "active_runs": [],
+  "source_sha256": {
+    "api.py": "ad062f1928146856fb0739d8be570fa7a9123fe1eb77c7c4fe74bee53acfe360",
+    "graph.py": "dbac35ada94f314a57b5e355cdcd81d64e1b5dcb725f08479a6d444c95caf489",
+    "llm.py": "4825610b0cac0f54b5315ebdb98bb3ad7b6cd03756a790fb0991d3d547504a87",
+    "bilibili.py": "52e3b2924ea1a102b69d38ae0b2eae7d540e164cdc76d1a8d8124f44e341ff3c",
+    "download.py": "8b8457125b84600bf555dbf15429206187d1538f60320be7afa6a524c8e19956",
+    "runs.py": "d43f578562d67e685ad729f3424bb01b475f586cb612df24c5d8e67603fc2edc",
+    "transcribe.py": "0d7595bb9b8ba4b439b9e682b4cd24e18d295d8ba6667da76f7bc2c8ddeda48a"
+  },
+  "new_task_runtime": {
+    "run_id": "dd586072",
+    "status": "error",
+    "partial_failures": {
+      "ocr": [
+        "1",
+        "2"
+      ]
+    },
+    "entries": [
+      {
+        "url": "https://www.bilibili.com/video/BV1LV411r77C/?p=1",
+        "transcript_chars": 488,
+        "note_exists": false,
+        "clips_count": 0
+      },
+      {
+        "url": "https://www.bilibili.com/video/BV1LV411r77C/?p=2",
+        "transcript_chars": 376,
+        "note_exists": false,
+        "clips_count": 0
+      }
+    ],
+    "spans": [
+      {
+        "event": "entry 1/2 download",
+        "status": "completed",
+        "durationMs": 400
+      },
+      {
+        "event": "entry 2/2 download",
+        "status": "completed",
+        "durationMs": 1425
+      },
+      {
+        "event": "stage:download",
+        "status": "completed",
+        "durationMs": 1835
+      },
+      {
+        "event": "entry 1/2 transcribe",
+        "status": "failed",
+        "durationMs": 902384
+      },
+      {
+        "event": "entry 2/2 transcribe",
+        "status": "failed",
+        "durationMs": 662923
+      },
+      {
+        "event": "stage:transcribe",
+        "status": "exited",
+        "durationMs": 1565321
+      },
+      {
+        "event": "entry 1/2 download",
+        "status": "completed",
+        "durationMs": 361
+      },
+      {
+        "event": "entry 2/2 download",
+        "status": "completed",
+        "durationMs": 1394
+      },
+      {
+        "event": "stage:download",
+        "status": "completed",
+        "durationMs": 1766
+      },
+      {
+        "event": "entry 1/2 transcribe",
+        "status": "completed",
+        "durationMs": 116955
+      },
+      {
+        "event": "entry 2/2 transcribe",
+        "status": "completed",
+        "durationMs": 109498
+      },
+      {
+        "event": "stage:transcribe",
+        "status": "completed",
+        "durationMs": 226465
+      },
+      {
+        "event": "entry 1/2 frames",
+        "status": "completed",
+        "durationMs": 2950
+      },
+      {
+        "event": "entry 2/2 frames",
+        "status": "completed",
+        "durationMs": 2137
+      },
+      {
+        "event": "stage:frames",
+        "status": "completed",
+        "durationMs": 5103
+      },
+      {
+        "event": "entry 1/2 ocr",
+        "status": "failed",
+        "durationMs": 78350
+      },
+      {
+        "event": "entry 2/2 ocr",
+        "status": "failed",
+        "durationMs": 83692
+      },
+      {
+        "event": "stage:ocr",
+        "status": "exited",
+        "durationMs": 162060
+      }
+    ],
+    "llm_span_count": 0,
+    "error_categories": [
+      "colab_quota_cooldown"
+    ]
+  }
+}

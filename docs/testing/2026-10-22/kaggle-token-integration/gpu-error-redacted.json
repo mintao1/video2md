@@ -1,0 +1,6 @@
+{
+  "job_id": "a33e1c2dec82",
+  "status": "error",
+  "provider": "",
+  "error_redacted": "[clips] 所有 provider 均不可用 → kaggle: Kaggle 剪辑内核报错: [Errno 2] No such file or directory: '/kaggle/input/gpu-router-io | modal(跳过: 已禁用（配置或手动开关）) | colab(跳过: 冷却中（剩 74962s: quota: colab new -s 失败: [colab] Creating session 'v2md-whisp）) | zerogpu(跳过: 无 clips 能力) | aliyun(跳过: 已禁用（配置或手动开关）) | local-cpu(跳过: 无 clips 能力) | modal-yue(跳过: 无 clips 能力) | autodl-yue(跳过: 无 clips 能力) | sam3-node(跳过: 无 clips 能力)"
+}

@@ -1,0 +1,28 @@
+{
+  "verdict": "FAIL",
+  "run_id": "3c05faf8",
+  "source": "https://www.bilibili.com/video/BV1LV411r77C/",
+  "selected_parts": [
+    1,
+    2
+  ],
+  "status": "partial",
+  "new_notes": 0,
+  "new_books": 0,
+  "recorded_cost_usd": 0.013502,
+  "recorded_usage": {
+    "gpu_s": 1460.57,
+    "llm_in_tok": 19169,
+    "llm_out_tok": 23495,
+    "llm_cached_in_tok": 9344
+  },
+  "cost_formula_matches": true,
+  "monthly_delta_matches": true,
+  "retry_usage_repro": "FAIL (confirmed lost usage)",
+  "oauth_initial_and_final": "PASS",
+  "oauth_intermediate_exchange_failures": 2,
+  "production_llm_matches_repro": true,
+  "active_user_tasks": 0,
+  "app_source_modified_in_this_turn": false,
+  "production_configuration_modified_in_this_turn": false
+}

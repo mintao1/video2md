@@ -9,6 +9,9 @@ import { fileURLToPath } from 'node:url'
 import { setTimeout as delay } from 'node:timers/promises'
 import { createPinia, setActivePinia } from 'pinia'
 import { createServer } from 'vite'
+import vue from '@vitejs/plugin-vue'
+import { createSSRApp } from 'vue'
+import { renderToString } from '@vue/server-renderer'
 
 const webRoot = fileURLToPath(new URL('..', import.meta.url))
 const repoRoot = resolve(webRoot, '../..')
@@ -75,7 +78,7 @@ before(async () => {
   // Vite performs the same TS/import.meta.env transformations as the application.
   // The store, API facade, live adapters, Pinia and HTTP client are all real modules.
   vite = await createServer({
-    root: webRoot, configFile: false, server: { middlewareMode: true },
+    root: webRoot, configFile: false, plugins: [vue()], server: { middlewareMode: true },
     define: { 'import.meta.env.VITE_API_BASE_URL': JSON.stringify(baseUrl) },
   })
   api = await vite.ssrLoadModule('/src/api/index.ts')
@@ -251,6 +254,24 @@ it('fetches referenced media as an authenticated binary response', async () => {
   await assert.rejects(() => api.getMedia('finished', 'demo.png'), { code: 403 })
 })
 
+it('the actual getMedia adapter uses authenticated ranges through FastAPI for MP4', async () => {
+  assert.equal((await http('/__tests/seed-range-media', { method: 'POST' })).status, 200)
+  const blob = await api.getMedia('finished', 'range-demo.mp4')
+  assert.equal(blob.type, 'video/mp4')
+  assert.deepEqual(new Uint8Array(await blob.arrayBuffer()),
+    Uint8Array.from({ length: 150000 }, (_, i) => i % 251))
+  const auditResponse = await http('/__tests/range-audit', { method: 'POST' })
+  assert.equal(auditResponse.status, 200)
+  const audit = (await auditResponse.json()).requests
+  assert.deepEqual(audit.map(row => row.range), ['bytes=0-65535', 'bytes=65536-131071', 'bytes=131072-196607'])
+  assert.ok(audit.every(row => row.authenticated && row.status === 206))
+  assert.ok(audit.slice(1).every(row => row.if_range === audit[1].if_range && row.if_range))
+  storage.set('v2md_token', 'integration-bob')
+  await assert.rejects(() => api.getMedia('finished', 'range-demo.mp4'), { code: 403 })
+  const denied = (await (await http('/__tests/range-audit', { method: 'POST' })).json()).requests.at(-1)
+  assert.equal(denied.status, 403)
+})
+
 it('reports unavailable bundles instead of a fake successful download', async () => {
   await assert.rejects(() => api.downloadBundle('finished'), { code: 409 })
 })
@@ -278,3 +299,118 @@ it('persists private LLM settings through the live API without returning or cach
     await api.clearLlmSettings()
   }
 })
+
+
+it('preserves real run usage and redacted failure diagnostics through HTTP, adapter and rendered card', async () => {
+  assert.equal((await http('/__tests/model-failure', { method: 'POST' })).status, 200)
+  const run = (await api.listRuns()).find((r) => r.run_id === 'finished')
+  assert.equal(run.usage.gpu_s, 204.669)
+  assert.equal(run.cost_usd, 0)
+  assert.equal(run.diagnostic.stage, 'note')
+  assert.match(run.diagnostic.message, /403/)
+  assert.doesNotMatch(JSON.stringify(run), /sk-private|upstream-secret/)
+  const Component = (await vite.ssrLoadModule('/src/components/queue/TaskCard.vue')).default
+  const app = createSSRApp(Component, { run })
+  app.use(createPinia())
+  const html = await renderToString(app)
+  assert.match(html, /任务编号：finished/)
+  assert.match(html, /失败阶段：note/)
+  assert.match(html, /204.669/)
+  assert.match(html, /403/)
+})
+
+it('loads actual monthly billing details and renders per-run usage instead of an inert placeholder', async () => {
+  const report = await api.getCost()
+  assert.deepEqual(report.runs.map((r) => r.run_id), ['finished'])
+  assert.equal(report.runs[0].usage.llm_in_tok, 1000)
+  assert.equal(report.spend_usd, 0.00028)
+  const Component = (await vite.ssrLoadModule('/src/components/profile/BillingPanel.vue')).default
+  const html = await renderToString(createSSRApp(Component, { report }))
+  assert.match(html, /费用明细/)
+  assert.match(html, /任务编号：finished/)
+  assert.match(html, /1000 tokens/)
+  assert.match(html, /180.000 秒/)
+  assert.match(html, /\$0.000280/)
+  storage.set('v2md_token', 'integration-bob')
+  assert.deepEqual((await api.getCost()).runs, [])
+})
+
+it('keeps a billed partial run without a note out of the library and disables reading', async () => {
+  await http('/__tests/quality-partial', { method: 'POST' })
+  const run = (await api.listRuns()).find((r) => r.run_id === 'finished')
+  assert.equal(run.readable, false)
+  assert.match(run.diagnostic.message, /过短/)
+  assert.deepEqual(await api.getBooks(), [])
+  const store = useQueueStore()
+  await store.load()
+  assert.equal(store.counts.done, 0)
+  assert.equal(store.counts.error, 1)
+  const Component = (await vite.ssrLoadModule('/src/components/queue/TaskCard.vue')).default
+  const app = createSSRApp(Component, { run })
+  app.use(createPinia())
+  const html = await renderToString(app)
+  assert.doesNotMatch(html, /立即阅读/)
+  assert.match(html, /尚未生成可读教材/)
+  assert.match(html, /过短/)
+})
+
+it('reuses a queued submission without duplicating the frontend row', async () => {
+  const store = useQueueStore()
+  await store.load()
+  const before = store.runs.length
+  await store.createRun('https://example.test/queued')
+  await store.createRun('https://example.test/queued')
+  assert.equal(store.runs.length, before)
+  assert.equal(store.runs.filter((r) => r.run_id === 'queued').length, 1)
+})
+
+it('renders API rejection persistently inside the still-open import sheet', async () => {
+  const Component = (await vite.ssrLoadModule('/src/components/queue/ImportModal.vue')).default
+  const context = {}
+  await renderToString(createSSRApp(Component, { modelValue: true, error: '提交失败：本地路径输入已被禁用' }), context)
+  assert.match(context.teleports.body, /role="alert"[^>]*>提交失败：本地路径输入已被禁用/)
+  assert.match(context.teleports.body, /添加新的网课转换/)
+})
+
+for (const code of [422, 429]) {
+  it(`preserves tasks and billing on an actual HTTP ${code} rejection and renders its message`, async () => {
+    const store = useQueueStore()
+    await store.load()
+    const beforeRows = JSON.stringify(store.runs)
+    const beforeCost = await api.getCost()
+    const url = code === 422 ? '/not-an-approved-upload.mp4' : 'https://example.test/budget-rejected'
+    if (code === 429) {
+      assert.equal((await http('/__tests/budget', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled: true }),
+      })).status, 200)
+    }
+    try {
+      let failure
+      await assert.rejects(() => store.createRun(url), (error) => {
+        failure = error
+        return error.name === 'ApiRequestError' && error.code === code
+      })
+      assert.match(failure.message, code === 422 ? /本地路径输入已被禁用/ : /本月预算已用尽/)
+      assert.equal(JSON.stringify(store.runs), beforeRows)
+      await store.load()
+      assert.equal(JSON.stringify(store.runs), beforeRows)
+      const afterCost = await api.getCost()
+      assert.deepEqual(afterCost.usage, beforeCost.usage)
+      assert.deepEqual(afterCost.runs, beforeCost.runs)
+      assert.equal(afterCost.spend_usd, beforeCost.spend_usd)
+      const Component = (await vite.ssrLoadModule('/src/components/queue/ImportModal.vue')).default
+      const context = {}
+      await renderToString(createSSRApp(Component, { modelValue: true, error: failure.message }), context)
+      assert.match(context.teleports.body, /role="alert"/)
+      assert.ok(context.teleports.body.includes(failure.message))
+      assert.match(context.teleports.body, /添加新的网课转换/)
+    } finally {
+      if (code === 429) {
+        await http('/__tests/budget', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled: false }),
+        })
+        assert.equal((await api.getCost()).budget_usd, beforeCost.budget_usd)
+      }
+    }
+  })
+}

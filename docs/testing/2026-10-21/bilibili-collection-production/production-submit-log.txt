@@ -1,0 +1,2 @@
+[req] POST /runs → 400 user=<current-test-user> url=https://www.bilibili.com/video/BV1vV411k7GB/ error=链接解析失败（已重试 3 次）：ERROR: [BiliBili] 1vV411k7GB: Unable to down
+[req] POST /runs → 400 user=<current-test-user> url=https://www.bilibili.com/video/BV1MS4y117Bv/ error=链接解析失败（已重试 3 次）：ERROR: [BiliBili] 1MS4y117Bv: Unable to down

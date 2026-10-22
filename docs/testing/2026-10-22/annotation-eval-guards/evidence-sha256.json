@@ -1,0 +1,20 @@
+{
+  "../gpu-router/backend/tests/test_kaggle_review_state.py": "4badb10147b1750d925f9fe8434a2fc13330a6e4fffafab7668887bb1d6cc671",
+  ".github/workflows/ci.yml": "3c0d743d2d91552b196a4539b9971df5a975bec4802779e95863621a58848564",
+  "backend/tests/test_resolution_annotations.py": "dd6d367807ead382ad64543c46dba515d3618ac43fe639b89fb7dccbf86b00ea",
+  "backend/tests/test_resolution_operations.py": "eced8324ad180769f1d1d6b85d81954d8c63315423cf10d0470a80c677ab716b",
+  "docs/evals/README.md": "f1aaa5f386e5bb35185e75dcb3d783de921438c69ca916080842fc8c828c5465",
+  "docs/evals/production-resolution-annotations.jsonl": "368adea7c23a9dd7003dc786e8a65f4d9c6bb977ed06b56a7b7aa032a4a8fe07",
+  "docs/testing/2026-10-22/annotation-eval-guards/annotation-coverage.json": "6e6962b4d4b3ce0a713a4f18da8750b41aaa36af43dbbecf146047488dc76124",
+  "docs/testing/2026-10-22/annotation-eval-guards/gpu-inputs.txt": "d03e53804d4f050d8399ce9dd6b2e8c03b2264ca9957ff70e34e7954a2e935c3",
+  "docs/testing/2026-10-22/annotation-eval-guards/gpu-lifecycle.txt": "85a23339fe2eff550763c89fd568e9ce1cfd2a3bd21ca0996a86edcbb306d336",
+  "docs/testing/2026-10-22/annotation-eval-guards/green.txt": "9b272ac186b5c2d9d6189d2489dddfb6a4dd2bfb08bc9c1d8d6ff07b46669a08",
+  "docs/testing/2026-10-22/annotation-eval-guards/lint.txt": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18",
+  "docs/testing/2026-10-22/annotation-eval-guards/malformed-red.txt": "e6289c9cc0268a1e0a64043313ea042bfdc4142a17296076635e5baf96829815",
+  "docs/testing/2026-10-22/annotation-eval-guards/privacy-scan.json": "ba4c435366a8fe2a1cfe5cbff2f69ec2a38ccbb03f69926c4709035ef271239b",
+  "docs/testing/2026-10-22/annotation-eval-guards/red.txt": "37c4ae8fa2a2866b50056ac02e58eabb344c98ec1ae4adfae2a0df6ceddd0c94",
+  "docs/testing/2026-10-22/annotation-eval-guards/regression.txt": "23c23db3bd7038e3e209e6ea0a2ffe3f9fdc0b2af37098700e50ade818116e22",
+  "docs/testing/2026-10-22/annotation-eval-guards/replay.txt": "abb4b6b51611b3798ea8a4d59e9035a658676691f76dbdce3ab0a9af3656fbb1",
+  "docs/testing/2026-10-22/annotation-eval-guards/strict.txt": "a6fb70caef4b556fb321fce4828eb8de6edbce70479ec0fe2bfad65df43efd36",
+  "scripts/check_resolution_annotations.py": "ce587f23f6ad798c5529d2ca053596974c6a9a1192441a7218079888d0e1df93"
+}

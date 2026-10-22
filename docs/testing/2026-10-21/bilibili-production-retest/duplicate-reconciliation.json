@@ -1,0 +1,11 @@
+{
+  "reused_run_id": "be188f78",
+  "identical_cost_response": true,
+  "deltas": {
+    "spend_usd": 0.0,
+    "llm_in_tok": 0,
+    "llm_out_tok": 0,
+    "gpu_s": 0.0,
+    "runs_n": 0
+  }
+}

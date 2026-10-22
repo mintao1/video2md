@@ -1,0 +1,114 @@
+[
+  {
+    "run_id": "3c05faf8",
+    "status": "partial",
+    "usage": {
+      "gpu_s": 1460.57,
+      "llm_in_tok": 19169,
+      "llm_out_tok": 23495,
+      "llm_cached_in_tok": 9344
+    },
+    "cost_usd": 0.013502,
+    "spans": [
+      {
+        "event": "llm:organize",
+        "status": "completed",
+        "durationMs": 38636,
+        "attempts": 1,
+        "usage": {
+          "total_tokens": 7174,
+          "prompt_tokens": 1540,
+          "completion_tokens": 5634,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cached_tokens": 0
+          },
+          "completion_tokens_details": {
+            "audio_tokens": null,
+            "reasoning_tokens": 4861,
+            "accepted_prediction_tokens": null,
+            "rejected_prediction_tokens": null
+          }
+        },
+        "model": "glm-5.3-flash"
+      },
+      {
+        "event": "llm:metadata",
+        "status": "completed",
+        "durationMs": 4230,
+        "attempts": 1,
+        "usage": {
+          "total_tokens": 1210,
+          "prompt_tokens": 875,
+          "completion_tokens": 335,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cached_tokens": 0
+          },
+          "completion_tokens_details": {
+            "audio_tokens": null,
+            "reasoning_tokens": 245,
+            "accepted_prediction_tokens": null,
+            "rejected_prediction_tokens": null
+          }
+        },
+        "model": "glm-5.3-flash"
+      },
+      {
+        "event": "llm:organize",
+        "status": "completed",
+        "durationMs": 86309,
+        "attempts": 1,
+        "usage": {
+          "total_tokens": 19125,
+          "prompt_tokens": 5944,
+          "completion_tokens": 13181,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cached_tokens": 0
+          },
+          "completion_tokens_details": {
+            "audio_tokens": null,
+            "reasoning_tokens": 11823,
+            "accepted_prediction_tokens": null,
+            "rejected_prediction_tokens": null
+          }
+        },
+        "model": "glm-5.3-flash"
+      },
+      {
+        "event": "llm:metadata",
+        "status": "completed",
+        "durationMs": 5719,
+        "attempts": 1,
+        "usage": {
+          "total_tokens": 1877,
+          "prompt_tokens": 1463,
+          "completion_tokens": 414,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cached_tokens": 0
+          },
+          "completion_tokens_details": {
+            "audio_tokens": null,
+            "reasoning_tokens": 336,
+            "accepted_prediction_tokens": null,
+            "rejected_prediction_tokens": null
+          }
+        },
+        "model": "glm-5.3-flash"
+      }
+    ]
+  },
+  {
+    "run_id": "f1fff0b8",
+    "status": "error",
+    "usage": {
+      "gpu_s": 0.089,
+      "llm_in_tok": 0,
+      "llm_out_tok": 0
+    },
+    "cost_usd": 0.0,
+    "spans": []
+  }
+]

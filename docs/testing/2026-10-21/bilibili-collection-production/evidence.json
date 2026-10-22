@@ -1,0 +1,170 @@
+{
+  "date": "2026-10-21",
+  "timezone": "Asia/Shanghai",
+  "site": "https://ferosse.tech",
+  "status": "FAIL_bilibili_resolution_model_billing_BLOCKED",
+  "scope": "从退出并重新登录开始，在前端显式输入真实 Bilibili 合集链接，验收模型调用、用量、成本归因及教材",
+  "observations": {
+    "initial_authenticated_library_visible": true,
+    "initial_book_count": 1,
+    "logout_observed": true,
+    "login_page_visible": true,
+    "unchecked_terms_login_rejected": true,
+    "validation_message": "请先阅读并同意《用户服务协议》与《隐私保护政策》",
+    "terms_page_read": true,
+    "terms_update_date": "2026-10-21",
+    "terms_accepted": true,
+    "oauth_completed": true,
+    "bilibili_url_entered": true,
+    "new_conversion_submitted": true,
+    "run_id": null,
+    "new_model_usage": {
+      "llm_in_tok": 0,
+      "llm_out_tok": 0,
+      "gpu_s": 0
+    },
+    "new_cost_usd": 0,
+    "terms_confirmation_source": "用户在本会话明确确认勾选并继续登录",
+    "oauth_automatic_return_to_library": true,
+    "submission_attempt_count": 2,
+    "new_run_created": false,
+    "new_task_count": 0,
+    "final_book_count": 1
+  },
+  "evidence_files": [
+    "login-consent-required.png",
+    "terms.png",
+    "profile-before.txt",
+    "billing-before.txt",
+    "collection-url-entered.png",
+    "first-submission-failed.txt",
+    "first-submission-failed.png",
+    "second-collection-url-entered.png",
+    "second-submission-failed.txt",
+    "second-submission-failed.png",
+    "billing-after.txt",
+    "production-submit-log.txt",
+    "same-route-import-not-open.png"
+  ],
+  "limits": [
+    "本轮未更改生产配置、代理、密钥或部署。",
+    "历史成功教材与费用仅作为前测基线，不作为本轮成功证据。",
+    "零增量是失败提交的账本观测，不表示模型计费主链通过。",
+    "容器初次辅助探测因无 curl 未执行成功；改用现有 httpx 后复现 TLS EOF。",
+    "本地 33 项集成测试与构建不替代生产 B站验收。"
+  ],
+  "test_window_local": "2026-10-21 15:03–15:12 Asia/Shanghai",
+  "submissions": [
+    {
+      "url": "https://www.bilibili.com/video/BV1vV411k7GB/",
+      "title": "布衣公子《一分钟PPT技能》免费视频教程",
+      "source_observed_part_count": 100,
+      "entered_via": "可见生产任务页输入框",
+      "submitted_via": "开始解析按钮",
+      "submitted_at_utc": "2026-10-21T07:06:25.031Z",
+      "http_status": 400,
+      "resolver_attempts_reported": 3,
+      "error_category": "TLS_UNEXPECTED_EOF_WHILE_READING",
+      "run_id": null
+    },
+    {
+      "url": "https://www.bilibili.com/video/BV1MS4y117Bv/",
+      "title": "【机器学习基础】油管3Blue1Brown 深度学习 视频合集",
+      "source_observed_part_count": 8,
+      "entered_via": "可见生产任务页输入框",
+      "submitted_via": "开始解析按钮",
+      "http_status": 400,
+      "resolver_attempts_reported": 3,
+      "error_category": "TLS_UNEXPECTED_EOF_WHILE_READING",
+      "run_id": null
+    }
+  ],
+  "billing_before": {
+    "runs_n": 6,
+    "llm_in_tok": 8545,
+    "llm_out_tok": 15609,
+    "gpu_s": 1780.114,
+    "spend_usd": 0.009086,
+    "books_n": 1
+  },
+  "billing_after": {
+    "runs_n": 6,
+    "llm_in_tok": 8545,
+    "llm_out_tok": 15609,
+    "gpu_s": 1780.114,
+    "spend_usd": 0.009086,
+    "books_n": 1
+  },
+  "billing_text_identical": true,
+  "pricing": {
+    "currency": "USD",
+    "llm_in_per_million": 0.15,
+    "llm_cached_in_per_million": 0.03,
+    "llm_out_per_million": 0.5,
+    "gpu_per_minute": 0,
+    "gpu_policy": "free",
+    "scope": "应用成本归因，非供应商最终现金账单"
+  },
+  "supplemental_checks": {
+    "production_submit_logs": "两次 POST /runs 均 HTTP 400",
+    "container_probe": {
+      "same_effective_resolver_proxy": true,
+      "status": "ConnectError",
+      "error": "[SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1010)",
+      "duration_s": 5.109,
+      "tls_verification_disabled": false
+    },
+    "configuration_observed": {
+      "V2MD_PROXY_DOMESTIC": "1",
+      "V2MD_PROXY_present": false,
+      "effective_HTTPS_PROXY_present": true
+    },
+    "api_health": {
+      "internal_status": 200,
+      "public_status": 200,
+      "version": "0.2.0"
+    },
+    "anonymous_http": {
+      "/me": 401,
+      "/runs": 401,
+      "/cost": 401,
+      "/docs": 403
+    },
+    "frontend_integration_tests": {
+      "passed": 33,
+      "failed": 0
+    },
+    "frontend_production_build": "PASS"
+  },
+  "ui_checks": {
+    "terms_unchecked_validation": "PASS",
+    "logout_and_google_login": "PASS",
+    "explicit_real_collection_urls": "PASS",
+    "failed_submission_preserves_url_and_error": "PASS",
+    "no_false_success_or_extra_run": "PASS",
+    "billing_details_load": "PASS",
+    "same_route_bottom_new_conversion": "未观察到导入面板；直接点击更多导入方式可打开",
+    "more_import_button": "PASS"
+  },
+  "findings": [
+    {
+      "priority": "P1",
+      "title": "B站合集解析生产主链失败",
+      "evidence": "两条不同真实合集均 HTTP 400 / TLS EOF，容器内相同解析器代理环境复现。",
+      "impact": "无 run、转写、模型调用或新教材，无法验收本轮模型计费。",
+      "root_cause_limit": "已定位到视频解析器出网路径；未证明最终根因是代理服务、出口、源站策略或具体 TLS 组件。"
+    },
+    {
+      "priority": "P2",
+      "title": "解析等待缺少明显进度反馈",
+      "evidence": "首条提交约 95 秒后观察到终态错误，等待期间开始解析按钮保持原文案，界面无解析中状态。",
+      "impact": "用户难以判断是否已提交。"
+    }
+  ],
+  "not_tested": [
+    "B站真实任务的下载、ASR、OCR、模型生成、教材阅读及新任务计费结算（解析阻塞）",
+    "B站成功任务重复提交的计费幂等（无新 run）",
+    "供应商最终账单",
+    "全量合集处理（当前前端源码限制前两个条目）"
+  ]
+}

@@ -1,0 +1,12 @@
+    ⚠ 条目异常：远程 OCR 失败 HTTP 502: {"detail":{"error":"[ocr] 所有 provider 均不可用 → colab: Colab 会话已消失（被回收或被其他进程关闭），请重试 | kaggle: Kaggle 凭证缺失：~/.kaggle/kaggle.json 或 KAGGLE_USERNAME/KEY | modal(跳过: 已禁用（配置或手动开关）) | aliyun(跳过: 已禁用（配置或手动开关）) | zerogpu(跳过: 无 ocr 能力) | local-cpu(跳过: 无 ocr 能力) | modal-yue(跳过: 无 ocr 能力) | autodl-yue(跳过: 无 ocr 能
+    · 条目 2/2：ocr
+  ☁️ 远端 GPU OCR → 127.0.0.1:9700（57 帧一批）
+  ✅ 远端 OCR 完成（provider=colab）
+    🔍 OCR 命中 51/57 · 时间线 7918 字符
+PARTIAL-FAIL ocr 条目 1
+  ⚠ LLM select_frames 第 1 次调用失败（空回包（HTTP 200 但零内容）），30s 后重试
+  ⚠ LLM select_frames 第 2 次调用失败（空回包（HTTP 200 但零内容）），30s 后重试
+  🧠 LLM 选帧 8 帧
+    · 条目 1/2：select
+    · 条目 2/2：select
+    · 条目 1/2：clips

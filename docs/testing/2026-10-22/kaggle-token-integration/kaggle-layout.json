@@ -1,0 +1,10 @@
+{
+  "kernel_status": "done",
+  "elapsed_s": 29.18,
+  "llm_calls": 0,
+  "input_files": [
+    "/kaggle/input/datasets/<account>/gpu-router-io/clip-src.mp4",
+    "/kaggle/input/datasets/<account>/gpu-router-io/clip_job.json"
+  ],
+  "gpu_probe_error": "FileNotFoundError"
+}

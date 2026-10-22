@@ -1,0 +1,99 @@
+Browser tab: 1, Title: "视书 · Textbook Library", URL: "https://ferosse.tech/profile".
+1 AXWebArea 视书 · Textbook Library, URL: ferosse.tech/profile
+	2 container app
+		3 container
+			4 text M verified Mintao Lin workspace_premium 免费版 ID: a550fcca296f
+			5 button 编辑资料
+			6 text 4 已生成教材 0 提取知识点 0 % 公式精准度
+			7 link Description: Colab 授权 连接 Google 账号，启用云端转写与剪辑, Value: ferosse.tech/profile/colab
+			8 text 算力与云存储用量
+			9 button 明细流水 chevron_right
+				10 text 明细流水
+				11 text chevron_right
+			12 text timelapse AI 转换时长 剩余 — 0 / 0 小时 重置周期：次月 1 日 cloud_done 教材库空间 已用 — 0 / 0 GB 云端高清 PDF & Markdown
+			64 container 费用明细
+				65 heading 费用明细, Value: 2
+					66 text 费用明细
+				67 text 本月成本归因 $0.067605 · 13 个任务
+				68 text 免费 GPU：费用 $0，保留实际用量。 用量成本归因以服务商最终账单为准。
+				69 text 当前单价（USD）：输入 0.15/百万 tokens，缓存输入 0.03/百万 tokens，输出 0.5/百万 tokens，GPU 0/分钟。
+				70 text 月度合计：输入 221558 tokens，输出 73231 tokens，GPU 8171.942 秒。
+				71 container
+					72 text 深度学习之神经网络的结构 · running 任务编号：8c5d87f3 用量尚未结算 费用 待结算
+				73 container
+					74 text PPT 2019 教程开篇：五大章节课程结构总览 · done 任务编号：628f38fc 输入 122193 tokens（缓存 0），输出 6707 tokens，GPU 1105.960 秒。 费用 $0.021682
+				75 container
+					76 text 宿舍之麦麦和小海蛎第一次见面 · error 任务编号：1d13e1c9 用量尚未结算 费用 待结算
+				77 container
+					78 text 用一张图片改造纯文本PPT排版 · done 任务编号：dd586072 输入 37018 tokens（缓存 0），输出 3579 tokens，GPU 2548.759 秒。 费用 $0.007342
+				79 container
+					80 text 如何用一张图片改变枯燥的纯文本排版？ · error 任务编号：f1fff0b8 输入 0 tokens（缓存 0），输出 0 tokens，GPU 0.089 秒。 费用 $0.000000
+				81 container
+					82 text 如何用一张图片改变枯燥的纯文本排版？ · partial 任务编号：3c05faf8 输入 37863 tokens（缓存 18688），输出 31495 tokens，GPU 1460.570 秒。 费用 $0.019184
+				83 container
+					84 text 学PPT该学哪些技能：会做巧做好用漂亮 · done 任务编号：be188f78 输入 15939 tokens（缓存 0），输出 15841 tokens，GPU 1276.450 秒。 费用 $0.010311
+				85 container
+					86 text 数据库索引原理与查询优化 · done 任务编号：4df77d9c 输入 6498 tokens（缓存 0），输出 6919 tokens，GPU 809.120 秒。 费用 $0.004434
+				87 container
+					88 text ferosse.tech · partial 任务编号：edfa1b1a 输入 2047 tokens（缓存 0），输出 8690 tokens，GPU 331.228 秒。 费用 $0.004652
+				89 container
+					90 text ferosse.tech · error 任务编号：312e97ae 输入 0 tokens（缓存 0），输出 0 tokens，GPU 204.669 秒。 费用 $0.000000  · 历史记录未保存结算单价
+				91 container
+					92 text ferosse.tech · error 任务编号：56835fed 输入 0 tokens（缓存 0），输出 0 tokens，GPU 183.082 秒。 费用 $0.000000  · 历史记录未保存结算单价
+				93 container
+					94 text ferosse.tech · error 任务编号：aef9643a 输入 0 tokens（缓存 0），输出 0 tokens，GPU 251.977 秒。 费用 $0.000000  · 历史记录未保存结算单价
+				95 container
+					96 text ferosse.tech · error 任务编号：9ad9ee9d 输入 0 tokens（缓存 0），输出 0 tokens，GPU 0.038 秒。 费用 $0.000000  · 历史记录未保存结算单价
+			13 text auto_awesome SVIP 旗舰学术特权 旗舰版 享 4K 超清板书提纯 & 独立专属 GPU 队列
+			14 button 立即升级
+			15 container LLM API 配置
+				16 heading LLM API 配置, Value: 2, ID: llm-settings-title
+					17 text LLM API 配置
+				18 container
+					19 text 自定义 AI 服务 已保存个人配置 填写 OpenAI 兼容接口，仅用于你的转换任务。保存配置不会验证上游余额或可用性。
+					20 text API URL
+					21 text field (settable) API URL, Value: https://opencode.ai/inference/go/openai/v1, ID: llm-api-url
+					22 text 填写 Base URL（通常以 /v1 结尾），后端会追加 /chat/completions。
+					23 text API Key
+					24 text field (settable) API Key
+					25 checkbox Description: 显示 API Key, Value: 0
+					26 text Key 保存在服务端，读取配置时不回传，不存入浏览器本地存储。
+					27 text 模型名称（可选）
+					28 text field (settable) 模型名称（可选）, Value: glm-5.3-flash, ID: llm-model
+					29 button 保存 LLM 配置
+					30 button 恢复服务默认
+			31 text 转书排版与 AI 引擎配置
+			32 button auto_stories 默认教材排版模板 学术专著风格 · 自动目录与摘要 学术专著 chevron_right
+				33 text auto_stories
+				34 text 默认教材排版模板
+				35 text 学术专著风格 · 自动目录与摘要
+				36 text 学术专著
+				37 text chevron_right
+			38 button ios_share 默认导出格式与备份 PDF 打印版 / EPUB / Markdown 原始包 PDF + MD chevron_right
+				39 text ios_share
+				40 text 默认导出格式与备份
+				41 text PDF 打印版 / EPUB / Markdown 原始包
+				42 text PDF + MD
+				43 text chevron_right
+			44 text sync_saved_locally 生成完成后自动同步 Notion 推送到《我的视频教材知识库》页面
+			45 switch 1
+			46 text 支持与系统信息
+			47 button help_outline 常见问题解答与工单反馈 遇到排队超时或公式解析错误？ chevron_right
+				48 text help_outline
+				49 text 常见问题解答与工单反馈
+				50 text 遇到排队超时或公式解析错误？
+				51 text chevron_right
+			52 button info 关于视书 新特性与版本更新说明 v0.1.0 chevron_right
+				53 text info
+				54 text 关于视书
+				55 text 新特性与版本更新说明
+				56 text v0.1.0
+				57 text chevron_right
+			58 button 退出登录
+		59 container
+			60 link Description: motion_photos_on 1 排队处理, Value: ferosse.tech/tasks
+			61 link Description: local_library 教材库, Value: ferosse.tech/library
+			62 link Description: add 新建转换, Value: ferosse.tech/tasks?openImport=1
+			63 link Description: person 我的, Value: ferosse.tech/profile
+
+The focused UI element is 9 button 明细流水 chevron_right

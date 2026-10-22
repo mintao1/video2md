@@ -1,0 +1,108 @@
+- main:
+  - generic: M
+  - generic: verified
+  - generic: Mintao Lin
+  - generic: workspace_premium
+  - text: 免费版
+  - generic: "ID: a550fcca296f"
+  - button "编辑资料":
+    - generic: edit
+  - generic: "1"
+  - generic: 已生成教材
+  - generic: "0"
+  - generic: 提取知识点
+  - generic: 0%
+  - generic: 公式精准度
+  - link "Colab 授权 连接 Google 账号，启用云端转写与剪辑":
+    - /url: /profile/colab
+    - generic: cloud_sync
+    - generic: Colab 授权
+    - generic: 连接 Google 账号，启用云端转写与剪辑
+    - generic: chevron_right
+  - generic: 算力与云存储用量
+  - button "明细流水 chevron_right":
+    - text: 明细流水
+    - generic: chevron_right
+  - generic: timelapse
+  - text: AI 转换时长
+  - generic: 剩余 —
+  - generic: "0"
+  - generic: / 0 小时
+  - generic: 重置周期：次月 1 日
+  - generic: cloud_done
+  - text: 教材库空间
+  - generic: 已用 —
+  - generic: "0"
+  - generic: / 0 GB
+  - generic: 云端高清 PDF & Markdown
+  - generic: auto_awesome
+  - generic: SVIP 旗舰学术特权
+  - generic: 旗舰版
+  - generic: 享 4K 超清板书提纯 & 独立专属 GPU 队列
+  - button "立即升级"
+  - region "LLM API 配置":
+    - heading "LLM API 配置" [level=2]
+    - generic: 自定义 AI 服务
+    - generic: 使用服务默认配置
+    - paragraph: 填写 OpenAI 兼容接口，仅用于你的转换任务。保存配置不会验证上游余额或可用性。
+    - generic: API URL
+    - textbox "API URL":
+      - /placeholder: https://api.example.com/v1
+    - paragraph: 填写 Base URL（通常以 /v1 结尾），后端会追加 /chat/completions。
+    - generic: API Key
+    - textbox "API Key":
+      - /placeholder: 请输入 API Key
+    - button "显示 API Key": 显示
+    - paragraph: Key 保存在服务端，读取配置时不回传，不存入浏览器本地存储。
+    - generic: 模型名称（可选）
+    - textbox "模型名称（可选）":
+      - /placeholder: 留空使用服务默认模型
+    - button "保存 LLM 配置"
+    - button "恢复服务默认" [disabled]
+  - generic: 转书排版与 AI 引擎配置
+  - button "auto_stories 默认教材排版模板 学术专著风格 · 自动目录与摘要 学术专著 chevron_right":
+    - generic: auto_stories
+    - generic: 默认教材排版模板
+    - generic: 学术专著风格 · 自动目录与摘要
+    - generic: 学术专著
+    - generic: chevron_right
+  - button "ios_share 默认导出格式与备份 PDF 打印版 / EPUB / Markdown 原始包 PDF + MD chevron_right":
+    - generic: ios_share
+    - generic: 默认导出格式与备份
+    - generic: PDF 打印版 / EPUB / Markdown 原始包
+    - generic: PDF + MD
+    - generic: chevron_right
+  - generic: sync_saved_locally
+  - generic: 生成完成后自动同步 Notion
+  - generic: 推送到《我的视频教材知识库》页面
+  - switch [checked]
+  - generic: 支持与系统信息
+  - button "help_outline 常见问题解答与工单反馈 遇到排队超时或公式解析错误？ chevron_right":
+    - generic: help_outline
+    - generic: 常见问题解答与工单反馈
+    - generic: 遇到排队超时或公式解析错误？
+    - generic: chevron_right
+  - button "info 关于视书 新特性与版本更新说明 v0.1.0 chevron_right":
+    - generic: info
+    - generic: 关于视书
+    - generic: 新特性与版本更新说明
+    - generic: v0.1.0
+    - generic: chevron_right
+  - button "退出登录"
+- navigation:
+  - link "motion_photos_on 排队处理":
+    - /url: /tasks
+    - generic: motion_photos_on
+    - generic: 排队处理
+  - link "local_library 教材库":
+    - /url: /library
+    - generic: local_library
+    - generic: 教材库
+  - link "add 新建转换":
+    - /url: /tasks?openImport=1
+    - generic: add
+    - generic: 新建转换
+  - link "person 我的":
+    - /url: /profile
+    - generic: person
+    - generic: 我的

@@ -1,0 +1,24 @@
+{
+  "changed_paths": [
+    "spec.template.spec.volumes[2].secret.optional",
+    "spec.template.spec.volumes[2].secret.items[1]",
+    "spec.template.spec.volumes[2].secret.defaultMode",
+    "spec.template.spec.containers[0].image"
+  ],
+  "intended_image": "gpu-router:0.2.3-kaggle-token-20261022a",
+  "credential_projection": {
+    "defaultMode": 288,
+    "items": [
+      {
+        "key": "kaggle.json",
+        "path": "kaggle.json"
+      },
+      {
+        "key": "access_token",
+        "path": "access_token"
+      }
+    ],
+    "secretName": "gpu-router-secrets",
+    "optional": true
+  }
+}

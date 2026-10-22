@@ -1,0 +1,14 @@
+# Dedicated home egress for the production Bilibili route. No system proxy or
+# LAN listener; other destinations are rejected. TLS remains end to end.
+mixed-port: 17895
+bind-address: 127.0.0.1
+allow-lan: false
+external-controller: ''
+mode: rule
+log-level: silent
+rules:
+  - DOMAIN-SUFFIX,bilibili.com,DIRECT
+  - DOMAIN-SUFFIX,bilivideo.com,DIRECT
+  - DOMAIN-SUFFIX,bilivideo.cn,DIRECT
+  - DOMAIN-SUFFIX,hdslb.com,DIRECT
+  - MATCH,REJECT

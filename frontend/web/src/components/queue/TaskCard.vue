@@ -48,7 +48,7 @@ const statusBadge = computed(() => {
   const r = props.run
   switch (r.status) {
     case 'running':
-      return { text: '转录处理中', cls: 'bg-primary/10 text-primary' }
+      return { text: '处理中', cls: 'bg-primary/10 text-primary' }
     case 'created':
       return { text: '待处理', cls: 'bg-surface-container text-outline' }
     case 'cancelling':
@@ -60,7 +60,7 @@ const statusBadge = computed(() => {
     case 'done':
       return { text: '转换完成', cls: 'bg-surface-container text-primary' }
     case 'partial':
-      return { text: '部分完成', cls: 'bg-tertiary-fixed text-on-tertiary-fixed-variant' }
+      return { text: r.readable ? '部分完成' : '生成受阻', cls: 'bg-tertiary-fixed text-on-tertiary-fixed-variant' }
     case 'error':
       return { text: '转换失败', cls: 'bg-error-container text-on-error-container' }
     default:
@@ -151,6 +151,16 @@ function fmtEta(sec?: number): string {
       </div>
     </div>
 
+    <div class="text-label-sm text-outline break-all">任务编号：{{ run.run_id }}</div>
+    <div v-if="run.usage" class="text-body-sm text-on-surface-variant flex flex-wrap gap-space-sm">
+      <span>输入 {{ run.usage.llm_in_tok }} tokens</span>
+      <span>输出 {{ run.usage.llm_out_tok }} tokens</span>
+      <span>GPU {{ run.usage.gpu_s.toFixed(3) }} 秒</span>
+      <span>费用 {{ run.cost_usd == null ? '待结算' : `$${run.cost_usd.toFixed(6)}` }}</span>
+    </div>
+    <div v-if="run.diagnostic" role="alert" class="bg-error-container/50 rounded-lg px-space-sm py-1.5 text-body-sm text-on-error-container">
+      <span>失败阶段：{{ run.diagnostic.stage }}。</span>{{ run.diagnostic.message }}
+    </div>
     <!-- 进度条（running） -->
     <ProgressBar
       v-if="run.status === 'running' || run.status === 'cancelling'"
@@ -161,7 +171,7 @@ function fmtEta(sec?: number): string {
 
     <!-- 错误信息 -->
     <div
-      v-if="run.error && (run.status === 'error' || run.status === 'partial')"
+      v-if="!run.diagnostic && run.error && (run.status === 'error' || run.status === 'partial')"
       class="bg-error-container/50 rounded-lg px-space-sm py-1.5 font-body-sm text-body-sm text-on-error-container"
     >
       {{ run.error.message }}
@@ -216,12 +226,14 @@ function fmtEta(sec?: number): string {
 
     <div v-else-if="run.status === 'done' || run.status === 'partial'" class="flex items-center gap-space-sm pt-1">
       <button
+        v-if="run.readable"
         class="flex-1 py-2 rounded-lg bg-secondary text-on-secondary font-label-md text-label-md active:scale-95 transition-transform flex items-center justify-center gap-1 shadow-sm"
         @click="emit('read', run)"
       >
         <span class="material-symbols-outlined text-[18px]">menu_book</span>
         立即阅读
       </button>
+      <span v-else class="text-body-sm text-outline">尚未生成可读教材</span>
       <button v-if="run.status === 'partial'" class="font-label-sm text-label-sm text-primary"
         :disabled="busy" @click="action('resume')">补跑失败条目</button>
       <button

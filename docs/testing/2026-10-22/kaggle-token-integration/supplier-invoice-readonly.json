@@ -1,0 +1,14 @@
+{
+  "document_sha256": "e2d14accc09d45f4c7e5858f2deaa8eabcf89cf477e5bcdd57b0848daf6ba15f",
+  "safe_invoice_lines": [
+    "Invoice number XPIMO8IF-0003",
+    "Date of issue  October 5, 2026",
+    "Date due       October 5, 2026",
+    "CN¥67.72 due October 5, 2026",
+    "OpenCode Go renewal                                                                     1      CN¥67.72       CN¥67.72",
+    "Subtotal                                           CN¥67.72",
+    "Total                                              CN¥67.72",
+    "Amount due                                         CN¥67.72",
+    "XPIMO8IF-0003 · CN¥67.72 due October 5, 2026                                                                  Page 1 of 1"
+  ]
+}

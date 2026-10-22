@@ -1,0 +1,31 @@
+{
+  "worker_status": {
+    "state": "error",
+    "error": "[Errno 2] No such file or directory: '/kaggle/input/datasets/<account>/gpu-router-io/frames.tar'"
+  },
+  "dataset_filenames_first_page": [
+    "000-g_001.jpg",
+    "001-g_002.jpg",
+    "002-g_003.jpg",
+    "003-g_004.jpg",
+    "004-g_005.jpg",
+    "005-s_002.jpg",
+    "006-g_006.jpg",
+    "007-g_007.jpg",
+    "008-g_008.jpg",
+    "009-s_003.jpg",
+    "010-g_009.jpg",
+    "011-g_010.jpg",
+    "012-g_011.jpg",
+    "013-g_012.jpg",
+    "014-g_013.jpg",
+    "015-g_014.jpg",
+    "016-g_015.jpg",
+    "017-g_016.jpg",
+    "018-g_017.jpg",
+    "019-g_018.jpg"
+  ],
+  "more_files_exist": true,
+  "listing_is_complete": false,
+  "opaque_cursor_and_warnings_omitted": true
+}

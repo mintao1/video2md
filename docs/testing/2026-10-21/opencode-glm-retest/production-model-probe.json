@@ -1,0 +1,4 @@
+{
+  "ok": false,
+  "error": "LLM connectivity 连续 1 次失败：[SSL: WRONG_VERSION_NUMBER] wrong version number (_ssl.c:1010)"
+}

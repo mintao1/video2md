@@ -1,0 +1,133 @@
+{
+  "status": "PASS_SCOPED_WITH_RECORDED_OBSERVATIONS",
+  "date": "2026-10-21",
+  "site": "https://ferosse.tech",
+  "authorized_scope": "联调解决上一轮 B站合集解析、解析等待反馈及同路由新建入口问题，并继续真实模型计费验收",
+  "release": "video2md:0.2.0-integration-20261021m",
+  "root_cause": {
+    "video_network": "旧住宅出口指向未监听的本机7897；服务器通用17898代理的B站规则转入该失效隧道。服务器网页直连返回412。",
+    "api_fallback": "view接口曾短暂可用，随后HTTP412；公开pagelist和MP4播放接口可用，已实测下载。",
+    "download": "网页下载失败后错误被Chrome cookies数据库缺失覆盖；原路径无B站下载超时。",
+    "import_navigation": "App按$route.fullPath重建QueueView，消费openImport查询参数时销毁已打开面板。",
+    "reader_feedback": "附件原本Promise.all等待全部完成，下载中被渲染为不可用；新版逐项显示就绪媒体，并区分加载状态。实测两项请求发生200但0字节的传输中断，增加仅网络TypeError的一次只读重试。",
+    "media_transfer": "公网MP4整段传输截断；磁盘文件与FileResponse应用内输出字节数完全一致。未将故障武断归因到某一运营商或鉴权服务。"
+  },
+  "changes": [
+    "仅B站域名走新的回环住宅出口17895；媒体CDN直连，其他站规则保留。",
+    "新增公开接口分集枚举、下载时刷新媒体URL、目标域名校验和不完整MP4清理。",
+    "网页下载失败或60秒超时后使用公开MP4，B站不再尝试服务器Chrome cookies。",
+    "解析期间显示状态，禁用重复提交和输入编辑，失败保留输入与错误。",
+    "任务页按path保持实例；阅读器仍保留fullPath切章行为。",
+    "阅读媒体按项展示；切章释放blob URL并忽略旧请求；网络中断仅重试一次，不重试HTTP权限/不存在错误。",
+    "MP4按64KB携带Bearer读取HTTP Range；仅重试失败段，校验Content-Range/长度/ETag，禁止混合文件版本。"
+  ],
+  "network_services": {
+    "local_proxy": "127.0.0.1:17895",
+    "remote_ssh_listener": "127.0.0.1:17895",
+    "allowed_suffixes": [
+      "bilibili.com",
+      "bilivideo.com",
+      "bilivideo.cn",
+      "hdslb.com"
+    ],
+    "default": "REJECT",
+    "system_proxy_changed": false,
+    "tls_verification_disabled": false,
+    "launch_agents": [
+      "com.linmintao.video2md-bilibili-home",
+      "com.linmintao.video2md-bilibili-tunnel"
+    ],
+    "server_config_backup": "/etc/mihomo/config.before-bilibili-20261021.yaml",
+    "operational_limit": "住宅出口依赖本机在线；公开API降级实测支持匿名可用的单段MP4，不保证所有视频类型、清晰度或付费内容。"
+  },
+  "regressions": {
+    "backend_passed": 114,
+    "frontend_integration_passed": 42,
+    "frontend_regression_passed": 1,
+    "build": "PASS",
+    "ruff": "PASS",
+    "old_fullPath_bug_replay": "FAIL as expected",
+    "new_navigation_replay": "PASS",
+    "billing_acceptance": "PASS",
+    "release": "27文件SHA256匹配，健康200，匿名Range媒体401，pod ready、重启0"
+  },
+  "production": {
+    "url_entered_explicitly": "https://www.bilibili.com/video/BV1vV411k7GB/",
+    "run_id": "be188f78",
+    "selected_parts": [
+      1,
+      2
+    ],
+    "reused_login": "沿用本会话已明确退出并通过Google OAuth建立的真实登录态；本轮未声称另一次退出。",
+    "task_count_before": 6,
+    "task_count_after_create": 7,
+    "initial_attempt": "download失败，未进入模型；已保留pre-download-fix.json",
+    "current": "done，2/2讲生成、真实模型计费和教材阅读均完成验收。",
+    "oauth_refresh_during_run": {
+      "expired_session_detected": true,
+      "same_account_reauthenticated": true,
+      "returned_to_tasks": true,
+      "task_count_remained": 7,
+      "new_agreement_requested": false,
+      "authorization": "沿用用户在本会话明确确认的同一协议和登录授权",
+      "reauthentication_count": 2,
+      "unresolved_observation": "第二次前端判定登录过期的原因未定位，未将其声明为已修复；本轮未修改鉴权逻辑。"
+    },
+    "usage": {
+      "llm_in_tok": 15939,
+      "llm_out_tok": 15841,
+      "gpu_s": 1276.45
+    },
+    "cost_usd": 0.010311,
+    "model": "glm-5.3-flash",
+    "billing_reconciliation": "PASS；月度增量完全等于本次用量及费用，重复提交全部增量为0",
+    "library_count_after": 2,
+    "billing_checker": "PASS: production model billing pipeline is complete",
+    "successful_logged_model_calls": 4,
+    "tmp_cleaned": true,
+    "media_incremental_feedback_visible": true,
+    "reader_validation": {
+      "first_chapter": "正文、2张嵌入图片与2段剪辑已就绪，首段播放至13秒结束。",
+      "second_chapter": "最终版3图3视频全部就绪，无加载中或不可用项；首段完整播放13秒；此前失败的c08剪辑完整播放27秒。",
+      "evidence": [
+        "reader-final.json",
+        "reader-range-playback.json",
+        "reader-final.txt",
+        "reader-recovered-clip-playback.json"
+      ]
+    },
+    "duplicate_submission": "前端重复显式提交同一URL后仍7个任务，模型与GPU用量、费用增量均为0。",
+    "cost_scope": "按生产配置归因成本，非供应商现金扣款核验。"
+  },
+  "local_test_isolation_incident": "首轮导入顺序污染了此前已含测试夹具的本地开发JSON；已延迟导入并隔离临时存储。详见local-test-isolation.json。生产存储未受影响。",
+  "sources": [
+    "https://github.com/yt-dlp/yt-dlp/blob/master/yt_dlp/extractor/bilibili.py",
+    "https://wiki.metacubex.one/api/",
+    "https://google-auth.readthedocs.io/en/latest/reference/google.oauth2.id_token.html"
+  ],
+  "source_outage_fallback": {
+    "pass": true,
+    "collection_parts": 100,
+    "download_bytes": 3017797,
+    "duration_s": 1.872,
+    "production_configuration_changed": false
+  },
+  "verification_scope": "上一轮B站合集失败、提交反馈和新建入口问题；附加阅读媒体反馈修复。不宣称所有项目功能已验收或服务商现金账单已核对。",
+  "release_verification": "27个发布文件SHA256全部匹配，pod ready=true/restarts=0",
+  "finished_local": "2026-10-21T17:05:47",
+  "remaining_observations": [
+    "第二次前端判定登录过期原因未定位，未宣称鉴权问题已修复。",
+    "当前公网链路较慢；分段读取已完成本次3段视频验收，未承诺所有网络条件下的加载速度。",
+    "本地开发测试JSON曾被首轮测试误写；已隔离后续测试，无法确认恢复误写前的全部值。生产数据未受影响。"
+  ],
+  "evidence_index": [
+    "results.json",
+    "billing-evidence.json",
+    "billing-reconciliation.json",
+    "billing-final.txt",
+    "release-verification.json",
+    "reader-final.json",
+    "media-transport-diagnosis.json",
+    "local-test-isolation.json"
+  ]
+}

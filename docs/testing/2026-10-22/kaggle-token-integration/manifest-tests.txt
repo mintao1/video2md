@@ -1,0 +1,39 @@
+== 红线 §2.1：单副本铁律 ==
+  ✅ replicas == 1
+  ✅ hostNetwork + ClusterFirstWithHostNet（宿主回环服务刚需：代理/队列；NetPol 失效由 iptables 补位）
+  ✅ enableServiceLinks: false（Service 名 gpu-router 注入 GPU_ROUTER_PORT=tcp://… 与配置 env 碰撞）
+  ✅ strategy == Recreate（禁 RollingUpdate 卡 RWO PVC）
+  ✅ 无 PDB（replicas=1 的 PDB 是假保护）
+== 红线 §2.2：探针口径 ==
+  ✅ 探针三件齐备且全 tcpSocket :http（token 闸门下 /ping 恒 401——httpGet 探针不可用）
+  ✅ 终止语义（§2.2 落地）：grace=180 长任务在途余量 + preStop sleep 15
+== 阶段 1 gate：镜像 tag 化 + 安全上下文 + 资源 ==
+  ✅ 镜像禁 latest（tag 随版本推进）
+  ✅ 镜像 tag 为 semver（deploy.yml 从此处读版本，非 semver 会中途炸）
+  ✅ pod 安全上下文：runAsNonRoot + 数值 UID
+  ✅ container 安全上下文：drop ALL + 禁提权
+  ✅ 资源 requests/limits 齐备（§2.8 预算纪律）
+== 暴露面 §2.3：NodePort + 白名单 ==
+  ✅ NodePort 30766（sing-train 占 30765 无冲突）
+  ✅ NetworkPolicy：ingress 白名单含消费者 ns（sing-train/video2md）
+  ✅ 白名单端口收敛到 9700
+== 状态与配置 §2.4/§2.7 ==
+  ✅ PVC：RWO 审计卷挂载（deployment 引用一致）
+  ✅ ConfigMap：插件挂载（能力层升格：插件随镜像内置，路径指镜像内）
+  ✅ ConfigMap：插件路径确在镜像内（不得指向 ConfigMap/PVC 挂载点）
+  ✅ ConfigMap：train 三能力各自独占 picodet-train（不得跨 provider 串能力）
+  ✅ ConfigMap：local-cpu 承载 tts/embeddings，sam3-node 在役（Modal url）、yue 配置位缺省关
+  ✅ 配置只读挂载（subPath readOnly）
+  ✅ 密钥经 Secret（optional 引用，不硬编码 env 值）
+== 模板纪律：secret.example 零真值 ==
+  ✅ secret.example 全占位（无真值入库）
+== apply 路径纪律：Secret 不进 kustomize（占位值绝不随 build|apply 上线）==
+  ✅ kustomization 不引用任何 secret* 文件
+== 命名一致性 ==
+  ✅ 全部资源 ns=gpu-router
+  ✅ Deployment/Service selector 匹配 pod 标签
+  ✅ kustomization resources 收齐（Secret 独立于 apply 路径，见上节）
+  ✅ kustomization 无 images: 覆盖（tag 只允许一个来源）
+  ✅ colab 凭证走 rw PVC（OAuth 回写；Secret 只读挂载会炸刷新）
+
+✅ 全部通过

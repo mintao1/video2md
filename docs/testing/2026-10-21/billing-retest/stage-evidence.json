@@ -1,0 +1,361 @@
+{
+  "schema_version": 2,
+  "kind": "production",
+  "run_id": "312e97ae",
+  "tested_at": "2026-10-21T11:20:00+08:00",
+  "results": [
+    {
+      "id": "pps-001",
+      "status": "pass",
+      "observed": "退出、Google 重新登录、保护页与刷新后会话均已观察",
+      "evidence_refs": [
+        "report.md"
+      ],
+      "metrics": {
+        "run_id": "312e97ae",
+        "logout_observed": true,
+        "oauth_login_succeeded": true,
+        "authenticated_page_visible": true,
+        "session_survives_reload": true
+      }
+    },
+    {
+      "id": "pps-002",
+      "status": "pass",
+      "observed": "清空输入框后显式输入并读回受控 URL，点击开始解析",
+      "evidence_refs": [
+        "01-explicit-video-url.png"
+      ],
+      "metrics": {
+        "run_id": "312e97ae",
+        "cleared": true,
+        "entered_explicitly": true,
+        "submitted": true,
+        "approved_url": "https://ferosse.tech/test-assets/model-billing-smoke.mp4",
+        "visible_url": "https://ferosse.tech/test-assets/model-billing-smoke.mp4"
+      }
+    },
+    {
+      "id": "pps-003",
+      "status": "blocked",
+      "observed": "已观察下载 41 秒 640×360 视频；本轮未保留本地文件字节数与精确下载耗时",
+      "evidence_refs": [
+        "pipeline-log.txt"
+      ],
+      "metrics": {
+        "run_id": "312e97ae",
+        "completed_before_model": true
+      }
+    },
+    {
+      "id": "pps-004",
+      "status": "blocked",
+      "observed": "Colab turbo 返回 2 段、置信度 0.97；缺少时间戳有效性原始断言",
+      "evidence_refs": [
+        "pipeline-log.txt"
+      ],
+      "metrics": {
+        "run_id": "312e97ae",
+        "provider": "colab",
+        "segments": 2,
+        "transcript_nonempty": true,
+        "duration_s": 123
+      }
+    },
+    {
+      "id": "pps-005",
+      "status": "pass",
+      "observed": "Colab OCR 完成 5 帧，路由器记录约 82 秒；命中 0/5 不代表识别质量通过",
+      "evidence_refs": [
+        "pipeline-log.txt"
+      ],
+      "metrics": {
+        "run_id": "312e97ae",
+        "provider": "colab",
+        "frames_requested": 5,
+        "frames_completed": 5,
+        "duration_s": 82
+      }
+    },
+    {
+      "id": "pps-006",
+      "status": "blocked",
+      "observed": "clips 完成 1/1，CPU 执行；未采集独立的 clips 精确耗时",
+      "evidence_refs": [
+        "pipeline-log.txt"
+      ],
+      "metrics": {
+        "run_id": "312e97ae",
+        "device": "cpu",
+        "requested": 1,
+        "completed": 1,
+        "gpu_seconds": 0
+      }
+    },
+    {
+      "id": "pps-007",
+      "status": "pass",
+      "observed": "204.669 秒与 ASR 123 + OCR 82 秒相符，未将 CPU clips 计入 GPU",
+      "evidence_refs": [
+        "backend-result.json"
+      ],
+      "metrics": {
+        "run_id": "312e97ae",
+        "gpu_s": 204.669
+      }
+    },
+    {
+      "id": "pps-008",
+      "status": "blocked",
+      "observed": "日志确认队列空闲后关闭 Colab；缺少 idle→确认关闭的单调时钟证据",
+      "evidence_refs": [
+        "pipeline-log.txt"
+      ],
+      "metrics": {
+        "run_id": "312e97ae",
+        "queue_idle": true,
+        "closed": true,
+        "warm_window_s": 30,
+        "poll_interval_s": 15
+      }
+    },
+    {
+      "id": "pps-009",
+      "status": "fail",
+      "observed": "选帧与正文 LLM 请求均返回 HTTP 403：该渠道已被禁用",
+      "evidence_refs": [
+        "backend-result.json"
+      ],
+      "metrics": {
+        "run_id": "312e97ae",
+        "model_called": true,
+        "http_status": 403,
+        "inference_succeeded": false,
+        "content_nonempty": false
+      }
+    },
+    {
+      "id": "pps-010",
+      "status": "fail",
+      "observed": "LLM 输入/输出 token 均为零，GPU 204.669 秒不能代替 token 验收",
+      "evidence_refs": [
+        "backend-result.json"
+      ],
+      "metrics": {
+        "run_id": "312e97ae",
+        "gpu_s": 204.669,
+        "llm_in_tok": 0,
+        "llm_out_tok": 0,
+        "owner_matches": true
+      }
+    },
+    {
+      "id": "pps-011",
+      "status": "fail",
+      "observed": "三个生产单价均为零，审批证据也未采集",
+      "evidence_refs": [
+        "backend-result.json"
+      ],
+      "metrics": {
+        "run_id": "312e97ae",
+        "llm_in_mtok": 0.0,
+        "llm_out_mtok": 0.0,
+        "gpu_min": 0.0
+      }
+    },
+    {
+      "id": "pps-012",
+      "status": "fail",
+      "observed": "费用记录为 0.0，不能通过正数单价费用复算",
+      "evidence_refs": [
+        "backend-result.json"
+      ],
+      "metrics": {
+        "run_id": "312e97ae",
+        "settled": true,
+        "cost_usd": 0.0
+      }
+    },
+    {
+      "id": "pps-013",
+      "status": "blocked",
+      "observed": "模型失败，没有教材，阅读与交付包未覆盖",
+      "evidence_refs": [
+        "04-library-empty.png"
+      ],
+      "metrics": {
+        "run_id": "312e97ae",
+        "book_visible": false,
+        "markdown_chars": 0,
+        "book_count_before": 0,
+        "book_count_after": 0,
+        "reader_loads": false
+      }
+    },
+    {
+      "id": "pps-014",
+      "status": "fail",
+      "observed": "前后端均 error；可见失败并不意味着成功主链通过",
+      "evidence_refs": [
+        "03-terminal-error.png"
+      ],
+      "metrics": {
+        "run_id": "312e97ae",
+        "backend_status": "error",
+        "ui_status": "error",
+        "feedback_visible": true
+      }
+    },
+    {
+      "id": "pps-015",
+      "status": "pass",
+      "observed": "任务数 3→4，新增 owned run 与提交窗口 count=1，已观察转录处理中",
+      "evidence_refs": [
+        "report.md"
+      ],
+      "metrics": {
+        "run_id": "312e97ae",
+        "task_count_before": 3,
+        "task_count_after": 4,
+        "historical_retry": false,
+        "feedback_visible": true,
+        "run_persisted": true,
+        "owner_matches": true,
+        "submit_log_present": true,
+        "running_stage_observed": true
+      }
+    },
+    {
+      "id": "pps-016",
+      "status": "blocked",
+      "observed": "受控 MP4 已解析，但未保留解析 elapsed/timeout 数值",
+      "evidence_refs": [
+        "report.md"
+      ],
+      "metrics": {
+        "run_id": "312e97ae",
+        "resolved": true,
+        "url": "https://ferosse.tech/test-assets/model-billing-smoke.mp4"
+      }
+    },
+    {
+      "id": "pps-017",
+      "status": "blocked",
+      "observed": "候选帧 5 张，上限 120；缺少逐文件非空及时间戳断言",
+      "evidence_refs": [
+        "pipeline-log.txt"
+      ],
+      "metrics": {
+        "run_id": "312e97ae",
+        "candidate_count": 5,
+        "max_frames": 120
+      }
+    },
+    {
+      "id": "pps-018",
+      "status": "blocked",
+      "observed": "403 后本地启发式选中 1 帧；未核对最终文件清单，前端未显示回退原因",
+      "evidence_refs": [
+        "pipeline-log.txt"
+      ],
+      "metrics": {
+        "run_id": "312e97ae",
+        "selected_count": 1,
+        "mode": "heuristic_fallback",
+        "fallback_reason_visible": false
+      }
+    },
+    {
+      "id": "pps-019",
+      "status": "pass",
+      "observed": "同属主本月 GPU 435.097→639.766，差值204.669，run数3→4，token/cost差值均0",
+      "evidence_refs": [
+        "backend-result.json"
+      ],
+      "metrics": {
+        "run_id": "312e97ae",
+        "owner_matches": true,
+        "isolated_window": true,
+        "before": {
+          "runs_n": 3,
+          "llm_in_tok": 0,
+          "llm_out_tok": 0,
+          "gpu_s": 435.097,
+          "spend_usd": 0
+        },
+        "after": {
+          "spend_usd": 0.0,
+          "llm_in_tok": 0,
+          "llm_out_tok": 0,
+          "gpu_s": 639.766,
+          "runs_n": 4
+        }
+      }
+    },
+    {
+      "id": "pps-020",
+      "status": "fail",
+      "observed": "明细流水点击无变化，未显示本次 run token/GPU/费用",
+      "evidence_refs": [
+        "report.md"
+      ],
+      "metrics": {
+        "run_id": "312e97ae",
+        "details_opens": false,
+        "usage_visible": false,
+        "cost_visible": false,
+        "values_match_ledger": false
+      }
+    },
+    {
+      "id": "pps-021",
+      "status": "fail",
+      "observed": "任务失败卡只有模糊文案；缺少 run_id、失败阶段和错误原因",
+      "evidence_refs": [
+        "03-terminal-error.png"
+      ],
+      "metrics": {
+        "run_id": "312e97ae",
+        "failure_observed": true,
+        "run_id_visible": false,
+        "failure_stage_visible": false,
+        "failure_reason_visible": false,
+        "retry_available": true,
+        "secrets_redacted": true
+      }
+    },
+    {
+      "id": "pps-022",
+      "status": "not_tested",
+      "observed": "未对已知模型渠道错误重复发起计费请求；重试幂等仍待验收",
+      "evidence_refs": [
+        "report.md"
+      ],
+      "metrics": {
+        "run_id": "312e97ae"
+      }
+    },
+    {
+      "id": "pps-023",
+      "status": "not_tested",
+      "observed": "未制造超预算请求；预算拒绝仍待验收",
+      "evidence_refs": [
+        "report.md"
+      ],
+      "metrics": {
+        "run_id": "312e97ae"
+      }
+    },
+    {
+      "id": "pps-024",
+      "status": "not_tested",
+      "observed": "本轮任务创建成功，未制造 POST /runs 被拒绝分支",
+      "evidence_refs": [
+        "report.md"
+      ],
+      "metrics": {
+        "run_id": "312e97ae"
+      }
+    }
+  ]
+}

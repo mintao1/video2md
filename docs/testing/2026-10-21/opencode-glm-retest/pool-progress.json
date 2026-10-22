@@ -1,0 +1,78 @@
+{
+  "status": 200,
+  "keys": [
+    "ok",
+    "capabilities_ok",
+    "strategy",
+    "providers",
+    "ts",
+    "state_write_failures",
+    "state_write_error"
+  ],
+  "ok": true,
+  "providers": [
+    {
+      "name": "modal",
+      "enabled": false,
+      "healthy": false,
+      "cooldown_remaining_s": 0,
+      "last_error": ""
+    },
+    {
+      "name": "colab",
+      "enabled": true,
+      "healthy": true,
+      "cooldown_remaining_s": 0,
+      "last_error": ""
+    },
+    {
+      "name": "kaggle",
+      "enabled": true,
+      "healthy": true,
+      "cooldown_remaining_s": 0,
+      "last_error": "task: Kaggle 凭证缺失：~/.kaggle/kaggle.json 或 KAGGLE_USERNAME/KEY"
+    },
+    {
+      "name": "zerogpu",
+      "enabled": false,
+      "healthy": false,
+      "cooldown_remaining_s": 0,
+      "last_error": ""
+    },
+    {
+      "name": "aliyun",
+      "enabled": false,
+      "healthy": false,
+      "cooldown_remaining_s": 0,
+      "last_error": ""
+    },
+    {
+      "name": "local-cpu",
+      "enabled": true,
+      "healthy": true,
+      "cooldown_remaining_s": 0,
+      "last_error": "task: local-cpu YuE2 失败 HTTP 404: {\"detail\":\"Not Found\"}"
+    },
+    {
+      "name": "modal-yue",
+      "enabled": true,
+      "healthy": false,
+      "cooldown_remaining_s": 0,
+      "last_error": ""
+    },
+    {
+      "name": "autodl-yue",
+      "enabled": false,
+      "healthy": false,
+      "cooldown_remaining_s": 0,
+      "last_error": ""
+    },
+    {
+      "name": "sam3-node",
+      "enabled": true,
+      "healthy": false,
+      "cooldown_remaining_s": 0,
+      "last_error": "task: sam3-node 分割失败 HTTP 500: Internal Server Error"
+    }
+  ]
+}

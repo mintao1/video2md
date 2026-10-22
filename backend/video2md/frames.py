@@ -327,7 +327,9 @@ def ocr_candidates(frames: list[tuple[float, Path]], ocr: str,
     Vision（gemini 路径已摘除，入参保留兼容）。"""
     raw: list[list]
     if ocr == "remote":
-        base = base or ENV.get("V2MD_OCR_REMOTE", "")
+        from .colab import remote_for_user
+
+        base = remote_for_user(base or ENV.get("V2MD_OCR_REMOTE", ""))
         if not base:
             raise SystemExit("ocr=remote 但 V2MD_OCR_REMOTE 未配置")
         if base.lower() in ("colab", "colab-cli"):

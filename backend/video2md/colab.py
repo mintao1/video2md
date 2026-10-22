@@ -4,6 +4,7 @@ from __future__ import annotations
 import contextlib
 import contextvars
 import fcntl
+import hashlib
 import sys
 import threading
 import time
@@ -20,9 +21,28 @@ class _SessionUse:
     # LangGraph copies context into node threads. The object must be shared:
     # setting a boolean ContextVar inside a node never updates the caller's context.
     used: bool = False
+    personal: bool = False
 
 
 _USE: contextvars.ContextVar[_SessionUse | None] = contextvars.ContextVar("colab_session_use", default=None)
+_OWNER: contextvars.ContextVar[str] = contextvars.ContextVar("colab_owner", default="")
+
+
+def tenant_home(uid: str) -> Path:
+    if not uid:
+        raise ValueError("Colab tenant uid is required")
+    root = Path(ENV.get("V2MD_COLAB_USERS_DIR") or PROJ / "data" / "colab-users")
+    return root / hashlib.sha256(uid.encode()).hexdigest()
+
+
+def credential_directory(uid: str) -> Path:
+    return tenant_home(uid) / ".config" / "colab-cli"
+
+
+def remote_for_user(default: str) -> str:
+    """A connected tenant uses its own account for all GPU stages of this run."""
+    use = _USE.get()
+    return "colab-cli" if use is not None and use.personal else default
 
 
 def configured() -> bool:
@@ -31,25 +51,41 @@ def configured() -> bool:
 
 
 @contextlib.contextmanager
-def _session(wait: bool = True):
-    path = Path(ENV.get("V2MD_COLAB_LOCK") or PROJ / "data" / "colab.lock")
-    path.parent.mkdir(parents=True, exist_ok=True)
-    if not _LOCK.acquire(blocking=wait):
-        raise BlockingIOError("Colab busy")
+def _session(wait: bool = True, *, owner: str | None = None):
+    owner_token = _OWNER.set(owner) if owner is not None else None
     try:
-        with path.open("a+") as lock:
-            fcntl.flock(lock, fcntl.LOCK_EX | (0 if wait else fcntl.LOCK_NB))
-            _configure()
-            try:
-                yield
-            finally:
-                fcntl.flock(lock, fcntl.LOCK_UN)
+        uid = _OWNER.get()
+        path = (tenant_home(uid) / "execution.lock" if uid else
+                Path(ENV.get("V2MD_COLAB_LOCK") or PROJ / "data" / "colab.lock"))
+        path.parent.mkdir(mode=0o750, parents=True, exist_ok=True)
+        if not _LOCK.acquire(blocking=wait):
+            raise BlockingIOError("Colab busy")
+        previous = {}
+        try:
+            fields = ("SESSION", "BIN_OVERRIDE", "CLI_HOME", "MAX_WAIT_S", "QUEUE_URL", "KEEP_SESSION",
+                      "ALLOW_CPU_FALLBACK")
+            previous = {name: getattr(machinery, name) for name in fields}
+            with path.open("a+") as lock:
+                fcntl.flock(lock, fcntl.LOCK_EX | (0 if wait else fcntl.LOCK_NB))
+                try:
+                    _configure()
+                    yield
+                finally:
+                    fcntl.flock(lock, fcntl.LOCK_UN)
+        finally:
+            for name, value in previous.items():
+                setattr(machinery, name, value)
+            _LOCK.release()
     finally:
-        _LOCK.release()
+        if owner_token is not None:
+            _OWNER.reset(owner_token)
 
 
 def _configure():
-    machinery.SESSION = ENV.get("V2MD_COLAB_SESSION") or "v2md-whisper"
+    uid = _OWNER.get()
+    name = ENV.get("V2MD_COLAB_SESSION") or "v2md-whisper"
+    machinery.SESSION = name + "-" + hashlib.sha256(uid.encode()).hexdigest()[:16] if uid else name
+    machinery.CLI_HOME = str(tenant_home(uid)) if uid else ""
     machinery.BIN_OVERRIDE = ENV.get("V2MD_COLAB_BIN") or ""
     machinery.MAX_WAIT_S = int(ENV.get("V2MD_COLAB_MAX_WAIT_S") or 2700)
     machinery.QUEUE_URL = ""
@@ -57,12 +93,16 @@ def _configure():
     machinery.ALLOW_CPU_FALLBACK = (ENV.get("V2MD_COLAB_CPU_FALLBACK") or "off") == "on"
 
 @contextlib.contextmanager
-def session_scope():
+def session_scope(owner: str | None = None):
     """Reuse one session across a run's stages, releasing it even on failure."""
     if _USE.get() is not None:
+        if owner is not None and owner != _OWNER.get():
+            raise RuntimeError("Colab 任务执行期间不能切换租户")
         yield
         return
-    token = _USE.set(_SessionUse())
+    owner_token = _OWNER.set(owner) if owner is not None else None
+    uid = _OWNER.get()
+    token = _USE.set(_SessionUse(personal=bool(uid and (credential_directory(uid) / "token.json").is_file())))
     try:
         yield
     finally:
@@ -70,6 +110,8 @@ def session_scope():
             release_session("run 结束")
         finally:
             _USE.reset(token)
+            if owner_token is not None:
+                _OWNER.reset(owner_token)
 
 
 def release_session(reason: str = "GPU 阶段结束") -> None:
@@ -96,6 +138,8 @@ def health() -> tuple[bool, str]:
             binary = machinery._colab_bin()
             if not shutil.which(binary):
                 return False, "未安装 colab CLI：uv sync 后重试"
+            if (ENV.get("V2MD_AUTH") or "off").lower() not in ("off", "none", ""):
+                return True, "Colab CLI 可用；每个用户需连接自己的 Colab 账号"
             if not (Path.home() / ".config/colab-cli/token.json").is_file():
                 return False, "Colab CLI 未授权：先运行 colab sessions 完成登录"
             machinery._colab(["sessions"], timeout=30, retries=0)
@@ -113,6 +157,9 @@ def _work(fn, *args):
         with session_scope():
             return _work(fn, *args)
     with _session():
+        uid = _OWNER.get()
+        if uid and not (credential_directory(uid) / "token.json").is_file():
+            raise RuntimeError("当前用户尚未连接 Colab，请在“我的 → Colab 授权”完成授权")
         use = _USE.get()
         assert use is not None
         use.used = True

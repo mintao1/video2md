@@ -1,0 +1,15 @@
+PASS CLI status maps KernelStatus.COMPLETE
+PASS CLI status maps KernelStatus.ERROR
+PASS CLI status maps KernelStatus.CANCELLED
+PASS CLI status maps KernelStatus.QUEUED
+PASS CLI status maps KernelStatus.RUNNING
+PASS CLI status maps unrecognized platform status
+PASS platform completion cannot hide worker error or missing output
+PASS platform completion cannot hide worker error or missing output
+PASS valid business output is accepted
+PASS rejected push never polls or fetches old job: 409
+PASS rejected push never polls or fetches old job: zero-exit-error
+PASS lifecycle success: no blind resubmit, cancel only uncertain active exit
+PASS lifecycle failure: no blind resubmit, cancel only uncertain active exit
+PASS lifecycle timeout: no blind resubmit, cancel only uncertain active exit
+PASS lifecycle failure: no blind resubmit, cancel only uncertain active exit

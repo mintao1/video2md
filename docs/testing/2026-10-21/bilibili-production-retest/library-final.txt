@@ -1,0 +1,86 @@
+Browser tab: 1, Title: "视书 · Textbook Library", URL: "https://ferosse.tech/library".
+1 AXWebArea 视书 · Textbook Library, URL: ferosse.tech/library
+	2 container app
+		3 container
+			4 text menu_book 视书 · Textbook Library
+			5 button 通知
+			6 link Description: M, Value: ferosse.tech/profile
+			7 button 退出登录
+		8 container
+			9 container
+				10 text search
+				11 text field (settable)
+			12 container
+				13 button auto_stories 全部教材 (2)
+					14 text auto_stories
+					15 text 全部教材
+					16 text (2)
+				17 button 计算机 / AI
+				18 button 数学基础
+				19 button 商业管理
+				20 button 语言学习
+				21 button bookmark 收藏夹
+					22 text bookmark
+					23 text 收藏夹
+			24 container
+				25 text menu_book 最近在读 · 进度 100% 已转录 2/2 讲
+				26 container
+					27 text auto_stories
+					28 text 学PPT该学哪些技能
+				29 text auto_awesome 学PPT该学哪些技能：会做巧做好用漂亮 https://www.bilibili.com/video/BV1vV411k7GB/
+				30 button play_circle 继续阅读
+					31 text play_circle
+					32 text 继续阅读
+				33 button 查看全书目录
+			34 heading 智能教材架, Value: 2
+				35 text 智能教材架
+			36 text 共 2 本
+			37 button 网格视图
+			38 button 列表视图
+			39 container
+				40 container
+					41 text auto_stories
+					42 text 学PPT该学哪些技能
+					43 text 2 讲 已完成
+				44 text school B站
+				45 button 收藏本书
+				46 heading 学PPT该学哪些技能：会做巧做好用漂亮, Value: 3
+					47 text 学PPT该学哪些技能：会做巧做好用漂亮
+				48 text https://www.bilibili.com/video/BV1vV411k7GB/ 已转录 2/2 讲 100%
+				49 button menu_book 继续阅读
+					50 text menu_book
+					51 text 继续阅读
+				52 button format_list_bulleted 目录 (2)
+					53 text format_list_bulleted
+					54 text 目录 (2)
+				55 button download, Help: 导出书籍
+				56 button share, Help: 分享教材
+			57 container
+				58 container
+					59 text auto_stories
+					60 text 数据库索引原理与查询
+					61 text 1 讲 已完成
+				62 text school ferosse.tech
+				63 button 收藏本书
+				64 heading 数据库索引原理与查询优化, Value: 3
+					65 text 数据库索引原理与查询优化
+				66 text https://ferosse.tech/test-assets/billing-index-lesson.mp4 已转录 1/1 讲 100%
+				67 button menu_book 继续阅读
+					68 text menu_book
+					69 text 继续阅读
+				70 button format_list_bulleted 目录 (1)
+					71 text format_list_bulleted
+					72 text 目录 (1)
+				73 button download, Help: 导出书籍
+				74 button share, Help: 分享教材
+			75 text cloud_sync 全端书籍与笔记自动同步已开启 上次同步于 21:49
+			76 button 立即同步 sync
+				77 text 立即同步
+				78 text sync
+		79 container
+			80 link Description: motion_photos_on 排队处理, Value: ferosse.tech/tasks
+			81 link Description: local_library 教材库, Value: ferosse.tech/library
+			82 link Description: add 新建转换, Value: ferosse.tech/tasks?openImport=1
+			83 link Description: person 我的, Value: ferosse.tech/profile
+
+The focused UI element is 1 AXWebArea 视书 · Textbook Library, URL: ferosse.tech/library

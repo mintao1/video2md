@@ -37,6 +37,7 @@ from . import artsink
 from .config import ENV, PROJ
 from .graph_obs import GraphObsHandler
 from .llm import assemble_entry_note, llm_task, select_frames
+from .note import MIN_NOTE_TRANSCRIPT_CHARS
 from .resolve import extract_url
 from .runs import _STAGE_FNS, _load_runs, _run_outputs, _run_stage, _runs_file_lock, _runs_merge, create_run
 from .state import RunState
@@ -161,6 +162,12 @@ def _stage_node(stage: str, args_of=None):
 
 
 
+def _failed_dependencies(run: dict, idx: int, stages: tuple[str, ...]) -> list[str]:
+    failures = run.get("partial_failures") or {}
+    return [stage for stage in stages
+            if str(idx) in {str(value) for value in failures.get(stage, [])}]
+
+
 def node_select_frames(state: RunState) -> dict:
     """内容选帧 LLM：整 run 转录本 + 候选清单（多条目带分节头）→ select 阶段 payload。
 
@@ -168,8 +175,20 @@ def node_select_frames(state: RunState) -> dict:
     （对齐 DSL code_parse_select 的 note 语义；比 Dify 时代「LLM 挂=整 run 挂」多一层韧性）。
     """
     run = _reload(state["run_id"], state.get("run") or {})
-    transcript = _run_outputs(run, "transcript")
-    candidates = _run_outputs(run, "candidates")
+    # Keep original collection indexes in prompts while excluding failed entries.
+    eligible = {entry["url"]: run["artifacts"].get(entry["url"], {})
+                for idx, entry in enumerate(run["entries"], 1)
+                if not _failed_dependencies(run, idx, ("download", "transcribe", "frames", "ocr"))
+                and not run["artifacts"].get(entry["url"], {}).get("skipped")
+                and not run["artifacts"].get(entry["url"], {}).get("note")}
+    selection_run = {**run, "artifacts": eligible}
+    pending = [str(a.get('transcript') or '').strip() for a in eligible.values()
+               if not a.get('skipped') and not a.get('note') and str(a.get('transcript') or '').strip()]
+    if pending and all(len(text) < MIN_NOTE_TRANSCRIPT_CHARS for text in pending):
+        message = f"note: 待处理转录本过短（均不足 {MIN_NOTE_TRANSCRIPT_CHARS} 字），停止模型生成与剪辑"
+        return {'run': run, 'status': 'error', 'errors': [*state.get('errors', []), message]}
+    transcript = _run_outputs(selection_run, "transcript")
+    candidates = _run_outputs(selection_run, "candidates")
     total = int(run.get("total") or 1)
     if not transcript.strip() or not candidates.strip():
         # 全跳过 run（state 幂等全命中）没有产物——正常路径，不是错误
@@ -202,10 +221,22 @@ def node_note_entry(state: RunState) -> dict:
     if art.get("skipped") or art.get("note"):
         print(f"  ⏭ 条目 {idx}/{run['total']} 已写盘/幂等跳过，不烧 LLM")
         return nxt
+    blocked = _failed_dependencies(run, idx, ("download", "transcribe", "frames", "ocr", "select", "clips"))
+    if (not art.get("images") and art.get("published") and art.get("clips") is None
+            and (ENV.get("V2MD_CLIPS_REMOTE") or "").strip() and "clips" not in blocked):
+        blocked.append("clips")
+    if blocked:
+        msg = f"note 条目 {idx}: 依赖阶段 {', '.join(blocked)} 未成功，停止模型生成，请先补跑失败阶段"
+        failed = run.setdefault("partial_failures", {}).setdefault("note", [])
+        if str(idx) not in failed:
+            failed.append(str(idx))
+        _persist(run)
+        return {**nxt, "errors": [*state.get("errors", []), msg]}
     transcript = (art.get("transcript") or "").strip()
-    if not transcript:
+    if len(transcript) < MIN_NOTE_TRANSCRIPT_CHARS:
         # 对齐 DSL if_entry_text 门禁 + _stage_note 硬门禁：无转录本绝不喂 LLM、绝不写盘
-        msg = f"条目 {idx} 无转录本（transcribe 未成功），跳过写盘"
+        msg = (f"note 条目 {idx} 无转录本（transcribe 未成功），跳过写盘" if not transcript else
+               f"note 条目 {idx}: 转录本过短（{len(transcript)} 字 < {MIN_NOTE_TRANSCRIPT_CHARS}），跳过模型生成")
         print(f"  ⚠ {msg}")
         run.setdefault("partial_failures", {}).setdefault("note", []).append(str(idx))
         _persist(run)
@@ -346,6 +377,8 @@ def node_finalize(state: RunState) -> dict:
     """收尾：run 状态落盘 + 清临时目录（deliver 模式先把 outbox 搬家到在架位）。"""
     run = _reload(state["run_id"], state.get("run") or {})
     errors = state.get("errors") or []
+    if errors:
+        run['errors'] = list(dict.fromkeys([*(run.get('errors') or []), *errors]))[-20:]
     run["status"] = "partial" if run.get("partial_failures") else "done"
     if artsink.current_mode() == "deliver":
         _relocate_outbox(run)
@@ -417,8 +450,9 @@ def build_graph(checkpointer=None):
         g.add_conditional_edges(prev, _route_ok, {"ok": nxt, "fail": "fail"})
         prev = nxt
     g.add_conditional_edges("ocr", _route_ok, {"ok": "select_frames_llm", "fail": "fail"})
-    # 选帧 LLM 自带兜底（空 payload → 启发式），它的 errors 不致命，无条件进 select
-    g.add_edge("select_frames_llm", "select")
+    # LLM failure still falls back without setting error status. A quality
+    # rejection explicitly sets error status and must stop before publishing.
+    g.add_conditional_edges("select_frames_llm", _route_ok, {"ok": "select", "fail": "fail"})
     g.add_conditional_edges("select", _route_ok, {"ok": "clips", "fail": "fail"})
     g.add_conditional_edges("clips", _route_ok, {"ok": "note_entry", "fail": "fail"})
     # note 逐条目回环：entry_idx 从 1 起，> total 出环
@@ -487,7 +521,7 @@ def run_graph(url: str, *, part_items: str = "", force: bool = False, review: bo
     """一次 run 的入口（api.py 后台任务与 graph-run CLI 共用）。返回终态 state。
 
     owner = 归属内部 uid（多用户隔离）：随初始 state 流转到 resolve，做 owner 级去重；
-    图核其余节点不读它。CLI/开发留空串=旧全局去重语义。
+    同时绑定个人 LLM/Colab 执行上下文。CLI/开发留空串=旧全局去重语义。
     """
     from . import deadman
 
@@ -515,7 +549,7 @@ def run_graph(url: str, *, part_items: str = "", force: bool = False, review: bo
     try:
         from .colab import session_scope
         from .llm_settings import user_scope
-        with user_scope(owner), session_scope():
+        with user_scope(owner), session_scope(owner=owner):
             final = graph.invoke(initial, config=config)
     except Exception:
         deadman.ping("fail", run_id=run_id, trace_name=url)

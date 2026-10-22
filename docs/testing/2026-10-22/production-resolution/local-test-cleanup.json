@@ -1,0 +1,21 @@
+{
+  "scope": "local_ignored_test_storage_only",
+  "production_storage_affected": false,
+  "removed_own_fixture_records": 42,
+  "remaining_records": 89,
+  "remaining_records_unchanged": true,
+  "private_backup_retained": true,
+  "state_had_only_test_sentinels": true,
+  "valid_existing_artifact_cache_entries": 0,
+  "state_rebuilt_as_empty_derived_cache": true,
+  "original_pre_test_cache_baseline_available": false,
+  "identity_store_retained": true,
+  "limitation": "This is not a byte-for-byte restoration of an unavailable original local cache baseline.",
+  "vault_test_named_files_snapshotted": [
+    "web-frame.jpg",
+    "web-clip.mp4",
+    "unreferenced.jpg"
+  ],
+  "vault_files_deleted": false,
+  "vault_pre_test_baseline_available": false
+}

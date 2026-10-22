@@ -1,0 +1,428 @@
+{
+  "kind": "production",
+  "release": "video2md:0.2.0-note-embeds-20261022f",
+  "run_id": "dd586072",
+  "generation_release": "video2md:0.2.0-ocr-guard-20261022d",
+  "post_generation_repairs": [
+    "public_certificate_cache",
+    "canonical_frame_reference_repair"
+  ],
+  "results": [
+    {
+      "id": "failure-cost-001",
+      "status": "not-tested",
+      "metrics": {
+        "run_id": "dd586072",
+        "release": "video2md:0.2.0-note-embeds-20261022f",
+        "entries": [
+          {
+            "entry": "dd586072-ocr-failure",
+            "failed_stages": [
+              "ocr"
+            ],
+            "llm_calls_after_failure": 0,
+            "blocked_before_model": true,
+            "observation_release": "video2md:0.2.0-ocr-guard-20261022d"
+          },
+          {
+            "entry": "dd586072-healthy",
+            "failed_stages": [],
+            "llm_calls": 5
+          }
+        ],
+        "missing_evidence": "Same-candidate actual clips failure and downstream-call observation; offline regression is not live evidence."
+      },
+      "evidence_refs": [
+        {
+          "path": "../testing/2026-10-22/production-resolution/second-ocr-errors.json",
+          "sha256": "723a2cecb7c0ad9824187fade61f364cc2f48aed1dc0c7290c4fe3b0cb2359a2"
+        },
+        {
+          "path": "../testing/2026-10-22/production-resolution/book-delivery.json",
+          "sha256": "d0c03030607a460028b302eb336b5810d841321f94111b482a52077bcd515716"
+        }
+      ]
+    },
+    {
+      "id": "failure-cost-002",
+      "status": "not-tested",
+      "metrics": {
+        "run_id": "dd586072",
+        "release": "video2md:0.2.0-note-embeds-20261022f",
+        "attempts": [
+          {
+            "request_id": "01a16002-9014-748d-a832-10ce4184bad2",
+            "input_tokens": 7014,
+            "output_tokens": 1158,
+            "cached_tokens": 0,
+            "outcome": "success",
+            "usage_source": "provider_response",
+            "request_id_correlation": "unique_usage_fingerprint",
+            "task": "llm:organize",
+            "run_id": "dd586072",
+            "account_ref": "90aae05929df",
+            "occurred_at": "2026-10-21T19:49:03.124000+00:00",
+            "occurred_at_source": "matched_supplier_export"
+          },
+          {
+            "request_id": "01a16002-de23-7a37-beb8-e20eb6ad4ae8",
+            "input_tokens": 1159,
+            "output_tokens": 78,
+            "cached_tokens": 0,
+            "outcome": "success",
+            "usage_source": "provider_response",
+            "request_id_correlation": "unique_usage_fingerprint",
+            "task": "llm:metadata",
+            "run_id": "dd586072",
+            "account_ref": "90aae05929df",
+            "occurred_at": "2026-10-21T19:49:23.107000+00:00",
+            "occurred_at_source": "matched_supplier_export"
+          },
+          {
+            "request_id": "01a16002-ef65-79fa-83aa-7021932fb368",
+            "input_tokens": 7164,
+            "output_tokens": 1404,
+            "cached_tokens": 0,
+            "outcome": "success",
+            "usage_source": "provider_response",
+            "request_id_correlation": "unique_usage_fingerprint",
+            "task": "llm:organize",
+            "run_id": "dd586072",
+            "account_ref": "90aae05929df",
+            "occurred_at": "2026-10-21T19:49:27.525000+00:00",
+            "occurred_at_source": "matched_supplier_export"
+          },
+          {
+            "request_id": "01a16003-4b93-7d3d-8f34-5215d487cf65",
+            "input_tokens": 1239,
+            "output_tokens": 87,
+            "cached_tokens": 0,
+            "outcome": "success",
+            "usage_source": "provider_response",
+            "request_id_correlation": "unique_usage_fingerprint",
+            "task": "llm:metadata",
+            "run_id": "dd586072",
+            "account_ref": "90aae05929df",
+            "occurred_at": "2026-10-21T19:49:51.123000+00:00",
+            "occurred_at_source": "matched_supplier_export"
+          },
+          {
+            "input_tokens": 20442,
+            "output_tokens": 852,
+            "cached_tokens": 0,
+            "request_id": "01a15fff-3911-7f41-b1b9-b13490db7fe8",
+            "outcome": "success",
+            "usage_source": "run_total_residual",
+            "request_id_correlation": "sole_unmatched_export_request_and_aggregate_residual",
+            "task": "select_frames",
+            "independent_attempt_span_available": false,
+            "run_id": "dd586072",
+            "account_ref": "90aae05929df",
+            "occurred_at": "2026-10-21T19:45:24.241000+00:00",
+            "occurred_at_source": "matched_supplier_export"
+          }
+        ],
+        "recorded_usage": {
+          "input_tokens": 37018,
+          "output_tokens": 3579,
+          "cached_tokens": 0
+        },
+        "missing_evidence": "This successful run had no observed empty response; selection lacks a stored independent attempt span."
+      },
+      "evidence_refs": [
+        {
+          "path": "../testing/2026-10-22/production-resolution/book-delivery.json",
+          "sha256": "d0c03030607a460028b302eb336b5810d841321f94111b482a52077bcd515716"
+        },
+        {
+          "path": "../testing/2026-10-22/production-resolution/final-reconciliation.json",
+          "sha256": "40e1f30e3ee1c32cf268b98523e2955ba4f72585c56cba87ecd1a5709787f450"
+        }
+      ]
+    },
+    {
+      "id": "failure-cost-003",
+      "status": "pass",
+      "metrics": {
+        "run_id": "dd586072",
+        "release": "video2md:0.2.0-note-embeds-20261022f",
+        "observations": [
+          {
+            "attempt_id": "final-ui-login-1",
+            "outcome": "success",
+            "login_started_at": "2026-10-22T04:36:12+08:00",
+            "callback_at": "2026-10-22T04:36:29+08:00",
+            "me_at": "2026-10-22T04:36:31+08:00",
+            "refresh_at": "2026-10-22T04:37:06+08:00",
+            "elapsed_s": 19.0,
+            "me_status": 200,
+            "refresh_status": 200,
+            "screenshot": "login-f-1.png"
+          },
+          {
+            "attempt_id": "final-ui-login-2",
+            "outcome": "success",
+            "login_started_at": "2026-10-22T04:38:04+08:00",
+            "callback_at": "2026-10-22T04:38:19+08:00",
+            "me_at": "2026-10-22T04:38:21+08:00",
+            "refresh_at": "2026-10-22T04:39:17+08:00",
+            "elapsed_s": 17.0,
+            "me_status": 200,
+            "refresh_status": 200,
+            "screenshot": "login-f-2.png"
+          },
+          {
+            "attempt_id": "final-ui-login-3",
+            "outcome": "success",
+            "login_started_at": "2026-10-22T04:39:35+08:00",
+            "callback_at": "2026-10-22T04:39:51+08:00",
+            "me_at": "2026-10-22T04:39:53+08:00",
+            "refresh_at": "2026-10-22T04:40:13+08:00",
+            "elapsed_s": 18.0,
+            "me_status": 200,
+            "refresh_status": 200,
+            "screenshot": "login-f-3.png"
+          }
+        ],
+        "relay": {
+          "active_units": [
+            "video2md-oauth-relay.service"
+          ],
+          "retired_unit_enabled": false,
+          "listener_host": "127.0.0.1"
+        }
+      },
+      "evidence_refs": [
+        {
+          "path": "../testing/2026-10-22/production-resolution/oauth-final-observations.json",
+          "sha256": "2099b155617e5825f39cce5e6003a3d6db2845b4ceb06b365abad9eafba0ec50"
+        },
+        {
+          "path": "../testing/2026-10-22/production-resolution/http-current.json",
+          "sha256": "4785807a08742562a134b1b07533047553cb31397dd66bdaac4d4eac8f7f2a50"
+        },
+        {
+          "path": "../testing/2026-10-22/production-resolution/final-runtime.json",
+          "sha256": "9ac1588c1405ff677c685148413a882ca7df88dbd3a402a4e7e46f03fb50e3b1"
+        },
+        {
+          "path": "../testing/2026-10-22/production-resolution/login-f-1.png",
+          "sha256": "6725edabfdacef41899d206de7697fce125dd73b8d9a34fab8b70a156c89aaae"
+        },
+        {
+          "path": "../testing/2026-10-22/production-resolution/login-f-2.png",
+          "sha256": "844250793c2e2b248b2078aaaac8b9029b17f422ea2048325f1537b7b95f336c"
+        },
+        {
+          "path": "../testing/2026-10-22/production-resolution/login-f-3.png",
+          "sha256": "2a8894d2690f904aa890207408ab401f12c340e8e81f6e0f0b0df77332ca3950"
+        }
+      ]
+    },
+    {
+      "id": "failure-cost-004",
+      "status": "pass",
+      "metrics": {
+        "run_id": "dd586072",
+        "release": "video2md:0.2.0-note-embeds-20261022f",
+        "provider": "OpenCode Go",
+        "provider_export_id": "e4a468f7578d7c3199299c4f84fb7f2e75230775a5aa98db54e7b1648d63c13e",
+        "provider_export_sha256": "e4a468f7578d7c3199299c4f84fb7f2e75230775a5aa98db54e7b1648d63c13e",
+        "account_ref": "90aae05929df",
+        "currency": "USD",
+        "scope": "run-isolated",
+        "settlement_status": "settled",
+        "application_cost_usd": 0.007342,
+        "application_requests": [
+          {
+            "request_id": "01a16002-9014-748d-a832-10ce4184bad2",
+            "input_tokens": 7014,
+            "output_tokens": 1158,
+            "cached_tokens": 0,
+            "outcome": "success",
+            "usage_source": "provider_response",
+            "request_id_correlation": "unique_usage_fingerprint",
+            "task": "llm:organize",
+            "run_id": "dd586072",
+            "account_ref": "90aae05929df",
+            "occurred_at": "2026-10-21T19:49:03.124000+00:00",
+            "occurred_at_source": "matched_supplier_export"
+          },
+          {
+            "request_id": "01a16002-de23-7a37-beb8-e20eb6ad4ae8",
+            "input_tokens": 1159,
+            "output_tokens": 78,
+            "cached_tokens": 0,
+            "outcome": "success",
+            "usage_source": "provider_response",
+            "request_id_correlation": "unique_usage_fingerprint",
+            "task": "llm:metadata",
+            "run_id": "dd586072",
+            "account_ref": "90aae05929df",
+            "occurred_at": "2026-10-21T19:49:23.107000+00:00",
+            "occurred_at_source": "matched_supplier_export"
+          },
+          {
+            "request_id": "01a16002-ef65-79fa-83aa-7021932fb368",
+            "input_tokens": 7164,
+            "output_tokens": 1404,
+            "cached_tokens": 0,
+            "outcome": "success",
+            "usage_source": "provider_response",
+            "request_id_correlation": "unique_usage_fingerprint",
+            "task": "llm:organize",
+            "run_id": "dd586072",
+            "account_ref": "90aae05929df",
+            "occurred_at": "2026-10-21T19:49:27.525000+00:00",
+            "occurred_at_source": "matched_supplier_export"
+          },
+          {
+            "request_id": "01a16003-4b93-7d3d-8f34-5215d487cf65",
+            "input_tokens": 1239,
+            "output_tokens": 87,
+            "cached_tokens": 0,
+            "outcome": "success",
+            "usage_source": "provider_response",
+            "request_id_correlation": "unique_usage_fingerprint",
+            "task": "llm:metadata",
+            "run_id": "dd586072",
+            "account_ref": "90aae05929df",
+            "occurred_at": "2026-10-21T19:49:51.123000+00:00",
+            "occurred_at_source": "matched_supplier_export"
+          },
+          {
+            "input_tokens": 20442,
+            "output_tokens": 852,
+            "cached_tokens": 0,
+            "request_id": "01a15fff-3911-7f41-b1b9-b13490db7fe8",
+            "outcome": "success",
+            "usage_source": "run_total_residual",
+            "request_id_correlation": "sole_unmatched_export_request_and_aggregate_residual",
+            "task": "select_frames",
+            "independent_attempt_span_available": false,
+            "run_id": "dd586072",
+            "account_ref": "90aae05929df",
+            "occurred_at": "2026-10-21T19:45:24.241000+00:00",
+            "occurred_at_source": "matched_supplier_export"
+          }
+        ],
+        "supplier_rows": [
+          {
+            "input_tokens": 1239,
+            "output_tokens": 87,
+            "cached_tokens": 0,
+            "request_id": "01a16003-4b93-7d3d-8f34-5215d487cf65",
+            "run_id": "dd586072",
+            "account_ref": "90aae05929df",
+            "product": "go",
+            "occurred_at": "2026-10-21T19:49:51.123000+00:00",
+            "attribution_usd": 0.00022935
+          },
+          {
+            "input_tokens": 7164,
+            "output_tokens": 1404,
+            "cached_tokens": 0,
+            "request_id": "01a16002-ef65-79fa-83aa-7021932fb368",
+            "run_id": "dd586072",
+            "account_ref": "90aae05929df",
+            "product": "go",
+            "occurred_at": "2026-10-21T19:49:27.525000+00:00",
+            "attribution_usd": 0.0017766
+          },
+          {
+            "input_tokens": 1159,
+            "output_tokens": 78,
+            "cached_tokens": 0,
+            "request_id": "01a16002-de23-7a37-beb8-e20eb6ad4ae8",
+            "run_id": "dd586072",
+            "account_ref": "90aae05929df",
+            "product": "go",
+            "occurred_at": "2026-10-21T19:49:23.107000+00:00",
+            "attribution_usd": 0.00021285
+          },
+          {
+            "input_tokens": 7014,
+            "output_tokens": 1158,
+            "cached_tokens": 0,
+            "request_id": "01a16002-9014-748d-a832-10ce4184bad2",
+            "run_id": "dd586072",
+            "account_ref": "90aae05929df",
+            "product": "go",
+            "occurred_at": "2026-10-21T19:49:03.124000+00:00",
+            "attribution_usd": 0.0016311
+          },
+          {
+            "input_tokens": 20442,
+            "output_tokens": 852,
+            "cached_tokens": 0,
+            "request_id": "01a15fff-3911-7f41-b1b9-b13490db7fe8",
+            "run_id": "dd586072",
+            "account_ref": "90aae05929df",
+            "product": "go",
+            "occurred_at": "2026-10-21T19:45:24.241000+00:00",
+            "attribution_usd": 0.0034923
+          }
+        ],
+        "billing_mode": "subscription_receipt",
+        "amount_source": "provider_export_attribution",
+        "product": "go",
+        "export_truncated": false,
+        "extra_usage_enabled": false,
+        "subscription_invoice": {
+          "invoice_id": "XPIMO8IF-0003",
+          "account_ref": "90aae05929df",
+          "product": "go",
+          "status": "paid",
+          "currency": "CNY",
+          "amount_paid": 67.72,
+          "receipt_date": "2026-10-05",
+          "paid_until": "2026-11-06T01:26:00+08:00",
+          "document_sha256": "e2d14accc09d45f4c7e5858f2deaa8eabcf89cf477e5bcdd57b0848daf6ba15f"
+        },
+        "limitations": [
+          "select_frames has no independent stored attempt span; its usage is the aggregate residual",
+          "request IDs correlate four spans by unique token fingerprint; timestamps come from the matched supplier export",
+          "USD attribution is not a second cash charge; the PDF amount-due text alone is not proof of payment"
+        ]
+      },
+      "evidence_refs": [
+        {
+          "path": "../testing/2026-10-22/production-resolution/final-reconciliation.json",
+          "sha256": "40e1f30e3ee1c32cf268b98523e2955ba4f72585c56cba87ecd1a5709787f450"
+        },
+        {
+          "path": "../testing/2026-10-22/production-resolution/book-delivery.json",
+          "sha256": "d0c03030607a460028b302eb336b5810d841321f94111b482a52077bcd515716"
+        },
+        {
+          "path": "../testing/2026-10-22/production-resolution/billing-final-ui.png",
+          "sha256": "3583e396ecac2ce708b5ec0560af556433176e7bbd23a574c0ac8744d62f9f27"
+        },
+        {
+          "path": "../testing/2026-10-22/production-resolution/billing-final-ui.txt",
+          "sha256": "f759adf07f7f8f008da958ac89337f94094b6d38a12171b5def49ba44961f7a5"
+        },
+        {
+          "path": "../testing/2026-10-22/production-resolution/supplier-paid-receipt.json",
+          "sha256": "b7b746c81072d1cc14b9ea736e3d610b72b6db1fa76aee584dfaf01d902d8e00",
+          "role": "supplier_paid_status"
+        },
+        {
+          "path": "../testing/2026-10-22/production-resolution/supplier-coverage-current.json",
+          "sha256": "27f277dc0f62da81b94842ca4ccde20dc3772536ec16669f5545de7975e07d23",
+          "role": "subscription_coverage"
+        },
+        {
+          "path": "../../../../../../.config/video2md-settlement/invoice-2026-10.pdf",
+          "sha256": "e2d14accc09d45f4c7e5858f2deaa8eabcf89cf477e5bcdd57b0848daf6ba15f",
+          "role": "supplier_invoice"
+        },
+        {
+          "path": "../../../../../../.config/video2md-settlement/provider-requests-dd-final-2026-10-22.json",
+          "sha256": "e4a468f7578d7c3199299c4f84fb7f2e75230775a5aa98db54e7b1648d63c13e",
+          "role": "supplier_export"
+        }
+      ]
+    }
+  ]
+}

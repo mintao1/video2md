@@ -1,0 +1,85 @@
+{
+  "tested_at": "2026-10-21T11:20:00+08:00",
+  "production_url": "https://ferosse.tech",
+  "image": "video2md:0.2.0-hotfix-20261021l",
+  "authentication": {
+    "logout_observed": true,
+    "oauth_login_succeeded": true,
+    "authenticated_page_visible": true,
+    "session_survives_reload": true
+  },
+  "source_resolution": {
+    "provider": "controlled-mp4",
+    "resolved": true,
+    "url": "https://ferosse.tech/test-assets/model-billing-smoke.mp4"
+  },
+  "submission": {
+    "feedback_visible": true,
+    "run_id": "312e97ae",
+    "submit_log_present": true,
+    "url_entered_explicitly": true,
+    "task_count_before": 3,
+    "task_count_after": 4,
+    "historical_retry": false
+  },
+  "execution": {
+    "status": "error",
+    "running_stage_observed": true,
+    "observed_stage": "转录处理中",
+    "model_called": true,
+    "model_inference_succeeded": false,
+    "failure_reason_visible": false,
+    "failure_stage_visible": false,
+    "run_id_visible": false,
+    "failure_category": "upstream_model_channel_disabled_http_403",
+    "gpu_shutdown_log_observed": true
+  },
+  "billing": {
+    "usage": {
+      "gpu_s": 204.669,
+      "llm_in_tok": 0,
+      "llm_out_tok": 0
+    },
+    "cost_usd": 0.0,
+    "cost_settled": true,
+    "monthly_rollup_includes_run": true,
+    "monthly_gpu_s_before": 435.097,
+    "monthly_gpu_s_after": 639.766,
+    "usage_visible": false,
+    "cost_visible": false,
+    "positive_prices_configured": false,
+    "prices": {
+      "llm_in_mtok": 0.0,
+      "llm_out_mtok": 0.0,
+      "gpu_min": 0.0
+    },
+    "evidence_source": "production-database and same month_rollup method used by GET /cost; authenticated /cost HTTP not directly exercised",
+    "external_provider_invoice_verified": false
+  },
+  "artifact": {
+    "book_visible": false,
+    "markdown_nonempty": false,
+    "book_count_before": 0,
+    "book_count_after": 0,
+    "book_count_delta": 0
+  },
+  "anonymous_http": {
+    "/healthz": 200,
+    "/me": 401,
+    "/runs": 401,
+    "/cost": 401,
+    "/queue": 404,
+    "/docs": 403,
+    "/openapi.json": 403,
+    "/terms": 200,
+    "/privacy": 200
+  },
+  "not_tested": [
+    "retry billing idempotency",
+    "budget rejection",
+    "successful reader and bundle delivery",
+    "other source sites",
+    "external provider invoice reconciliation"
+  ],
+  "kind": "production"
+}

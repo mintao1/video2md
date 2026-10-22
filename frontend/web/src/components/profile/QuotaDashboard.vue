@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import type { Quota } from '../../types'
 import ProgressBar from '../common/ProgressBar.vue'
 
+const emit = defineEmits<{ (e: 'details'): void }>()
 const props = defineProps<{ quota: Quota | null }>()
 
 function percentage(used: number, total: number): number {
@@ -22,10 +23,10 @@ const storagePct = computed(() =>
   <div class="flex flex-col gap-space-sm">
     <div class="flex items-center justify-between px-space-xs">
       <span class="font-title-sm text-title-sm text-on-surface">算力与云存储用量</span>
-      <span class="font-label-sm text-label-sm text-primary flex items-center gap-0.5 cursor-pointer">
+      <button type="button" class="font-label-sm text-label-sm text-primary flex items-center gap-0.5" @click="emit('details')">
         明细流水
         <span class="material-symbols-outlined text-[14px]">chevron_right</span>
-      </span>
+      </button>
     </div>
     <div class="grid grid-cols-2 gap-space-sm">
       <!-- AI 时长 -->

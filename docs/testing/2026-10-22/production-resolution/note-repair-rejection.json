@@ -1,0 +1,8 @@
+{
+  "exit_code": 1,
+  "stdin_line_numbers": [
+    "68",
+    "35"
+  ],
+  "exception_type": "command terminated with exit code 1"
+}

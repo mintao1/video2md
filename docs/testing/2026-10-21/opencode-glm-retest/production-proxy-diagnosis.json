@@ -1,0 +1,39 @@
+{
+  "proxy": {
+    "HTTP_PROXY": {
+      "scheme": "http",
+      "host": "127.0.0.1",
+      "port": 17898
+    },
+    "HTTPS_PROXY": {
+      "scheme": "http",
+      "host": "127.0.0.1",
+      "port": 17898
+    }
+  },
+  "no_proxy_has_opencode": false,
+  "tests": [
+    {
+      "trust_env": true,
+      "error": "[SSL: WRONG_VERSION_NUMBER] wrong version number (_ssl.c:1010)"
+    },
+    {
+      "trust_env": false,
+      "status": 200,
+      "usage": {
+        "prompt_tokens": 15,
+        "completion_tokens": 11,
+        "total_tokens": 26,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": null
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 8
+        }
+      },
+      "error": "",
+      "seconds": 12.537
+    }
+  ]
+}

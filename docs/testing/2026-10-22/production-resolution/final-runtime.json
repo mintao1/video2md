@@ -1,0 +1,64 @@
+{
+  "observed_at": "2026-10-21T20:43:38.093865+00:00",
+  "deployments": [
+    {
+      "namespace": "video2md",
+      "deployment": "video2md-api",
+      "images": {
+        "api": "video2md:0.2.0-note-embeds-20261022f"
+      },
+      "ready_replicas": 1,
+      "pods": [
+        {
+          "name": "video2md-api-5789c77c46-vdkp2",
+          "containers": [
+            {
+              "name": "api",
+              "ready": true,
+              "restartCount": 0,
+              "image": "docker.io/library/video2md:0.2.0-note-embeds-20261022f",
+              "imageID": "sha256:03b8494ef1d0e0eb41ea78b880cd76d4bd94f48f113ef4f6378577ddaedc43c6"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "namespace": "gpu-router",
+      "deployment": "gpu-router",
+      "images": {
+        "router": "gpu-router:0.2.3-ocr-layout-20261022g"
+      },
+      "ready_replicas": 1,
+      "pods": [
+        {
+          "name": "gpu-router-844cf58cdd-xsb5j",
+          "containers": [
+            {
+              "name": "router",
+              "ready": true,
+              "restartCount": 0,
+              "image": "docker.io/library/gpu-router:0.2.3-ocr-layout-20261022g",
+              "imageID": "sha256:3e639b17ef5fa1554dae06d1f849ea0994629c57651c29eac00063444afa6206"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "gpu_runtime": {
+    "provider_source_sha256": "515efec650b80ef1a69fb5d1cbbcfbf90241255daa6fd0078ed66a6d3af239d3",
+    "business_kernel_status": "done"
+  },
+  "relay": {
+    "video2md-oauth-relay.service": {
+      "is-active": "active",
+      "is-enabled": "enabled"
+    },
+    "oauth-relay.service": {
+      "is-active": "inactive",
+      "is-enabled": "disabled"
+    },
+    "listener": "LISTEN 0      32     127.0.0.1:18080 0.0.0.0:*"
+  }
+}

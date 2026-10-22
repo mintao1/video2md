@@ -20,7 +20,7 @@ export const useAuthStore = defineStore('auth', () => {
   function logout(): void {
     clearToken()
     user.value = null
-    window.location.replace('/login')
+    window.location.replace('/')
   }
 
   async function fetchUser() {

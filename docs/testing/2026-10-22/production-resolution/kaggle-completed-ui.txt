@@ -1,0 +1,11 @@
+Browser tab: 5, Title: "gpu-router-job", URL: "https://www.kaggle.com/code/mintaolin/gpu-router-job/settings".
+The following is a diff from the previous accessibility tree with ~ and + representing changed and added elements, respectively. Removed elements are summarized by ID range.
+Removed element IDs: 169-176
+~		105 container Status for gpu-router-job: Successful. Click to open gpu-router-job in new window List Item gpu-router-io List Item Status for gpu-router-job: Successful. Click to open gpu-router-job in new window List Item gpu-router-io List Item Status for gpu-router-diag-accelerator: Cancelled. Click to open gpu-router-diag-accelerator in new window List Item Status for gpu-router-diag-network: Successful. Click to open gpu-router-diag-network in new window List Item Status for gpu-router-job: Cancelled. Click to open gpu-router-job in new window List Item gpu-router-io List Item undefined List Item
+~						114 text 22m
+~						121 text 22m
+~						129 text 39m
+~						136 text 40m
+~						144 text 1h
+~						152 text 1h
+The focused UI element is 109 link Status for gpu-router-job: Successful. Click to open gpu-router-job in new window

@@ -1,0 +1,4 @@
+FAIL
+- prod-billing-artifact: generated textbook is unavailable or empty
+- prod-billing-book-delta: library did not gain exactly one textbook
+exit_code=1

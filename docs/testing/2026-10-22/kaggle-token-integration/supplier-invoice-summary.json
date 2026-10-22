@@ -1,0 +1,16 @@
+{
+  "kind": "independent_provider_billing_ui_and_invoice",
+  "account_ref": "90aae05929df",
+  "invoice_id": "XPIMO8IF-0003",
+  "ui_payment_status": "Paid",
+  "invoice_description": "Go renewal",
+  "issue_date": "2026-10-05",
+  "paid_amount": "67.72",
+  "paid_currency": "CNY",
+  "pdf_sha256": "e2d14accc09d45f4c7e5858f2deaa8eabcf89cf477e5bcdd57b0848daf6ba15f",
+  "pdf_payment_status_text": "amount due; Paid status independently observed in provider billing UI",
+  "subscription_paid_until_ui": "2026/11/6 01:26:00",
+  "subscription_id_observed": false,
+  "cash_and_token_attribution_separate": true,
+  "raw_originals_stored_outside_repository": true
+}

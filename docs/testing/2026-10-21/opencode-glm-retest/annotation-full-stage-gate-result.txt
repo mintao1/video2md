@@ -1,0 +1,7 @@
+FAIL
+- pps-008: stage is fail
+- pps-008: measured values do not satisfy the stage contract
+- pps-013: stage is blocked
+- pps-013: measured values do not satisfy the stage contract
+- pps-016: stage is blocked
+- pps-016: measured values do not satisfy the stage contract

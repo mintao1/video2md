@@ -1,0 +1,330 @@
+{
+  "run_id": "4df77d9c",
+  "status": "done",
+  "created": "2026-10-21T13:30:05",
+  "stages": {
+    "ocr": {
+      "ts": "2026-10-21T13:36:52",
+      "duration_s": 253.47233
+    },
+    "clips": {
+      "ts": "2026-10-21T13:43:47",
+      "duration_s": 407.983572
+    },
+    "frames": {
+      "ts": "2026-10-21T13:32:38",
+      "duration_s": 1.968483
+    },
+    "select": {
+      "ts": "2026-10-21T13:36:59",
+      "duration_s": 0.011666
+    },
+    "download": {
+      "ts": "2026-10-21T13:30:07",
+      "duration_s": 2.157249
+    },
+    "transcribe": {
+      "ts": "2026-10-21T13:32:36",
+      "duration_s": 149.104379
+    }
+  },
+  "usage": {
+    "gpu_s": 809.12,
+    "llm_in_tok": 6498,
+    "llm_out_tok": 6919
+  },
+  "cost_usd": 0.004434,
+  "cost_pricing": {
+    "gpu_min": 0.0,
+    "currency": "USD",
+    "gpu_policy": "free",
+    "llm_in_mtok": 0.15,
+    "llm_out_mtok": 0.5,
+    "llm_cached_in_mtok": 0.03
+  },
+  "tmp_cleaned": true,
+  "artifacts_burned": null,
+  "finished": null,
+  "artifacts": [
+    {
+      "stage_metrics": {
+        "ocr": {
+          "duration_s": 253.470833,
+          "gpu_seconds": 253.416,
+          "frames_completed": 80,
+          "frames_requested": 80
+        },
+        "clips": {
+          "device": "gpu",
+          "completed": 8,
+          "requested": 8,
+          "duration_s": 407.981739,
+          "gpu_seconds": 407.942
+        },
+        "frames": {
+          "duration_s": 1.965118,
+          "max_frames": 120,
+          "gpu_seconds": 0.0,
+          "files_nonempty": true,
+          "candidate_count": 80,
+          "timestamps_valid": true
+        },
+        "select": {
+          "mode": "llm",
+          "duration_s": 0.010234,
+          "gpu_seconds": 0.0,
+          "selected_count": 8
+        },
+        "download": {
+          "bytes": 1054426,
+          "duration_s": 2.155531,
+          "gpu_seconds": 0
+        },
+        "transcribe": {
+          "segments": 4,
+          "duration_s": 149.102674,
+          "gpu_seconds": 147.762,
+          "transcript_nonempty": true,
+          "timestamped_segments": true
+        }
+      },
+      "selection_mode": "llm",
+      "selected_count": 8,
+      "note_present": true,
+      "note_exists": true,
+      "title": "数据库索引原理与查询优化",
+      "markdown_chars": 2910,
+      "clips_done": true,
+      "transcript_chars": 1385,
+      "selection_in_candidates": true
+    }
+  ],
+  "diagnostic": null,
+  "cost": {
+    "uid": "u_a550fcca296f",
+    "month": "2026-10-01T00:00:00",
+    "spend_usd": 0.009086,
+    "budget_usd": 0.0,
+    "usage": {
+      "spend_usd": 0.009086,
+      "llm_in_tok": 8545,
+      "llm_out_tok": 15609,
+      "gpu_s": 1780.114,
+      "runs_n": 6
+    },
+    "gpu_policy": "free",
+    "runs": [
+      {
+        "run_id": "4df77d9c",
+        "title": "数据库索引原理与查询优化",
+        "status": "done",
+        "created": "2026-10-21T13:30:05",
+        "deleted": false,
+        "usage": {
+          "gpu_s": 809.12,
+          "llm_in_tok": 6498,
+          "llm_out_tok": 6919
+        },
+        "cost_usd": 0.004434,
+        "cost_pricing": {
+          "gpu_min": 0.0,
+          "currency": "USD",
+          "gpu_policy": "free",
+          "llm_in_mtok": 0.15,
+          "llm_out_mtok": 0.5,
+          "llm_cached_in_mtok": 0.03
+        }
+      },
+      {
+        "run_id": "edfa1b1a",
+        "title": "ferosse.tech",
+        "status": "partial",
+        "created": "2026-10-21T13:09:14",
+        "deleted": false,
+        "usage": {
+          "gpu_s": 331.228,
+          "llm_in_tok": 2047,
+          "llm_out_tok": 8690
+        },
+        "cost_usd": 0.004652,
+        "cost_pricing": {
+          "gpu_min": 0.0,
+          "currency": "USD",
+          "gpu_policy": "free",
+          "llm_in_mtok": 0.15,
+          "llm_out_mtok": 0.5,
+          "llm_cached_in_mtok": 0.03
+        }
+      },
+      {
+        "run_id": "312e97ae",
+        "title": "ferosse.tech",
+        "status": "error",
+        "created": "2026-10-21T11:20:09",
+        "deleted": false,
+        "usage": {
+          "gpu_s": 204.669,
+          "llm_in_tok": 0,
+          "llm_out_tok": 0
+        },
+        "cost_usd": 0.0,
+        "cost_pricing": null
+      },
+      {
+        "run_id": "56835fed",
+        "title": "ferosse.tech",
+        "status": "error",
+        "created": "2026-10-21T08:15:42",
+        "deleted": false,
+        "usage": {
+          "gpu_s": 183.082,
+          "llm_in_tok": 0,
+          "llm_out_tok": 0
+        },
+        "cost_usd": 0.0,
+        "cost_pricing": null
+      },
+      {
+        "run_id": "aef9643a",
+        "title": "ferosse.tech",
+        "status": "error",
+        "created": "2026-10-21T07:37:06",
+        "deleted": false,
+        "usage": {
+          "gpu_s": 251.977,
+          "llm_in_tok": 0,
+          "llm_out_tok": 0
+        },
+        "cost_usd": 0.0,
+        "cost_pricing": null
+      },
+      {
+        "run_id": "9ad9ee9d",
+        "title": "ferosse.tech",
+        "status": "error",
+        "created": "2026-10-21T06:03:35",
+        "deleted": false,
+        "usage": {
+          "gpu_s": 0.038,
+          "llm_in_tok": 0,
+          "llm_out_tok": 0
+        },
+        "cost_usd": 0.0,
+        "cost_pricing": null
+      }
+    ],
+    "pricing_configured": true,
+    "prices": {
+      "llm_in_mtok": 0.15,
+      "llm_out_mtok": 0.5,
+      "gpu_min": 0.0,
+      "llm_cached_in_mtok": 0.03
+    }
+  },
+  "span_log": [
+    {
+      "event": "entry 1/1 download",
+      "status": "completed",
+      "durationMs": 2152
+    },
+    {
+      "event": "stage:download",
+      "status": "completed",
+      "durationMs": 2158
+    },
+    {
+      "event": "entry 1/1 transcribe",
+      "status": "completed",
+      "durationMs": 149099
+    },
+    {
+      "event": "stage:transcribe",
+      "status": "completed",
+      "durationMs": 149106
+    },
+    {
+      "event": "entry 1/1 frames",
+      "status": "completed",
+      "durationMs": 1962
+    },
+    {
+      "event": "stage:frames",
+      "status": "completed",
+      "durationMs": 1971
+    },
+    {
+      "event": "entry 1/1 ocr",
+      "status": "completed",
+      "durationMs": 253468
+    },
+    {
+      "event": "stage:ocr",
+      "status": "completed",
+      "durationMs": 253476
+    },
+    {
+      "event": "entry 1/1 select",
+      "status": "completed",
+      "durationMs": 7
+    },
+    {
+      "event": "stage:select",
+      "status": "completed",
+      "durationMs": 15
+    },
+    {
+      "event": "entry 1/1 clips",
+      "status": "completed",
+      "durationMs": 407978
+    },
+    {
+      "event": "stage:clips",
+      "status": "completed",
+      "durationMs": 407988
+    },
+    {
+      "event": "llm:organize",
+      "status": "completed",
+      "durationMs": 48586,
+      "model": "glm-5.3-flash",
+      "usage": {
+        "total_tokens": 6497,
+        "prompt_tokens": 1470,
+        "completion_tokens": 5027,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cached_tokens": 0
+        },
+        "completion_tokens_details": {
+          "audio_tokens": null,
+          "reasoning_tokens": 4000,
+          "accepted_prediction_tokens": null,
+          "rejected_prediction_tokens": null
+        }
+      },
+      "attempts": 1
+    },
+    {
+      "event": "llm:metadata",
+      "status": "completed",
+      "durationMs": 5803,
+      "model": "glm-5.3-flash",
+      "usage": {
+        "total_tokens": 2032,
+        "prompt_tokens": 1123,
+        "completion_tokens": 909,
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cached_tokens": 0
+        },
+        "completion_tokens_details": {
+          "audio_tokens": null,
+          "reasoning_tokens": 840,
+          "accepted_prediction_tokens": null,
+          "rejected_prediction_tokens": null
+        }
+      },
+      "attempts": 1
+    }
+  ]
+}

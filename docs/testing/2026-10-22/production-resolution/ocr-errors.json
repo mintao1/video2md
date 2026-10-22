@@ -1,0 +1,7 @@
+{
+  "status": "error",
+  "errors": [
+    "远程 OCR 失败 HTTP 502: {\"detail\":{\"error\":\"[ocr] 所有 provider 均不可用 → kaggle: Kaggle 内核报错: [Errno 2] No such file or directory: '/kaggle/input/datasets/mintao | modal(跳过: 已禁用（配置或手动开关）) | colab(跳过: 冷却中（剩 68",
+    "远程 OCR 失败 HTTP 502: {\"detail\":{\"error\":\"[ocr] 所有 provider 均不可用 → kaggle: Kaggle 内核报错: [Errno 2] No such file or directory: '/kaggle/input/datasets/mintao | modal(跳过: 已禁用（配置或手动开关）) | colab(跳过: 冷却中（剩 68"
+  ]
+}

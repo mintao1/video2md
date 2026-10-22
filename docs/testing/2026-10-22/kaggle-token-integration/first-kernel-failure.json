@@ -1,0 +1,11 @@
+{
+  "job_id": "a33e1c2dec82",
+  "kernel_status": {
+    "state": "error",
+    "error": "[Errno 2] No such file or directory: '/kaggle/input/gpu-router-io/clip_job.json'"
+  },
+  "dataset_source_count": 1,
+  "dataset_tail_matches_template": true,
+  "metadata_enable_gpu": true,
+  "note": "metadata does not prove physical GPU; layout control checks nvidia-smi. Generic quota classification includes skipped Colab and is not the Kaggle root cause."
+}

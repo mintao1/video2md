@@ -1,0 +1,10 @@
+{
+  "image": "video2md:0.2.0-failure-cost-20261021a",
+  "base_image": "video2md:0.2.0-integration-20261021m",
+  "files": {
+    "backend/video2md/api.py": "ad062f1928146856fb0739d8be570fa7a9123fe1eb77c7c4fe74bee53acfe360",
+    "backend/video2md/graph.py": "dbac35ada94f314a57b5e355cdcd81d64e1b5dcb725f08479a6d444c95caf489",
+    "backend/video2md/llm.py": "4825610b0cac0f54b5315ebdb98bb3ad7b6cd03756a790fb0991d3d547504a87"
+  },
+  "patch_sha256": "c6bac8d90b2e8d10e2888c72ed9318bb762c93c0005cb38354a2eaff151a6c1c"
+}

@@ -1,0 +1,11 @@
+{
+  "same_run": true,
+  "deltas": {
+    "llm_in_tok": 0,
+    "llm_out_tok": 0,
+    "gpu_s": 0.0,
+    "spend_usd": 0.0,
+    "runs_n": 0
+  },
+  "task_count": 6
+}

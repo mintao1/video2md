@@ -1,0 +1,92 @@
+{
+  "kind": "ui_export_accounting_allowlist",
+  "truncated": false,
+  "source_items": 97,
+  "items": [
+    {
+      "requestID": "01a16085-60d3-74df-9490-a53b7c44f9fb",
+      "sessionID": "video2md-628f38fc",
+      "startedAt": 1792620716243,
+      "finishedAt": 1792620718509,
+      "model": "glm-5.3-flash",
+      "statusCode": 200,
+      "outcome": "succeeded",
+      "finish": {
+        "reason": "stop"
+      },
+      "inputTokens": 2357,
+      "outputTokens": 104,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "cost": 0.00040555
+    },
+    {
+      "requestID": "01a16084-db37-7f1d-b365-8e76a6d67f88",
+      "sessionID": "video2md-628f38fc",
+      "startedAt": 1792620682039,
+      "finishedAt": 1792620716190,
+      "model": "glm-5.3-flash",
+      "statusCode": 200,
+      "outcome": "succeeded",
+      "finish": {
+        "reason": "stop"
+      },
+      "inputTokens": 19339,
+      "outputTokens": 2809,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "cost": 0.00430535
+    },
+    {
+      "requestID": "01a16084-cf0d-7b4d-b238-aace9836037a",
+      "sessionID": "video2md-628f38fc",
+      "startedAt": 1792620678925,
+      "finishedAt": 1792620681196,
+      "model": "glm-5.3-flash",
+      "statusCode": 200,
+      "outcome": "succeeded",
+      "finish": {
+        "reason": "stop"
+      },
+      "inputTokens": 1634,
+      "outputTokens": 87,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "cost": 0.0002886
+    },
+    {
+      "requestID": "01a16084-61eb-7690-806d-d37dad454226",
+      "sessionID": "video2md-628f38fc",
+      "startedAt": 1792620650987,
+      "finishedAt": 1792620678902,
+      "model": "glm-5.3-flash",
+      "statusCode": 200,
+      "outcome": "succeeded",
+      "finish": {
+        "reason": "stop"
+      },
+      "inputTokens": 34240,
+      "outputTokens": 2187,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "cost": 0.0062295
+    },
+    {
+      "requestID": "01a16080-5ffa-74a4-9eda-f5006b9be091",
+      "sessionID": "video2md-628f38fc",
+      "startedAt": 1792620388346,
+      "finishedAt": 1792620409192,
+      "model": "glm-5.3-flash",
+      "statusCode": 200,
+      "outcome": "succeeded",
+      "finish": {
+        "reason": "stop"
+      },
+      "inputTokens": 64623,
+      "outputTokens": 1520,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "cost": 0.01045345
+    }
+  ]
+}

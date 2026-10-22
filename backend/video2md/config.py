@@ -81,6 +81,7 @@ ENV = load_env()
 _SPEC: dict[str, tuple] = {
     # 运行档位
     "V2MD_ENV":             ("str", "development", None),
+    "V2MD_COLAB_USERS_DIR": ("path", str(PROJ / "data" / "colab-users"), None),
     # 持久化/身份/凭证（容器里指 data 卷；凭证文件只在此处定位）
     "V2MD_STATE_FILE":      ("path", str(PROJ / "state.json"), None),
     "V2MD_RUNS_FILE":       ("path", str(PROJ / "runs.json"), None),
@@ -140,7 +141,9 @@ _SPEC: dict[str, tuple] = {
     "V2MD_BUDGET_MONTH_USD":     ("float", 0.0, ("min", 0.0)),
     "V2MD_PRICE_LLM_IN_MTOK":    ("float", 0.0, ("min", 0.0)),
     "V2MD_PRICE_LLM_OUT_MTOK":   ("float", 0.0, ("min", 0.0)),
+    "V2MD_PRICE_LLM_CACHED_IN_MTOK": ("float", 0.0, ("min", 0.0)),
     "V2MD_PRICE_GPU_MIN":        ("float", 0.0, ("min", 0.0)),
+    "V2MD_GPU_PRICE_POLICY":     ("enum", "metered", ("metered", "free")),
 }
 
 
@@ -301,6 +304,7 @@ BUDGET_MONTH_USD: float = _PARSED["V2MD_BUDGET_MONTH_USD"]
 PRICE_LLM_IN_MTOK: float = _PARSED["V2MD_PRICE_LLM_IN_MTOK"]
 PRICE_LLM_OUT_MTOK: float = _PARSED["V2MD_PRICE_LLM_OUT_MTOK"]
 PRICE_GPU_MIN: float = _PARSED["V2MD_PRICE_GPU_MIN"]
+PRICE_LLM_CACHED_IN_MTOK: float = _PARSED["V2MD_PRICE_LLM_CACHED_IN_MTOK"]
 
 # 版本单源：dist metadata（已安装时）→ pyproject.toml（源码/镜像直跑，Dockerfile 有 COPY）
 # → "0.0.0"。FastAPI version 与 /healthz 都读这里，不手工双写。

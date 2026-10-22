@@ -1,0 +1,11 @@
+{
+  "images": [
+    {
+      "name": "api",
+      "image": "video2md:0.2.0-integration-20261021m"
+    }
+  ],
+  "generation": 52,
+  "ready_replicas": 1,
+  "updated_replicas": 1
+}

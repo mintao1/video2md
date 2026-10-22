@@ -1,0 +1,6 @@
+{
+  "base_image": "gpu-router:0.2.3-kaggle-token-20261022b",
+  "image": "gpu-router:0.2.3-asr-decoder-20261022c",
+  "source_sha256": "426f2bbbbf997853fda075b5dde939ce5bc0b9a7edfab62d3b14a640029360ed",
+  "only_change": "ASR worker pip versions faster-whisper==1.2.1 and av==18.1.0"
+}

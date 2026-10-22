@@ -18,6 +18,8 @@ import asyncio
 import json
 import urllib.request
 from collections.abc import Callable, Mapping
+from threading import Lock
+from time import monotonic as _cert_now
 from urllib.parse import urlencode
 
 from .models import AuthError, NoCredentials, Principal
@@ -33,25 +35,68 @@ class _GoogleHttpxResponse:
 
 
 class _GoogleHttpxRequest:
-    """Use the same proven HTTPX CONNECT path as the OAuth token exchange."""
+    """HTTPX CONNECT transport with bounded public-certificate caching.
+
+    google-auth fetches certificates on every verification by default. Cache
+    public keys only; signature/audience/issuer/expiry verification still runs
+    for every token. Never serve stale keys after an upstream failure.
+    """
+
+    _cache: dict[tuple[str, str], tuple[float, _GoogleHttpxResponse]] = {}
+    _lock = Lock()
+    _cert_url = 'https://www.googleapis.com/oauth2/v1/certs'
 
     def __init__(self, proxy_url: str):
-        import httpx
-
-        self._client = httpx.Client(proxy=proxy_url or None)
+        self.proxy_url = proxy_url
 
     def __call__(self, url, method="GET", body=None, headers=None, timeout=120, **kwargs):
+        public = url == self._cert_url and method.upper() == 'GET' and body is None and not headers
+        if not public:
+            return self._fetch(url, method, body, headers, timeout)
+        key = (self.proxy_url, url)
+        # Serialize cold/expired requests so concurrent media ranges do not
+        # stampede the certificate endpoint through the OAuth relay.
+        with self._lock:
+            now = _cert_now()
+            cached = self._cache.get(key)
+            if cached and now < cached[0]:
+                return cached[1]
+            self._cache.pop(key, None)
+            response = self._fetch(url, method, body, headers, min(float(timeout or 30), 30))
+            ttl = self._fresh_seconds(response)
+            if ttl > 0:
+                if len(self._cache) >= 32:
+                    self._cache.pop(next(iter(self._cache)))
+                self._cache[key] = (now + ttl, response)
+            return response
+
+    @staticmethod
+    def _fresh_seconds(response) -> int:
+        if response.status != 200:
+            return 0
+        directives = dict(part.strip().lower().partition('=')[::2]
+                          for part in response.headers.get('cache-control', '').split(','))
+        if 'no-store' in directives or 'no-cache' in directives:
+            return 0
+        try:
+            seconds = int(directives.get('max-age', '0'))
+            age = int(response.headers.get('age', '0'))
+            certs = json.loads(response.data)
+            if age < 0 or not isinstance(certs, dict) or not certs or not all(
+                    isinstance(value, str) and value.startswith('-----BEGIN CERTIFICATE-----')
+                    for value in certs.values()):
+                return 0
+            return max(0, min(seconds - age, 3600))
+        except (TypeError, ValueError):
+            return 0
+
+    def _fetch(self, url, method, body, headers, timeout):
         import httpx
         from google.auth import exceptions as gexceptions
 
         try:
-            response = self._client.request(
-                method,
-                url,
-                content=body,
-                headers=headers,
-                timeout=timeout,
-            )
+            with httpx.Client(proxy=self.proxy_url or None) as client:
+                response = client.request(method, url, content=body, headers=headers, timeout=timeout)
         except httpx.HTTPError as exc:
             raise gexceptions.TransportError(str(exc)) from exc
         return _GoogleHttpxResponse(response)

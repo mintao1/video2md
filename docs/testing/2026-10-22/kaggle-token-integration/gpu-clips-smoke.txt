@@ -1,0 +1,4 @@
+{"event": "submitted", "job_id": "a33e1c2dec82"}
+{"event": "state", "status": "running", "elapsed_s": 0.108}
+{"event": "state", "status": "error", "elapsed_s": 70.128}
+RESULT {"kind": "production_gpu_route_smoke", "llm_calls": 0, "fixture_url": "https://ferosse.tech/test-assets/model-billing-smoke.mp4", "source_bytes": 406492, "job_id": "a33e1c2dec82", "status": "error", "passed": false, "error_category": "quota", "elapsed_s": 70.128}

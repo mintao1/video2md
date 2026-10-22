@@ -1,0 +1,6 @@
+time="2026-10-21T15:47:40.142099000+08:00" level=info msg="Start initial configuration in progress"
+time="2026-10-21T15:47:40.146114000+08:00" level=info msg="Geodata Loader mode: memconservative"
+time="2026-10-21T15:47:40.146140000+08:00" level=info msg="Geosite Matcher implementation: succinct"
+time="2026-10-21T15:47:40.147634000+08:00" level=info msg="Initial configuration complete, total time: 3ms"
+configuration file /Users/linmintao/.config/video2md-bilibili-home/config.yaml test is successful
+{"services_loaded": {"com.linmintao.video2md-bilibili-home": true, "com.linmintao.video2md-bilibili-tunnel": true}, "loopback_listener": true}

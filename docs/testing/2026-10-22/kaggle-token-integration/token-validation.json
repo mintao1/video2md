@@ -1,0 +1,7 @@
+{
+  "authenticated": true,
+  "auth_method": "ACCESS_TOKEN",
+  "account_ref_sha256": "2b7ed353d159",
+  "token_value_recorded": false,
+  "runtime_cli_version": "2.2.4"
+}

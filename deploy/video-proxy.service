@@ -1,0 +1,11 @@
+[Unit]
+Description=Forward Video2MD container proxy traffic to host mihomo
+Requires=video-proxy.socket clash-verge-mihomo.service
+After=clash-verge-mihomo.service
+
+[Service]
+ExecStart=/lib/systemd/systemd-socket-proxyd 127.0.0.1:7897
+PrivateTmp=yes
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes

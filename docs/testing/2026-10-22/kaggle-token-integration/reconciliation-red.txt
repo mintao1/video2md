@@ -1,0 +1,18 @@
+/Library/Frameworks/Python.framework/Versions/3.14/lib/python3.14/site-packages/requests/__init__.py:113: RequestsDependencyWarning: urllib3 (2.7.0) or chardet (7.6.0)/charset_normalizer (3.4.2) doesn't match a supported version!
+  warnings.warn(
+
+==================================== ERRORS ====================================
+_________ ERROR collecting tests/test_opencode_usage_reconciliation.py _________
+backend/tests/test_opencode_usage_reconciliation.py:11: in <module>
+    SPEC.loader.exec_module(module)
+<frozen importlib._bootstrap_external>:755: in exec_module
+    ???
+<frozen importlib._bootstrap_external>:892: in get_code
+    ???
+<frozen importlib._bootstrap_external>:950: in get_data
+    ???
+E   FileNotFoundError: [Errno 2] No such file or directory: '/Users/linmintao/Desktop/开发项目/云端部署/video2md/scripts/reconcile_opencode_usage.py'
+=========================== short test summary info ============================
+ERROR backend/tests/test_opencode_usage_reconciliation.py - FileNotFoundError...
+!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!
+1 error in 0.10s

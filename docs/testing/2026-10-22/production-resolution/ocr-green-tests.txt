@@ -1,0 +1,121 @@
+...................FFF.................................................. [ 48%]
+........................................................................ [ 96%]
+.....                                                                    [100%]
+=================================== FAILURES ===================================
+_____ test_ocr_empty_text_without_error_is_valid_and_does_not_force_retry ______
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10abb6870>
+tmp_path = PosixPath('/private/var/folders/1b/7r5v_kjj689_65rpwv0hxg8h0000gn/T/pytest-of-linmintao/pytest-114/test_ocr_empty_text_without_er0')
+
+    def test_ocr_empty_text_without_error_is_valid_and_does_not_force_retry(monkeypatch, tmp_path):
+        from video2md import runs
+        art = {'candidates': [[0, 'f.jpg']], 'segs': [{'start':0,'end':2,'text':'healthy speech'}],
+               'video':'fixture.mp4'}
+        monkeypatch.setattr(runs, 'ocr_candidates', lambda *a, **kw: ([], [[0,'',0,None]]))
+>       runs._stage_ocr({}, {'url':'fixture'}, art, tmp_path, {})
+
+tests/test_failure_cost_regressions.py:193: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+video2md/runs.py:777: in _stage_ocr
+    transcript, _ev = merge_timeline(art["segs"], ocr_items)
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+segs = [{'start': 0, 'end': 2, 'text': 'healthy speech'}], ocr_items = []
+
+    def merge_timeline(segs: list[dict], ocr_items: list[tuple[float, str, float]]) -> tuple[str, list]:
+>       events = [("voice", s["start"], s["text"], s["conf"]) for s in segs if s["text"]]
+                                                   ^^^^^^^^^
+E       KeyError: 'conf'
+
+video2md/frames.py:219: KeyError
+______________________ test_invalid_cached_ocr_is_retried ______________________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10abb45c0>
+tmp_path = PosixPath('/private/var/folders/1b/7r5v_kjj689_65rpwv0hxg8h0000gn/T/pytest-of-linmintao/pytest-114/test_invalid_cached_ocr_is_ret0')
+
+    def test_invalid_cached_ocr_is_retried(monkeypatch, tmp_path):
+        from video2md import runs
+        art = {'candidates': [[0,'f.jpg']], 'segs':[{'start':0,'end':2,'text':'speech'}],
+               'video':'fixture.mp4', 'ocr_raw':[[0,'',0,'old failure']]}
+        calls = []
+        monkeypatch.setattr(runs, 'ocr_candidates', lambda *a, **kw: calls.append(True) or ([],[[0,'',0,None]]))
+>       runs._stage_ocr({}, {'url':'fixture'}, art, tmp_path, {})
+
+tests/test_failure_cost_regressions.py:203: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+video2md/runs.py:777: in _stage_ocr
+    transcript, _ev = merge_timeline(art["segs"], ocr_items)
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+segs = [{'start': 0, 'end': 2, 'text': 'speech'}], ocr_items = []
+
+    def merge_timeline(segs: list[dict], ocr_items: list[tuple[float, str, float]]) -> tuple[str, list]:
+>       events = [("voice", s["start"], s["text"], s["conf"]) for s in segs if s["text"]]
+                                                   ^^^^^^^^^
+E       KeyError: 'conf'
+
+video2md/frames.py:219: KeyError
+_______________ test_stage_loop_does_not_skip_failed_cached_ocr ________________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10abb7530>
+tmp_path = PosixPath('/private/var/folders/1b/7r5v_kjj689_65rpwv0hxg8h0000gn/T/pytest-of-linmintao/pytest-114/test_stage_loop_does_not_skip_0')
+
+    def test_stage_loop_does_not_skip_failed_cached_ocr(monkeypatch, tmp_path):
+        from contextlib import contextmanager, nullcontext
+    
+        from video2md import runs
+        art = {'candidates': [[0,'f.jpg']], 'segs':[{'start':0,'end':2,'text':'speech'}],
+               'video':'fixture.mp4', 'ocr_raw':[[0,'',0,'old failure']]}
+        run = {'run_id':'ocr-cache-fixture','tmp':str(tmp_path),'entries':[{'url':'entry'}],
+               'artifacts':{'entry':art},'stages':{}}
+        calls = []
+        monkeypatch.setattr(runs, '_runs_file_lock', nullcontext)
+        monkeypatch.setattr(runs, '_runs_merge', lambda value: None)
+        monkeypatch.setattr(runs, 'ocr_candidates', lambda *a, **kw: calls.append(True) or ([],[[0,'',0,None]]))
+    
+        class Log:
+            @contextmanager
+            def span(self, *args):
+                yield {}
+    
+            def info(self, *args, **kw):
+                pass
+    
+        runs._run_stage_inner(run, 'ocr', {}, Log())
+>       assert calls == [True] and not run.get('partial_failures', {}).get('ocr')
+E       AssertionError: assert ([True] == [True]
+E         
+E         Use -v to get more diff and not ['1'])
+E        +  where ['1'] = <built-in method get of dict object at 0x10ad2a440>('ocr')
+E        +    where <built-in method get of dict object at 0x10ad2a440> = {'ocr': ['1']}.get
+E        +      where {'ocr': ['1']} = <built-in method get of dict object at 0x10ad2a000>('partial_failures', {})
+E        +        where <built-in method get of dict object at 0x10ad2a000> = {'run_id': 'ocr-cache-fixture', 'tmp': '/private/var/folders/1b/7r5v_kjj689_65rpwv0hxg8h0000gn/T/pytest-of-linmintao/p... 'segs': [{'start': 0, 'end': 2, 'text': 'speech'}], 'video': 'fixture.mp4', 'ocr_raw': [[0, '', 0, None]], ...}}, ...}.get
+
+tests/test_failure_cost_regressions.py:229: AssertionError
+----------------------------- Captured stdout call -----------------------------
+    · 条目 1/1：ocr
+    ⚠ 条目异常：'conf'
+PARTIAL-FAIL ocr 条目 1
+=============================== warnings summary ===============================
+.venv/lib/python3.12/site-packages/starlette/testclient.py:53
+  /Users/linmintao/Desktop/开发项目/云端部署/video2md/backend/.venv/lib/python3.12/site-packages/starlette/testclient.py:53: DeprecationWarning: The anyio.abc.BlockingPortal alias is deprecated, use anyio.from_thread.BlockingPortal instead.
+    _PortalFactoryType = Callable[[], AbstractContextManager[anyio.abc.BlockingPortal]]
+
+tests/test_api_contract.py::test_auth_google_callback_happy_path
+tests/test_api_contract.py::test_auth_google_redirect_round_trip
+tests/test_api_contract.py::test_auth_google_callback_state_rejected
+tests/test_api_contract.py::test_auth_google_callback_state_rejected
+tests/test_api_contract.py::test_auth_google_callback_state_rejected
+tests/test_api_contract.py::test_auth_google_callback_exchange_rejected
+tests/test_api_contract.py::test_auth_google_callback_verify_fails
+  /Users/linmintao/Desktop/开发项目/云端部署/video2md/backend/.venv/lib/python3.12/site-packages/starlette/testclient.py:455: DeprecationWarning: Setting per-request cookies=<...> is being deprecated, because the expected behaviour on cookie persistence is ambiguous. Set cookies directly on the client instance instead.
+    return super().request(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_failure_cost_regressions.py::test_ocr_empty_text_without_error_is_valid_and_does_not_force_retry
+FAILED tests/test_failure_cost_regressions.py::test_invalid_cached_ocr_is_retried
+FAILED tests/test_failure_cost_regressions.py::test_stage_loop_does_not_skip_failed_cached_ocr
+3 failed, 146 passed, 8 warnings in 4.46s

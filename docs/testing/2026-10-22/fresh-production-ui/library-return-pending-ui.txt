@@ -1,0 +1,40 @@
+Browser tab: 1, Title: "视书 · Textbook Library", URL: "https://ferosse.tech/library".
+1 AXWebArea 视书 · Textbook Library, URL: ferosse.tech/library
+	2 container app
+		3 container
+			4 text menu_book 视书 · Textbook Library
+			5 button 通知
+			6 link Description: M, Value: ferosse.tech/profile
+			7 button 退出登录
+		8 container
+			9 container
+				10 text search
+				11 text field (settable)
+			12 container
+				13 button auto_stories 全部教材 (0)
+					14 text auto_stories
+					15 text 全部教材
+					16 text (0)
+				17 button 计算机 / AI
+				18 button 数学基础
+				19 button 商业管理
+				20 button 语言学习
+				21 button bookmark 收藏夹
+					22 text bookmark
+					23 text 收藏夹
+			24 heading 智能教材架, Value: 2
+				25 text 智能教材架
+			26 text 共 0 本
+			27 button 网格视图
+			28 button 列表视图
+			29 text cloud_sync 全端书籍与笔记自动同步已开启 尚未同步
+			30 button 立即同步 sync
+				31 text 立即同步
+				32 text sync
+		33 container
+			34 link Description: motion_photos_on 排队处理, Value: ferosse.tech/tasks
+			35 link Description: local_library 教材库, Value: ferosse.tech/library
+			36 link Description: add 新建转换, Value: ferosse.tech/tasks?openImport=1
+			37 link Description: person 我的, Value: ferosse.tech/profile
+
+The focused UI element is 1 AXWebArea 视书 · Textbook Library, URL: ferosse.tech/library

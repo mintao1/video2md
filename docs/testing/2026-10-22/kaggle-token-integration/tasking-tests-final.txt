@@ -1,0 +1,72 @@
+== run_task 状态机 ==
+  ✅ 规范状态集四态
+  ✅ happy path：返回 (task_id, 产物)
+  ✅ files/spec 原样直通（内核不解释 spec）
+  ✅ want 过滤：未点名产物不取
+  ✅ 状态轨迹按脚本推进
+  ✅ error 状态 → RuntimeError 带平台报文
+  ✅ 平台指纹咬合：全局不认识、指纹判 quota
+  ✅ 超时 → RuntimeError 且先 task_cancel 兜底
+  ✅ 未知状态 → RuntimeError 防协议漂移（且按弃单纪律先 task_cancel）
+  ✅ task_cancel 默认 False（平台不支持则弃单路径照常抛错）
+  ✅ 轮询中途异常 → 原异常透传不遮蔽
+  ✅ 弃单纪律：异常路径也先 task_cancel 兜底（风险 #5 收窄）
+  ✅ 无 cancel API（kaggle 现实）→ 弃单无害照常抛错，平台自灭接管
+== 经 Router 全链路（业务方法内嵌 run_task）==
+  ⚠️ provider bad 失败（quota）→ 换下一家: scripted only hit
+  ✅ error 后故障转移到下一家
+  ✅ 指纹判 quota → 冷却 ≈20h（全局正则判不出这个报文）
+== Kaggle tasking 适配器 ==
+  ✅ 全链路：slug 即 task_id、want 产物齐
+  ✅ 命令轨迹 list→create→push→status×n→output
+  ✅ kernel-metadata：dataset_sources=[ref] + schema 归壳
+  ✅ dataset 搜索按 slug 尾段（extra 覆盖不跑偏）
+  ✅ 已存在数据集走 version 整包替换
+  ✅ files 值支持 Path（流式拷贝不进内存）
+  ✅ task_submit 返回内核 slug
+  ✅ status 映射 'Kernel Worker complete' → done
+  ✅ status 映射 'kernels error occurred' → error
+  ✅ status 映射 'cancelRequested' → error
+  ✅ status 映射 'job queued for GPU' → queued
+  ✅ status 映射 'Kernel Worker is running' → running
+  ✅ task_fetch：want 过滤 + 缺键省略
+  ✅ 超时 → RuntimeError 且指纹判 network（全局认不出的中文报文）
+  ✅ task_cancel 无 API → False（超时兜底照常抛错）
+== Kaggle health / 凭证门 ==
+  ✅ Kaggle 缺 CLI → health 拒
+  ✅ Kaggle 缺凭证 → health 拒
+  ✅ _creds_user 凭证缺失 → RuntimeError
+  ✅ Kaggle 凭证经环境变量就位 → health 放行
+  ✅ _creds_user 读 KAGGLE_USERNAME
+  ✅ 只有 KAGGLE_USERNAME 无 KEY → health 拒
+  ✅ kaggle.json = {} → health 拒（存在 ≠ 有内容；本次线上事故根因）
+  ✅ _creds_user 遇 {} 的报错带文件路径与字节数（可诊断）
+  ✅ kaggle.json = [] → health 拒（非 dict）
+  ✅ kaggle.json 非法 JSON → health 拒（说清是解析失败）
+  ✅ kaggle.json 缺 key 字段 → health 拒并点名缺哪个字段
+  ✅ kaggle.json 完整 → health 放行且报出 username（可核对是哪份凭证）
+== 选举健康过滤（2026-10-07 kaggle 事故后补） ==
+  ✅ 选举滤掉已缓存为不健康的 provider
+  ✅ 过滤理由带上探活详情（可诊断）
+  ✅ 健康缓存缺失 = 未知 = 放行（不在选举路径上发探测）
+  ✅ 全部探活不通过 → panic 兜底仍给候选（宁可选一家失败也好过 502 无候选）
+  ✅ panic 放行者在 skipped 里有显式标注（不是静默降级）
+  ✅ 健康但冷却中 → 仍被排除（熔断是正交层，不被健康过滤覆盖）
+== kaggle 业务三件套（内建方法 + IN 动态注入） ==
+  ✅ transcribe：out.json 解析（whisper 同形）
+  ✅ transcribe：args.json 组装（model/language）
+  ✅ transcribe：in.m4a 以 Path 流式进数据集（staged 落盘）
+  ✅ IN 注入：缺省 slug 尾段 gpu-router-io
+  ✅ spec：gpu/internet 资源标志直通
+  ✅ IN 注入：extra.dataset 自定义名联动（命名耦合已治）
+  ✅ ocr：results 直读
+  ✅ ocr：多图打单 tar（防散文件）
+  ✅ cut_clips：clips_result 解析 + 失败段保留 False
+  ✅ cut_clips：clips.tar 解包落 out_dir
+  ✅ cut_clips：video=None → direct_url 进 clip_job.json
+  ✅ cut_clips：有 video → direct_url 置空 + 源片流式进数据集
+  ✅ 内核 error 状态 → RuntimeError 带报文
+  ✅ out.json 缺失（内核半途崩）→ RuntimeError
+  ✅ Router 全链：零插件 kaggle 走内建方法（segments 同形 + 归属记账）
+
+✅ 全部通过

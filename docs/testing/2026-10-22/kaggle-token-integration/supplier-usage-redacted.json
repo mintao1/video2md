@@ -1,0 +1,1556 @@
+{
+  "kind": "independent_provider_ui_export",
+  "product": "go",
+  "source_sha256": "8bd84216ef0e4fbb3e7700bb4a9f9f839ec9b33f47d9edea11bdb03ef781fa73",
+  "truncated": true,
+  "matching_model_count": 48,
+  "rows": [
+    {
+      "id": "01a15f2b-07ba-7d85-b943-e25ff20e1ce5",
+      "requestID": "01a15f2b-07ba-7d85-b943-e25ff20e1ce5",
+      "startedAt": 1792598017978,
+      "finishedAt": 1792598020372,
+      "durationMs": 2394,
+      "outcome": "succeeded",
+      "protocol": "openai-chat",
+      "product": "go",
+      "statusCode": 200,
+      "requestedModel": "glm-5.3-flash",
+      "model": "glm-5.3-flash",
+      "provider": "opencode",
+      "finish": {
+        "reason": "stop"
+      },
+      "inputTokens": 30,
+      "outputTokens": 45,
+      "reasoningTokens": 38,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "cost": 2.7e-05,
+      "attemptCount": 1,
+      "attempts": [
+        {
+          "provider": "opencode",
+          "model": "glm-5.3-flash",
+          "statusCode": 200,
+          "durationMs": 1283
+        }
+      ],
+      "session_is_video2md": true,
+      "run_id": "82bf8421075f43a89b0f1eb75ba87b0b"
+    },
+    {
+      "id": "01a15eb6-835f-7416-9b41-b4535e01ff47",
+      "requestID": "01a15eb6-835f-7416-9b41-b4535e01ff47",
+      "startedAt": 1792590381919,
+      "finishedAt": 1792590387545,
+      "durationMs": 5626,
+      "outcome": "succeeded",
+      "protocol": "openai-chat",
+      "product": "go",
+      "statusCode": 200,
+      "requestedModel": "glm-5.3-flash",
+      "model": "glm-5.3-flash",
+      "provider": "opencode",
+      "finish": {
+        "reason": "stop"
+      },
+      "inputTokens": 1463,
+      "outputTokens": 414,
+      "reasoningTokens": 336,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "cost": 0.00042645,
+      "attemptCount": 1,
+      "attempts": [
+        {
+          "provider": "opencode",
+          "model": "glm-5.3-flash",
+          "statusCode": 200,
+          "durationMs": 4067
+        }
+      ],
+      "session_is_video2md": true,
+      "run_id": "3c05faf8"
+    },
+    {
+      "id": "01a15eb5-32e5-7607-98a9-fe3ccb842567",
+      "requestID": "01a15eb5-32e5-7607-98a9-fe3ccb842567",
+      "startedAt": 1792590295781,
+      "finishedAt": 1792590381430,
+      "durationMs": 85649,
+      "outcome": "succeeded",
+      "protocol": "openai-chat",
+      "product": "go",
+      "statusCode": 200,
+      "requestedModel": "glm-5.3-flash",
+      "model": "glm-5.3-flash",
+      "provider": "opencode",
+      "finish": {
+        "reason": "stop"
+      },
+      "inputTokens": 5944,
+      "outputTokens": 13181,
+      "reasoningTokens": 11823,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "cost": 0.0074821,
+      "attemptCount": 1,
+      "attempts": [
+        {
+          "provider": "opencode",
+          "model": "glm-5.3-flash",
+          "statusCode": 200,
+          "durationMs": 84701
+        }
+      ],
+      "session_is_video2md": true,
+      "run_id": "3c05faf8"
+    },
+    {
+      "id": "01a15eb5-227c-7230-b806-051f000500c6",
+      "requestID": "01a15eb5-227c-7230-b806-051f000500c6",
+      "startedAt": 1792590291580,
+      "finishedAt": 1792590295307,
+      "durationMs": 3727,
+      "outcome": "succeeded",
+      "protocol": "openai-chat",
+      "product": "go",
+      "statusCode": 200,
+      "requestedModel": "glm-5.3-flash",
+      "model": "glm-5.3-flash",
+      "provider": "opencode",
+      "finish": {
+        "reason": "stop"
+      },
+      "inputTokens": 875,
+      "outputTokens": 335,
+      "reasoningTokens": 245,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "cost": 0.00029875,
+      "attemptCount": 1,
+      "attempts": [
+        {
+          "provider": "opencode",
+          "model": "glm-5.3-flash",
+          "statusCode": 200,
+          "durationMs": 2666
+        }
+      ],
+      "session_is_video2md": true,
+      "run_id": "3c05faf8"
+    },
+    {
+      "id": "01a15eb4-8b84-7d31-9b57-3b7757b5fecb",
+      "requestID": "01a15eb4-8b84-7d31-9b57-3b7757b5fecb",
+      "startedAt": 1792590252932,
+      "finishedAt": 1792590290668,
+      "durationMs": 37736,
+      "outcome": "succeeded",
+      "protocol": "openai-chat",
+      "product": "go",
+      "statusCode": 200,
+      "requestedModel": "glm-5.3-flash",
+      "model": "glm-5.3-flash",
+      "provider": "opencode",
+      "finish": {
+        "reason": "stop"
+      },
+      "inputTokens": 1540,
+      "outputTokens": 5634,
+      "reasoningTokens": 4861,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "cost": 0.003048,
+      "attemptCount": 1,
+      "attempts": [
+        {
+          "provider": "opencode",
+          "model": "glm-5.3-flash",
+          "statusCode": 200,
+          "durationMs": 36493
+        }
+      ],
+      "session_is_video2md": true,
+      "run_id": "3c05faf8"
+    },
+    {
+      "id": "01a15ea5-9408-78bf-8c34-1b1e02224eb5",
+      "requestID": "01a15ea5-9408-78bf-8c34-1b1e02224eb5",
+      "startedAt": 1792589272072,
+      "finishedAt": 1792589299670,
+      "durationMs": 27598,
+      "outcome": "succeeded",
+      "protocol": "openai-chat",
+      "product": "go",
+      "statusCode": 200,
+      "requestedModel": "glm-5.3-flash",
+      "model": "glm-5.3-flash",
+      "provider": "opencode",
+      "finish": {
+        "reason": "stop"
+      },
+      "inputTokens": 3,
+      "outputTokens": 3931,
+      "reasoningTokens": 3467,
+      "cacheReadTokens": 9344,
+      "cacheWriteTokens": 0,
+      "cost": 0.00224627,
+      "attemptCount": 1,
+      "attempts": [
+        {
+          "provider": "opencode",
+          "model": "glm-5.3-flash",
+          "statusCode": 200,
+          "durationMs": 26238
+        }
+      ],
+      "session_is_video2md": true,
+      "run_id": "3c05faf8"
+    },
+    {
+      "id": "01a15ea4-ac95-7cf0-9c4c-03b640fc5d86",
+      "requestID": "01a15ea4-ac95-7cf0-9c4c-03b640fc5d86",
+      "startedAt": 1792589212821,
+      "finishedAt": 1792589239540,
+      "durationMs": 26719,
+      "outcome": "succeeded",
+      "protocol": "openai-chat",
+      "product": "go",
+      "statusCode": 200,
+      "requestedModel": "glm-5.3-flash",
+      "model": "glm-5.3-flash",
+      "provider": "opencode",
+      "finish": {
+        "reason": "length"
+      },
+      "inputTokens": 3,
+      "outputTokens": 4000,
+      "reasoningTokens": 4000,
+      "cacheReadTokens": 9344,
+      "cacheWriteTokens": 0,
+      "cost": 0.00228077,
+      "attemptCount": 1,
+      "attempts": [
+        {
+          "provider": "opencode",
+          "model": "glm-5.3-flash",
+          "statusCode": 200,
+          "durationMs": 24714
+        }
+      ],
+      "session_is_video2md": true,
+      "run_id": "3c05faf8"
+    },
+    {
+      "id": "01a15ea3-c77c-7def-a9a1-1f6a55e033de",
+      "requestID": "01a15ea3-c77c-7def-a9a1-1f6a55e033de",
+      "startedAt": 1792589154172,
+      "finishedAt": 1792589181396,
+      "durationMs": 27224,
+      "outcome": "succeeded",
+      "protocol": "openai-chat",
+      "product": "go",
+      "statusCode": 200,
+      "requestedModel": "glm-5.3-flash",
+      "model": "glm-5.3-flash",
+      "provider": "opencode",
+      "finish": {
+        "reason": "length"
+      },
+      "inputTokens": 9347,
+      "outputTokens": 4000,
+      "reasoningTokens": 4000,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "cost": 0.00340205,
+      "attemptCount": 1,
+      "attempts": [
+        {
+          "provider": "opencode",
+          "model": "glm-5.3-flash",
+          "statusCode": 200,
+          "durationMs": 26169
+        }
+      ],
+      "session_is_video2md": true,
+      "run_id": "3c05faf8"
+    },
+    {
+      "id": "01a15d88-9a83-7cbc-80d0-aae3401a3786",
+      "requestID": "01a15d88-9a83-7cbc-80d0-aae3401a3786",
+      "startedAt": 1792570595971,
+      "finishedAt": 1792570603340,
+      "durationMs": 7369,
+      "outcome": "succeeded",
+      "protocol": "openai-chat",
+      "product": "go",
+      "statusCode": 200,
+      "requestedModel": "glm-5.3-flash",
+      "model": "glm-5.3-flash",
+      "provider": "opencode",
+      "finish": {
+        "reason": "stop"
+      },
+      "inputTokens": 827,
+      "outputTokens": 856,
+      "reasoningTokens": 781,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "cost": 0.00055205,
+      "attemptCount": 1,
+      "attempts": [
+        {
+          "provider": "opencode",
+          "model": "glm-5.3-flash",
+          "statusCode": 200,
+          "durationMs": 5330
+        }
+      ],
+      "session_is_video2md": true,
+      "run_id": "be188f78"
+    },
+    {
+      "id": "01a15d87-e64c-7cfe-9c68-4e914ed691de",
+      "requestID": "01a15d87-e64c-7cfe-9c68-4e914ed691de",
+      "startedAt": 1792570549836,
+      "finishedAt": 1792570596052,
+      "durationMs": 46216,
+      "outcome": "succeeded",
+      "protocol": "openai-chat",
+      "product": "go",
+      "statusCode": 200,
+      "requestedModel": "glm-5.3-flash",
+      "model": "glm-5.3-flash",
+      "provider": "opencode",
+      "finish": {
+        "reason": "stop"
+      },
+      "inputTokens": 2152,
+      "outputTokens": 7071,
+      "reasoningTokens": 6339,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "cost": 0.0038583,
+      "attemptCount": 1,
+      "attempts": [
+        {
+          "provider": "opencode",
+          "model": "glm-5.3-flash",
+          "statusCode": 200,
+          "durationMs": 45014
+        }
+      ],
+      "session_is_video2md": true,
+      "run_id": "be188f78"
+    },
+    {
+      "id": "01a15d87-c817-7bde-b9ba-bbdb3a75d1a7",
+      "requestID": "01a15d87-c817-7bde-b9ba-bbdb3a75d1a7",
+      "startedAt": 1792570542103,
+      "finishedAt": 1792570548443,
+      "durationMs": 6340,
+      "outcome": "succeeded",
+      "protocol": "openai-chat",
+      "product": "go",
+      "statusCode": 200,
+      "requestedModel": "glm-5.3-flash",
+      "model": "glm-5.3-flash",
+      "provider": "opencode",
+      "finish": {
+        "reason": "stop"
+      },
+      "inputTokens": 691,
+      "outputTokens": 982,
+      "reasoningTokens": 898,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "cost": 0.00059465,
+      "attemptCount": 1,
+      "attempts": [
+        {
+          "provider": "opencode",
+          "model": "glm-5.3-flash",
+          "statusCode": 200,
+          "durationMs": 5736
+        }
+      ],
+      "session_is_video2md": true,
+      "run_id": "be188f78"
+    },
+    {
+      "id": "01a15d87-2b81-7d35-8a57-4c48d71e804a",
+      "requestID": "01a15d87-2b81-7d35-8a57-4c48d71e804a",
+      "startedAt": 1792570502017,
+      "finishedAt": 1792570541814,
+      "durationMs": 39797,
+      "outcome": "succeeded",
+      "protocol": "openai-chat",
+      "product": "go",
+      "statusCode": 200,
+      "requestedModel": "glm-5.3-flash",
+      "model": "glm-5.3-flash",
+      "provider": "opencode",
+      "finish": {
+        "reason": "stop"
+      },
+      "inputTokens": 1533,
+      "outputTokens": 5944,
+      "reasoningTokens": 5348,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "cost": 0.00320195,
+      "attemptCount": 1,
+      "attempts": [
+        {
+          "provider": "opencode",
+          "model": "glm-5.3-flash",
+          "statusCode": 200,
+          "durationMs": 38969
+        }
+      ],
+      "session_is_video2md": true,
+      "run_id": "be188f78"
+    },
+    {
+      "id": "01a15d7e-fadf-7b84-8663-dc413bbf817f",
+      "requestID": "01a15d7e-fadf-7b84-8663-dc413bbf817f",
+      "startedAt": 1792569965279,
+      "finishedAt": 1792569972579,
+      "durationMs": 7300,
+      "outcome": "succeeded",
+      "protocol": "openai-chat",
+      "product": "go",
+      "statusCode": 200,
+      "requestedModel": "glm-5.3-flash",
+      "model": "glm-5.3-flash",
+      "provider": "opencode",
+      "finish": {
+        "reason": "stop"
+      },
+      "inputTokens": 10736,
+      "outputTokens": 988,
+      "reasoningTokens": 675,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "cost": 0.0021044,
+      "attemptCount": 1,
+      "attempts": [
+        {
+          "provider": "opencode",
+          "model": "glm-5.3-flash",
+          "statusCode": 200,
+          "durationMs": 6562
+        }
+      ],
+      "session_is_video2md": true,
+      "run_id": "be188f78"
+    },
+    {
+      "id": "01a15d00-699d-71ab-a693-576584d6f40a",
+      "requestID": "01a15d00-699d-71ab-a693-576584d6f40a",
+      "startedAt": 1792561670557,
+      "finishedAt": 1792561675049,
+      "durationMs": 4492,
+      "outcome": "succeeded",
+      "protocol": "openai-chat",
+      "product": "go",
+      "statusCode": 200,
+      "requestedModel": "glm-5.3-flash",
+      "model": "glm-5.3-flash",
+      "provider": "opencode",
+      "finish": {
+        "reason": "stop"
+      },
+      "inputTokens": 33,
+      "outputTokens": 220,
+      "reasoningTokens": 135,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "cost": 0.00011495,
+      "attemptCount": 1,
+      "attempts": [
+        {
+          "provider": "opencode",
+          "model": "glm-5.3-flash",
+          "statusCode": 200,
+          "durationMs": 3588
+        }
+      ],
+      "session_is_video2md": false,
+      "run_id": null
+    },
+    {
+      "id": "01a15d00-379e-793e-9f33-c26aeba1b649",
+      "requestID": "01a15d00-379e-793e-9f33-c26aeba1b649",
+      "startedAt": 1792561657758,
+      "finishedAt": 1792561660555,
+      "durationMs": 2797,
+      "outcome": "cancelled",
+      "protocol": "openai-chat",
+      "product": "go",
+      "statusCode": 200,
+      "requestedModel": "glm-5.3-flash",
+      "model": "glm-5.3-flash",
+      "provider": "opencode",
+      "finish": {
+        "reason": "stop"
+      },
+      "inputTokens": 1,
+      "outputTokens": 248,
+      "reasoningTokens": 202,
+      "cacheReadTokens": 12,
+      "cacheWriteTokens": 0,
+      "cost": 0.00012451,
+      "attemptCount": 1,
+      "attempts": [
+        {
+          "provider": "opencode",
+          "model": "glm-5.3-flash",
+          "statusCode": 200,
+          "durationMs": 1849
+        }
+      ],
+      "session_is_video2md": false,
+      "run_id": null
+    },
+    {
+      "id": "01a15cff-e764-7bde-a484-f98c29aa5b6a",
+      "requestID": "01a15cff-e764-7bde-a484-f98c29aa5b6a",
+      "startedAt": 1792561637220,
+      "finishedAt": 1792561639885,
+      "durationMs": 2665,
+      "outcome": "succeeded",
+      "protocol": "openai-chat",
+      "product": "go",
+      "statusCode": 200,
+      "requestedModel": "glm-5.3-flash",
+      "model": "glm-5.3-flash",
+      "provider": "opencode",
+      "inputTokens": 1,
+      "outputTokens": 262,
+      "reasoningTokens": 211,
+      "cacheReadTokens": 12,
+      "cacheWriteTokens": 0,
+      "cost": 0.00013151,
+      "attemptCount": 2,
+      "attempts": [
+        {
+          "provider": "opencode",
+          "model": "glm-5.3-flash",
+          "statusCode": 400,
+          "durationMs": 5,
+          "errorCode": "inference_failed"
+        },
+        {
+          "provider": "opencode",
+          "model": "glm-5.3-flash",
+          "statusCode": 200,
+          "durationMs": 1854
+        }
+      ],
+      "session_is_video2md": false,
+      "run_id": null
+    },
+    {
+      "id": "01a15cfd-74a9-73ed-a528-9daf46c30e7d",
+      "requestID": "01a15cfd-74a9-73ed-a528-9daf46c30e7d",
+      "startedAt": 1792561476777,
+      "finishedAt": 1792561482131,
+      "durationMs": 5354,
+      "outcome": "succeeded",
+      "protocol": "openai-chat",
+      "product": "go",
+      "statusCode": 200,
+      "requestedModel": "glm-5.3-flash",
+      "model": "glm-5.3-flash",
+      "provider": "opencode",
+      "finish": {
+        "reason": "stop"
+      },
+      "inputTokens": 1123,
+      "outputTokens": 909,
+      "reasoningTokens": 840,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "cost": 0.00062295,
+      "attemptCount": 1,
+      "attempts": [
+        {
+          "provider": "opencode",
+          "model": "glm-5.3-flash",
+          "statusCode": 200,
+          "durationMs": 4432
+        }
+      ],
+      "session_is_video2md": true,
+      "run_id": "4df77d9c"
+    },
+    {
+      "id": "01a15cfc-b68e-78db-bb83-5de9e0d3959c",
+      "requestID": "01a15cfc-b68e-78db-bb83-5de9e0d3959c",
+      "startedAt": 1792561428110,
+      "finishedAt": 1792561476176,
+      "durationMs": 48066,
+      "outcome": "succeeded",
+      "protocol": "openai-chat",
+      "product": "go",
+      "statusCode": 200,
+      "requestedModel": "glm-5.3-flash",
+      "model": "glm-5.3-flash",
+      "provider": "opencode",
+      "finish": {
+        "reason": "stop"
+      },
+      "inputTokens": 1470,
+      "outputTokens": 5027,
+      "reasoningTokens": 4000,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "cost": 0.002734,
+      "attemptCount": 1,
+      "attempts": [
+        {
+          "provider": "opencode",
+          "model": "glm-5.3-flash",
+          "statusCode": 200,
+          "durationMs": 47474
+        }
+      ],
+      "session_is_video2md": true,
+      "run_id": "4df77d9c"
+    },
+    {
+      "id": "01a15cf6-6483-7005-a04a-d3edfb7c4d71",
+      "requestID": "01a15cf6-6483-7005-a04a-d3edfb7c4d71",
+      "startedAt": 1792561013891,
+      "finishedAt": 1792561019300,
+      "durationMs": 5409,
+      "outcome": "succeeded",
+      "protocol": "openai-chat",
+      "product": "go",
+      "statusCode": 200,
+      "requestedModel": "glm-5.3-flash",
+      "model": "glm-5.3-flash",
+      "provider": "opencode",
+      "finish": {
+        "reason": "stop"
+      },
+      "inputTokens": 3905,
+      "outputTokens": 983,
+      "reasoningTokens": 635,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "cost": 0.00107725,
+      "attemptCount": 1,
+      "attempts": [
+        {
+          "provider": "opencode",
+          "model": "glm-5.3-flash",
+          "statusCode": 200,
+          "durationMs": 4910
+        }
+      ],
+      "session_is_video2md": true,
+      "run_id": "4df77d9c"
+    },
+    {
+      "id": "01a15ce2-f7e8-72d8-8e8d-4f5b467a127d",
+      "requestID": "01a15ce2-f7e8-72d8-8e8d-4f5b467a127d",
+      "startedAt": 1792559740904,
+      "finishedAt": 1792559744653,
+      "durationMs": 3749,
+      "outcome": "succeeded",
+      "protocol": "openai-chat",
+      "product": "go",
+      "statusCode": 200,
+      "requestedModel": "glm-5.3-flash",
+      "model": "glm-5.3-flash",
+      "provider": "opencode",
+      "finish": {
+        "reason": "stop"
+      },
+      "inputTokens": 654,
+      "outputTokens": 527,
+      "reasoningTokens": 441,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "cost": 0.0003616,
+      "attemptCount": 1,
+      "attempts": [
+        {
+          "provider": "opencode",
+          "model": "glm-5.3-flash",
+          "statusCode": 200,
+          "durationMs": 2924
+        }
+      ],
+      "session_is_video2md": true,
+      "run_id": "edfa1b1a"
+    },
+    {
+      "id": "01a15ce2-4f91-73e7-81b6-359196a0fb15",
+      "requestID": "01a15ce2-4f91-73e7-81b6-359196a0fb15",
+      "startedAt": 1792559697809,
+      "finishedAt": 1792559739095,
+      "durationMs": 41286,
+      "outcome": "succeeded",
+      "protocol": "openai-chat",
+      "product": "go",
+      "statusCode": 200,
+      "requestedModel": "glm-5.3-flash",
+      "model": "glm-5.3-flash",
+      "provider": "opencode",
+      "finish": {
+        "reason": "stop"
+      },
+      "inputTokens": 792,
+      "outputTokens": 7108,
+      "reasoningTokens": 6551,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "cost": 0.0036728,
+      "attemptCount": 1,
+      "attempts": [
+        {
+          "provider": "opencode",
+          "model": "glm-5.3-flash",
+          "statusCode": 200,
+          "durationMs": 40803
+        }
+      ],
+      "session_is_video2md": true,
+      "run_id": "edfa1b1a"
+    },
+    {
+      "id": "01a15ce0-986e-7ab1-8495-0b23eef91d25",
+      "requestID": "01a15ce0-986e-7ab1-8495-0b23eef91d25",
+      "startedAt": 1792559585390,
+      "finishedAt": 1792559592948,
+      "durationMs": 7558,
+      "outcome": "succeeded",
+      "protocol": "openai-chat",
+      "product": "go",
+      "statusCode": 200,
+      "requestedModel": "glm-5.3-flash",
+      "model": "glm-5.3-flash",
+      "provider": "opencode",
+      "finish": {
+        "reason": "stop"
+      },
+      "inputTokens": 601,
+      "outputTokens": 1055,
+      "reasoningTokens": 959,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "cost": 0.00061765,
+      "attemptCount": 1,
+      "attempts": [
+        {
+          "provider": "opencode",
+          "model": "glm-5.3-flash",
+          "statusCode": 200,
+          "durationMs": 6299
+        }
+      ],
+      "session_is_video2md": true,
+      "run_id": "edfa1b1a"
+    },
+    {
+      "id": "01a15cdb-760a-7245-b75d-76801689d3ce",
+      "requestID": "01a15cdb-760a-7245-b75d-76801689d3ce",
+      "startedAt": 1792559248906,
+      "finishedAt": 1792559250428,
+      "durationMs": 1522,
+      "outcome": "succeeded",
+      "protocol": "openai-chat",
+      "product": "go",
+      "statusCode": 200,
+      "requestedModel": "glm-5.3-flash",
+      "model": "glm-5.3-flash",
+      "provider": "opencode",
+      "finish": {
+        "reason": "stop"
+      },
+      "inputTokens": 23,
+      "outputTokens": 54,
+      "reasoningTokens": 51,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "cost": 3.045e-05,
+      "attemptCount": 1,
+      "attempts": [
+        {
+          "provider": "opencode",
+          "model": "glm-5.3-flash",
+          "statusCode": 200,
+          "durationMs": 597
+        }
+      ],
+      "session_is_video2md": true,
+      "run_id": "4f59f57a6a24467e974551967d6fb6b5"
+    },
+    {
+      "id": "01a15cd9-1421-797a-aa5a-73226c106ca0",
+      "requestID": "01a15cd9-1421-797a-aa5a-73226c106ca0",
+      "startedAt": 1792559092769,
+      "finishedAt": 1792559105096,
+      "durationMs": 12327,
+      "outcome": "succeeded",
+      "protocol": "openai-chat",
+      "product": "go",
+      "statusCode": 200,
+      "requestedModel": "glm-5.3-flash",
+      "model": "glm-5.3-flash",
+      "provider": "opencode",
+      "inputTokens": 15,
+      "outputTokens": 11,
+      "reasoningTokens": 8,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "cost": 7.75e-06,
+      "attemptCount": 4,
+      "attempts": [
+        {
+          "provider": "opencode",
+          "model": "glm-5.3-flash",
+          "statusCode": 400,
+          "durationMs": 15,
+          "errorCode": "inference_failed"
+        },
+        {
+          "provider": "opencode",
+          "model": "glm-5.3-flash",
+          "statusCode": 429,
+          "durationMs": 743,
+          "errorCode": "inference_failed"
+        },
+        {
+          "provider": "opencode",
+          "model": "glm-5.3-flash",
+          "statusCode": 429,
+          "durationMs": 714,
+          "errorCode": "inference_failed"
+        },
+        {
+          "provider": "opencode",
+          "model": "glm-5.3-flash",
+          "statusCode": 200,
+          "durationMs": 10071
+        }
+      ],
+      "session_is_video2md": true,
+      "run_id": "production-connectivity-20261021"
+    },
+    {
+      "id": "01a15cd3-4d8a-7936-93c9-42466b0ee7f9",
+      "requestID": "01a15cd3-4d8a-7936-93c9-42466b0ee7f9",
+      "startedAt": 1792558714250,
+      "finishedAt": 1792558715463,
+      "durationMs": 1213,
+      "outcome": "succeeded",
+      "protocol": "openai-chat",
+      "product": "go",
+      "statusCode": 200,
+      "requestedModel": "glm-5.3-flash",
+      "model": "glm-5.3-flash",
+      "provider": "opencode",
+      "inputTokens": 27,
+      "outputTokens": 32,
+      "reasoningTokens": 32,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "cost": 2.005e-05,
+      "attemptCount": 1,
+      "attempts": [
+        {
+          "provider": "opencode",
+          "model": "glm-5.3-flash",
+          "statusCode": 200,
+          "durationMs": 465
+        }
+      ],
+      "session_is_video2md": true,
+      "run_id": "glm-integration-20261021"
+    },
+    {
+      "id": "01a15b64-19a7-70c7-b03d-5d6364c33926",
+      "requestID": "01a15b64-19a7-70c7-b03d-5d6364c33926",
+      "startedAt": 1792534649255,
+      "finishedAt": 1792534656753,
+      "durationMs": 7498,
+      "outcome": "succeeded",
+      "protocol": "openai-chat",
+      "product": "go",
+      "statusCode": 200,
+      "requestedModel": "glm-5.3-flash",
+      "model": "glm-5.3-flash",
+      "provider": "opencode",
+      "inputTokens": 13,
+      "outputTokens": 245,
+      "reasoningTokens": 0,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "cost": 0.00012445,
+      "attemptCount": 1,
+      "attempts": [
+        {
+          "provider": "opencode",
+          "model": "glm-5.3-flash",
+          "statusCode": 200,
+          "durationMs": 6758
+        }
+      ],
+      "session_is_video2md": false,
+      "run_id": null
+    },
+    {
+      "id": "01a15b62-dc3b-7d0e-a577-0c6f625b62bb",
+      "requestID": "01a15b62-dc3b-7d0e-a577-0c6f625b62bb",
+      "startedAt": 1792534567995,
+      "finishedAt": 1792534570525,
+      "durationMs": 2530,
+      "outcome": "succeeded",
+      "protocol": "openai-chat",
+      "product": "go",
+      "statusCode": 200,
+      "requestedModel": "glm-5.3-flash",
+      "model": "glm-5.3-flash",
+      "provider": "opencode",
+      "inputTokens": 15,
+      "outputTokens": 100,
+      "reasoningTokens": 0,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "cost": 5.225e-05,
+      "attemptCount": 1,
+      "attempts": [
+        {
+          "provider": "opencode",
+          "model": "glm-5.3-flash",
+          "statusCode": 200,
+          "durationMs": 1769
+        }
+      ],
+      "session_is_video2md": false,
+      "run_id": null
+    },
+    {
+      "id": "01a15b62-a075-7bc2-bb53-2e3cd24c3bbd",
+      "requestID": "01a15b62-a075-7bc2-bb53-2e3cd24c3bbd",
+      "startedAt": 1792534552693,
+      "finishedAt": 1792534554561,
+      "durationMs": 1868,
+      "outcome": "succeeded",
+      "protocol": "openai-chat",
+      "product": "go",
+      "statusCode": 200,
+      "requestedModel": "glm-5.3-flash",
+      "model": "glm-5.3-flash",
+      "provider": "opencode",
+      "inputTokens": 15,
+      "outputTokens": 50,
+      "reasoningTokens": 0,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "cost": 2.725e-05,
+      "attemptCount": 1,
+      "attempts": [
+        {
+          "provider": "opencode",
+          "model": "glm-5.3-flash",
+          "statusCode": 200,
+          "durationMs": 1206
+        }
+      ],
+      "session_is_video2md": false,
+      "run_id": null
+    },
+    {
+      "id": "01a15b62-762f-7f5c-a4c5-d251af3b1aa4",
+      "requestID": "01a15b62-762f-7f5c-a4c5-d251af3b1aa4",
+      "startedAt": 1792534541871,
+      "finishedAt": 1792534543912,
+      "durationMs": 2041,
+      "outcome": "succeeded",
+      "protocol": "openai-chat",
+      "product": "go",
+      "statusCode": 200,
+      "requestedModel": "glm-5.3-flash",
+      "model": "glm-5.3-flash",
+      "provider": "opencode",
+      "inputTokens": 15,
+      "outputTokens": 50,
+      "reasoningTokens": 0,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "cost": 2.725e-05,
+      "attemptCount": 1,
+      "attempts": [
+        {
+          "provider": "opencode",
+          "model": "glm-5.3-flash",
+          "statusCode": 200,
+          "durationMs": 1277
+        }
+      ],
+      "session_is_video2md": false,
+      "run_id": null
+    },
+    {
+      "id": "01a15b05-065b-7137-9f54-16a22710fc31",
+      "requestID": "01a15b05-065b-7137-9f54-16a22710fc31",
+      "startedAt": 1792528418395,
+      "finishedAt": 1792528427121,
+      "durationMs": 8726,
+      "outcome": "succeeded",
+      "protocol": "openai-chat",
+      "product": "go",
+      "statusCode": 200,
+      "requestedModel": "glm-5.3-flash",
+      "model": "glm-5.3-flash",
+      "provider": "opencode",
+      "inputTokens": 1,
+      "outputTokens": 1,
+      "reasoningTokens": 1,
+      "cacheReadTokens": 12,
+      "cacheWriteTokens": 0,
+      "cost": 1.01e-06,
+      "attemptCount": 4,
+      "attempts": [
+        {
+          "provider": "opencode",
+          "model": "glm-5.3-flash",
+          "statusCode": 429,
+          "durationMs": 693,
+          "errorCode": "inference_failed"
+        },
+        {
+          "provider": "opencode",
+          "model": "glm-5.3-flash",
+          "statusCode": 429,
+          "durationMs": 709,
+          "errorCode": "inference_failed"
+        },
+        {
+          "provider": "opencode",
+          "model": "glm-5.3-flash",
+          "statusCode": 400,
+          "durationMs": 17,
+          "errorCode": "inference_failed"
+        },
+        {
+          "provider": "opencode",
+          "model": "glm-5.3-flash",
+          "statusCode": 200,
+          "durationMs": 477
+        }
+      ],
+      "session_is_video2md": false,
+      "run_id": null
+    },
+    {
+      "id": "01a15b05-04fd-7ae5-a544-d058a76dc633",
+      "requestID": "01a15b05-04fd-7ae5-a544-d058a76dc633",
+      "startedAt": 1792528418045,
+      "finishedAt": 1792528418108,
+      "durationMs": 63,
+      "outcome": "rejected",
+      "protocol": "anthropic-messages",
+      "product": "go",
+      "statusCode": 400,
+      "requestedModel": "glm-5.3-flash",
+      "model": "glm-5.3-flash",
+      "provider": "opencode",
+      "attemptCount": 0,
+      "attempts": [],
+      "session_is_video2md": false,
+      "run_id": null
+    },
+    {
+      "id": "01a158ee-36a5-70e6-b339-d0b174398d70",
+      "requestID": "01a158ee-36a5-70e6-b339-d0b174398d70",
+      "startedAt": 1792493368997,
+      "finishedAt": 1792493372461,
+      "durationMs": 3464,
+      "outcome": "succeeded",
+      "protocol": "openai-chat",
+      "product": "go",
+      "statusCode": 200,
+      "requestedModel": "glm-5.3-flash",
+      "model": "glm-5.3-flash",
+      "provider": "opencode",
+      "finish": {
+        "reason": "stop"
+      },
+      "inputTokens": 456,
+      "outputTokens": 79,
+      "reasoningTokens": 0,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "cost": 0.0001079,
+      "attemptCount": 1,
+      "attempts": [
+        {
+          "provider": "opencode",
+          "model": "glm-5.3-flash",
+          "statusCode": 200,
+          "durationMs": 2904
+        }
+      ],
+      "session_is_video2md": false,
+      "run_id": null
+    },
+    {
+      "id": "01a158ee-089f-7149-acc3-6e16a5b3258e",
+      "requestID": "01a158ee-089f-7149-acc3-6e16a5b3258e",
+      "startedAt": 1792493357215,
+      "finishedAt": 1792493360941,
+      "durationMs": 3726,
+      "outcome": "succeeded",
+      "protocol": "openai-chat",
+      "product": "go",
+      "statusCode": 200,
+      "requestedModel": "glm-5.3-flash",
+      "model": "glm-5.3-flash",
+      "provider": "opencode",
+      "finish": {
+        "reason": "stop"
+      },
+      "inputTokens": 392,
+      "outputTokens": 69,
+      "reasoningTokens": 0,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "cost": 9.33e-05,
+      "attemptCount": 1,
+      "attempts": [
+        {
+          "provider": "opencode",
+          "model": "glm-5.3-flash",
+          "statusCode": 200,
+          "durationMs": 3261
+        }
+      ],
+      "session_is_video2md": false,
+      "run_id": null
+    },
+    {
+      "id": "01a158ec-aeb7-793d-8e0b-d7c2fc689b47",
+      "requestID": "01a158ec-aeb7-793d-8e0b-d7c2fc689b47",
+      "startedAt": 1792493268663,
+      "finishedAt": 1792493272686,
+      "durationMs": 4023,
+      "outcome": "succeeded",
+      "protocol": "openai-chat",
+      "product": "go",
+      "statusCode": 200,
+      "requestedModel": "glm-5.3-flash",
+      "model": "glm-5.3-flash",
+      "provider": "opencode",
+      "finish": {
+        "reason": "stop"
+      },
+      "inputTokens": 405,
+      "outputTokens": 10,
+      "reasoningTokens": 4,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "cost": 6.575e-05,
+      "attemptCount": 1,
+      "attempts": [
+        {
+          "provider": "opencode",
+          "model": "glm-5.3-flash",
+          "statusCode": 200,
+          "durationMs": 2745
+        }
+      ],
+      "session_is_video2md": false,
+      "run_id": null
+    },
+    {
+      "id": "01a158ea-ecf8-7270-9c4e-8c7dc9a91926",
+      "requestID": "01a158ea-ecf8-7270-9c4e-8c7dc9a91926",
+      "startedAt": 1792493153528,
+      "finishedAt": 1792493157743,
+      "durationMs": 4215,
+      "outcome": "succeeded",
+      "protocol": "openai-chat",
+      "product": "go",
+      "statusCode": 200,
+      "requestedModel": "glm-5.3-flash",
+      "model": "glm-5.3-flash",
+      "provider": "opencode",
+      "finish": {
+        "reason": "stop"
+      },
+      "inputTokens": 369,
+      "outputTokens": 21,
+      "reasoningTokens": 15,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "cost": 6.585e-05,
+      "attemptCount": 3,
+      "attempts": [
+        {
+          "provider": "opencode",
+          "model": "glm-5.3-flash",
+          "statusCode": 429,
+          "durationMs": 557,
+          "errorCode": "inference_failed"
+        },
+        {
+          "provider": "opencode",
+          "model": "glm-5.3-flash",
+          "statusCode": 429,
+          "durationMs": 736,
+          "errorCode": "inference_failed"
+        },
+        {
+          "provider": "opencode",
+          "model": "glm-5.3-flash",
+          "statusCode": 200,
+          "durationMs": 2437
+        }
+      ],
+      "session_is_video2md": false,
+      "run_id": null
+    },
+    {
+      "id": "01a158d5-a343-7b7b-b894-e10237991bf3",
+      "requestID": "01a158d5-a343-7b7b-b894-e10237991bf3",
+      "startedAt": 1792491758403,
+      "finishedAt": 1792491760763,
+      "durationMs": 2360,
+      "outcome": "succeeded",
+      "protocol": "openai-chat",
+      "product": "go",
+      "statusCode": 200,
+      "requestedModel": "glm-5.3-flash",
+      "model": "glm-5.3-flash",
+      "provider": "opencode",
+      "inputTokens": 17,
+      "outputTokens": 74,
+      "reasoningTokens": 71,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "cost": 3.955e-05,
+      "attemptCount": 1,
+      "attempts": [
+        {
+          "provider": "opencode",
+          "model": "glm-5.3-flash",
+          "statusCode": 200,
+          "durationMs": 1348
+        }
+      ],
+      "session_is_video2md": false,
+      "run_id": null
+    },
+    {
+      "id": "01a158d5-6284-7c35-b962-6da6f4b03195",
+      "requestID": "01a158d5-6284-7c35-b962-6da6f4b03195",
+      "startedAt": 1792491741828,
+      "finishedAt": 1792491743647,
+      "durationMs": 1819,
+      "outcome": "succeeded",
+      "protocol": "openai-chat",
+      "product": "go",
+      "statusCode": 200,
+      "requestedModel": "glm-5.3-flash",
+      "model": "glm-5.3-flash",
+      "provider": "opencode",
+      "inputTokens": 17,
+      "outputTokens": 29,
+      "reasoningTokens": 26,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "cost": 1.705e-05,
+      "attemptCount": 1,
+      "attempts": [
+        {
+          "provider": "opencode",
+          "model": "glm-5.3-flash",
+          "statusCode": 200,
+          "durationMs": 1103
+        }
+      ],
+      "session_is_video2md": false,
+      "run_id": null
+    },
+    {
+      "id": "01a158be-3b50-7439-947c-138fad2ef830",
+      "requestID": "01a158be-3b50-7439-947c-138fad2ef830",
+      "startedAt": 1792490224464,
+      "finishedAt": 1792490224473,
+      "durationMs": 9,
+      "outcome": "rejected",
+      "protocol": "openai-chat",
+      "product": "go",
+      "statusCode": 400,
+      "requestedModel": "glm-5.3-flash",
+      "model": "glm-5.3-flash",
+      "provider": "opencode",
+      "attemptCount": 0,
+      "attempts": [],
+      "session_is_video2md": false,
+      "run_id": null
+    },
+    {
+      "id": "01a158bd-7d29-7501-9499-f515e13650a5",
+      "requestID": "01a158bd-7d29-7501-9499-f515e13650a5",
+      "startedAt": 1792490175785,
+      "finishedAt": 1792490175795,
+      "durationMs": 10,
+      "outcome": "rejected",
+      "protocol": "openai-chat",
+      "product": "go",
+      "statusCode": 400,
+      "requestedModel": "glm-5.3-flash",
+      "model": "glm-5.3-flash",
+      "provider": "opencode",
+      "attemptCount": 0,
+      "attempts": [],
+      "session_is_video2md": false,
+      "run_id": null
+    },
+    {
+      "id": "01a15153-4c87-7f8e-84b1-b6e9f13aad23",
+      "requestID": "01a15153-4c87-7f8e-84b1-b6e9f13aad23",
+      "startedAt": 1792365776007,
+      "finishedAt": 1792365777031,
+      "durationMs": 1024,
+      "outcome": "succeeded",
+      "protocol": "openai-chat",
+      "product": "go",
+      "statusCode": 200,
+      "requestedModel": "glm-5.3-flash",
+      "model": "glm-5.3-flash",
+      "provider": "opencode",
+      "inputTokens": 34,
+      "outputTokens": 4,
+      "reasoningTokens": 0,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "cost": 7.1e-06,
+      "attemptCount": 1,
+      "attempts": [
+        {
+          "provider": "opencode",
+          "model": "glm-5.3-flash",
+          "statusCode": 200,
+          "durationMs": 278
+        }
+      ],
+      "session_is_video2md": false,
+      "run_id": null
+    },
+    {
+      "id": "01a15151-1888-75e7-99f3-447af2d64445",
+      "requestID": "01a15151-1888-75e7-99f3-447af2d64445",
+      "startedAt": 1792365631624,
+      "finishedAt": 1792365634126,
+      "durationMs": 2502,
+      "outcome": "succeeded",
+      "protocol": "openai-chat",
+      "product": "go",
+      "statusCode": 200,
+      "requestedModel": "glm-5.3-flash",
+      "model": "glm-5.3-flash",
+      "provider": "opencode",
+      "inputTokens": 15,
+      "outputTokens": 107,
+      "reasoningTokens": 104,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "cost": 5.575e-05,
+      "attemptCount": 2,
+      "attempts": [
+        {
+          "provider": "opencode",
+          "model": "glm-5.3-flash",
+          "statusCode": 400,
+          "durationMs": 20,
+          "errorCode": "inference_failed"
+        },
+        {
+          "provider": "opencode",
+          "model": "glm-5.3-flash",
+          "statusCode": 200,
+          "durationMs": 1311
+        }
+      ],
+      "session_is_video2md": false,
+      "run_id": null
+    },
+    {
+      "id": "01a1514e-6d45-7d26-8d2b-964162db0761",
+      "requestID": "01a1514e-6d45-7d26-8d2b-964162db0761",
+      "startedAt": 1792365456709,
+      "finishedAt": 1792365458203,
+      "durationMs": 1494,
+      "outcome": "succeeded",
+      "protocol": "openai-chat",
+      "product": "go",
+      "statusCode": 200,
+      "requestedModel": "glm-5.3-flash",
+      "model": "glm-5.3-flash",
+      "provider": "opencode",
+      "inputTokens": 15,
+      "outputTokens": 8,
+      "reasoningTokens": 8,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "cost": 6.25e-06,
+      "attemptCount": 1,
+      "attempts": [
+        {
+          "provider": "opencode",
+          "model": "glm-5.3-flash",
+          "statusCode": 200,
+          "durationMs": 528
+        }
+      ],
+      "session_is_video2md": false,
+      "run_id": null
+    },
+    {
+      "id": "01a1514d-84dc-77dd-84e2-9fe7efea68df",
+      "requestID": "01a1514d-84dc-77dd-84e2-9fe7efea68df",
+      "startedAt": 1792365397212,
+      "finishedAt": 1792365397236,
+      "durationMs": 24,
+      "outcome": "rejected",
+      "protocol": "openai-chat",
+      "product": "go",
+      "statusCode": 400,
+      "requestedModel": "glm-5.3-flash",
+      "model": "glm-5.3-flash",
+      "provider": "opencode",
+      "attemptCount": 0,
+      "attempts": [],
+      "session_is_video2md": false,
+      "run_id": null
+    },
+    {
+      "id": "01a1514d-46f0-7647-b4ed-bfc24c42d2a7",
+      "requestID": "01a1514d-46f0-7647-b4ed-bfc24c42d2a7",
+      "startedAt": 1792365381360,
+      "finishedAt": 1792365381415,
+      "durationMs": 55,
+      "outcome": "rejected",
+      "protocol": "openai-chat",
+      "product": "go",
+      "statusCode": 400,
+      "requestedModel": "glm-5.3-flash",
+      "model": "glm-5.3-flash",
+      "provider": "opencode",
+      "attemptCount": 0,
+      "attempts": [],
+      "session_is_video2md": false,
+      "run_id": null
+    },
+    {
+      "id": "01a15084-7e98-7930-b3fe-fb2cee502957",
+      "requestID": "01a15084-7e98-7930-b3fe-fb2cee502957",
+      "startedAt": 1792352222872,
+      "finishedAt": 1792352223907,
+      "durationMs": 1035,
+      "outcome": "succeeded",
+      "protocol": "openai-chat",
+      "product": "go",
+      "statusCode": 200,
+      "requestedModel": "glm-5.3-flash",
+      "model": "glm-5.3-flash",
+      "provider": "opencode",
+      "inputTokens": 17,
+      "outputTokens": 4,
+      "reasoningTokens": 4,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "cost": 4.55e-06,
+      "attemptCount": 1,
+      "attempts": [
+        {
+          "provider": "opencode",
+          "model": "glm-5.3-flash",
+          "statusCode": 200,
+          "durationMs": 350
+        }
+      ],
+      "session_is_video2md": false,
+      "run_id": null
+    },
+    {
+      "id": "01a15084-5f57-75f3-b7fa-3bcf6d59d4bc",
+      "requestID": "01a15084-5f57-75f3-b7fa-3bcf6d59d4bc",
+      "startedAt": 1792352214871,
+      "finishedAt": 1792352214892,
+      "durationMs": 21,
+      "outcome": "rejected",
+      "protocol": "openai-chat",
+      "product": "go",
+      "statusCode": 400,
+      "requestedModel": "glm-5.3-flash",
+      "model": "glm-5.3-flash",
+      "provider": "opencode",
+      "attemptCount": 0,
+      "attempts": [],
+      "session_is_video2md": false,
+      "run_id": null
+    },
+    {
+      "id": "9d311808-04de-4501-8dfe-2f19ceb929b9",
+      "requestID": "9d311808-04de-4501-8dfe-2f19ceb929b9",
+      "startedAt": 1792269191971,
+      "finishedAt": 1792269193408,
+      "durationMs": 1437,
+      "outcome": "succeeded",
+      "protocol": "openai-chat",
+      "product": "go",
+      "statusCode": 200,
+      "requestedModel": "glm-5.3-flash",
+      "model": "glm-5.3-flash",
+      "provider": "opencode",
+      "inputTokens": 13,
+      "outputTokens": 1,
+      "reasoningTokens": 1,
+      "cacheReadTokens": 0,
+      "cacheWriteTokens": 0,
+      "cost": 2.45e-06,
+      "attemptCount": 1,
+      "attempts": [
+        {
+          "provider": "opencode",
+          "model": "glm-5.3-flash",
+          "statusCode": 200,
+          "durationMs": 243
+        }
+      ],
+      "session_is_video2md": false,
+      "run_id": null
+    },
+    {
+      "id": "64bacd6a-aad3-4f0e-92dd-916f012954b1",
+      "requestID": "64bacd6a-aad3-4f0e-92dd-916f012954b1",
+      "startedAt": 1792269190952,
+      "finishedAt": 1792269191152,
+      "durationMs": 200,
+      "outcome": "rejected",
+      "protocol": "anthropic-messages",
+      "product": "go",
+      "statusCode": 400,
+      "requestedModel": "glm-5.3-flash",
+      "model": "glm-5.3-flash",
+      "provider": "opencode",
+      "attemptCount": 0,
+      "attempts": [],
+      "session_is_video2md": false,
+      "run_id": null
+    }
+  ],
+  "source_contains_private_headers": true,
+  "public_artifact_omits_headers_and_account_identity": true
+}

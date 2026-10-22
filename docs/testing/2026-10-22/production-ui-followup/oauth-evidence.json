@@ -1,0 +1,61 @@
+{
+  "audit": [
+    {
+      "ts": "2026-10-22T00:21:27",
+      "method": "GET",
+      "path": "/auth/google/login",
+      "code": 302
+    },
+    {
+      "ts": "2026-10-22T00:21:42",
+      "method": "GET",
+      "path": "/auth/google/callback",
+      "code": 302
+    },
+    {
+      "ts": "2026-10-22T00:22:33",
+      "method": "GET",
+      "path": "/auth/google/login",
+      "code": 302
+    },
+    {
+      "ts": "2026-10-22T00:22:50",
+      "method": "GET",
+      "path": "/auth/google/callback",
+      "code": 302
+    },
+    {
+      "ts": "2026-10-22T00:23:53",
+      "method": "GET",
+      "path": "/auth/google/login",
+      "code": 302
+    },
+    {
+      "ts": "2026-10-22T00:24:10",
+      "method": "GET",
+      "path": "/auth/google/callback",
+      "code": 302
+    },
+    {
+      "ts": "2026-10-22T00:29:20",
+      "method": "POST",
+      "path": "/runs",
+      "code": 200,
+      "run_id": "f1fff0b8",
+      "dedup": false
+    }
+  ],
+  "http": [],
+  "relay": {
+    "video2md-oauth-relay.service": {
+      "is-active": "active",
+      "is-enabled": "enabled"
+    },
+    "oauth-relay.service": {
+      "is-active": "inactive",
+      "is-enabled": "disabled"
+    },
+    "listener": "State  Recv-Q Send-Q Local Address:Port  Peer Address:PortProcess\nLISTEN 0      32         127.0.0.1:18080      0.0.0.0:*"
+  },
+  "note": "UI artifacts separately prove actual account selection and library hydration; no credentials included."
+}

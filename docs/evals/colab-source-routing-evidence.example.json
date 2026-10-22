@@ -1,0 +1,11 @@
+{
+  "results": [
+    {"id": "csr-001", "passed": false, "observed": "pending: record DNS, ingress, lcode-4c workload and lcode-cn OAuth relay evidence"},
+    {"id": "csr-002", "passed": false, "observed": "pending: trace an approved overseas source without transferring the full video through either server"},
+    {"id": "csr-003", "passed": false, "observed": "pending: record Colab download and model-load timestamps"},
+    {"id": "csr-004", "passed": false, "observed": "pending: record first ASR segment time versus full-source completion time"},
+    {"id": "csr-005", "passed": false, "observed": "pending: record returned artifact names and byte counts"},
+    {"id": "csr-006", "passed": false, "observed": "pending: inject a retry and compare transfer plus billing identifiers"},
+    {"id": "csr-007", "passed": false, "observed": "pending: submit two jobs within the idle window and record the reused session id"}
+  ]
+}

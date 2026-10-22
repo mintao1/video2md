@@ -1,0 +1,353 @@
+Browser tab: 3, Title: "Kaggle: The World's AI Proving Ground", URL: "https://www.kaggle.com/".
+1 AXWebArea Kaggle: The World's AI Proving Ground, URL: kaggle.com/
+	2 container
+		3 container root
+			4 container Main Kaggle page navigation
+				5 button Navigation menu
+				6 link Description: Skip to content, Value: kaggle.com/#site-content
+				7 link Description: Return to Kaggle home page, Value: kaggle.com/
+				8 pop up button Create on Kaggle
+					9 text Create
+				10 container
+					11 container
+						12 content list
+							13 container Home List Item
+								14 link Description: Home, Value: kaggle.com/
+							15 container Competitions List Item
+								16 link Description: Competitions, Value: kaggle.com/competitions
+							17 container Benchmarks List Item
+								18 link Description: Benchmarks, Value: kaggle.com/benchmarks
+							19 container Arenas List Item
+								20 link Description: Arenas, Value: kaggle.com/arenas
+							21 container Game Arena List Item
+								22 link Description: Game Arena, Value: kaggle.com/game-arena
+						23 content list
+							24 container Data Hub List Item
+								25 container
+									26 link (collapsed) Description: Data Hub, Value: kaggle.com/#, Secondary Actions: Expand
+									27 button Expand
+						28 content list
+							29 container More on Kaggle List Item
+								30 container
+									31 link (collapsed) Description: More on Kaggle, Value: kaggle.com/#, Secondary Actions: Expand
+									32 button Expand
+					33 content list
+						34 container Your Work List Item
+							35 container
+								36 link Description: Your Work, Value: kaggle.com/work
+								37 button (expanded) Description: Collapse Your Work, Help: Collapse
+						38 container Collapse Viewed List Item
+							39 container
+								40 link (expanded) Description: Collapse Viewed, Value: kaggle.com/#, Secondary Actions: Collapse
+								41 button Collapse Viewed
+						42 content list
+							43 container gpu-router-job List Item
+								44 link Description: gpu-router-job, Value: kaggle.com/code/mintaolin/gpu-router-job
+						45 container Collapse Edited List Item
+							46 container
+								47 link (expanded) Description: Collapse Edited, Value: kaggle.com/#, Secondary Actions: Collapse
+								48 button Collapse Edited
+						49 content list
+							50 container gpu-router-job List Item
+								51 link Description: gpu-router-job, Value: kaggle.com/code/mintaolin/gpu-router-job
+					52 button (expanded) Event running 1 View Active Events, Secondary Actions: Collapse
+						53 container
+							54 container Event running
+								55 text update
+							56 text 1
+						57 text View Active Events
+			58 container Main menu, search and your account
+				59 container
+					60 text field (settable) :r2:
+					61 button Mintao Lin
+						62 image
+			63 container site-content
+				64 container
+					65 text Kaggle uses cookies from Google to deliver and enhance the quality of its services and to analyze traffic.
+					66 link Description: Learn more, Value: kaggle.com/cookies
+					67 text OK, Got it.
+				68 heading Welcome, Mintao Lin!, Value: 1
+					69 text Welcome, Mintao Lin!
+				70 text Kaggle is the place to learn data science and build a portfolio. Login streak
+				71 container
+					72 text 1 day
+					73 text a new record!
+				74 text Tier progress
+				75 container
+					76 text 0%
+					77 link Description: to Expert, Value: kaggle.com/progression
+					78 image
+				79 text Public activity M T W T F S S
+				80 button Tue Oct 06 2026 07:33:31 GMT+0800 (中国标准时间)
+				81 button Wed Oct 07 2026 07:33:31 GMT+0800 (中国标准时间)
+				82 button Thu Oct 08 2026 07:33:31 GMT+0800 (中国标准时间)
+				83 button Fri Oct 09 2026 07:33:31 GMT+0800 (中国标准时间)
+				84 button Sat Oct 10 2026 07:33:31 GMT+0800 (中国标准时间)
+				85 button Sun Oct 11 2026 07:33:31 GMT+0800 (中国标准时间)
+				86 button Mon Oct 12 2026 07:33:31 GMT+0800 (中国标准时间)
+				87 button Tue Oct 13 2026 07:33:31 GMT+0800 (中国标准时间)
+				88 button Wed Oct 14 2026 07:33:31 GMT+0800 (中国标准时间)
+				89 button Thu Oct 15 2026 07:33:31 GMT+0800 (中国标准时间)
+				90 button Fri Oct 16 2026 07:33:31 GMT+0800 (中国标准时间)
+				91 button Sat Oct 17 2026 07:33:31 GMT+0800 (中国标准时间)
+				92 button Sun Oct 18 2026 07:33:31 GMT+0800 (中国标准时间)
+				93 button Mon Oct 19 2026 07:33:31 GMT+0800 (中国标准时间)
+				94 button Tue Oct 20 2026 07:33:31 GMT+0800 (中国标准时间)
+				95 button Wed Oct 21 2026 07:33:31 GMT+0800 (中国标准时间)
+				96 button Thu Oct 22 2026 07:33:31 GMT+0800 (中国标准时间)
+				97 button Fri Oct 23 2026 07:33:31 GMT+0800 (中国标准时间)
+				98 button Sat Oct 24 2026 07:33:31 GMT+0800 (中国标准时间)
+				99 button Sun Oct 25 2026 07:33:31 GMT+0800 (中国标准时间)
+				100 button Mon Oct 26 2026 07:33:31 GMT+0800 (中国标准时间)
+				101 link Description: Datasets Progress Datasets 2 trending_up 2 total created, Value: kaggle.com/work/datasets
+				102 link Description: Notebooks Progress Notebooks 3 trending_up 3 total created, Value: kaggle.com/work/code
+				103 link Description: Competitions Progress Competitions 0 total joined, Value: kaggle.com/work/competitions
+				104 link Description: comment Discussions 0 total posted, Value: kaggle.com/work/discussions
+				105 link Description: school Courses 0 total completed, Value: kaggle.com/learn
+				106 button Hide stats
+				107 container
+					108 container
+						109 heading How to start: Choose a focus for today, Value: 5
+							110 text How to start: Choose a focus for today
+						111 text Help us make relevant suggestions for you
+					112 button Close
+					113 container
+						114 text emoji_events
+						115 heading Learn to compete on Kaggle, Value: 5
+							116 text Learn to compete on Kaggle
+						117 text Improve and test your skills
+						118 text Get started school
+						119 heading Take a short course, Value: 5
+							120 text Take a short course
+						121 text Our courses are the fastest way to learn data science
+						122 text Get started explore
+						123 heading Browse inspiring data and code, Value: 5
+							124 text Browse inspiring data and code
+						125 text Improve your data science projects
+						126 text Get started
+				127 heading Next Steps, Value: 2
+					128 text Next Steps
+				129 heading Things to do, Value: 3
+					130 text Things to do
+				131 content list
+					132 container Run your first notebook List Item
+						133 link Description: Run your first notebook opens in new window, Value: kaggle.com/code
+						134 checkbox (disabled, settable, integer) 1
+					135 container Join a conversation List Item
+						136 link Description: Join a conversation opens in new window, Value: kaggle.com/discussion?sort=published
+						137 checkbox (disabled, settable, integer) 0
+					138 container Cast your first upvote List Item
+						139 link Description: Cast your first upvote opens in new window, Value: kaggle.com/code
+						140 checkbox (disabled, settable, integer) 0
+					141 container Make a competition submission List Item
+						142 link Description: Make a competition submission opens in new window, Value: kaggle.com/code/alexisbcook/titanic-tutorial/notebook
+						143 checkbox (disabled, settable, integer) 0
+				144 container
+					145 heading AI Benchmark Sandbox: Discover What Works, Value: 2
+						146 text AI Benchmark Sandbox: Discover What Works
+					147 button (expanded) Description: Collapse AI Benchmark Sandbox, Secondary Actions: Collapse
+					148 text Go beyond vibe checks. See responses to your prompt from two frontier models, then turn it into a repeatable Benchmark in
+					149 link Description: Kaggle’s ecosystem, Value: kaggle.com/benchmarks
+					150 text . What do you want a model to do?
+					151 text Prompt
+					152 text entry area (settable) Prompt, ID: :rd:, Value: Write a children's bedtime story (200-260 words) about a shadow that wants its own day off. Must include a turning point where the shadow speaks for the first time. End with a one-line moral prefixed with 'Moral:'.
+					153 button Inspire me
+						154 text model_training
+						155 text Inspire me
+					156 button Logic
+						157 text neurology
+						158 text Logic
+					159 button Coding
+						160 text code
+						161 text Coding
+					162 button Generate
+					163 button Clear prompt
+					164 heading Responses, Value: 3
+						165 text Responses
+					166 combo box (collapsed) Description: Select Model for slot A. Gemini 3.8 Flash currently selected., Value: Gemini 3.8 Flash, Secondary Actions: Expand
+						167 text Gemini 3.8 Flash
+					168 text Response will appear here
+					169 combo box (collapsed) Description: Select Model for slot B. Claude Sonnet 5.5 currently selected., Value: Claude Sonnet 5.5, Secondary Actions: Expand
+						170 text Claude Sonnet 5.5
+					171 text Response will appear here
+				172 container
+					173 heading Join Top AI Challenges, Value: 2
+						174 text Join Top AI Challenges
+					175 link Description: See all, Value: kaggle.com/competitions?hostSegmentIdFilter=1
+					176 text Build solutions to solve the industry's hardest AI problems and reveal the true state-of-the-art. trophy
+					177 heading Open Challenges, Value: 6
+						178 text Open Challenges
+					179 container
+						180 text 8 active
+					181 text paid
+					182 heading Prize Pool, Value: 6
+						183 text Prize Pool
+					184 container
+						185 text $2.3M total
+					186 text file_upload
+					187 heading Submissions, Value: 6
+						188 text Submissions
+					189 container
+						190 text 189K total
+					191 content list Featured challenges
+						192 container Squares in Squares
+							193 link Value: kaggle.com/competitions/squares-in-squares, ID: 166661, Description: organized by Kaggle trophy Competition Squares in Squares Competition options menu collapsed Find the smallest enclosing square for N unit squares 21 Teams
+							194 heading $50,000, Value: 2
+								195 text $50,000
+							196 text info
+							197 text 9 months to go
+						198 container Name That LLM
+							199 link Value: kaggle.com/competitions/name-that-llm, ID: 170484, Description: organized by Kaggle trophy Competition Name That LLM Competition options menu collapsed Identify the model behind the text 2426 Teams
+							200 heading $50,000, Value: 2
+								201 text $50,000
+							202 text 3 months to go
+						203 container NFL Big Data Bowl 2027
+							204 link Value: kaggle.com/competitions/nfl-big-data-bowl-2027, ID: 162982, Description: organized by The National Football League rocket_launch Hackathon NFL Big Data Bowl 2027 Competition options menu collapsed Uncover non-obvious linkages between Combine sensor tracking and regular-season NFL game performance 354 Teams
+							205 heading $100,000, Value: 2
+								206 text $100,000
+							207 text 3 months to go
+					208 container
+						209 text Community Pulse Loaded 40 recent community updates.
+						210 content list
+							211 container A few more games, new discussion by Russell Kirk in ARC Prize 2026 - ARC-AGI-3 List Item
+								212 link Description: A few more games, new discussion by Russell Kirk in ARC Prize 2026 - ARC-AGI-3, Value: kaggle.com/competitions/arc-prize-2026-arc-agi-3/discussion/751526
+							213 container Squarecraft | Beyond the Grid | 22.7417 LB, new notebook by avazaku in Squares in Squares List Item
+								214 link Description: Squarecraft | Beyond the Grid | 22.7417 LB, new notebook by avazaku in Squares in Squares, Value: kaggle.com/code/avazaku/squarecraft-beyond-the-grid-22-7417-lb
+							215 container Scoring backlog? Multiple submissions PENDING 6+ hours with kernels COMPLETE — deadline is tomorrow, new discussion by Masum Huq in RSNA Knee Abnormality Detection List Item
+								216 link Value: kaggle.com/competitions/rsna-knee-abnormality-detection/discussion/751502, Description: Scoring backlog? Multiple submissions PENDING 6+ hours with kernels COMPLETE — deadline is tomorrow, new discussion by Masum Huq in RSNA Knee Abnormality Detection
+							217 container I hope this is not a replacement for Santa competition, new discussion by Ali in Squares in Squares List Item
+								218 link Description: I hope this is not a replacement for Santa competition, new discussion by Ali in Squares in Squares, Value: kaggle.com/competitions/squares-in-squares/discussion/751496
+							219 container University Track Eligibility, new discussion by Michael Schuckers in NFL Big Data Bowl 2027 List Item
+								220 link Description: University Track Eligibility, new discussion by Michael Schuckers in NFL Big Data Bowl 2027, Value: kaggle.com/competitions/nfl-big-data-bowl-2027/discussion/751492
+							221 container Local eval that matches the scorer: gold patches pass on 127/129 public tasks (was 52), new discussion by Zbigniew Kirchner in Google - The Gemma 4 Developer Agent Competition List Item
+								222 link Value: kaggle.com/competitions/gemma-4-developer-agent/discussion/751487, Description: Local eval that matches the scorer: gold patches pass on 127/129 public tasks (was 52), new discussion by Zbigniew Kirchner in Google - The Gemma 4 Developer Agent Competition
+							223 container Clarification on the Next Gen Stats score inputs and earlier datasets, new discussion by Lalith Vardhan3 in NFL Big Data Bowl 2027 List Item
+								224 link Value: kaggle.com/competitions/nfl-big-data-bowl-2027/discussion/751476, Description: Clarification on the Next Gen Stats score inputs and earlier datasets, new discussion by Lalith Vardhan3 in NFL Big Data Bowl 2027
+							225 container 6th Place: my best submission was my simplest one (and I lost the code), new discussion by Harsh_2035 in Distracted Driving Risk Detection Challenge List Item
+								226 link Description: 6th Place: my best submission was my simplest one (and I lost the code), new discussion by Harsh_2035 in Distracted Driving Risk Detection Challenge, Value: kaggle.com/competitions/distracted-driving-risk-detection-challenge/writeups/6th-place-my-best-submission-was-my-simplest-one
+							227 container Training-spectrum provenance and pinned MRR scorer version, new discussion by fagbola peter in Enveda CASMI 2026 - Molecule ID From Mass Spectra List Item
+								228 link Value: kaggle.com/competitions/enveda-CASMI26-molecule-id-mass-spectra/discussion/751474, Description: Training-spectrum provenance and pinned MRR scorer version, new discussion by fagbola peter in Enveda CASMI 2026 - Molecule ID From Mass Spectra
+							229 container A few questions about the final check, new discussion by cccccfsd in Data-Centric Land Cover Classification Challenge 2026 List Item
+								230 link Value: kaggle.com/competitions/data-centric-land-cover-classification-challenge-26/discussion/751469, Description: A few questions about the final check, new discussion by cccccfsd in Data-Centric Land Cover Classification Challenge 2026
+							231 container Data loading error???, new discussion by Penguin in ARC Prize 2026 - ARC-AGI-3 List Item
+								232 link Description: Data loading error???, new discussion by Penguin in ARC Prize 2026 - ARC-AGI-3, Value: kaggle.com/competitions/arc-prize-2026-arc-agi-3/discussion/751427
+							233 container Submission scored 0.00 after <2h with no error: infra issue or a true zero?, new discussion by NguyenThanhNhan in ARC Prize 2026 - ARC-AGI-2 List Item
+								234 link Value: kaggle.com/competitions/arc-prize-2026-arc-agi-2/discussion/751344, Description: Submission scored 0.00 after <2h with no error: infra issue or a true zero?, new discussion by NguyenThanhNhan in ARC Prize 2026 - ARC-AGI-2
+							235 container "Notebook Threw Exception" on a non-LoRA submission that validates and compiles locally, new discussion by Sultan Fawad in Google - The Gemma 4 Developer Agent Competition List Item
+								236 link Value: kaggle.com/competitions/gemma-4-developer-agent/discussion/751339, Description: "Notebook Threw Exception" on a non-LoRA submission that validates and compiles locally, new discussion by Sultan Fawad in Google - The Gemma 4 Developer Agent Competition
+							237 container Question on Grand Prize and Private Leaderboard, new discussion by Darren Amadeus Martin in ARC Prize 2026 - ARC-AGI-2 List Item
+								238 link Value: kaggle.com/competitions/arc-prize-2026-arc-agi-2/discussion/751292, Description: Question on Grand Prize and Private Leaderboard, new discussion by Darren Amadeus Martin in ARC Prize 2026 - ARC-AGI-2
+							239 container MOCK_TETT, new notebook by Dao Kiet Hong in AAAAAAAAA List Item
+								240 link Description: MOCK_TETT, new notebook by Dao Kiet Hong in AAAAAAAAA, Value: kaggle.com/code/danndan/mock-tett
+							241 container Forked a 0.600+ notebook and hit the 9-hour limit? Check the Qwen3.5-9B load time, new discussion by HALX2158 in Name That LLM List Item
+								242 link Value: kaggle.com/competitions/name-that-llm/discussion/751268, Description: Forked a 0.600+ notebook and hit the 9-hour limit? Check the Qwen3.5-9B load time, new discussion by HALX2158 in Name That LLM
+							243 container CASMI26: Top 1% Gold ⭐🏅, new notebook by Lavin Wins in Enveda CASMI 2026 - Molecule ID From Mass Spectra List Item
+								244 link Value: kaggle.com/code/lavinwins/casmi26-top-1-gold, Description: CASMI26: Top 1% Gold ⭐🏅, new notebook by Lavin Wins in Enveda CASMI 2026 - Molecule ID From Mass Spectra
+							245 container Name That LLM: Prompt-Disjoint TF-IDF Baseline, new notebook by Satwik S P Sahoo in Name That LLM List Item
+								246 link Description: Name That LLM: Prompt-Disjoint TF-IDF Baseline, new notebook by Satwik S P Sahoo in Name That LLM, Value: kaggle.com/code/satwiksps/name-that-llm-prompt-disjoint-tf-idf-baseline
+							247 container nlm-v21, new notebook by Dhruv Tibarewal in Name That LLM List Item
+								248 link Description: nlm-v21, new notebook by Dhruv Tibarewal in Name That LLM, Value: kaggle.com/code/dhruvtibarewal/nlm-v21
+							249 container Smart Buildings Facilities V2, new notebook by jazivxt in Smart Buildings Competition List Item
+								250 link Description: Smart Buildings Facilities V2, new notebook by jazivxt in Smart Buildings Competition, Value: kaggle.com/code/jazivxt/smart-buildings-facilities-v2
+							251 container Gemma 4 Developer Agent Small Model Leaderboard, new notebook by Ryan Holbrook in Google - The Gemma 4 Developer Agent Competition List Item
+								252 link Value: kaggle.com/code/ryanholbrook/gemma-4-developer-agent-small-model-leaderboard, Description: Gemma 4 Developer Agent Small Model Leaderboard, new notebook by Ryan Holbrook in Google - The Gemma 4 Developer Agent Competition
+							253 container v1_Vishak, new notebook by Vishak K Bhat in Name That LLM List Item
+								254 link Description: v1_Vishak, new notebook by Vishak K Bhat in Name That LLM, Value: kaggle.com/code/vishakkbhat/v1-vishak
+							255 container S6E10 | What I Broke First: 0.9583→0.9621🚀, new notebook by ZeKai Z. in Predicting Airline Satisfaction List Item
+								256 link Value: kaggle.com/code/zekaizhan/s6e10-what-i-broke-first-0-9583-0-9621, Description: S6E10 | What I Broke First: 0.9583→0.9621🚀, new notebook by ZeKai Z. in Predicting Airline Satisfaction
+							257 container RMIT HACKATHON 2025, new notebook by Dao Kiet Hong in RMIT HACKATHON 2025 List Item
+								258 link Description: RMIT HACKATHON 2025, new notebook by Dao Kiet Hong in RMIT HACKATHON 2025, Value: kaggle.com/code/danndan/rmit-hackathon-2025
+							259 container NTL 0604 Dual LoRA Gaussian Hungarian, new notebook by Kizabgd123 in Name That LLM List Item
+								260 link Description: NTL 0604 Dual LoRA Gaussian Hungarian, new notebook by Kizabgd123 in Name That LLM, Value: kaggle.com/code/kiza123123/ntl-0604-dual-lora-gaussian-hungarian
+							261 container S6E10 | Precision-Preserved Consensus | 0.96206, new notebook by avazaku in Predicting Airline Satisfaction List Item
+								262 link Value: kaggle.com/code/avazaku/s6e10-precision-preserved-consensus-0-96206, Description: S6E10 | Precision-Preserved Consensus | 0.96206, new notebook by avazaku in Predicting Airline Satisfaction
+							263 container 31B vs 12B vs E4B with the same agent files: a local comparison, new discussion by Dmitrii Gluzdov in Google - The Gemma 4 Developer Agent Competition List Item
+								264 link Value: kaggle.com/competitions/gemma-4-developer-agent/discussion/750974, Description: 31B vs 12B vs E4B with the same agent files: a local comparison, new discussion by Dmitrii Gluzdov in Google - The Gemma 4 Developer Agent Competition
+							265 container RMIT_SGS_demo_C1, new notebook by Bowen in RMIT HACKATHON 2026 List Item
+								266 link Description: RMIT_SGS_demo_C1, new notebook by Bowen in RMIT HACKATHON 2026, Value: kaggle.com/code/aisuko/rmit-sgs-demo-c1
+							267 container 0.96206 | Disagreement-Gated Teachers, new notebook by Кирилл Тымчишин in Predicting Airline Satisfaction List Item
+								268 link Value: kaggle.com/code/kirilltym/0-96206-disagreement-gated-teachers, Description: 0.96206 | Disagreement-Gated Teachers, new notebook by Кирилл Тымчишин in Predicting Airline Satisfaction
+							269 container Teach the Model + 10% ATLAS, new notebook by Joseph Adamski in Name That LLM List Item
+								270 link Description: Teach the Model + 10% ATLAS, new notebook by Joseph Adamski in Name That LLM, Value: kaggle.com/code/josephadamski91/teach-the-model-10-atlas
+							271 container CASMI26 Explained For HUMANS, new notebook by Mansur Nurmukhambetov in Enveda CASMI 2026 - Molecule ID From Mass Spectra List Item
+								272 link Value: kaggle.com/code/mononom/casmi26-explained-for-humans, Description: CASMI26 Explained For HUMANS, new notebook by Mansur Nurmukhambetov in Enveda CASMI 2026 - Molecule ID From Mass Spectra
+							273 container ARC3 franzen-v19, new notebook by lalalia in ARC Prize 2026 - ARC-AGI-3 List Item
+								274 link Description: ARC3 franzen-v19, new notebook by lalalia in ARC Prize 2026 - ARC-AGI-3, Value: kaggle.com/code/lalalia9/arc3-franzen-v19
+							275 container Two-Stage LoRA + Gaussian + Full Hungarian [0.604+, new notebook by Sangam Gautam in Name That LLM List Item
+								276 link Description: Two-Stage LoRA + Gaussian + Full Hungarian [0.604+, new notebook by Sangam Gautam in Name That LLM, Value: kaggle.com/code/sangam21/two-stage-lora-gaussian-full-hungarian-0-604
+							277 container Enveda CASMI Gold Medal ⭐🏅, new notebook by Lavin Wins in Enveda CASMI 2026 - Molecule ID From Mass Spectra List Item
+								278 link Value: kaggle.com/code/lavinwins/enveda-casmi-gold-medal, Description: Enveda CASMI Gold Medal ⭐🏅, new notebook by Lavin Wins in Enveda CASMI 2026 - Molecule ID From Mass Spectra
+							279 container ClimateWeaver: Quantile Ridge + Weather Mapping, new notebook by Longhao Wang in ClimX: Extreme-aware climate model emulation List Item
+								280 link Value: kaggle.com/code/giswlh/climateweaver-quantile-ridge-weather-mapping, Description: ClimateWeaver: Quantile Ridge + Weather Mapping, new notebook by Longhao Wang in ClimX: Extreme-aware climate model emulation
+							281 container Watching LLM Agents Solve ARC-AGI-2, new discussion by Chris Deotte in ARC Prize 2026 - ARC-AGI-2 List Item
+								282 link Description: Watching LLM Agents Solve ARC-AGI-2, new discussion by Chris Deotte in ARC Prize 2026 - ARC-AGI-2, Value: kaggle.com/competitions/arc-prize-2026-arc-agi-2/discussion/750577
+							283 container Will the winner just be whoever can get the most amount of extra training data?, new discussion by CoreyJamesLevinson in Name That LLM List Item
+								284 link Value: kaggle.com/competitions/name-that-llm/discussion/749447, Description: Will the winner just be whoever can get the most amount of extra training data?, new discussion by CoreyJamesLevinson in Name That LLM
+							285 container Kaggle could we please start doing something about the public notebooks? , new discussion by Cody_Null in RSNA Knee Abnormality Detection List Item
+								286 link Value: kaggle.com/competitions/rsna-knee-abnormality-detection/discussion/748181, Description: Kaggle could we please start doing something about the public notebooks? , new discussion by Cody_Null in RSNA Knee Abnormality Detection
+							287 container Missing FastAPI test dependencies in the evaluation sandbox, new discussion by babycare in Google - The Gemma 4 Developer Agent Competition List Item
+								288 link Value: kaggle.com/competitions/gemma-4-developer-agent/discussion/745775, Description: Missing FastAPI test dependencies in the evaluation sandbox, new discussion by babycare in Google - The Gemma 4 Developer Agent Competition
+							289 container FastApi tasks fail even with the gold patch, typing_inspection seems to be missing, new discussion by Vivek K N in Google - The Gemma 4 Developer Agent Competition List Item
+								290 link Value: kaggle.com/competitions/gemma-4-developer-agent/discussion/744370, Description: FastApi tasks fail even with the gold patch, typing_inspection seems to be missing, new discussion by Vivek K N in Google - The Gemma 4 Developer Agent Competition
+					291 text New to Kaggle? Build your skills and learn by doing in our monthly low-stakes
+					292 link Description: Playground Series, Value: kaggle.com/competitions?hostSegmentIdFilter=8
+					293 text .
+				294 heading New and Exciting, Value: 2
+					295 text New and Exciting
+				296 link Value: kaggle.com/competitions/5-day-ai-agents-intensive-vibecoding-course-with-google, Description: Announcement 5-Day AI Agents: Intensive Vibe Coding Course With Google Registration is now open for the 5-Day AI Agents: Intensive Vibecoding Course with Google
+				297 link Value: kaggle.com/blog/introducing-the-benchmarks-resource-grant-program, Description: Blog Benchmark Research Grants Apply for compute and infrastructure support for novel research benchmarks
+				298 link Value: kaggle.com/learn, Description: Learn Level Up Your Skills: 2 New Kaggle Learn Guides Discover how to evaluate models like a pro in "Kaggle Benchmarks Deep Dive" and conquer complex text data in "Intermediate NLP"
+				299 link Value: kaggle.com/discussions/product-announcements/697874, Description: Announcement Private Hackathons Kaggle’s new Private option now enables exclusive, closed-door community hackathons for internal teams.
+				300 container
+					301 heading New from Kagglers you follow, Value: 2
+						302 text New from Kagglers you follow
+					303 text The newsfeed is now in an experimental state! Now you will see new content from only users you follow, and announcements from Kaggle.
+			304 text Loaded 3 featured challenges
+		305 container Status for gpu-router-job: [object Object]. Click to open gpu-router-job in new window List Item gpu-router-io List Item Status for gpu-router-job: Successful. Click to open gpu-router-job in new window List Item gpu-router-io List Item undefined List Item
+			306 container active-events-panel
+				307 content list
+					308 container Status for gpu-router-job: [object Object]. Click to open gpu-router-job in new window List Item
+						309 link Status for gpu-router-job: [object Object]. Click to open gpu-router-job in new window
+							310 button Loading
+								311 progress indicator Loading
+							312 text gpu-router-job
+							313 text Version #28 with GPU T4 x2
+							314 text Running
+							315 text : 
+							316 text just now
+						317 text just now
+						318 button More options for gpu-router-job
+					319 container gpu-router-io List Item
+						320 link gpu-router-io
+							321 text gpu-router-io
+							322 text gpu-router job
+							323 text Successful
+						324 text just now
+						325 button More options for undefined
+					326 container Status for gpu-router-job: Successful. Click to open gpu-router-job in new window List Item
+						327 link Status for gpu-router-job: Successful. Click to open gpu-router-job in new window
+							328 text open_in_new
+							329 text gpu-router-job
+							330 text Version #27 with GPU T4 x2
+							331 text Successful
+						332 text 4m
+						333 button More options for gpu-router-job
+					334 container gpu-router-io List Item
+						335 link gpu-router-io
+							336 text gpu-router-io
+							337 text gpu-router job
+							338 text Successful
+						339 text 4m
+						340 button More options for undefined
+				341 content list
+					342 container undefined List Item
+						343 link Event running 1 1 Active Event
+							344 container
+								345 container Event running
+									346 text update
+								347 text 1
+							348 container
+								349 text 1  Active Event
+						350 button Collapse Active Events dialog
+
+The focused UI element is 309 link Status for gpu-router-job: [object Object]. Click to open gpu-router-job in new window

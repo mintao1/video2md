@@ -1,0 +1,344 @@
+.............................................F.F.F.....F.......F.F..F... [ 45%]
+.................F.F...........    · 条目 1/1：download
+..F..F..F..........FF.................... [ 90%]
+...............                                                          [100%]
+=================================== FAILURES ===================================
+______________________ test_preflight_anonymous_redacted _______________________
+
+client = <starlette.testclient.TestClient object at 0x10d06a0f0>
+
+    def test_preflight_anonymous_redacted(client):
+        # TestClient host="testclient" 非回环；本套件 AUTH=off 非真实认证 → 全部 detail 剥除
+        r = client.get("/preflight")
+        assert r.status_code == 200
+>       assert r.json()["ok"] is True
+E       assert False is True
+
+tests/test_api_contract.py:215: AssertionError
+_______________________________ test_me_defaults _______________________________
+
+client = <starlette.testclient.TestClient object at 0x10d12f1a0>
+
+    def test_me_defaults(client):
+        # 本套件无 V2MD_PG_DSN（json 档）→ /me 回 free 默认视图：uid 回显、id_label 派生
+        put_identity("test", "carol", "u_carol123")
+        r = client.get("/me", headers={"X-Test-Auth": "carol"})
+        assert r.status_code == 200, r.text
+        body = r.json()
+>       assert body["uid"] == "u_carol123"
+E       AssertionError: assert 'uid_carol' == 'u_carol123'
+E         
+E         - u_carol123
+E         + uid_carol
+
+tests/test_api_contract.py:249: AssertionError
+____________________ test_quota_books_counts_finished_runs _____________________
+
+client = <starlette.testclient.TestClient object at 0x10d14ba70>
+
+    def test_quota_books_counts_finished_runs(client):
+        # L-09：「已生成教材」= 本人未删的 done/partial run，不读无写入方的 membership 列
+        put_identity("test", "carol", "u_carol123")
+        _seed_run("r_c1", "u_carol123")
+        _seed_run("r_c2", "u_carol123", status="partial")
+        _seed_run("r_c3", "u_carol123", status="error")
+        _seed_run("r_other", "u_someone_else")
+        r = client.get("/quota", headers={"X-Test-Auth": "carol"})
+>       assert r.json()["stats"]["books"] == 2
+E       assert 0 == 2
+
+tests/test_api_contract.py:275: AssertionError
+_____________________ test_resolve_run_owner_scoped_dedup ______________________
+
+    def test_resolve_run_owner_scoped_dedup():
+        put_identity("test", "carol", "uid_carol")
+        put_identity("test", "dave", "uid_dave")
+        url = "local-dedup-x"
+        _seed_run("r_carol", "uid_carol", status="created")  # created/running 都能命中 dedup；created 不会被 lifespan 恢复真跑
+        runs_runs = runs._load_runs()
+        runs_runs["r_carol"]["url"] = url
+        runs._save_runs(runs_runs)
+    
+        # 同 owner → 复用（is_dup True，返回旧 run，不新建）
+        run, err, is_dup = resolve_run(url, "", False, "should_be_ignored", "uid_carol")
+        assert err == "" and is_dup and run["run_id"] == "r_carol"
+        # 他人同 URL → 各建各的（多用户不串），owner 落到新 run
+        run2, err2, dup2 = resolve_run(url, "", False, "", "uid_dave")
+>       assert err2 == "" and not dup2 and run2["owner"] == "uid_dave"
+E       AssertionError: assert ('' == '' and not True)
+
+tests/test_api_contract.py:328: AssertionError
+----------------------------- Captured stdout call -----------------------------
+♻️ 复用进行中的 run r_carol（1 条目），继续推进
+♻️ 复用进行中的 run 09f8a31b（1 条目），继续推进
+________________ test_create_run_skip_requires_owner_and_shelf _________________
+
+deliver = PosixPath('/var/folders/1b/7r5v_kjj689_65rpwv0hxg8h0000gn/T/v2md-contract-ir3f5oih/shelf-3d2815')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10d1f9f70>
+
+    def test_create_run_skip_requires_owner_and_shelf(deliver, monkeypatch):
+        """deliver 幂等跳过的硬条件：state 条目 owner 相同 + 源 run 产物还在架上。"""
+        url = "https://example.test/dedup-me"
+        # state：alice 处理过（node_resolve 落盘带 owner/run_id），源 run r_src 在架
+        st = {"fp1": {"url": url, "owner": "uid_alice", "run_id": "r_src", "title": "旧笔记",
+                      "status": "completed"}}
+        (Path(_TMP) / "state.json").write_text(json.dumps(st), encoding="utf-8")
+        _seed_delivered_run("r_src", "uid_alice", deliver)
+        import video2md.runs as _r
+        monkeypatch.setattr(_r, "resolve_url", lambda u: [{"url": u, "id": ""}])
+    
+        a = _r.create_run(url, "", False, owner="uid_alice")
+        art_a = a["artifacts"][a["entries"][0]["url"]]
+>       assert art_a.get("skipped") and art_a["skipped_from"]["run_id"] == "r_src"
+E       AssertionError: assert (None)
+E        +  where None = <built-in method get of dict object at 0x10d5776c0>('skipped')
+E        +    where <built-in method get of dict object at 0x10d5776c0> = {}.get
+
+tests/test_api_contract.py:525: AssertionError
+_________________ test_run_list_owner_scoped_and_status_filter _________________
+
+client = <starlette.testclient.TestClient object at 0x10d02da90>
+
+    def test_run_list_owner_scoped_and_status_filter(client):
+        put_identity("test", "alice", "uid_alice")
+        put_identity("test", "bob", "uid_bob")
+        _seed_run("r_a1", "uid_alice", status="done")
+        _seed_run("r_a2", "uid_alice", status="error")
+        _seed_run("r_b1", "uid_bob", status="done")
+    
+        items = client.get("/runs", headers={"X-Test-Auth": "alice"}).json()["items"]
+>       assert {i["run_id"] for i in items} == {"r_a1", "r_a2"}
+E       AssertionError: assert {'already-bil... 'oldmo', ...} == {'r_a1', 'r_a2'}
+E         
+E         Extra items in the left set:
+E         'r_noprod'
+E         'r_entry'
+E         'r_new'
+E         'short-transcript'
+E         'r_sse2'...
+E         
+E         ...Full output truncated (26 lines hidden), use '-vv' to show
+
+tests/test_api_contract.py:561: AssertionError
+_________________ test_prefs_empty_upsert_partial_and_persist __________________
+
+client = <starlette.testclient.TestClient object at 0x10d02ca10>
+
+    def test_prefs_empty_upsert_partial_and_persist(client):
+        put_identity("test", "alice", "uid_alice")
+        _seed_run("r_p1", "uid_alice")
+>       assert client.get("/prefs", headers={"X-Test-Auth": "alice"}).json() == {"items": []}
+E       AssertionError: assert {'items': [{'...ogress': 68}]} == {'items': []}
+E         
+E         Differing items:
+E         {'items': [{'run_id': 'r_p1', 'fav': True, 'progress': 68}]} != {'items': []}
+E         Use -v to get more diff
+
+tests/test_api_contract.py:611: AssertionError
+______________________ test_budget_gate_and_cost_endpoint ______________________
+
+client = <starlette.testclient.TestClient object at 0x10d263500>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10d2f4680>
+
+    def test_budget_gate_and_cost_endpoint(client, monkeypatch):
+        import video2md.api as _api
+        import video2md.runs as _runs_mod
+        put_identity("test", "alice", "uid_alice")
+        # 本月已结算 $5 的 run（json 档：created 用本月真实日期保证进统计窗）
+        month_now = datetime.now().strftime("%Y-%m")
+        rec = _seed_run("costy", "uid_alice")
+        rec["created"] = f"{month_now}-15T00:00:00"
+        rec["cost_usd"] = 5.0
+        rec["usage"] = {"llm_in_tok": 1000, "llm_out_tok": 2000, "gpu_s": 60.0}
+        with _runs_mod._runs_file_lock():
+            _runs_mod._runs_merge(rec)
+    
+        _stub_resolve(monkeypatch)
+        # 预算 $4 < 已花 $5 → POST /runs 429 BUDGET_EXCEEDED（信封 details 符号码）
+        monkeypatch.setattr(_api, "BUDGET_MONTH_USD", 4.0)
+        r = client.post("/runs", json={"url": "https://example.test/c1", "resolve_only": True},
+                         headers={"X-Test-Auth": "alice"})
+        assert r.status_code == 429 and r.json()["error"]["details"] == "BUDGET_EXCEEDED", r.text
+>       assert "5.00" in r.json()["error"]["message"] and "4.00" in r.json()["error"]["message"]
+E       AssertionError: assert ('5.00' in '本月预算已用尽（$9.25/$4.00），下月自动重置或联系管理员调整 V2MD_BUDGET_MONTH_USD')
+
+tests/test_api_contract.py:1114: AssertionError
+_____________________________ test_cost_cli_export _____________________________
+
+client = <starlette.testclient.TestClient object at 0x10d1f9460>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10d599760>
+capsys = <_pytest.capture.CaptureFixture object at 0x10d59b860>
+
+    def test_cost_cli_export(client, monkeypatch, capsys):
+        import video2md.runs as _runs_mod
+        put_identity("test", "alice", "uid_alice")
+        month_now = datetime.now().strftime("%Y-%m")
+        rec = _seed_run("exp1", "uid_alice")
+        rec["created"] = f"{month_now}-02T00:00:00"
+        rec["cost_usd"] = 1.25
+        rec["usage"] = {"llm_in_tok": 10, "llm_out_tok": 20, "gpu_s": 30.0}
+        with _runs_mod._runs_file_lock():
+            _runs_mod._runs_merge(rec)
+        import video2md.__main__ as main_mod
+        with pytest.MonkeyPatch.context() as mp:
+            mp.setattr("sys.argv", ["video2md", "cost", "--uid", "uid_alice"])
+            main_mod.main()
+        out = capsys.readouterr().out.strip().splitlines()
+        rows = [json.loads(ln) for ln in out]
+        detail = [r for r in rows if not r.get("summary")]
+        summary = [r for r in rows if r.get("summary")][0]
+        assert any(r["run_id"] == "exp1" and r["cost_usd"] == 1.25 for r in detail)
+>       assert summary["spend_usd"] == 1.25 and summary["runs_n"] == 1 and summary["llm_in_tok"] == 10
+E       assert (9.25 == 1.25)
+
+tests/test_api_contract.py:1201: AssertionError
+______________ test_web_media_requires_owner_and_referenced_file _______________
+
+client = <starlette.testclient.TestClient object at 0x10ab276e0>
+tmp_path = PosixPath('/private/var/folders/1b/7r5v_kjj689_65rpwv0hxg8h0000gn/T/pytest-of-linmintao/pytest-125/test_web_media_requires_owner_0')
+
+    def test_web_media_requires_owner_and_referenced_file(client, tmp_path):
+        from video2md.config import OUT_DIR
+        put_identity("test", "alice", "uid_alice")
+        put_identity("test", "bob", "uid_bob")
+        _seed_run("web_media", "uid_alice")
+        attachments = OUT_DIR / "attachments"
+        attachments.mkdir(parents=True, exist_ok=True)
+        (attachments / "web-frame.jpg").write_bytes(b"jpeg-fixture")
+        (attachments / "web-clip.mp4").write_bytes(b"mp4-fixture")
+        (attachments / "unreferenced.jpg").write_bytes(b"private")
+        secret = tmp_path / "secret.jpg"
+        secret.write_bytes(b"secret")
+>       (attachments / "escape.jpg").symlink_to(secret)
+
+tests/test_api_contract.py:1686: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = PosixPath('/Users/linmintao/Documents/Obsidian Vault/资料库/视频笔记/attachments/escape.jpg')
+target = PosixPath('/private/var/folders/1b/7r5v_kjj689_65rpwv0hxg8h0000gn/T/pytest-of-linmintao/pytest-125/test_web_media_requires_owner_0/secret.jpg')
+target_is_directory = False
+
+    def symlink_to(self, target, target_is_directory=False):
+        """
+        Make this path a symlink pointing to the target path.
+        Note the order of arguments (link, target) is the reverse of os.symlink.
+        """
+        if not hasattr(os, "symlink"):
+            raise NotImplementedError("os.symlink() not available on this system")
+>       os.symlink(target, self, target_is_directory)
+E       FileExistsError: [Errno 17] File exists: '/private/var/folders/1b/7r5v_kjj689_65rpwv0hxg8h0000gn/T/pytest-of-linmintao/pytest-125/test_web_media_requires_owner_0/secret.jpg' -> '/Users/linmintao/Documents/Obsidian Vault/资料库/视频笔记/attachments/escape.jpg'
+
+/opt/homebrew/Cellar/python@3.12/3.12.14/Frameworks/Python.framework/Versions/3.12/lib/python3.12/pathlib.py:1386: FileExistsError
+_________________ test_cancelling_state_survives_list_refresh __________________
+
+client = <starlette.testclient.TestClient object at 0x10cfa4230>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10d4dda60>
+
+    def test_cancelling_state_survives_list_refresh(client, monkeypatch):
+        started = threading.Event()
+        release = threading.Event()
+    
+        def workload(url, *, run_id=""):
+            started.set()
+            assert release.wait(5)
+            return {"status": "error", "errors": ["cancelled"], "run_id": run_id}
+    
+        _cancel_stubs(monkeypatch, workload)
+        rid = client.post("/runs", json={"url": "https://example.test/long-stage"}).json()["run_id"]
+        assert started.wait(3)
+        try:
+            assert client.post(f"/runs/{rid}/cancel").json()["status"] == "cancelling"
+            assert client.get(f"/runs/{rid}").json()["status"] == "cancelling"
+            items = client.get("/runs").json()["items"]
+>           assert next(row for row in items if row["run_id"] == rid)["status"] == "cancelling"
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E           StopIteration
+
+tests/test_api_contract.py:1778: StopIteration
+----------------------------- Captured stdout call -----------------------------
+[req] POST /runs → 200 run_id=a226bcde total=1 dedup=False user=u_9db31e487173
+[req] POST /runs/a226bcde/cancel → 200 run_id=a226bcde user=u_9db31e487173 local=running
+_________ test_deleting_task_keeps_monthly_cost_and_budget_accounting __________
+
+client = <starlette.testclient.TestClient object at 0x10d4ddd90>
+
+    def test_deleting_task_keeps_monthly_cost_and_budget_accounting(client):
+        put_identity("test", "alice", "uid_alice")
+        rec = _seed_run("billed_deleted", "uid_alice")
+        rec.update(created=datetime.now().isoformat(), cost_usd=2.5, usage={"llm_in_tok": 100, "gpu_s": 60})
+        with runs._runs_file_lock():
+            runs._runs_merge(rec)
+        h = {"X-Test-Auth": "alice"}
+>       assert client.get("/cost", headers=h).json()["spend_usd"] == 2.5
+E       assert 9.25 == 2.5
+
+tests/test_api_contract.py:1841: AssertionError
+_____ test_monthly_cost_details_include_only_owner_and_keep_deleted_bills ______
+
+client = <starlette.testclient.TestClient object at 0x10d06bfe0>
+
+    def test_monthly_cost_details_include_only_owner_and_keep_deleted_bills(client):
+        put_identity('test', 'alice', 'uid_alice')
+        rec = _seed_run('monthly-bill', 'uid_alice', status='done')
+        rec.update(created=datetime.now().isoformat(), cost_usd=0.5,
+                   usage={'llm_in_tok': 1000, 'llm_out_tok': 500, 'gpu_s': 180}, deleted=True)
+        with runs._runs_file_lock():
+            runs._runs_merge(rec)
+        _seed_run('someone-elses-bill', 'uid_bob')
+        body = client.get('/cost', headers={'X-Test-Auth': 'alice'}).json()
+>       assert [r['run_id'] for r in body['runs']] == ['monthly-bill']
+E       AssertionError: assert ['monthly-bil...osty', 'exp1'] == ['monthly-bill']
+E         
+E         Left contains 3 more items, first extra item: 'billed_deleted'
+E         Use -v to get more diff
+
+tests/test_api_contract.py:2013: AssertionError
+_____ test_partial_without_notes_has_quality_diagnostic_and_is_not_a_book ______
+
+client = <starlette.testclient.TestClient object at 0x10d02cb30>
+
+    def test_partial_without_notes_has_quality_diagnostic_and_is_not_a_book(client):
+        put_identity('test', 'alice', 'uid_alice')
+        rec = _seed_run('short-transcript', 'uid_alice', status='partial')
+        rec.update(partial_failures={'note': ['1']}, errors=[])
+        rec['artifacts'] = {rec['entries'][0]['url']: {'transcript': '字' * 193}}
+        with runs._runs_file_lock():
+            runs._runs_merge(rec)
+        headers = {'X-Test-Auth': 'alice'}
+        item = client.get('/runs', headers=headers).json()['items'][0]
+>       assert item['done_entries'] == 0
+E       assert 1 == 0
+
+tests/test_api_contract.py:2027: AssertionError
+=============================== warnings summary ===============================
+.venv/lib/python3.12/site-packages/starlette/testclient.py:53
+  /Users/linmintao/Desktop/开发项目/云端部署/video2md/backend/.venv/lib/python3.12/site-packages/starlette/testclient.py:53: DeprecationWarning: The anyio.abc.BlockingPortal alias is deprecated, use anyio.from_thread.BlockingPortal instead.
+    _PortalFactoryType = Callable[[], AbstractContextManager[anyio.abc.BlockingPortal]]
+
+tests/test_api_contract.py::test_auth_google_callback_happy_path
+tests/test_api_contract.py::test_auth_google_redirect_round_trip
+tests/test_api_contract.py::test_auth_google_callback_state_rejected
+tests/test_api_contract.py::test_auth_google_callback_state_rejected
+tests/test_api_contract.py::test_auth_google_callback_state_rejected
+tests/test_api_contract.py::test_auth_google_callback_exchange_rejected
+tests/test_api_contract.py::test_auth_google_callback_verify_fails
+  /Users/linmintao/Desktop/开发项目/云端部署/video2md/backend/.venv/lib/python3.12/site-packages/starlette/testclient.py:455: DeprecationWarning: Setting per-request cookies=<...> is being deprecated, because the expected behaviour on cookie persistence is ambiguous. Set cookies directly on the client instance instead.
+    return super().request(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_api_contract.py::test_preflight_anonymous_redacted - assert...
+FAILED tests/test_api_contract.py::test_me_defaults - AssertionError: assert ...
+FAILED tests/test_api_contract.py::test_quota_books_counts_finished_runs - as...
+FAILED tests/test_api_contract.py::test_resolve_run_owner_scoped_dedup - Asse...
+FAILED tests/test_api_contract.py::test_create_run_skip_requires_owner_and_shelf
+FAILED tests/test_api_contract.py::test_run_list_owner_scoped_and_status_filter
+FAILED tests/test_api_contract.py::test_prefs_empty_upsert_partial_and_persist
+FAILED tests/test_api_contract.py::test_budget_gate_and_cost_endpoint - Asser...
+FAILED tests/test_api_contract.py::test_cost_cli_export - assert (9.25 == 1.25)
+FAILED tests/test_api_contract.py::test_web_media_requires_owner_and_referenced_file
+FAILED tests/test_api_contract.py::test_cancelling_state_survives_list_refresh
+FAILED tests/test_api_contract.py::test_deleting_task_keeps_monthly_cost_and_budget_accounting
+FAILED tests/test_api_contract.py::test_monthly_cost_details_include_only_owner_and_keep_deleted_bills
+FAILED tests/test_api_contract.py::test_partial_without_notes_has_quality_diagnostic_and_is_not_a_book
+14 failed, 145 passed, 8 warnings in 71.08s (0:01:11)

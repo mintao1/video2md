@@ -1,0 +1,23 @@
+{
+  "run_id": "be188f78",
+  "expected_cost_usd": 0.010311,
+  "actual_cost_usd": 0.010311,
+  "monthly_deltas": {
+    "runs_n": 1,
+    "llm_in_tok": 15939,
+    "llm_out_tok": 15841,
+    "gpu_s": 1276.45,
+    "spend_usd": 0.010311
+  },
+  "duplicate_submit_deltas": {
+    "runs_n": 0,
+    "llm_in_tok": 0,
+    "llm_out_tok": 0,
+    "gpu_s": 0.0,
+    "spend_usd": 0.0
+  },
+  "all_two_notes_present": true,
+  "gpu_stage_sum_s": 1276.45,
+  "gpu_stage_sum_equals_run_usage": true,
+  "gpu_scope": "远程ASR/OCR/剪辑阶段墙钟耗时；非硬件忙碌时间。GPU免费计价。"
+}

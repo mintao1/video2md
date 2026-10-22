@@ -1,0 +1,294 @@
+{
+  "run": {
+    "run_id": "3c05faf8",
+    "status": "running",
+    "created": "2026-10-21T21:17:07",
+    "stages": {
+      "ocr": {
+        "ts": "2026-10-21T21:25:52",
+        "duration_s": 281.933159,
+        "failed_entries": [
+          "1"
+        ]
+      },
+      "frames": {
+        "ts": "2026-10-21T21:21:10",
+        "duration_s": 5.205704
+      },
+      "download": {
+        "ts": "2026-10-21T21:17:12",
+        "duration_s": 4.825641
+      },
+      "transcribe": {
+        "ts": "2026-10-21T21:21:05",
+        "duration_s": 232.754696
+      }
+    },
+    "total": 2,
+    "usage": null,
+    "cost_usd": null,
+    "cost_pricing": null,
+    "tmp_cleaned": null,
+    "finished": null,
+    "entries": [
+      {
+        "id": "BV1LV411r77C_p1",
+        "url": "https://www.bilibili.com/video/BV1LV411r77C/?p=1",
+        "playlist_index": 1,
+        "playlist_title": "PPT短视频教程合集，持续更新中……",
+        "title": "如何用一张图片改变枯燥的纯文本排版？",
+        "bilibili": {
+          "cid": 214879208,
+          "bvid": "BV1LV411r77C"
+        }
+      },
+      {
+        "id": "BV1LV411r77C_p2",
+        "url": "https://www.bilibili.com/video/BV1LV411r77C/?p=2",
+        "playlist_index": 2,
+        "playlist_title": "PPT短视频教程合集，持续更新中……",
+        "title": "传统图表和500强图表的一步之遥",
+        "bilibili": {
+          "cid": 214879411,
+          "bvid": "BV1LV411r77C"
+        }
+      }
+    ],
+    "artifacts": [
+      {
+        "stage_metrics": {
+          "frames": {
+            "duration_s": 3.049489,
+            "max_frames": 120,
+            "gpu_seconds": 0.0,
+            "files_nonempty": true,
+            "candidate_count": 60,
+            "timestamps_valid": true
+          },
+          "download": {
+            "bytes": 1898375,
+            "duration_s": 3.717357,
+            "gpu_seconds": 0
+          },
+          "transcribe": {
+            "segments": 3,
+            "duration_s": 156.647261,
+            "gpu_seconds": 154.397,
+            "transcript_nonempty": true,
+            "timestamped_segments": true
+          }
+        },
+        "selection_mode": null,
+        "selected_count": 0,
+        "note_present": false,
+        "title": null,
+        "markdown_chars": 0,
+        "clips_done": null,
+        "transcript_chars": 488
+      },
+      {
+        "stage_metrics": {
+          "ocr": {
+            "duration_s": 126.799166,
+            "gpu_seconds": 126.765,
+            "frames_completed": 57,
+            "frames_requested": 57
+          },
+          "frames": {
+            "duration_s": 2.15013,
+            "max_frames": 120,
+            "gpu_seconds": 0.0,
+            "files_nonempty": true,
+            "candidate_count": 57,
+            "timestamps_valid": true
+          },
+          "download": {
+            "bytes": 1303974,
+            "duration_s": 1.104795,
+            "gpu_seconds": 0
+          },
+          "transcribe": {
+            "segments": 3,
+            "duration_s": 76.103589,
+            "gpu_seconds": 73.832,
+            "transcript_nonempty": true,
+            "timestamped_segments": true
+          }
+        },
+        "selection_mode": null,
+        "selected_count": 0,
+        "note_present": false,
+        "title": null,
+        "markdown_chars": 0,
+        "clips_done": null,
+        "transcript_chars": 7918
+      }
+    ],
+    "diagnostic": null,
+    "model_calls": []
+  },
+  "cost": {
+    "month": "2026-10-01T00:00:00",
+    "spend_usd": 0.019397,
+    "budget_usd": 0.0,
+    "usage": {
+      "spend_usd": 0.019397,
+      "llm_in_tok": 24484,
+      "llm_out_tok": 31450,
+      "gpu_s": 3056.564,
+      "runs_n": 8
+    },
+    "gpu_policy": "free",
+    "runs": [
+      {
+        "run_id": "3c05faf8",
+        "title": "如何用一张图片改变枯燥的纯文本排版？",
+        "status": "running",
+        "created": "2026-10-21T21:17:07",
+        "deleted": false,
+        "usage": null,
+        "cost_usd": null,
+        "cost_pricing": null
+      },
+      {
+        "run_id": "be188f78",
+        "title": "学PPT该学哪些技能：会做巧做好用漂亮",
+        "status": "done",
+        "created": "2026-10-21T15:44:32",
+        "deleted": false,
+        "usage": {
+          "gpu_s": 1276.45,
+          "llm_in_tok": 15939,
+          "llm_out_tok": 15841
+        },
+        "cost_usd": 0.010311,
+        "cost_pricing": {
+          "gpu_min": 0.0,
+          "currency": "USD",
+          "gpu_policy": "free",
+          "llm_in_mtok": 0.15,
+          "llm_out_mtok": 0.5,
+          "llm_cached_in_mtok": 0.03
+        }
+      },
+      {
+        "run_id": "4df77d9c",
+        "title": "数据库索引原理与查询优化",
+        "status": "done",
+        "created": "2026-10-21T13:30:05",
+        "deleted": false,
+        "usage": {
+          "gpu_s": 809.12,
+          "llm_in_tok": 6498,
+          "llm_out_tok": 6919
+        },
+        "cost_usd": 0.004434,
+        "cost_pricing": {
+          "gpu_min": 0.0,
+          "currency": "USD",
+          "gpu_policy": "free",
+          "llm_in_mtok": 0.15,
+          "llm_out_mtok": 0.5,
+          "llm_cached_in_mtok": 0.03
+        }
+      },
+      {
+        "run_id": "edfa1b1a",
+        "title": "ferosse.tech",
+        "status": "partial",
+        "created": "2026-10-21T13:09:14",
+        "deleted": false,
+        "usage": {
+          "gpu_s": 331.228,
+          "llm_in_tok": 2047,
+          "llm_out_tok": 8690
+        },
+        "cost_usd": 0.004652,
+        "cost_pricing": {
+          "gpu_min": 0.0,
+          "currency": "USD",
+          "gpu_policy": "free",
+          "llm_in_mtok": 0.15,
+          "llm_out_mtok": 0.5,
+          "llm_cached_in_mtok": 0.03
+        }
+      },
+      {
+        "run_id": "312e97ae",
+        "title": "ferosse.tech",
+        "status": "error",
+        "created": "2026-10-21T11:20:09",
+        "deleted": false,
+        "usage": {
+          "gpu_s": 204.669,
+          "llm_in_tok": 0,
+          "llm_out_tok": 0
+        },
+        "cost_usd": 0.0,
+        "cost_pricing": null
+      },
+      {
+        "run_id": "56835fed",
+        "title": "ferosse.tech",
+        "status": "error",
+        "created": "2026-10-21T08:15:42",
+        "deleted": false,
+        "usage": {
+          "gpu_s": 183.082,
+          "llm_in_tok": 0,
+          "llm_out_tok": 0
+        },
+        "cost_usd": 0.0,
+        "cost_pricing": null
+      },
+      {
+        "run_id": "aef9643a",
+        "title": "ferosse.tech",
+        "status": "error",
+        "created": "2026-10-21T07:37:06",
+        "deleted": false,
+        "usage": {
+          "gpu_s": 251.977,
+          "llm_in_tok": 0,
+          "llm_out_tok": 0
+        },
+        "cost_usd": 0.0,
+        "cost_pricing": null
+      },
+      {
+        "run_id": "9ad9ee9d",
+        "title": "ferosse.tech",
+        "status": "error",
+        "created": "2026-10-21T06:03:35",
+        "deleted": false,
+        "usage": {
+          "gpu_s": 0.038,
+          "llm_in_tok": 0,
+          "llm_out_tok": 0
+        },
+        "cost_usd": 0.0,
+        "cost_pricing": null
+      }
+    ],
+    "pricing_configured": true,
+    "prices": {
+      "llm_in_mtok": 0.15,
+      "llm_out_mtok": 0.5,
+      "gpu_min": 0.0,
+      "llm_cached_in_mtok": 0.03
+    }
+  },
+  "source_sha256": {
+    "bilibili.py": "bec970b5875c2886d42d93d03a097b94095a6f13661e8351ace83d89629c7985",
+    "resolve.py": "132a77647ceb8a49c663936b7a897d02574f0309fe0866a3b01b1fa5dfcbfcd0",
+    "download.py": "4dcb86fe9686385ad4d1e2d7a608fe5b4a8c0f6a806f17884560aee70df08733"
+  },
+  "web_index_sha256": "574b22cc43d199e409e4488ff47c880827cf88f24e24fe7f8c5d0a8024f9bea0",
+  "default_model": "glm-5.3-flash",
+  "fake_llm_enabled": false,
+  "submit_audit": {
+    "present": true,
+    "window_count": 1,
+    "timestamp": "2026-10-21 13:16:10.401559+00:00"
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "status": 200,
+  "duration_s": 1.396,
+  "model": "glm-5.3-flash",
+  "usage": {
+    "prompt_tokens": 27,
+    "completion_tokens": 32,
+    "total_tokens": 59,
+    "prompt_tokens_details": {
+      "cached_tokens": 0
+    },
+    "completion_tokens_details": {
+      "accepted_prediction_tokens": null,
+      "reasoning_tokens": 32,
+      "rejected_prediction_tokens": null
+    }
+  },
+  "content_present": true
+}

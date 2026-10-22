@@ -1,0 +1,132 @@
+FFF....                                                                  [100%]
+=================================== FAILURES ===================================
+__ test_oauth_transport_failure_is_safe_and_fresh_login_recovers[ReadTimeout] __
+
+client = <starlette.testclient.TestClient object at 0x10c94dc10>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10c94d6d0>
+error = <class 'httpx.ReadTimeout'>
+
+    @pytest.mark.parametrize('error', [httpx.ReadTimeout, httpx.ConnectTimeout, httpx.ProxyError])
+    def test_oauth_transport_failure_is_safe_and_fresh_login_recovers(client, monkeypatch, error):
+        """Production timeout replay: consume state, show retry, never replay code."""
+        import urllib.parse as up
+    
+        import video2md.api as api
+        from acctkit.providers import GoogleProvider
+    
+        env = {**_GENV, 'V2MD_GOOGLE_OAUTH_TIMEOUT_S': '9',
+               'V2MD_GOOGLE_OAUTH_PROXY_URL': 'http://oauth-relay.test:18080'}
+        monkeypatch.setattr(api, 'ENV', env)
+        events, calls = [], []
+        monkeypatch.setattr(api, '_req_log', lambda *args, **kw: events.append((args, kw)))
+        monkeypatch.setattr(GoogleProvider, '_verify', lambda *a: {'sub': 'synthetic-user'})
+    
+        async def token(self, url, data=None, **kwargs):
+            calls.append((url, self.timeout.read))
+            if len(calls) == 1:
+                raise error('synthetic-code synthetic-secret must never leak')
+            return httpx.Response(200, json={'id_token': 'synthetic.id.token'})
+    
+        monkeypatch.setattr(httpx.AsyncClient, 'post', token)
+        login = client.get('/auth/google/login?redirect=%2Ftasks', follow_redirects=False)
+        state = up.parse_qs(up.urlparse(login.headers['location']).query)['state'][0]
+        callback = client.get('/auth/google/callback', params={'code': 'synthetic-code', 'state': state},
+                              follow_redirects=False)
+        location = up.unquote(callback.headers['location'])
+        assert callback.status_code == 302
+        assert 'auth_error=' in location and error.__name__ in location
+>       assert '重新登录' in location and 'redirect=%2Ftasks' in callback.headers['location']
+E       AssertionError: assert ('重新登录' in 'http://frontend.test/?redirect=/tasks#auth_error=Google 换票不可达（ReadTimeout）')
+
+backend/tests/test_api_contract.py:2146: AssertionError
+---------------------------- Captured stdout setup -----------------------------
+🧹 清理孤儿临时目录 40 个（无 run 记录认领，>6h 未动）
+_ test_oauth_transport_failure_is_safe_and_fresh_login_recovers[ConnectTimeout] _
+
+client = <starlette.testclient.TestClient object at 0x10c92e4b0>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10ca53bc0>
+error = <class 'httpx.ConnectTimeout'>
+
+    @pytest.mark.parametrize('error', [httpx.ReadTimeout, httpx.ConnectTimeout, httpx.ProxyError])
+    def test_oauth_transport_failure_is_safe_and_fresh_login_recovers(client, monkeypatch, error):
+        """Production timeout replay: consume state, show retry, never replay code."""
+        import urllib.parse as up
+    
+        import video2md.api as api
+        from acctkit.providers import GoogleProvider
+    
+        env = {**_GENV, 'V2MD_GOOGLE_OAUTH_TIMEOUT_S': '9',
+               'V2MD_GOOGLE_OAUTH_PROXY_URL': 'http://oauth-relay.test:18080'}
+        monkeypatch.setattr(api, 'ENV', env)
+        events, calls = [], []
+        monkeypatch.setattr(api, '_req_log', lambda *args, **kw: events.append((args, kw)))
+        monkeypatch.setattr(GoogleProvider, '_verify', lambda *a: {'sub': 'synthetic-user'})
+    
+        async def token(self, url, data=None, **kwargs):
+            calls.append((url, self.timeout.read))
+            if len(calls) == 1:
+                raise error('synthetic-code synthetic-secret must never leak')
+            return httpx.Response(200, json={'id_token': 'synthetic.id.token'})
+    
+        monkeypatch.setattr(httpx.AsyncClient, 'post', token)
+        login = client.get('/auth/google/login?redirect=%2Ftasks', follow_redirects=False)
+        state = up.parse_qs(up.urlparse(login.headers['location']).query)['state'][0]
+        callback = client.get('/auth/google/callback', params={'code': 'synthetic-code', 'state': state},
+                              follow_redirects=False)
+        location = up.unquote(callback.headers['location'])
+        assert callback.status_code == 302
+        assert 'auth_error=' in location and error.__name__ in location
+>       assert '重新登录' in location and 'redirect=%2Ftasks' in callback.headers['location']
+E       AssertionError: assert ('重新登录' in 'http://frontend.test/?redirect=/tasks#auth_error=Google 换票不可达（ConnectTimeout）')
+
+backend/tests/test_api_contract.py:2146: AssertionError
+__ test_oauth_transport_failure_is_safe_and_fresh_login_recovers[ProxyError] ___
+
+client = <starlette.testclient.TestClient object at 0x10c9bb590>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10cb586e0>
+error = <class 'httpx.ProxyError'>
+
+    @pytest.mark.parametrize('error', [httpx.ReadTimeout, httpx.ConnectTimeout, httpx.ProxyError])
+    def test_oauth_transport_failure_is_safe_and_fresh_login_recovers(client, monkeypatch, error):
+        """Production timeout replay: consume state, show retry, never replay code."""
+        import urllib.parse as up
+    
+        import video2md.api as api
+        from acctkit.providers import GoogleProvider
+    
+        env = {**_GENV, 'V2MD_GOOGLE_OAUTH_TIMEOUT_S': '9',
+               'V2MD_GOOGLE_OAUTH_PROXY_URL': 'http://oauth-relay.test:18080'}
+        monkeypatch.setattr(api, 'ENV', env)
+        events, calls = [], []
+        monkeypatch.setattr(api, '_req_log', lambda *args, **kw: events.append((args, kw)))
+        monkeypatch.setattr(GoogleProvider, '_verify', lambda *a: {'sub': 'synthetic-user'})
+    
+        async def token(self, url, data=None, **kwargs):
+            calls.append((url, self.timeout.read))
+            if len(calls) == 1:
+                raise error('synthetic-code synthetic-secret must never leak')
+            return httpx.Response(200, json={'id_token': 'synthetic.id.token'})
+    
+        monkeypatch.setattr(httpx.AsyncClient, 'post', token)
+        login = client.get('/auth/google/login?redirect=%2Ftasks', follow_redirects=False)
+        state = up.parse_qs(up.urlparse(login.headers['location']).query)['state'][0]
+        callback = client.get('/auth/google/callback', params={'code': 'synthetic-code', 'state': state},
+                              follow_redirects=False)
+        location = up.unquote(callback.headers['location'])
+        assert callback.status_code == 302
+        assert 'auth_error=' in location and error.__name__ in location
+>       assert '重新登录' in location and 'redirect=%2Ftasks' in callback.headers['location']
+E       AssertionError: assert ('重新登录' in 'http://frontend.test/?redirect=/tasks#auth_error=Google 换票不可达（ProxyError）')
+
+backend/tests/test_api_contract.py:2146: AssertionError
+=============================== warnings summary ===============================
+backend/.venv/lib/python3.12/site-packages/starlette/testclient.py:53
+  /Users/linmintao/Desktop/开发项目/云端部署/video2md/backend/.venv/lib/python3.12/site-packages/starlette/testclient.py:53: DeprecationWarning: The anyio.abc.BlockingPortal alias is deprecated, use anyio.from_thread.BlockingPortal instead.
+    _PortalFactoryType = Callable[[], AbstractContextManager[anyio.abc.BlockingPortal]]
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED backend/tests/test_api_contract.py::test_oauth_transport_failure_is_safe_and_fresh_login_recovers[ReadTimeout]
+FAILED backend/tests/test_api_contract.py::test_oauth_transport_failure_is_safe_and_fresh_login_recovers[ConnectTimeout]
+FAILED backend/tests/test_api_contract.py::test_oauth_transport_failure_is_safe_and_fresh_login_recovers[ProxyError]
+3 failed, 4 passed, 93 deselected, 1 warning in 0.94s

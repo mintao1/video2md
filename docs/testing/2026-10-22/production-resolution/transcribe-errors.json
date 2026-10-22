@@ -1,0 +1,7 @@
+{
+  "store": "postgres",
+  "errors": [
+    "timed out",
+    "远程转录失败 HTTP 502: {\"detail\":{\"error\":\"[asr] 所有 provider 均不可用 → kaggle: Kaggle 内核报错: open() got an unexpected keyword argument 'metadata_errors' | modal(跳过: 已禁用（配置或手动开关）) | colab(跳过: 冷却中（剩 71615s: quota"
+  ]
+}

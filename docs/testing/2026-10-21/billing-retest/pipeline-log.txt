@@ -1,0 +1,10 @@
+脱敏记录：2026-10-21 run 312e97ae；来自本轮只读 kubectl logs 观察。
+API: model-billing-smoke.mp4 · 00:00:41 · 640x360
+API: Colab turbo 转录返回 2 段，置信度 0.97。
+Router: Colab ASR 往返 123s。
+API: 候选帧 5 张（池 120）；OCR 已完成，命中 0/5。
+Router: Colab OCR 往返 82s（5 帧）。
+API: 选帧 HTTP 403 该渠道已被禁用，降级本地启发式，选中 1 帧。
+API: clips 1/1，CPU；note LLM HTTP 403 该渠道已被禁用；run 失败。
+Router: 关闭 Colab 会话（队列空闲自动关闭，省配额）。
+注意：123/82 为日志取整耗时；没有逐段时间戳、精确关机延迟或产物文件校验数据。

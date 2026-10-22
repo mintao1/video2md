@@ -1,0 +1,9 @@
+					60 heading Invoices, Value: 2
+						61 text Invoices
+					63 text Go renewal
+					64 text XPIMO8IF-0003 Paid
+					65 text Oct 5, 2026
+					66 text CN¥67.72 CNY
+					67 button Download invoice XPIMO8IF-0003
+					69 text Paid
+					74 text Paid

@@ -1,0 +1,122 @@
+✅ run 3c48c840：1 条
+    · 条目 1/1：download
+    · 条目 1/1：transcribe
+    · 条目 1/1：frames
+    · 条目 1/1：ocr
+  🧠 LLM 选帧 1 帧
+    · 条目 1/1：select
+    · 条目 1/1：clips
+🏁 run 3c48c840 → done
+✅ 1. 单条目 happy path（节点序 / state.json 落盘 / tmp 清理）
+✅ run 473b784a：2 条（1 条幂等跳过）
+    ⏭ 条目 1/2 已处理过（state 幂等），跳过
+    · 条目 2/2：download
+    ⏭ 条目 1/2 已处理过（state 幂等），跳过
+    · 条目 2/2：transcribe
+    ⏭ 条目 1/2 已处理过（state 幂等），跳过
+    · 条目 2/2：frames
+    ⏭ 条目 1/2 已处理过（state 幂等），跳过
+    · 条目 2/2：ocr
+  🧠 LLM 选帧 1 帧
+    ⏭ 条目 1/2 已处理过（state 幂等），跳过
+    · 条目 2/2：select
+    ⏭ 条目 1/2 已处理过（state 幂等），跳过
+    · 条目 2/2：clips
+  ⏭ 条目 1/2 已写盘/幂等跳过，不烧 LLM
+🏁 run 473b784a → done
+✅ 2. 多条目 + state.json 幂等短路（跳过条目不烧 LLM）
+✅ run 907866db：1 条
+    · 条目 1/1：download
+    · 条目 1/1：transcribe
+    ⚠ 条目异常：模拟全局故障
+PARTIAL-FAIL transcribe 条目 1
+❌ 阶段 transcribe 失败：阶段 transcribe 全部条目失败，终止后续阶段
+💥 run 907866db 失败：阶段 transcribe: 阶段 transcribe 全部条目失败，终止后续阶段
+✅ 3. 阶段失败 → fail 路由（下游不执行，runs.json 留痕）
+✅ run 61de1510：1 条
+    · 条目 1/1：download
+    · 条目 1/1：transcribe
+    · 条目 1/1：frames
+    · 条目 1/1：ocr
+  🧠 LLM 选帧 1 帧
+    · 条目 1/1：select
+    · 条目 1/1：clips
+  ❌ 条目 1 LLM 链失败：LLM 连续 3 次失败：HTTP 500
+💥 run 61de1510 失败：note 条目 1 LLM: LLM 连续 3 次失败：HTTP 500
+✅ 4. note LLM 全局故障 → run error（不拿死 LLM 烧剩余条目）
+✅ run 32b4dd1b：1 条
+    · 条目 1/1：download
+    · 条目 1/1：transcribe
+    · 条目 1/1：frames
+    · 条目 1/1：ocr
+  🧠 LLM 选帧 1 帧
+    · 条目 1/1：select
+    · 条目 1/1：clips
+  ⚠ note 条目 1: 正文疑似 LLM 拒答/空壳，拒绝写盘
+🏁 run 32b4dd1b → partial（1 条留痕）
+✅ 5. 拒答门禁 → partial（state.json 不落该条目，run 不炸）
+✅ run 8f0d8017：1 条
+    · 条目 1/1：download
+    · 条目 1/1：transcribe
+    · 条目 1/1：frames
+    · 条目 1/1：ocr
+  ⚠ LLM 选帧失败（HTTP 500），降级本地启发式
+    · 条目 1/1：select
+    · 条目 1/1：clips
+🏁 run 8f0d8017 → done（1 条留痕）
+✅ 6. 选帧 LLM 失败 → 启发式兜底（run 不炸，错误留痕）
+✅ run fbd69132：1 条
+    · 条目 1/1：download
+    · 条目 1/1：transcribe
+    · 条目 1/1：frames
+    · 条目 1/1：ocr
+  🧠 LLM 选帧 1 帧
+    · 条目 1/1：select
+    · 条目 1/1：clips
+🏁 run fbd69132 → done
+✅ 7. SqliteSaver 落库 + done 后 delete_thread 裁剪
+✅ 7b. checkpointer env 分派（sqlite 默认；postgres 守卫在 import 前，不联网）
+✅ run db22cb4f：1 条
+    · 条目 1/1：download
+    · 条目 1/1：transcribe
+    · 条目 1/1：frames
+    · 条目 1/1：ocr
+  🧠 LLM 选帧 1 帧
+    · 条目 1/1：select
+    · 条目 1/1：clips
+  📊 条目 1/1 评测（off）：note_quality=0.900
+🏁 run db22cb4f → done
+✅ run f8251010：1 条
+    · 条目 1/1：download
+    · 条目 1/1：transcribe
+    · 条目 1/1：frames
+    · 条目 1/1：ocr
+  🧠 LLM 选帧 1 帧
+    · 条目 1/1：select
+    · 条目 1/1：clips
+  ⚠ 条目 1 在线评测失败（不影响 run）：judge 全灭
+🏁 run f8251010 → done（1 条留痕）
+✅ run a6c0517a：1 条
+    · 条目 1/1：download
+    · 条目 1/1：transcribe
+    · 条目 1/1：frames
+    · 条目 1/1：ocr
+  🧠 LLM 选帧 1 帧
+    · 条目 1/1：select
+    · 条目 1/1：clips
+🏁 run a6c0517a → done
+✅ 8. V2MD_EVAL 在线评测节点：接线评测写回 artifacts / 失败不致命 / 缺省不接线
+✅ 9a. artsink 激活缝（漏激活炸 / vault 直通 / sink 建目录+复位）
+✅ 9b. _relocate_outbox：剥正文/搬家/路径改写/历史路径保留/重入幂等
+✅ run cad6c0e2：1 条
+    · 条目 1/1：download
+    · 条目 1/1：transcribe
+    · 条目 1/1：frames
+    · 条目 1/1：ocr
+  🧠 LLM 选帧 1 帧
+    · 条目 1/1：select
+    · 条目 1/1：clips
+🏁 run cad6c0e2 → done · 产物在架至 2026-10-22T13:23:52
+✅ 9c. deliver 全链路：note 经 sink 写 outbox → finalize 搬家，vault 零写入
+
+✅ test_graph.py 全部通过

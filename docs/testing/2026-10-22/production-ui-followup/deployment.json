@@ -1,0 +1,8 @@
+{
+  "generation": 54,
+  "images": {
+    "api": "video2md:0.2.0-failure-cost-20261021b"
+  },
+  "ready_replicas": 1,
+  "updated_replicas": 1
+}

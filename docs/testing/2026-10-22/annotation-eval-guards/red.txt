@@ -1,0 +1,21 @@
+........................................................................ [ 22%]
+........................................................................ [ 45%]
+........................................................................ [ 67%]
+........................................................................ [ 90%]
+...............F..............                                           [100%]
+=================================== FAILURES ===================================
+_________ test_required_ci_executes_replay_and_operational_regressions _________
+
+    def test_required_ci_executes_replay_and_operational_regressions():
+        workflow = yaml.safe_load((ROOT / ".github/workflows/ci.yml").read_text())
+        for filename in ("tests/test_resolution_annotations.py", "tests/test_resolution_operations.py"):
+            job = workflow["jobs"]["test"]
+            steps = [s for s in job["steps"] if filename in shlex.split(s.get("run", ""))]
+>           assert len(steps) == 1 and steps[0]["run"].startswith("uv run pytest ")
+E           assert (0 == 1)
+E            +  where 0 = len([])
+
+tests/test_resolution_annotations.py:189: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_resolution_annotations.py::test_required_ci_executes_replay_and_operational_regressions
+1 failed, 317 passed in 1.91s

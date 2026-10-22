@@ -1,0 +1,4 @@
+FAIL generated worker contains input resolver
+FAIL GPU task explicitly requests supported T4 accelerator
+PASS CPU diagnostic does not request accelerator
+FAIL zero-exit CLI push rejection cannot reuse stale kernel output

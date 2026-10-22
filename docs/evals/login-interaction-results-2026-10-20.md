@@ -1,6 +1,7 @@
 # 登录操作自动化评测结果（2026-10-20）
 
-评测集：[frontend-login-interaction-set.jsonl](./frontend-login-interaction-set.jsonl)
+本页保留 2026-10-20 的历史结果与编号。原登录交互集已被删除，当前口径见
+[个人租户登录与 Colab 评测集](./tenant-colab-login-eval-set.jsonl)；下列历史通过数不代表新流程已验收。
 
 ## 确定性回归
 

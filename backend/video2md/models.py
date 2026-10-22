@@ -106,6 +106,10 @@ class RunStatusOut(BaseModel):
     errors: list[str] | None = None   # 记录级留痕（P1-4：跨副本可见——task.errors 只在驱动进程）
     entries: list[EntryStatus] | None = None
     artifacts: ArtifactsInfo | None = None
+    usage: dict[str, Any] | None = None
+    cost_usd: float | None = None
+    cost_pricing: dict[str, Any] | None = None
+    diagnostic: dict[str, str] | None = None
 
 
 class ArtifactsAckOut(BaseModel):
@@ -126,6 +130,10 @@ class RunListItem(BaseModel):
     done_entries: int = Field(0, description="note 产物已写成的条目数（skipped 不计入）")
     artifacts: ArtifactsInfo | None = Field(
         None, description="deliver 模式在架状态；vault 模式为 None")
+    usage: dict[str, Any] | None = None
+    cost_usd: float | None = None
+    cost_pricing: dict[str, Any] | None = None
+    diagnostic: dict[str, str] | None = None
 
 
 class RunListOut(BaseModel):
@@ -206,6 +214,9 @@ class CostOut(BaseModel):
     budget_usd: float
     usage: dict[str, Any] = Field(description="llm_in_tok/llm_out_tok/gpu_s/runs_n 月度合计")
     prices: dict[str, float] = Field(description="llm_in_mtok/llm_out_mtok/gpu_min 当前单价")
+    gpu_policy: str = "metered"
+    pricing_configured: bool = False
+    runs: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class QuotaStats(BaseModel):

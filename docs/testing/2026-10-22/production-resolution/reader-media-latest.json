@@ -1,0 +1,36 @@
+{
+  "observed_at": "2026-10-21T20:25:54.098Z",
+  "videos": [
+    {
+      "error": 0,
+      "label": "p001-BV1LV411r77C_p1-c04-0003.mp4",
+      "readyState": 4
+    },
+    {
+      "error": 0,
+      "label": "p001-BV1LV411r77C_p1-c13-0012.mp4",
+      "readyState": 4
+    },
+    {
+      "error": 0,
+      "label": "p001-BV1LV411r77C_p1-c34-0033.mp4",
+      "readyState": 4
+    },
+    {
+      "error": 0,
+      "label": "p001-BV1LV411r77C_p1-c36-0035.mp4",
+      "readyState": 4
+    },
+    {
+      "error": 0,
+      "label": "p001-BV1LV411r77C_p1-c38-0036.mp4",
+      "readyState": 4
+    },
+    {
+      "error": 0,
+      "label": "p001-BV1LV411r77C_p1-c53-0052.mp4",
+      "readyState": 4
+    }
+  ],
+  "pending": []
+}

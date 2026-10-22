@@ -1,0 +1,30 @@
+{
+  "retained_current_and_previous": true,
+  "all_pod_and_init_refs_checked": true,
+  "tags": [
+    {
+      "tag": "video2md:0.2.0-resume-billing-20261022c",
+      "removed": true,
+      "exit_codes": [
+        0,
+        0
+      ]
+    },
+    {
+      "tag": "gpu-router:0.2.3-asr-compat-20261022c",
+      "removed": true,
+      "exit_codes": [
+        1,
+        0
+      ]
+    },
+    {
+      "tag": "gpu-router:0.2.3-ocr-packet-20261022e",
+      "removed": true,
+      "exit_codes": [
+        0,
+        0
+      ]
+    }
+  ]
+}

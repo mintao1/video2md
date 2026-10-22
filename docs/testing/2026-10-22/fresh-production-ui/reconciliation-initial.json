@@ -1,0 +1,56 @@
+{
+  "kind": "independent_provider_export_reconciliation",
+  "run_id": "628f38fc",
+  "provider_request_count": 4,
+  "requests": [
+    {
+      "request_id": "01a16084-db37-7f1d-b365-8e76a6d67f88",
+      "input_tokens": 19339,
+      "output_tokens": 2809,
+      "cached_tokens": 0,
+      "attribution_usd": "0.00430535"
+    },
+    {
+      "request_id": "01a16084-cf0d-7b4d-b238-aace9836037a",
+      "input_tokens": 1634,
+      "output_tokens": 87,
+      "cached_tokens": 0,
+      "attribution_usd": "0.0002886"
+    },
+    {
+      "request_id": "01a16084-61eb-7690-806d-d37dad454226",
+      "input_tokens": 34240,
+      "output_tokens": 2187,
+      "cached_tokens": 0,
+      "attribution_usd": "0.0062295"
+    },
+    {
+      "request_id": "01a16080-5ffa-74a4-9eda-f5006b9be091",
+      "input_tokens": 64623,
+      "output_tokens": 1520,
+      "cached_tokens": 0,
+      "attribution_usd": "0.01045345"
+    }
+  ],
+  "provider_usage": {
+    "llm_in_tok": 119836,
+    "llm_out_tok": 6603,
+    "llm_cached_in_tok": 0
+  },
+  "application_usage": {
+    "llm_in_tok": 122193,
+    "llm_out_tok": 6707,
+    "llm_cached_in_tok": 0
+  },
+  "missing_usage": {
+    "llm_in_tok": -2357,
+    "llm_out_tok": -104,
+    "llm_cached_in_tok": 0
+  },
+  "usage_matches": false,
+  "provider_attribution_usd": "0.02127690",
+  "application_attribution_usd": "0.021682",
+  "attribution_matches": false,
+  "supplier_cash_verified": false,
+  "provider_export_sha256": "d05ed6ac1dbdf57b566029f9d92c7c3ca42a546fb33838dc3959fb2f66420c83"
+}

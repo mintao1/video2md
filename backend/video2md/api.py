@@ -37,6 +37,7 @@ import os
 import re
 import secrets
 import shutil
+import sys
 import tempfile
 import time
 import urllib.parse
@@ -1228,7 +1229,7 @@ def _google_public_base() -> str:
 
 
 def _google_web_base() -> str:
-    """前端 origin：成功 302 回 {WEB}/login#id_token=…，失败 #auth_error=…（fragment
+    """前端 origin：成功 302 回品牌首页 #id_token=…，失败 #auth_error=…（fragment
     不进服务端日志/代理）。"""
     return (ENV.get("V2MD_WEB_BASE_URL") or "http://localhost:5173").rstrip("/")
 
@@ -1253,13 +1254,13 @@ def _google_safe_redirect(path: str) -> str:
 
 
 def _google_login_url(redirect: str) -> str:
-    base = f"{_google_web_base()}/login"
+    base = f"{_google_web_base()}/"
     return f"{base}?{urllib.parse.urlencode({'redirect': redirect})}" if redirect else base
 
 
 def _google_error_redirect(msg: str, back: str = "") -> RedirectResponse:
     """浏览器整页导航端点的错误出口：JSON 错误信封对 302 跳转无意义，
-    统一 302 回登录页 fragment，前端 toast 消费。back=站内回跳路径，重试时不丢。"""
+    统一 302 回品牌首页 fragment，前端消费。back=站内回跳路径，重试时不丢。"""
     return RedirectResponse(f"{_google_login_url(back)}"
                             f"#auth_error={urllib.parse.quote(msg)}", status_code=302)
 
@@ -1336,7 +1337,7 @@ async def auth_google_callback(request: Request, code: str = "", state: str = ""
         # Keep the failure actionable without ever logging code/state/credentials.
         _req_log("POST", "/auth/google/token", 503, user=f"(anon:{ip})",
                  error_type=type(exc).__name__, timeout_s=_google_oauth_timeout_s())
-        return _google_finish(_google_error_redirect(f"Google 换票不可达（{type(exc).__name__}）", back))
+        return _google_finish(_google_error_redirect(f"Google 换票不可达（{type(exc).__name__}），请重新登录", back))
     if r.status_code != 200:
         _req_log("POST", "/auth/google/token", r.status_code, user=f"(anon:{ip})",
                  error_type="oauth_http_error")
@@ -1378,6 +1379,52 @@ def _run_title(r: dict) -> str:
     return urllib.parse.urlparse(r.get("url") or "").hostname or r.get("url") or ""
 
 
+def _public_run_diagnostic(run: dict) -> dict | None:
+    """Never forward provider bodies, prompts, credentials or paths to the UI."""
+    from .note import MIN_NOTE_TRANSCRIPT_CHARS
+
+    errors = run.get("errors") or []
+    if not errors and (run.get('partial_failures') or {}).get('note'):
+        short = any(len(str(a.get('transcript') or '').strip()) < MIN_NOTE_TRANSCRIPT_CHARS
+                    for a in (run.get('artifacts') or {}).values() if not a.get('note'))
+        return {'stage': 'note', 'message': ('转录内容过短，未达到教材生成质量门槛；请使用内容更完整的视频。'
+                if short else '部分条目未生成教材，请检查视频内容或重试。')}
+    if not errors:
+        return None
+    error = str(errors[-1])
+    stage = next((name for name in ("note", "select_frames", "transcribe", "download", "frames", "ocr", "clips")
+                  if name in error), "unknown")
+    if "依赖阶段" in error or "clips 阶段无节段产物" in error:
+        failed = run.get("partial_failures") or {}
+        dependency = next((name for name in ("clips", "ocr", "select", "frames", "transcribe", "download")
+                           if name in error and failed.get(name)), None)
+        if dependency:
+            label = {"clips": "视频剪辑", "ocr": "画面文字识别", "select": "画面选择", "frames": "抽帧",
+                     "transcribe": "语音转写", "download": "视频下载"}[dependency]
+            return {"stage": dependency, "message": f"{label}未完成，暂时无法生成教材；请补跑失败条目。"}
+    status = re.search(r"HTTP\s+(\d{3})", error)
+    if status:
+        code = status.group(1)
+        message = {"402": "模型账户余额不足，请补足余额或更换可用配置。",
+                   "403": "模型渠道拒绝访问，请检查渠道是否启用及账号权限。",
+                   "401": "模型身份验证失败，请检查服务配置。",
+                   "429": "模型请求受限，请稍后重试。"}.get(code, "上游服务请求失败，请稍后重试。")
+        message = f"{message}（HTTP {code}）"
+    elif '转录本过短' in error or '无转录本' in error:
+        message = '转录内容过短或为空，未达到教材生成质量门槛；请使用内容更完整的视频。'
+    elif "cancelled" in error or "用户取消" in error:
+        message = "任务已取消（cancelled）。"
+    elif "timeout" in error.lower() or "超时" in error:
+        message = "处理阶段超时，请稍后重试。"
+    else:
+        message = "处理未完成，请重试或凭任务编号联系支持。"
+    return {"stage": stage, "message": message}
+
+
+def _run_accounting(run: dict) -> dict:
+    return {key: run.get(key) for key in ("usage", "cost_usd", "cost_pricing")}
+
+
 @app.get("/runs", response_model=RunListOut,
          summary="列出本人名下的 run（插件收件箱发现新产物用）")
 def get_runs(status: str = "", limit: int = 50,
@@ -1411,7 +1458,8 @@ def get_runs(status: str = "", limit: int = 50,
                      "title": _run_title(r),
                      "status": visible_status, "created": r.get("created"),
                      "queue_pos": positions.get(r["run_id"]),
-                     "total": r.get("total"), "done_entries": done_n, "artifacts": arts})
+                     "total": r.get("total"), "done_entries": done_n, "artifacts": arts,
+                     **_run_accounting(r), "diagnostic": _public_run_diagnostic(r)})
         if len(rows) >= limit:
             break
     return {"items": rows, "mode": mode}
@@ -1442,13 +1490,33 @@ async def post_runs(body: RunCreate, ident: Identity = Depends(current_identity)
     """同步解析建 run（旧 serve 语义：响应即知 total/all_skipped，批量驱动靠它分窗），
     随后异步驱动整张图。解析慢点（抖音分享页抓取 70s+）所以在线程里跑，不堵事件循环。"""
     from .graph import resolve_run
-    from .resolve import extract_url
+    from .resolve import extract_url, normalize_url
 
     url = extract_url((body.url or "").strip())
     part_items = (body.part_items or "").strip()
     if not url:
         _req_log("POST", "/runs", 400, user=ident.uid, error="缺 url")
         raise HTTPException(400, "缺 url")
+    # Reopening an existing completed artifact is a read, not a billable rerun.
+    # Explicit force, expired delivery, missing files, other owners and other
+    # partitions all retain the normal admission/resolve path below.
+    if not body.force:
+        for previous in _load_runs().values():
+            if (previous.get("deleted") or previous.get("status") != "done"
+                    or previous.get("owner") != ident.uid
+                    or normalize_url(previous.get("url") or "") != normalize_url(url)
+                    or (previous.get("part_items") or "").strip() != part_items):
+                continue
+            notes = [a.get("note") for a in (previous.get("artifacts") or {}).values() if a.get("note")]
+            reusable = (bool(notes) and all(Path(p).is_file() for p in notes))
+            if artsink.current_mode() == "deliver":
+                reusable = bool(notes) and _outbox_live(previous)[0] is not None
+            if reusable:
+                return {"run_id": previous["run_id"], "total": previous.get("total", 0),
+                        "entries": [{"index": i, "url": e["url"], "skipped": True,
+                                     "from_run": previous["run_id"]}
+                                    for i, e in enumerate(previous.get("entries") or [], 1)],
+                        "all_skipped": True, "status": "done", "dedup": True}
     _admit_submission(ident.uid)   # 配额闸（队列/每用户在途/滑窗频率）——便宜检查放最前
     _validate_run_url(url, ident.uid)  # 非 http 输入的白名单闸（多用户档不收裸本地路径）
     run_id = uuid.uuid4().hex[:8]
@@ -1503,6 +1571,10 @@ def get_run(run_id: str, ident: Identity = Depends(current_identity)) -> dict:
         out["task"] = {k: task.get(k) for k in ("status", "url", "created", "started",
                                                 "finished", "errors") if task.get(k) is not None}
     if run:
+        diagnostic = _public_run_diagnostic(run)
+        out.update(**_run_accounting(run), diagnostic=diagnostic)
+        if task and task.get("errors"):
+            out["task"]["errors"] = [diagnostic["message"]] if diagnostic else []
         entries = []
         for e in run["entries"]:
             art = run["artifacts"].get(e["url"], {})
@@ -1520,7 +1592,7 @@ def get_run(run_id: str, ident: Identity = Depends(current_identity)) -> dict:
             })
         out.update(url=run.get("url"), status=run.get("status"), total=run.get("total"),
                    stages=run.get("stages"), partial_failures=run.get("partial_failures"),
-                   errors=run.get("errors"),
+                   errors=[diagnostic["message"]] if diagnostic else [],
                    entries=entries)
         if run.get("cancel_requested") and run.get("status") in ("running", "queued"):
             out["status"] = "cancelling"
@@ -1703,6 +1775,9 @@ async def resume_run(run_id: str, ident: Identity = Depends(current_identity)) -
                           {"status": "created", "cancel_requested": False})
     if run is None:
         raise HTTPException(409, "任务已被其他请求重试或删除")
+    be = _tasks_backend()
+    if be is not None and not be.release_claim_for_retry(run_id):
+        raise HTTPException(409, "任务重试租约重置失败，请刷新后重试")
     await _discard_waiting_drive(run_id)
     forget_cancel(run_id)
     # 新建临时目录时复制仍在架的 deliver 产物，finalize 替换旧架时不能丢掉已完成笔记。
@@ -1820,10 +1895,20 @@ def get_cost(ident: Identity = Depends(current_identity)) -> dict:
     be = _tasks_backend()
     since = _month_start_iso()
     u = be.month_rollup(ident.uid, since) if be is not None else month_rollup(ident.uid, since)
+    items = [{"run_id": r["run_id"], "title": _run_title(r), "status": r.get("status"),
+              "created": r.get("created"), "deleted": bool(r.get("deleted")), **_run_accounting(r)}
+             for r in _load_runs().values()
+             if r.get("owner") == ident.uid and (r.get("created") or "") >= since]
+    items.sort(key=lambda r: r.get("created") or "", reverse=True)
+    policy = ENV.get("V2MD_GPU_PRICE_POLICY", "metered")
     return {"uid": ident.uid, "month": since, "spend_usd": u["spend_usd"],
             "budget_usd": BUDGET_MONTH_USD, "usage": u,
+            "gpu_policy": policy, "runs": items,
+            "pricing_configured": PRICE_LLM_IN_MTOK > 0 and PRICE_LLM_OUT_MTOK > 0
+                and (PRICE_GPU_MIN > 0 or (PRICE_GPU_MIN == 0 and policy == "free")),
             "prices": {"llm_in_mtok": PRICE_LLM_IN_MTOK, "llm_out_mtok": PRICE_LLM_OUT_MTOK,
-                       "gpu_min": PRICE_GPU_MIN}}
+                       "gpu_min": PRICE_GPU_MIN,
+                       "llm_cached_in_mtok": float(ENV.get("V2MD_PRICE_LLM_CACHED_IN_MTOK") or 0)}}
 
 
 # ---------------------------------------------------------------- 会员/配额展示档（web 个人页）
@@ -1868,7 +1953,8 @@ def get_quota(ident: Identity = Depends(current_identity)) -> dict:
     # 不读 membership.stats_books——该列无写入方，恒为 0。
     books = sum(1 for r in _load_runs().values()
                 if (r.get("owner", "") or "") == ident.uid and not r.get("deleted")
-                and r.get("status") in ("done", "partial"))
+                and r.get("status") in ("done", "partial")
+                and any(a.get('note') for a in (r.get('artifacts') or {}).values()))
     return {"ai_hours_used": float(row.get("ai_hours_used") or 0),
             "ai_hours_total": float(row.get("ai_hours_total") or 0),
             "storage_gb_used": float(row.get("storage_gb_used") or 0),
@@ -1916,7 +2002,7 @@ def preflight(request: Request, ident: Identity | None = Depends(optional_identi
 
 # The production image also contains the Vite bundle. Keep the API at the root
 # paths for backwards compatibility, and let the final catch-all serve Vue
-# history routes such as /login and /read/:id. If the bundle is not present
+# history routes such as / and /read/:id. If the bundle is not present
 # (tests and API-only development images), these handlers remain ordinary 404s.
 _WEB_DIST = Path(ENV.get("V2MD_WEB_DIST") or "/app/web-dist").resolve()
 _API_PATH_PREFIXES = (
@@ -1947,13 +2033,21 @@ def web_fallback(path: str) -> FileResponse:
         raise HTTPException(status_code=404, detail="Not Found")
     return _web_file(path)
 
-def cmd_api(port: int) -> None:
-    # launchd/容器环境 PATH 极简，补齐框架/homebrew 路径让子进程找得到 yt-dlp/whisper/ffmpeg
-    os.environ["PATH"] = ":".join([
+def configure_subprocess_path() -> str:
+    """Put this interpreter's scripts first so packaged CLIs remain executable."""
+    os.environ["PATH"] = os.pathsep.join([
+        str(Path(sys.executable).parent),
         "/opt/homebrew/bin", "/usr/local/bin",
         "/Library/Frameworks/Python.framework/Versions/3.14/bin",
         str(Path.home() / ".local/bin"),
-    ]) + ":" + os.environ.get("PATH", "")
+        os.environ.get("PATH", ""),
+    ])
+    return os.environ["PATH"]
+
+
+def cmd_api(port: int) -> None:
+    # launchd/容器环境 PATH 极简；镜像 CLI 安装在当前虚拟环境的 bin 目录。
+    configure_subprocess_path()
     host = ENV.get("V2MD_HOST", "127.0.0.1")  # 容器内设 0.0.0.0；无认证，别暴露公网
     print(f"🎬 video2md LangGraph 服务 → http://{host}:{port}")
     uvicorn.run(app, host=host, port=port, log_level="warning")

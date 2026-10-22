@@ -1,0 +1,53 @@
+{
+  "elapsed_s": 156.545,
+  "images": [
+    {
+      "complete": true,
+      "width": 668
+    },
+    {
+      "complete": true,
+      "width": 668
+    },
+    {
+      "complete": true,
+      "width": 668
+    },
+    {
+      "complete": true,
+      "width": 668
+    },
+    {
+      "complete": true,
+      "width": 668
+    },
+    {
+      "complete": true,
+      "width": 668
+    },
+    {
+      "complete": true,
+      "width": 668
+    },
+    {
+      "complete": true,
+      "width": 668
+    },
+    {
+      "complete": true,
+      "width": 668
+    },
+    {
+      "complete": true,
+      "width": 668
+    },
+    {
+      "complete": true,
+      "width": 668
+    }
+  ],
+  "observed_at": "2026-10-21T22:19:06.733Z",
+  "pending": 11,
+  "unavailable": false,
+  "videos": []
+}

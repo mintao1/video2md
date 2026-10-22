@@ -1,0 +1,48 @@
+{
+  "source_resolution": {
+    "provider": "bilibili",
+    "resolved": true
+  },
+  "submission": {
+    "feedback_visible": true,
+    "run_id": "redacted-run-id",
+    "submit_log_present": true,
+    "url_entered_explicitly": true,
+    "task_count_before": 0,
+    "task_count_after": 1
+  },
+  "execution": {
+    "status": "done",
+    "model_called": true,
+    "model_inference_succeeded": true,
+    "running_stage_observed": true,
+    "run_id_visible": true
+  },
+  "billing": {
+    "usage": {
+      "llm_in_tok": 1000,
+      "llm_out_tok": 500,
+      "gpu_s": 180
+    },
+    "cost_usd": 0.302,
+    "monthly_rollup_includes_run": true,
+    "prices": {
+      "llm_in_mtok": 1,
+      "llm_out_mtok": 2,
+      "gpu_min": 0.1
+    },
+    "usage_visible": true,
+    "cost_visible": true
+  },
+  "artifact": {
+    "book_visible": true,
+    "markdown_nonempty": true,
+    "book_count_delta": 1
+  },
+  "kind": "synthetic",
+  "notice": "Synthetic example only. These values do not establish production readiness or approved prices.",
+  "authentication": {
+    "logout_observed": true,
+    "oauth_login_succeeded": true
+  }
+}

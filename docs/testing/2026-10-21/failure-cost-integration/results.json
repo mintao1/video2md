@@ -1,0 +1,64 @@
+{
+  "verdict": "PARTIAL_EXTERNAL_BLOCKERS",
+  "tested_release": "video2md:0.2.0-failure-cost-20261021b",
+  "deployed": true,
+  "source_files_verified": 5,
+  "pod_ready": true,
+  "restarts": 0,
+  "runtime_dependency_model_calls": {
+    "ocr_failure": 0,
+    "clips_failure": 0
+  },
+  "retry_replay": {
+    "before_recorded": [
+      200,
+      60
+    ],
+    "expected": [
+      300,
+      100
+    ],
+    "after_recorded": [
+      300,
+      100
+    ],
+    "passed": true
+  },
+  "real_model_probe": {
+    "status": "success",
+    "input_tokens": 30,
+    "output_tokens": 45,
+    "attempts": 1,
+    "task_ledger_included": false
+  },
+  "oauth_relay": {
+    "single_active_unit": true,
+    "retired_unit_disabled": true,
+    "loopback_only": true,
+    "post_change_no_credential_probes_passed": 6,
+    "real_browser_login_tested": false
+  },
+  "gpu_smoke": {
+    "job_id": "4a244f52e4d5",
+    "passed": false,
+    "category": "quota",
+    "historical_archive_loss_closed": false
+  },
+  "supplier_cash_verified": false,
+  "billing_gate_supports_subscription": true,
+  "ui_tested_this_round": false,
+  "new_bilibili_task_created": false,
+  "checks": {
+    "backend_tests_passed": 937,
+    "frontend_integration_passed": 45,
+    "backend_mypy_source_files_passed": 39,
+    "ci_scope_lint": "pass"
+  },
+  "active_user_tasks": 0,
+  "production_acceptance_closed": false,
+  "blockers": [
+    "GPU quota/working fallback",
+    "computer use tool unavailable",
+    "independent supplier invoice/usage export unavailable"
+  ]
+}

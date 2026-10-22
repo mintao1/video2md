@@ -1,0 +1,20 @@
+[
+  {
+    "elapsed_ms": 9750,
+    "dom": {
+      "decodedImages": 0,
+      "imageCount": 0,
+      "loadingTexts": [],
+      "videos": []
+    }
+  },
+  {
+    "elapsed_ms": 60111,
+    "dom": {
+      "decodedImages": 7,
+      "imageCount": 7,
+      "loadingTexts": [],
+      "videos": []
+    }
+  }
+]

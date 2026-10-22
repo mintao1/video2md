@@ -1,0 +1,1157 @@
+{
+  "kind": "offline_annotation_regression_results",
+  "created_at": "2026-10-21T21:22:54.712326+00:00",
+  "dataset": "docs/evals/production-resolution-annotations.jsonl",
+  "annotation_count": 43,
+  "source_bound_positive_replays": 43,
+  "counterexamples": 185,
+  "missing_measurement_rejections": 43,
+  "new_pytest_passed": 323,
+  "related_pytest_passed": 856,
+  "gpu_existing_checks_passed": 30,
+  "gpu_new_checks_passed": 15,
+  "lint": "pass",
+  "ci_wired": true,
+  "remote_ci_run": false,
+  "production_mutation_performed": false,
+  "new_model_or_gpu_calls": 0,
+  "original_evidence_files_hash_checked": 160,
+  "original_evidence_files_changed": [],
+  "production_acceptance": "not_passed",
+  "open_production_items": [
+    {
+      "id": "failure-cost-001",
+      "missing": "Same-candidate actual clips failure followed by zero downstream model calls"
+    },
+    {
+      "id": "failure-cost-002",
+      "missing": "Real empty response retry with independent per-attempt application usage; selection span remains residual"
+    },
+    {
+      "id": "media-readiness",
+      "missing": "Complete real measurement of all expected media ready within 60 seconds"
+    }
+  ],
+  "limitations": [
+    "Public historical evidence replay is not a fresh production run.",
+    "GPU tests execute in the sibling repository and its own existing CI loop; main checkout does not assume a sibling exists.",
+    "Paid subscription receipt and USD token attribution remain separate; no new cash debit claim.",
+    "Four independent application spans plus one selection residual must not be relabeled as five independent traces.",
+    "Old source/CI entries in the old hash manifest describe the previous snapshot; the original evidence directory is immutable. New test/CI hashes are recorded separately."
+  ],
+  "rules": [
+    "GATE-01",
+    "GOV-03",
+    "DRIFT-02"
+  ],
+  "new_rule_exceptions": [],
+  "deviations_this_round": [],
+  "rows": [
+    {
+      "id": "pra-001",
+      "annotation_index": 1,
+      "scenario": "ASR 失败定位与零模型费用",
+      "replay": "pass",
+      "counterexamples_rejected": 6,
+      "historical_status": "historical_observation",
+      "interpretation": "先读终态与真实阶段错误；排队、平台成功和业务失败分开；零费用同时核对调用数与 tokens。",
+      "regressions": [
+        "backend/tests/test_failure_cost_regressions.py::test_failed_dependency_spends_no_note_tokens",
+        "backend/tests/test_kaggle_followup_eval_set.py::test_metrics_must_match_the_hashed_observation_not_just_any_valid_file"
+      ],
+      "companion_regressions": [
+        "../gpu-router/backend/tests/test_kaggle_runtime_inputs.py",
+        "../gpu-router/backend/tests/test_kaggle_review_state.py"
+      ],
+      "production_evidence_required": "新候选需重新取得同任务、同范围、同发布的真实前端或服务端证据；离线回放不能冒充新生产验收。",
+      "evidence_refs": [
+        {
+          "path": "docs/testing/2026-10-22/production-resolution/transcribe-errors.json",
+          "sha256": "161a7d3e8ddf64a3a084ab67ab77055c79b1a2af7ce791149f3ae33e10494b3a"
+        },
+        {
+          "path": "docs/testing/2026-10-22/production-resolution/before.json",
+          "sha256": "e678095a8f9166b96ac9ee4bcaa543125c3d38b96481f065c998257efbaddabc"
+        }
+      ]
+    },
+    {
+      "id": "pra-002",
+      "annotation_index": 2,
+      "scenario": "平台终态不能继续归因为排队",
+      "replay": "pass",
+      "counterexamples_rejected": 3,
+      "historical_status": "historical_observation",
+      "interpretation": "Successful 是平台终态，不能推定业务成功；以 worker error/阶段失败继续定位，不把历史 UI 当当前队列。",
+      "regressions": [
+        "backend/tests/test_kaggle_followup_eval_set.py::test_metrics_must_match_the_hashed_observation_not_just_any_valid_file",
+        "backend/tests/test_failure_cost_regressions.py::test_failed_dependency_spends_no_note_tokens"
+      ],
+      "companion_regressions": [
+        "../gpu-router/backend/tests/test_kaggle_runtime_inputs.py",
+        "../gpu-router/backend/tests/test_kaggle_review_state.py"
+      ],
+      "production_evidence_required": "新候选需重新取得同任务、同范围、同发布的真实前端或服务端证据；离线回放不能冒充新生产验收。",
+      "evidence_refs": [
+        {
+          "path": "docs/testing/2026-10-22/production-resolution/transcribe-errors.json",
+          "sha256": "161a7d3e8ddf64a3a084ab67ab77055c79b1a2af7ce791149f3ae33e10494b3a"
+        },
+        {
+          "path": "docs/testing/2026-10-22/production-resolution/before.json",
+          "sha256": "e678095a8f9166b96ac9ee4bcaa543125c3d38b96481f065c998257efbaddabc"
+        },
+        {
+          "path": "docs/testing/2026-10-22/production-resolution/kaggle-completed-ui.txt",
+          "sha256": "1a5d8a283cbce8d3b0329e75aba67df5d3c4419622f1ddf9d69fdf252bdf5ef3"
+        }
+      ]
+    },
+    {
+      "id": "pra-003",
+      "annotation_index": 3,
+      "scenario": "PyAV 兼容与超时双故障",
+      "replay": "pass",
+      "counterexamples_rejected": 4,
+      "historical_status": "historical_observation",
+      "interpretation": "解码兼容与请求超时分别评测；固定 worker 依赖的测试归 gpu-router，本仓绑定真实解码非空产物。",
+      "regressions": [
+        "backend/tests/test_usage_backfill.py::test_transcribe_timeout_still_records_wall_clock",
+        "backend/tests/test_resolution_annotations.py::test_gpu_packet_probe_is_bound_to_input_runtime_and_source"
+      ],
+      "companion_regressions": [
+        "../gpu-router/backend/tests/test_kaggle_runtime_inputs.py",
+        "../gpu-router/backend/tests/test_kaggle_review_state.py"
+      ],
+      "production_evidence_required": "新候选需重新取得同任务、同范围、同发布的真实前端或服务端证据；离线回放不能冒充新生产验收。",
+      "evidence_refs": [
+        {
+          "path": "docs/testing/2026-10-22/production-resolution/resume-progress-2.json",
+          "sha256": "21161b8178013e134b600564adffa15c1540d08be91ec11496fb30e66f164785"
+        },
+        {
+          "path": "docs/testing/2026-10-22/production-resolution/transcribe-errors.json",
+          "sha256": "161a7d3e8ddf64a3a084ab67ab77055c79b1a2af7ce791149f3ae33e10494b3a"
+        }
+      ]
+    },
+    {
+      "id": "pra-004",
+      "annotation_index": 4,
+      "scenario": "回填原值与事务保护",
+      "replay": "pass",
+      "counterexamples_rejected": 4,
+      "historical_status": "historical_observation",
+      "interpretation": "必须先精确原值和并发校验、私有备份；回填只更正应用归集，重复无变更且不产生现金扣款。",
+      "regressions": [
+        "backend/tests/test_usage_backfill.py::test_json_store_atomic_backup_other_run_and_repeat",
+        "backend/tests/test_usage_backfill.py::test_compare_and_swap_rejects_stale_or_wrong_record",
+        "backend/tests/test_usage_backfill.py::test_postgres_uses_locked_row_transaction_and_leaves_other_fields"
+      ],
+      "companion_regressions": [],
+      "production_evidence_required": "新候选需重新取得同任务、同范围、同发布的真实前端或服务端证据；离线回放不能冒充新生产验收。",
+      "evidence_refs": [
+        {
+          "path": "docs/testing/2026-10-22/production-resolution/backfill-applied.json",
+          "sha256": "5eebfc8dba291dcf46756f9c092dc1947171e08f70ef39aeb2408aec0666a137"
+        }
+      ]
+    },
+    {
+      "id": "pra-005",
+      "annotation_index": 5,
+      "scenario": "历史数量、月份与其他任务隔离",
+      "replay": "pass",
+      "counterexamples_rejected": 6,
+      "historical_status": "historical_observation",
+      "interpretation": "锁定该历史时点的 37863/31495/18688、0.019184，保留 GPU 1460.570 和其他9个任务；月度0.038581是回填时快照。",
+      "regressions": [
+        "backend/tests/test_usage_backfill.py::test_json_store_atomic_backup_other_run_and_repeat",
+        "backend/tests/test_usage_backfill.py::test_compare_and_swap_rejects_stale_or_wrong_record"
+      ],
+      "companion_regressions": [],
+      "production_evidence_required": "新候选需重新取得同任务、同范围、同发布的真实前端或服务端证据；离线回放不能冒充新生产验收。",
+      "evidence_refs": [
+        {
+          "path": "docs/testing/2026-10-22/production-resolution/backfill-applied.json",
+          "sha256": "5eebfc8dba291dcf46756f9c092dc1947171e08f70ef39aeb2408aec0666a137"
+        }
+      ]
+    },
+    {
+      "id": "pra-006",
+      "annotation_index": 6,
+      "scenario": "结算后重试增量不能遗漏",
+      "replay": "pass",
+      "counterexamples_rejected": 3,
+      "historical_status": "historical_observation",
+      "interpretation": "新内存批次累加，保留历史审计；同批不能重复消费。不声称跨进程 exactly-once。",
+      "regressions": [
+        "backend/tests/test_usage_backfill.py::test_resumed_run_settles_new_usage_without_losing_correction",
+        "backend/tests/test_failure_cost_regressions.py::test_retry_accounts_every_observed_usage_once"
+      ],
+      "companion_regressions": [],
+      "production_evidence_required": "新候选需重新取得同任务、同范围、同发布的真实前端或服务端证据；离线回放不能冒充新生产验收。",
+      "evidence_refs": [
+        {
+          "path": "docs/testing/2026-10-22/production-resolution/backfill-applied.json",
+          "sha256": "5eebfc8dba291dcf46756f9c092dc1947171e08f70ef39aeb2408aec0666a137"
+        },
+        {
+          "path": "docs/testing/2026-10-22/production-resolution/book-delivery.json",
+          "sha256": "d0c03030607a460028b302eb336b5810d841321f94111b482a52077bcd515716"
+        }
+      ]
+    },
+    {
+      "id": "pra-007",
+      "annotation_index": 7,
+      "scenario": "无新增结算与超时墙钟",
+      "replay": "pass",
+      "counterexamples_rejected": 3,
+      "historical_status": "historical_observation",
+      "interpretation": "无新增用量保持不变；ReadTimeout 也记录远程调用墙钟；不能将排队传输墙钟称 GPU 忙时。",
+      "regressions": [
+        "backend/tests/test_usage_backfill.py::test_resumed_run_settles_new_usage_without_losing_correction",
+        "backend/tests/test_usage_backfill.py::test_transcribe_timeout_still_records_wall_clock"
+      ],
+      "companion_regressions": [],
+      "production_evidence_required": "新候选需重新取得同任务、同范围、同发布的真实前端或服务端证据；离线回放不能冒充新生产验收。",
+      "evidence_refs": [
+        {
+          "path": "docs/testing/2026-10-22/production-resolution/transcribe-errors.json",
+          "sha256": "161a7d3e8ddf64a3a084ab67ab77055c79b1a2af7ce791149f3ae33e10494b3a"
+        },
+        {
+          "path": "docs/testing/2026-10-22/production-resolution/backfill-applied.json",
+          "sha256": "5eebfc8dba291dcf46756f9c092dc1947171e08f70ef39aeb2408aec0666a137"
+        },
+        {
+          "path": "docs/testing/2026-10-22/production-resolution/book-delivery.json",
+          "sha256": "d0c03030607a460028b302eb336b5810d841321f94111b482a52077bcd515716"
+        }
+      ]
+    },
+    {
+      "id": "pra-008",
+      "annotation_index": 8,
+      "scenario": "仅镜像发布预检",
+      "replay": "pass",
+      "counterexamples_rejected": 3,
+      "historical_status": "historical_observation",
+      "interpretation": "server dry-run 中环境、卷、init、资源、权限任何意外变更都阻断真实 apply；保留所有生产配置。",
+      "regressions": [
+        "backend/tests/test_resolution_operations.py::test_server_dry_run_rejects_every_unrelated_spec_change"
+      ],
+      "companion_regressions": [],
+      "production_evidence_required": "新候选需重新取得同任务、同范围、同发布的真实前端或服务端证据；离线回放不能冒充新生产验收。",
+      "evidence_refs": [
+        {
+          "path": "docs/testing/2026-10-22/production-resolution/api-dry-run.json",
+          "sha256": "b665a950397622a27cb7418a5fd0b76013659eee7d45e46a337c240a1890a245"
+        }
+      ]
+    },
+    {
+      "id": "pra-009",
+      "annotation_index": 9,
+      "scenario": "重复 last-applied 记账修复",
+      "replay": "pass",
+      "counterexamples_rejected": 4,
+      "historical_status": "historical_observation",
+      "interpretation": "仅修记账元数据，线上 spec 不变；不通过 force-conflicts 掩盖差异。",
+      "regressions": [
+        "backend/tests/test_resolution_operations.py::test_server_dry_run_rejects_every_unrelated_spec_change"
+      ],
+      "companion_regressions": [],
+      "production_evidence_required": "新候选需重新取得同任务、同范围、同发布的真实前端或服务端证据；离线回放不能冒充新生产验收。",
+      "evidence_refs": [
+        {
+          "path": "docs/testing/2026-10-22/production-resolution/api-dry-run.json",
+          "sha256": "b665a950397622a27cb7418a5fd0b76013659eee7d45e46a337c240a1890a245"
+        }
+      ]
+    },
+    {
+      "id": "pra-010",
+      "annotation_index": 10,
+      "scenario": "发布故障必须恢复业务并保留回填",
+      "replay": "pass",
+      "counterexamples_rejected": 4,
+      "historical_status": "historical_observation",
+      "interpretation": "init 故障和健康恢复分别留痕；Ready/进程存活不能替代健康与登录；恢复后回填读回仍在。",
+      "regressions": [
+        "backend/tests/test_usage_backfill.py::test_private_backup_allows_existing_init_group_to_traverse_without_reading_data",
+        "backend/tests/test_resolution_operations.py::test_server_dry_run_rejects_every_unrelated_spec_change"
+      ],
+      "companion_regressions": [],
+      "production_evidence_required": "新候选需重新取得同任务、同范围、同发布的真实前端或服务端证据；离线回放不能冒充新生产验收。",
+      "evidence_refs": [
+        {
+          "path": "docs/testing/2026-10-22/production-resolution/audit-readback.json",
+          "sha256": "244624cc7aa975d699e6805ced8a7ea1c81dab968e662d479249eb4049e773ba"
+        },
+        {
+          "path": "docs/testing/2026-10-22/production-resolution/public-health.json",
+          "sha256": "3a8c77d34786744d3328aa0aa31f1ca2eedb793442a48bd7ea95daa3cb4257c0"
+        },
+        {
+          "path": "docs/testing/2026-10-22/production-resolution/init-recovery.json",
+          "sha256": "a2eda8a4626cae89213ae1b2720b76f21e4b64f2d5be1d61b4fb438b73140bd0"
+        }
+      ]
+    },
+    {
+      "id": "pra-011",
+      "annotation_index": 11,
+      "scenario": "备份目录遍历与文件私密性",
+      "replay": "pass",
+      "counterexamples_rejected": 5,
+      "historical_status": "historical_observation",
+      "interpretation": "目录0750只开放既有组遍历，文件0600，内容不变；不能宽放备份读取权限来恢复站点。",
+      "regressions": [
+        "backend/tests/test_usage_backfill.py::test_private_backup_allows_existing_init_group_to_traverse_without_reading_data"
+      ],
+      "companion_regressions": [],
+      "production_evidence_required": "新候选需重新取得同任务、同范围、同发布的真实前端或服务端证据；离线回放不能冒充新生产验收。",
+      "evidence_refs": [
+        {
+          "path": "docs/testing/2026-10-22/production-resolution/backup-directory-fix.json",
+          "sha256": "ad41293063c5eece7c2e420b379bb353fca635f51ab7a081994594d00e8eb2d3"
+        }
+      ]
+    },
+    {
+      "id": "pra-012",
+      "annotation_index": 12,
+      "scenario": "恢复后真实登录与前端原任务重试",
+      "replay": "pass",
+      "counterexamples_rejected": 5,
+      "historical_status": "historical_observation",
+      "interpretation": "原任务重新运行且仍只处理两集；业务健康与最终真实登录/刷新独立核对，不能仅凭 Pod Ready。",
+      "regressions": [
+        "backend/tests/test_resolution_annotations.py::test_browser_timeout_and_status_alone_never_prove_login",
+        "backend/tests/test_kaggle_followup_eval_set.py::test_metrics_must_match_the_hashed_observation_not_just_any_valid_file"
+      ],
+      "companion_regressions": [],
+      "production_evidence_required": "新候选需重新取得同任务、同范围、同发布的真实前端或服务端证据；离线回放不能冒充新生产验收。",
+      "evidence_refs": [
+        {
+          "path": "docs/testing/2026-10-22/production-resolution/public-health.json",
+          "sha256": "3a8c77d34786744d3328aa0aa31f1ca2eedb793442a48bd7ea95daa3cb4257c0"
+        },
+        {
+          "path": "docs/testing/2026-10-22/production-resolution/oauth-final-observations.json",
+          "sha256": "2099b155617e5825f39cce5e6003a3d6db2845b4ceb06b365abad9eafba0ec50"
+        },
+        {
+          "path": "docs/testing/2026-10-22/production-resolution/resume-submitted.json",
+          "sha256": "c1f783a232e6c2391964e10cb4269610e08704d31a5b1ea8cbf70cd51c611278"
+        }
+      ]
+    },
+    {
+      "id": "pra-013",
+      "annotation_index": 13,
+      "scenario": "真实非空 ASR 与逐帧 OCR 边界",
+      "replay": "pass",
+      "counterexamples_rejected": 3,
+      "historical_status": "historical_observation",
+      "interpretation": "两集解码非空；OCR错误、缺行和坏缓存阻断，合法无字帧允许。59.776秒/3段的原始依据为 asr-first-output.png，JSON仅断言其可机读非空结果。",
+      "regressions": [
+        "backend/tests/test_failure_cost_regressions.py::test_ocr_frame_errors_cannot_be_promoted_to_success",
+        "backend/tests/test_failure_cost_regressions.py::test_invalid_cached_ocr_is_retried",
+        "backend/tests/test_failure_cost_regressions.py::test_ocr_empty_text_without_error_is_valid_and_does_not_force_retry"
+      ],
+      "companion_regressions": [
+        "../gpu-router/backend/tests/test_kaggle_runtime_inputs.py",
+        "../gpu-router/backend/tests/test_kaggle_review_state.py"
+      ],
+      "production_evidence_required": "非空转录 JSON 及 asr-first-output.png；新运行需保留源音频时长、segments 和任务身份。",
+      "evidence_refs": [
+        {
+          "path": "docs/testing/2026-10-22/production-resolution/resume-progress-2.json",
+          "sha256": "21161b8178013e134b600564adffa15c1540d08be91ec11496fb30e66f164785"
+        }
+      ]
+    },
+    {
+      "id": "pra-014",
+      "annotation_index": 14,
+      "scenario": "前置成功而 OCR 失败不得调用模型",
+      "replay": "pass",
+      "counterexamples_rejected": 5,
+      "historical_status": "historical_observation",
+      "interpretation": "ASR/抽帧成功不等于任务成功；OCR错误后零调用零tokens零费用；中间文件是否复用取决于当次清理状态。",
+      "regressions": [
+        "backend/tests/test_failure_cost_regressions.py::test_failed_dependency_spends_no_note_tokens",
+        "backend/tests/test_failure_cost_regressions.py::test_ocr_frame_errors_cannot_be_promoted_to_success",
+        "backend/tests/test_failure_cost_regressions.py::test_invalid_cached_ocr_is_retried"
+      ],
+      "companion_regressions": [],
+      "production_evidence_required": "新候选需重新取得同任务、同范围、同发布的真实前端或服务端证据；离线回放不能冒充新生产验收。",
+      "evidence_refs": [
+        {
+          "path": "docs/testing/2026-10-22/production-resolution/resume-progress-3.json",
+          "sha256": "337b2bde5baa98291dd21dca472e93b5b235b6e0a893c7ddd8bf752f99bc3ad7"
+        }
+      ]
+    },
+    {
+      "id": "pra-015",
+      "annotation_index": 15,
+      "scenario": "输入缺失的三个假设分开验证",
+      "replay": "pass",
+      "counterexamples_rejected": 4,
+      "historical_status": "historical_observation",
+      "interpretation": "自动解包、旧版本和CLI假成功必须分别验证；实际 CPU 清单说明 frames/ 路径，不能只据 CLI 退出码判上传成功。",
+      "regressions": [
+        "backend/tests/test_resolution_annotations.py::test_gpu_packet_probe_is_bound_to_input_runtime_and_source",
+        "backend/tests/test_kaggle_followup_eval_set.py::test_metrics_must_match_the_hashed_observation_not_just_any_valid_file"
+      ],
+      "companion_regressions": [
+        "../gpu-router/backend/tests/test_kaggle_runtime_inputs.py",
+        "../gpu-router/backend/tests/test_kaggle_review_state.py"
+      ],
+      "production_evidence_required": "新候选需重新取得同任务、同范围、同发布的真实前端或服务端证据；离线回放不能冒充新生产验收。",
+      "evidence_refs": [
+        {
+          "path": "docs/testing/2026-10-22/production-resolution/input-layout.json",
+          "sha256": "03f4a7fa7a23b45f2952b4837642a0b0d5d012cc49f37d88391ae935f1064592"
+        },
+        {
+          "path": "docs/testing/2026-10-22/production-resolution/ocr-engine-probe-layout-failed.json",
+          "sha256": "7f92baadf53e9ff3a7a796694f47ce22695361b6122323e3076bb77939aeb253"
+        }
+      ]
+    },
+    {
+      "id": "pra-016",
+      "annotation_index": 16,
+      "scenario": "早期扁平路径与逐图上传说法已更正",
+      "replay": "pass",
+      "counterexamples_rejected": 4,
+      "historical_status": "superseded_by_measured_layout_and_packet",
+      "interpretation": "早期逐图片上传被两文件归档方案替代，实际解包到 frames/；校验控制ID和内容SHA，不能把过渡方案固化为最终规范。",
+      "regressions": [
+        "backend/tests/test_resolution_annotations.py::test_gpu_packet_probe_is_bound_to_input_runtime_and_source"
+      ],
+      "companion_regressions": [
+        "../gpu-router/backend/tests/test_kaggle_runtime_inputs.py",
+        "../gpu-router/backend/tests/test_kaggle_review_state.py"
+      ],
+      "production_evidence_required": "新候选需重新取得同任务、同范围、同发布的真实前端或服务端证据；离线回放不能冒充新生产验收。",
+      "evidence_refs": [
+        {
+          "path": "docs/testing/2026-10-22/production-resolution/input-layout.json",
+          "sha256": "03f4a7fa7a23b45f2952b4837642a0b0d5d012cc49f37d88391ae935f1064592"
+        },
+        {
+          "path": "docs/testing/2026-10-22/production-resolution/ocr-engine-probe.json",
+          "sha256": "99b208c4d0d918e6b5cab311565b93c47be1d596b637a74dec5c7cca072f6658"
+        },
+        {
+          "path": "docs/testing/2026-10-22/production-resolution/final-runtime.json",
+          "sha256": "9ac1588c1405ff677c685148413a882ca7df88dbd3a402a4e7e46f03fb50e3b1"
+        }
+      ]
+    },
+    {
+      "id": "pra-017",
+      "annotation_index": 17,
+      "scenario": "缓存复用按实际阶段记录判断",
+      "replay": "pass",
+      "counterexamples_rejected": 3,
+      "historical_status": "corrected_cache_scope",
+      "interpretation": "有清理的补跑重新转写；最终补跑的5毫秒stage显示复用有效缓存。既不能保证总能复用，也不能说每次都重算。",
+      "regressions": [
+        "backend/tests/test_failure_cost_regressions.py::test_invalid_cached_ocr_is_retried",
+        "backend/tests/test_usage_backfill.py::test_transcribe_timeout_still_records_wall_clock"
+      ],
+      "companion_regressions": [],
+      "production_evidence_required": "新候选需重新取得同任务、同范围、同发布的真实前端或服务端证据；离线回放不能冒充新生产验收。",
+      "evidence_refs": [
+        {
+          "path": "docs/testing/2026-10-22/production-resolution/resume-progress-2.json",
+          "sha256": "21161b8178013e134b600564adffa15c1540d08be91ec11496fb30e66f164785"
+        },
+        {
+          "path": "docs/testing/2026-10-22/production-resolution/third-resume-progress-2.json",
+          "sha256": "602cbd91f77f288b620ed1ce39275b6e13452f8eb998d1d867565ba0f90e40a2"
+        }
+      ]
+    },
+    {
+      "id": "pra-018",
+      "annotation_index": 18,
+      "scenario": "运行态就绪与业务终态分开",
+      "replay": "pass",
+      "counterexamples_rejected": 5,
+      "historical_status": "historical_observation",
+      "interpretation": "容器Ready/零重启与业务OCR/教材结果独立核对；最终镜像与真实任务绑定，不把历史阶段回放称当前运行。",
+      "regressions": [
+        "backend/tests/test_kaggle_followup_eval_set.py::test_metrics_must_match_the_hashed_observation_not_just_any_valid_file",
+        "backend/tests/test_resolution_annotations.py::test_successful_delivery_does_not_close_failure_or_performance_gaps"
+      ],
+      "companion_regressions": [],
+      "production_evidence_required": "新候选需重新取得同任务、同范围、同发布的真实前端或服务端证据；离线回放不能冒充新生产验收。",
+      "evidence_refs": [
+        {
+          "path": "docs/testing/2026-10-22/production-resolution/book-delivery.json",
+          "sha256": "d0c03030607a460028b302eb336b5810d841321f94111b482a52077bcd515716"
+        },
+        {
+          "path": "docs/testing/2026-10-22/production-resolution/third-resume-progress-3.json",
+          "sha256": "f939c9193f080bace6602f4bb266fc1af0c0028cc4e9b6d88ad68765cd0d9568"
+        },
+        {
+          "path": "docs/testing/2026-10-22/production-resolution/final-runtime.json",
+          "sha256": "9ac1588c1405ff677c685148413a882ca7df88dbd3a402a4e7e46f03fb50e3b1"
+        }
+      ]
+    },
+    {
+      "id": "pra-019",
+      "annotation_index": 19,
+      "scenario": "上传对象数量与不中断活动任务",
+      "replay": "pass",
+      "counterexamples_rejected": 3,
+      "historical_status": "historical_observation",
+      "interpretation": "逐图上传性能退化必须由两对象归档测试拦截；历史约4分钟是观察，不作为精确SLA。活动业务期间不发布重启，诊断使用独立已结束内核。",
+      "regressions": [
+        "backend/tests/test_resolution_annotations.py::test_gpu_packet_probe_is_bound_to_input_runtime_and_source",
+        "backend/tests/test_resolution_operations.py::test_server_dry_run_rejects_every_unrelated_spec_change"
+      ],
+      "companion_regressions": [
+        "../gpu-router/backend/tests/test_kaggle_runtime_inputs.py",
+        "../gpu-router/backend/tests/test_kaggle_review_state.py"
+      ],
+      "production_evidence_required": "真实上传次数/耗时与活动任务检查；当前离线只验证归档对象数和独立探针，不新启动GPU。",
+      "evidence_refs": [
+        {
+          "path": "docs/testing/2026-10-22/production-resolution/ocr-engine-probe.json",
+          "sha256": "99b208c4d0d918e6b5cab311565b93c47be1d596b637a74dec5c7cca072f6658"
+        },
+        {
+          "path": "docs/testing/2026-10-22/production-resolution/final-runtime.json",
+          "sha256": "9ac1588c1405ff677c685148413a882ca7df88dbd3a402a4e7e46f03fb50e3b1"
+        }
+      ]
+    },
+    {
+      "id": "pra-020",
+      "annotation_index": 20,
+      "scenario": "worker done 不能掩盖逐帧引擎错误",
+      "replay": "pass",
+      "counterexamples_rejected": 6,
+      "historical_status": "historical_observation",
+      "interpretation": "57/57有err即失败，即使 status.json=done；固定两个OCR依赖，单帧真实非空通过后再补跑。",
+      "regressions": [
+        "backend/tests/test_failure_cost_regressions.py::test_ocr_frame_errors_cannot_be_promoted_to_success",
+        "backend/tests/test_failure_cost_regressions.py::test_failed_dependency_spends_no_note_tokens",
+        "backend/tests/test_resolution_annotations.py::test_gpu_packet_probe_is_bound_to_input_runtime_and_source"
+      ],
+      "companion_regressions": [
+        "../gpu-router/backend/tests/test_kaggle_runtime_inputs.py",
+        "../gpu-router/backend/tests/test_kaggle_review_state.py"
+      ],
+      "production_evidence_required": "新候选需重新取得同任务、同范围、同发布的真实前端或服务端证据；离线回放不能冒充新生产验收。",
+      "evidence_refs": [
+        {
+          "path": "docs/testing/2026-10-22/production-resolution/second-ocr-worker.json",
+          "sha256": "01fd5108daa790d88da45e32c8cc25bf67f003e017f5c193f7e461dbf67c0bef"
+        },
+        {
+          "path": "docs/testing/2026-10-22/production-resolution/ocr-engine-probe.json",
+          "sha256": "99b208c4d0d918e6b5cab311565b93c47be1d596b637a74dec5c7cca072f6658"
+        },
+        {
+          "path": "docs/testing/2026-10-22/production-resolution/second-resume-progress-5.json",
+          "sha256": "5f073116ed91f1b41dda4961ddef11a69d0f9d8f38c18497b00719df61a0a1c9"
+        }
+      ]
+    },
+    {
+      "id": "pra-021",
+      "annotation_index": 21,
+      "scenario": "提交冲突不能轮询旧作业或盲目重提",
+      "replay": "pass",
+      "counterexamples_rejected": 4,
+      "historical_status": "historical_observation",
+      "interpretation": "409/CLI零退出报错都不能视为新任务被接受；记录拒绝后核对独立内核，未证明接受不得领取旧输出。",
+      "regressions": [
+        "backend/tests/test_resolution_annotations.py::test_gpu_packet_probe_is_bound_to_input_runtime_and_source"
+      ],
+      "companion_regressions": [
+        "../gpu-router/backend/tests/test_kaggle_runtime_inputs.py",
+        "../gpu-router/backend/tests/test_kaggle_review_state.py"
+      ],
+      "production_evidence_required": "新候选需重新取得同任务、同范围、同发布的真实前端或服务端证据；离线回放不能冒充新生产验收。",
+      "evidence_refs": [
+        {
+          "path": "docs/testing/2026-10-22/production-resolution/ocr-engine-probe-push-rejected.json",
+          "sha256": "4bee85c46e5f85236a622bbb7b48635a417caf059f20b8270527e5f07dd88560"
+        },
+        {
+          "path": "docs/testing/2026-10-22/production-resolution/ocr-engine-probe.json",
+          "sha256": "99b208c4d0d918e6b5cab311565b93c47be1d596b637a74dec5c7cca072f6658"
+        }
+      ]
+    },
+    {
+      "id": "pra-022",
+      "annotation_index": 22,
+      "scenario": "先CPU只读看布局再补跑",
+      "replay": "pass",
+      "counterexamples_rejected": 4,
+      "historical_status": "historical_observation",
+      "interpretation": "探针失败必须保留，CPU诊断不得申请GPU；真实挂载清单优先于猜测，不重复整轮生成。",
+      "regressions": [
+        "backend/tests/test_resolution_annotations.py::test_gpu_packet_probe_is_bound_to_input_runtime_and_source"
+      ],
+      "companion_regressions": [
+        "../gpu-router/backend/tests/test_kaggle_runtime_inputs.py",
+        "../gpu-router/backend/tests/test_kaggle_review_state.py"
+      ],
+      "production_evidence_required": "新候选需重新取得同任务、同范围、同发布的真实前端或服务端证据；离线回放不能冒充新生产验收。",
+      "evidence_refs": [
+        {
+          "path": "docs/testing/2026-10-22/production-resolution/input-layout.json",
+          "sha256": "03f4a7fa7a23b45f2952b4837642a0b0d5d012cc49f37d88391ae935f1064592"
+        },
+        {
+          "path": "docs/testing/2026-10-22/production-resolution/ocr-engine-probe-layout-failed.json",
+          "sha256": "7f92baadf53e9ff3a7a796694f47ce22695361b6122323e3076bb77939aeb253"
+        }
+      ]
+    },
+    {
+      "id": "pra-023",
+      "annotation_index": 23,
+      "scenario": "OCR 输入路径 SHA 与随机标识绑定",
+      "replay": "pass",
+      "counterexamples_rejected": 4,
+      "historical_status": "historical_observation",
+      "interpretation": "frames/目录、逐文件内容和控制标识共同验证；旧同名图片、错清单和旧out.json均拒绝。",
+      "regressions": [
+        "backend/tests/test_resolution_annotations.py::test_gpu_packet_probe_is_bound_to_input_runtime_and_source",
+        "backend/tests/test_kaggle_followup_eval_set.py::test_metrics_must_match_the_hashed_observation_not_just_any_valid_file"
+      ],
+      "companion_regressions": [
+        "../gpu-router/backend/tests/test_kaggle_runtime_inputs.py",
+        "../gpu-router/backend/tests/test_kaggle_review_state.py"
+      ],
+      "production_evidence_required": "新候选需重新取得同任务、同范围、同发布的真实前端或服务端证据；离线回放不能冒充新生产验收。",
+      "evidence_refs": [
+        {
+          "path": "docs/testing/2026-10-22/production-resolution/input-layout.json",
+          "sha256": "03f4a7fa7a23b45f2952b4837642a0b0d5d012cc49f37d88391ae935f1064592"
+        },
+        {
+          "path": "docs/testing/2026-10-22/production-resolution/ocr-engine-probe.json",
+          "sha256": "99b208c4d0d918e6b5cab311565b93c47be1d596b637a74dec5c7cca072f6658"
+        },
+        {
+          "path": "docs/testing/2026-10-22/production-resolution/final-runtime.json",
+          "sha256": "9ac1588c1405ff677c685148413a882ca7df88dbd3a402a4e7e46f03fb50e3b1"
+        }
+      ]
+    },
+    {
+      "id": "pra-024",
+      "annotation_index": 24,
+      "scenario": "用户确认订阅验收口径",
+      "replay": "pass",
+      "counterexamples_rejected": 5,
+      "historical_status": "historical_observation",
+      "interpretation": "CNY67.72实付与USD归集分开；完整同账期导出逐请求核对，拒绝截断跨期漏重试和虚构现金扣款。",
+      "regressions": [
+        "backend/tests/test_production_failure_cost_eval_set.py::test_paid_cny_receipt_and_usd_request_usage_are_independently_accepted",
+        "backend/tests/test_failure_cost_regressions.py::test_retry_accounts_every_observed_usage_once"
+      ],
+      "companion_regressions": [],
+      "production_evidence_required": "新候选需重新取得同任务、同范围、同发布的真实前端或服务端证据；离线回放不能冒充新生产验收。",
+      "evidence_refs": [
+        {
+          "path": "docs/testing/2026-10-22/production-resolution/supplier-acceptance-result.json",
+          "sha256": "bea3db2ca864b01a5e643d42d912634f0a618597dc078b45dcf234b48bfcef0d"
+        },
+        {
+          "path": "docs/testing/2026-10-22/production-resolution/final-reconciliation.json",
+          "sha256": "40e1f30e3ee1c32cf268b98523e2955ba4f72585c56cba87ecd1a5709787f450"
+        }
+      ]
+    },
+    {
+      "id": "pra-025",
+      "annotation_index": 25,
+      "scenario": "登录过期不代表后台任务停止",
+      "replay": "pass",
+      "counterexamples_rejected": 4,
+      "historical_status": "historical_observation",
+      "interpretation": "重新登录与后台阶段分别观测；最终三次当前版本登录刷新核验，不把会话到期原因猜成已解决。",
+      "regressions": [
+        "backend/tests/test_resolution_annotations.py::test_browser_timeout_and_status_alone_never_prove_login",
+        "backend/tests/test_kaggle_followup_eval_set.py::test_metrics_must_match_the_hashed_observation_not_just_any_valid_file"
+      ],
+      "companion_regressions": [],
+      "production_evidence_required": "新候选需重新取得同任务、同范围、同发布的真实前端或服务端证据；离线回放不能冒充新生产验收。",
+      "evidence_refs": [
+        {
+          "path": "docs/testing/2026-10-22/production-resolution/book-delivery.json",
+          "sha256": "d0c03030607a460028b302eb336b5810d841321f94111b482a52077bcd515716"
+        },
+        {
+          "path": "docs/testing/2026-10-22/production-resolution/oauth-final-observations.json",
+          "sha256": "2099b155617e5825f39cce5e6003a3d6db2845b4ceb06b365abad9eafba0ec50"
+        }
+      ]
+    },
+    {
+      "id": "pra-026",
+      "annotation_index": 26,
+      "scenario": "订阅评测与原按量口径同时保留",
+      "replay": "pass",
+      "counterexamples_rejected": 4,
+      "historical_status": "historical_observation",
+      "interpretation": "按已选口径核对发票、账户产品覆盖期和逐请求归集；历史20类是当时统计，CI实际执行正反例，不硬编码历史测试数量。",
+      "regressions": [
+        "backend/tests/test_production_failure_cost_eval_set.py::test_paid_cny_receipt_and_usd_request_usage_are_independently_accepted"
+      ],
+      "companion_regressions": [],
+      "production_evidence_required": "新候选需重新取得同任务、同范围、同发布的真实前端或服务端证据；离线回放不能冒充新生产验收。",
+      "evidence_refs": [
+        {
+          "path": "docs/testing/2026-10-22/production-resolution/supplier-acceptance-result.json",
+          "sha256": "bea3db2ca864b01a5e643d42d912634f0a618597dc078b45dcf234b48bfcef0d"
+        },
+        {
+          "path": "docs/testing/2026-10-22/production-resolution/final-reconciliation.json",
+          "sha256": "40e1f30e3ee1c32cf268b98523e2955ba4f72585c56cba87ecd1a5709787f450"
+        }
+      ]
+    },
+    {
+      "id": "pra-027",
+      "annotation_index": 27,
+      "scenario": "两集OCR阶段完成后才能选帧",
+      "replay": "pass",
+      "counterexamples_rejected": 4,
+      "historical_status": "historical_observation",
+      "interpretation": "同任务两集OCR completed后进入模型，不能用逐帧坏结果或HTTP200冒充成功。",
+      "regressions": [
+        "backend/tests/test_failure_cost_regressions.py::test_ocr_frame_errors_cannot_be_promoted_to_success",
+        "backend/tests/test_failure_cost_regressions.py::test_failed_dependency_spends_no_note_tokens"
+      ],
+      "companion_regressions": [],
+      "production_evidence_required": "新候选需重新取得同任务、同范围、同发布的真实前端或服务端证据；离线回放不能冒充新生产验收。",
+      "evidence_refs": [
+        {
+          "path": "docs/testing/2026-10-22/production-resolution/third-resume-progress-3.json",
+          "sha256": "f939c9193f080bace6602f4bb266fc1af0c0028cc4e9b6d88ad68765cd0d9568"
+        }
+      ]
+    },
+    {
+      "id": "pra-028",
+      "annotation_index": 28,
+      "scenario": "点击超时不自动记登录通过",
+      "replay": "pass",
+      "counterexamples_rejected": 4,
+      "historical_status": "historical_observation",
+      "interpretation": "超时尝试只有实际页面+同次服务端/me及刷新证据齐全才计成功；状态302或按钮点击结束都不足。",
+      "regressions": [
+        "backend/tests/test_resolution_annotations.py::test_browser_timeout_and_status_alone_never_prove_login"
+      ],
+      "companion_regressions": [],
+      "production_evidence_required": "新候选需重新取得同任务、同范围、同发布的真实前端或服务端证据；离线回放不能冒充新生产验收。",
+      "evidence_refs": [
+        {
+          "path": "docs/testing/2026-10-22/production-resolution/oauth-final-observations.json",
+          "sha256": "2099b155617e5825f39cce5e6003a3d6db2845b4ceb06b365abad9eafba0ec50"
+        }
+      ]
+    },
+    {
+      "id": "pra-029",
+      "annotation_index": 29,
+      "scenario": "教材库计数还需正文和媒体实物",
+      "replay": "pass",
+      "counterexamples_rejected": 3,
+      "historical_status": "historical_observation",
+      "interpretation": "2/2讲必须属于原任务、两篇非空正文和完整附件集合；计数标签不能代替可读和播放。",
+      "regressions": [
+        "backend/tests/test_resolution_annotations.py::test_successful_delivery_does_not_close_failure_or_performance_gaps"
+      ],
+      "companion_regressions": [],
+      "production_evidence_required": "新候选需重新取得同任务、同范围、同发布的真实前端或服务端证据；离线回放不能冒充新生产验收。",
+      "evidence_refs": [
+        {
+          "path": "docs/testing/2026-10-22/production-resolution/book-delivery.json",
+          "sha256": "d0c03030607a460028b302eb336b5810d841321f94111b482a52077bcd515716"
+        },
+        {
+          "path": "docs/testing/2026-10-22/production-resolution/final-state.json",
+          "sha256": "13f08c4f5f4ac35801ec1630e3dc298c8fee93d3cbe4aead0bb09e51dfdb0fda"
+        }
+      ]
+    },
+    {
+      "id": "pra-030",
+      "annotation_index": 30,
+      "scenario": "五请求总额与独立span限制",
+      "replay": "pass",
+      "counterexamples_rejected": 5,
+      "historical_status": "historical_observation",
+      "interpretation": "重新从5行服务商请求求和37018/3579和USD0.00734220；只有4个独立应用span，选帧是剩余量重建，不宣称5个独立trace。",
+      "regressions": [
+        "backend/tests/test_production_failure_cost_eval_set.py::test_paid_cny_receipt_and_usd_request_usage_are_independently_accepted",
+        "backend/tests/test_kaggle_followup_eval_set.py::test_metrics_must_match_the_hashed_observation_not_just_any_valid_file"
+      ],
+      "companion_regressions": [],
+      "production_evidence_required": "新候选需重新取得同任务、同范围、同发布的真实前端或服务端证据；离线回放不能冒充新生产验收。",
+      "evidence_refs": [
+        {
+          "path": "docs/testing/2026-10-22/production-resolution/supplier-acceptance-result.json",
+          "sha256": "bea3db2ca864b01a5e643d42d912634f0a618597dc078b45dcf234b48bfcef0d"
+        },
+        {
+          "path": "docs/testing/2026-10-22/production-resolution/final-reconciliation.json",
+          "sha256": "40e1f30e3ee1c32cf268b98523e2955ba4f72585c56cba87ecd1a5709787f450"
+        },
+        {
+          "path": "docs/testing/2026-10-22/production-resolution/book-delivery.json",
+          "sha256": "d0c03030607a460028b302eb336b5810d841321f94111b482a52077bcd515716"
+        }
+      ]
+    },
+    {
+      "id": "pra-031",
+      "annotation_index": 31,
+      "scenario": "服务器文件和206不能关闭读页性能",
+      "replay": "pass",
+      "counterexamples_rejected": 4,
+      "historical_status": "historical_observation",
+      "interpretation": "文件、解码、接口状态只是交付层证据；缺完整前端采样，即使最终全部ready也不关闭及时就绪。",
+      "regressions": [
+        "backend/tests/test_reader_readiness_eval.py::test_invalid_readiness_cannot_pass",
+        "backend/tests/test_resolution_annotations.py::test_successful_delivery_does_not_close_failure_or_performance_gaps"
+      ],
+      "companion_regressions": [],
+      "production_evidence_required": "新候选需重新取得同任务、同范围、同发布的真实前端或服务端证据；离线回放不能冒充新生产验收。",
+      "evidence_refs": [
+        {
+          "path": "docs/testing/2026-10-22/production-resolution/book-delivery.json",
+          "sha256": "d0c03030607a460028b302eb336b5810d841321f94111b482a52077bcd515716"
+        },
+        {
+          "path": "docs/testing/2026-10-22/production-resolution/reader-readiness-evidence.json",
+          "sha256": "da8fe2efdc6b1ca5e17f64c61ad728dbedd59021f086668fadd011e573e33d8a"
+        }
+      ]
+    },
+    {
+      "id": "pra-032",
+      "annotation_index": 32,
+      "scenario": "公开证书缓存与token逐次校验",
+      "replay": "pass",
+      "counterexamples_rejected": 4,
+      "historical_status": "historical_observation",
+      "interpretation": "只缓存公开证书且关闭客户端；缓存不能绕过签名/受众/签发者/过期验证，私有请求不能借用。",
+      "regressions": [
+        "backend/tests/test_google_cert_cache.py::test_proxy_isolation_and_concurrent_cold_cache_single_fetch"
+      ],
+      "companion_regressions": [],
+      "production_evidence_required": "新候选需重新取得同任务、同范围、同发布的真实前端或服务端证据；离线回放不能冒充新生产验收。",
+      "evidence_refs": [
+        {
+          "path": "docs/testing/2026-10-22/production-resolution/cert-cache-runtime.json",
+          "sha256": "36a6400667f86282606d948a14cacbfac0303c63c821687db2e5b03803a65e79"
+        }
+      ]
+    },
+    {
+      "id": "pra-033",
+      "annotation_index": 33,
+      "scenario": "证书缓存安全负例不得回退",
+      "replay": "pass",
+      "counterexamples_rejected": 3,
+      "historical_status": "historical_observation",
+      "interpretation": "冷缓存合并、过期刷新、错误不回退，所有JWT拒绝行为仍执行；历史18项不是当前测试数量门槛。",
+      "regressions": [
+        "backend/tests/test_google_cert_cache.py::test_proxy_isolation_and_concurrent_cold_cache_single_fetch"
+      ],
+      "companion_regressions": [],
+      "production_evidence_required": "新候选需重新取得同任务、同范围、同发布的真实前端或服务端证据；离线回放不能冒充新生产验收。",
+      "evidence_refs": [
+        {
+          "path": "docs/testing/2026-10-22/production-resolution/cert-cache-runtime.json",
+          "sha256": "36a6400667f86282606d948a14cacbfac0303c63c821687db2e5b03803a65e79"
+        }
+      ]
+    },
+    {
+      "id": "pra-034",
+      "annotation_index": 34,
+      "scenario": "局部缓存命中不推定全链性能",
+      "replay": "pass",
+      "counterexamples_rejected": 3,
+      "historical_status": "historical_observation",
+      "interpretation": "首拉1.2042s、第二次0s只证明公开证书缓存；媒体性能仍须完整独立观测。",
+      "regressions": [
+        "backend/tests/test_google_cert_cache.py::test_proxy_isolation_and_concurrent_cold_cache_single_fetch",
+        "backend/tests/test_reader_readiness_eval.py::test_invalid_readiness_cannot_pass"
+      ],
+      "companion_regressions": [],
+      "production_evidence_required": "新候选需重新取得同任务、同范围、同发布的真实前端或服务端证据；离线回放不能冒充新生产验收。",
+      "evidence_refs": [
+        {
+          "path": "docs/testing/2026-10-22/production-resolution/cert-cache-runtime.json",
+          "sha256": "36a6400667f86282606d948a14cacbfac0303c63c821687db2e5b03803a65e79"
+        },
+        {
+          "path": "docs/testing/2026-10-22/production-resolution/reader-readiness-evidence.json",
+          "sha256": "da8fe2efdc6b1ca5e17f64c61ad728dbedd59021f086668fadd011e573e33d8a"
+        }
+      ]
+    },
+    {
+      "id": "pra-035",
+      "annotation_index": 35,
+      "scenario": "成功生成和总额平衡不能关闭故障门禁",
+      "replay": "pass",
+      "counterexamples_rejected": 4,
+      "historical_status": "open_production_evidence",
+      "interpretation": "真实clips失败后零模型和真实空回包重试证据仍缺；status改成pass也不能通过原严格评测。",
+      "regressions": [
+        "backend/tests/test_resolution_annotations.py::test_successful_delivery_does_not_close_failure_or_performance_gaps",
+        "backend/tests/test_kaggle_followup_eval_set.py::test_claiming_pass_cannot_close_unresolved_real_observations"
+      ],
+      "companion_regressions": [],
+      "production_evidence_required": "新候选需重新取得同任务、同范围、同发布的真实前端或服务端证据；离线回放不能冒充新生产验收。",
+      "evidence_refs": [
+        {
+          "path": "docs/evals/production-failure-cost-resolution-2026-10-22.json",
+          "sha256": "bcfd217d5fc953a516da93733e9208a5b625086bca69eb087875950bb84426f4"
+        }
+      ]
+    },
+    {
+      "id": "pra-036",
+      "annotation_index": 36,
+      "scenario": "稀疏窗口不能冒充精确延迟",
+      "replay": "pass",
+      "counterexamples_rejected": 4,
+      "historical_status": "corrected_open_performance",
+      "interpretation": "18分钟说法已更正为观测窗口；全部ready和无解码错误只证明功能，measurement_complete=false持续阻断性能验收。",
+      "regressions": [
+        "backend/tests/test_reader_readiness_eval.py::test_invalid_readiness_cannot_pass",
+        "backend/tests/test_resolution_annotations.py::test_successful_delivery_does_not_close_failure_or_performance_gaps"
+      ],
+      "companion_regressions": [],
+      "production_evidence_required": "新候选需重新取得同任务、同范围、同发布的真实前端或服务端证据；离线回放不能冒充新生产验收。",
+      "evidence_refs": [
+        {
+          "path": "docs/testing/2026-10-22/production-resolution/reader-readiness-evidence.json",
+          "sha256": "da8fe2efdc6b1ca5e17f64c61ad728dbedd59021f086668fadd011e573e33d8a"
+        }
+      ]
+    },
+    {
+      "id": "pra-037",
+      "annotation_index": 37,
+      "scenario": "实际播放与第二讲裸图链缺陷",
+      "replay": "pass",
+      "counterexamples_rejected": 6,
+      "historical_status": "historical_observation",
+      "interpretation": "实际播放currentTime>0且无错；第二讲白名单图链归一后复用剪辑，不新增LLM。",
+      "regressions": [
+        "backend/tests/test_note_embed_regressions.py::test_known_frames_normalize_to_standalone_authorized_attachment",
+        "backend/tests/test_resolution_annotations.py::test_successful_delivery_does_not_close_failure_or_performance_gaps"
+      ],
+      "companion_regressions": [],
+      "production_evidence_required": "新候选需重新取得同任务、同范围、同发布的真实前端或服务端证据；离线回放不能冒充新生产验收。",
+      "evidence_refs": [
+        {
+          "path": "docs/testing/2026-10-22/production-resolution/reader-playback.json",
+          "sha256": "d431ee799ec8e23d7fa634cf9adf0e91f0d23d698b3ebd6168e10cb4e382f46c"
+        },
+        {
+          "path": "docs/testing/2026-10-22/production-resolution/note-repair-applied.json",
+          "sha256": "c6c2635066e6603f63b71b2fc2766b2599f781d896d9cbce0307f7b702986c25"
+        }
+      ]
+    },
+    {
+      "id": "pra-038",
+      "annotation_index": 38,
+      "scenario": "收集导入污染与红灯禁止发布",
+      "replay": "pass",
+      "counterexamples_rejected": 4,
+      "historical_status": "historical_observation",
+      "interpretation": "测试模块收集不能初始化真实配置；污染有备份但无事故前基线，不能宣称原样恢复；红灯期间不得apply。",
+      "regressions": [
+        "backend/tests/test_note_embed_regressions.py::test_collecting_note_regressions_cannot_initialize_project_storage",
+        "backend/tests/test_resolution_operations.py::test_server_dry_run_rejects_every_unrelated_spec_change"
+      ],
+      "companion_regressions": [],
+      "production_evidence_required": "新候选需重新取得同任务、同范围、同发布的真实前端或服务端证据；离线回放不能冒充新生产验收。",
+      "evidence_refs": [
+        {
+          "path": "docs/testing/2026-10-22/production-resolution/local-test-cleanup.json",
+          "sha256": "3c489556594f345e109befdc48aa5f9149b72c1552ca0bab6ddcd2a660cd327d"
+        }
+      ]
+    },
+    {
+      "id": "pra-039",
+      "annotation_index": 39,
+      "scenario": "教材修复幂等与账目隔离",
+      "replay": "pass",
+      "counterexamples_rejected": 7,
+      "historical_status": "historical_observation",
+      "interpretation": "DB/文件同步，首变更次不变、同摘要，其他任务与费用用量保持；当前5图5片真实DOM补证。",
+      "regressions": [
+        "backend/tests/test_note_embed_regressions.py::test_known_frames_normalize_to_standalone_authorized_attachment",
+        "backend/tests/test_resolution_annotations.py::test_successful_delivery_does_not_close_failure_or_performance_gaps"
+      ],
+      "companion_regressions": [],
+      "production_evidence_required": "新候选需重新取得同任务、同范围、同发布的真实前端或服务端证据；离线回放不能冒充新生产验收。",
+      "evidence_refs": [
+        {
+          "path": "docs/testing/2026-10-22/production-resolution/note-repair-applied.json",
+          "sha256": "c6c2635066e6603f63b71b2fc2766b2599f781d896d9cbce0307f7b702986c25"
+        }
+      ]
+    },
+    {
+      "id": "pra-040",
+      "annotation_index": 40,
+      "scenario": "最终三次登录与媒体采样完整性",
+      "replay": "pass",
+      "counterexamples_rejected": 4,
+      "historical_status": "open_performance",
+      "interpretation": "同发布3次登录刷新通过与媒体性能失败分别记录；不使用稀疏观测补造精确耗时。",
+      "regressions": [
+        "backend/tests/test_resolution_annotations.py::test_browser_timeout_and_status_alone_never_prove_login",
+        "backend/tests/test_reader_readiness_eval.py::test_invalid_readiness_cannot_pass"
+      ],
+      "companion_regressions": [],
+      "production_evidence_required": "新候选需重新取得同任务、同范围、同发布的真实前端或服务端证据；离线回放不能冒充新生产验收。",
+      "evidence_refs": [
+        {
+          "path": "docs/testing/2026-10-22/production-resolution/oauth-final-observations.json",
+          "sha256": "2099b155617e5825f39cce5e6003a3d6db2845b4ceb06b365abad9eafba0ec50"
+        },
+        {
+          "path": "docs/testing/2026-10-22/production-resolution/reader-readiness-evidence.json",
+          "sha256": "da8fe2efdc6b1ca5e17f64c61ad728dbedd59021f086668fadd011e573e33d8a"
+        }
+      ]
+    },
+    {
+      "id": "pra-041",
+      "annotation_index": 41,
+      "scenario": "交付数量与三个未关闭项分开",
+      "replay": "pass",
+      "counterexamples_rejected": 6,
+      "historical_status": "partial_production_acceptance",
+      "interpretation": "两讲22媒体、修复零调用可确认；真实剪辑故障、空回包重试、媒体性能三项继续开放。",
+      "regressions": [
+        "backend/tests/test_resolution_annotations.py::test_successful_delivery_does_not_close_failure_or_performance_gaps",
+        "backend/tests/test_kaggle_followup_eval_set.py::test_claiming_pass_cannot_close_unresolved_real_observations"
+      ],
+      "companion_regressions": [],
+      "production_evidence_required": "新候选需重新取得同任务、同范围、同发布的真实前端或服务端证据；离线回放不能冒充新生产验收。",
+      "evidence_refs": [
+        {
+          "path": "docs/testing/2026-10-22/production-resolution/book-delivery.json",
+          "sha256": "d0c03030607a460028b302eb336b5810d841321f94111b482a52077bcd515716"
+        },
+        {
+          "path": "docs/testing/2026-10-22/production-resolution/reader-readiness-evidence.json",
+          "sha256": "da8fe2efdc6b1ca5e17f64c61ad728dbedd59021f086668fadd011e573e33d8a"
+        },
+        {
+          "path": "docs/testing/2026-10-22/production-resolution/note-repair-applied.json",
+          "sha256": "c6c2635066e6603f63b71b2fc2766b2599f781d896d9cbce0307f7b702986c25"
+        },
+        {
+          "path": "docs/evals/production-failure-cost-resolution-2026-10-22.json",
+          "sha256": "bcfd217d5fc953a516da93733e9208a5b625086bca69eb087875950bb84426f4"
+        }
+      ]
+    },
+    {
+      "id": "pra-042",
+      "annotation_index": 42,
+      "scenario": "最终UI账目与隐私证据",
+      "replay": "pass",
+      "counterexamples_rejected": 6,
+      "historical_status": "historical_observation",
+      "interpretation": "任务/月/历史回填三份金额与前端文本一致；公开材料不得含请求头或凭据，未通过项保留。",
+      "regressions": [
+        "backend/tests/test_production_failure_cost_eval_set.py::test_paid_cny_receipt_and_usd_request_usage_are_independently_accepted",
+        "backend/tests/test_kaggle_followup_eval_set.py::test_metrics_must_match_the_hashed_observation_not_just_any_valid_file"
+      ],
+      "companion_regressions": [],
+      "production_evidence_required": "新候选需重新取得同任务、同范围、同发布的真实前端或服务端证据；离线回放不能冒充新生产验收。",
+      "evidence_refs": [
+        {
+          "path": "docs/testing/2026-10-22/production-resolution/final-reconciliation.json",
+          "sha256": "40e1f30e3ee1c32cf268b98523e2955ba4f72585c56cba87ecd1a5709787f450"
+        },
+        {
+          "path": "docs/testing/2026-10-22/production-resolution/billing-final-ui.txt",
+          "sha256": "f759adf07f7f8f008da958ac89337f94094b6d38a12171b5def49ba44961f7a5"
+        },
+        {
+          "path": "docs/testing/2026-10-22/production-resolution/privacy-scan.json",
+          "sha256": "0d2cf7292afa6845aca1ceb224a85f899f00da5cdf92ab36ad230850eb183eae"
+        },
+        {
+          "path": "docs/testing/2026-10-22/production-resolution/final-state.json",
+          "sha256": "13f08c4f5f4ac35801ec1630e3dc298c8fee93d3cbe4aead0bb09e51dfdb0fda"
+        }
+      ]
+    },
+    {
+      "id": "pra-043",
+      "annotation_index": 43,
+      "scenario": "整体结果不能由离线绿灯升级为生产通过",
+      "replay": "pass",
+      "counterexamples_rejected": 6,
+      "historical_status": "partial_production_acceptance",
+      "interpretation": "13类旧评测已扩为43条逐项回放；历史533项不作为新测试数量；保留付款/归集区分、4span限制及三个生产缺口。",
+      "regressions": [
+        "backend/tests/test_resolution_annotations.py::test_successful_delivery_does_not_close_failure_or_performance_gaps",
+        "backend/tests/test_kaggle_followup_eval_set.py::test_claiming_pass_cannot_close_unresolved_real_observations",
+        "backend/tests/test_production_failure_cost_eval_set.py::test_paid_cny_receipt_and_usd_request_usage_are_independently_accepted"
+      ],
+      "companion_regressions": [],
+      "production_evidence_required": "新候选需重新取得同任务、同范围、同发布的真实前端或服务端证据；离线回放不能冒充新生产验收。",
+      "evidence_refs": [
+        {
+          "path": "docs/testing/2026-10-22/production-resolution/supplier-acceptance-result.json",
+          "sha256": "bea3db2ca864b01a5e643d42d912634f0a618597dc078b45dcf234b48bfcef0d"
+        },
+        {
+          "path": "docs/testing/2026-10-22/production-resolution/final-reconciliation.json",
+          "sha256": "40e1f30e3ee1c32cf268b98523e2955ba4f72585c56cba87ecd1a5709787f450"
+        },
+        {
+          "path": "docs/testing/2026-10-22/production-resolution/book-delivery.json",
+          "sha256": "d0c03030607a460028b302eb336b5810d841321f94111b482a52077bcd515716"
+        },
+        {
+          "path": "docs/testing/2026-10-22/production-resolution/reader-readiness-evidence.json",
+          "sha256": "da8fe2efdc6b1ca5e17f64c61ad728dbedd59021f086668fadd011e573e33d8a"
+        },
+        {
+          "path": "docs/evals/production-failure-cost-resolution-2026-10-22.json",
+          "sha256": "bcfd217d5fc953a516da93733e9208a5b625086bca69eb087875950bb84426f4"
+        }
+      ]
+    }
+  ]
+}

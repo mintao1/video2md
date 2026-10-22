@@ -1,0 +1,197 @@
+{
+  "method": "production operator API functions and file/DB reads; browser proof stored separately",
+  "model": "glm-5.3-flash",
+  "base_url": "https://opencode.ai/inference/go/openai/v1",
+  "budget_usd": 0.0,
+  "run_id": "4df77d9c",
+  "record_updated": "2026-10-21T05:44:41.867126+00:00",
+  "note_count": 1,
+  "markdown_chars": 2910,
+  "refusal_detected": false,
+  "selection_in_manifest": true,
+  "media": [
+    {
+      "name": "billing-index-lesson-c01-0000.mp4",
+      "bytes": 209675,
+      "type": "video/mp4"
+    },
+    {
+      "name": "billing-index-lesson-c17-0024.mp4",
+      "bytes": 332239,
+      "type": "video/mp4"
+    },
+    {
+      "name": "billing-index-lesson-c37-0055.mp4",
+      "bytes": 327062,
+      "type": "video/mp4"
+    },
+    {
+      "name": "billing-index-lesson-c53-0119.mp4",
+      "bytes": 335598,
+      "type": "video/mp4"
+    },
+    {
+      "name": "billing-index-lesson-c62-0133.mp4",
+      "bytes": 270586,
+      "type": "video/mp4"
+    },
+    {
+      "name": "billing-index-lesson-f01-0000.jpg",
+      "bytes": 22080,
+      "type": "image/jpeg"
+    },
+    {
+      "name": "billing-index-lesson-f17-0024.jpg",
+      "bytes": 21080,
+      "type": "image/jpeg"
+    },
+    {
+      "name": "billing-index-lesson-f37-0055.jpg",
+      "bytes": 22416,
+      "type": "image/jpeg"
+    },
+    {
+      "name": "billing-index-lesson-f53-0119.jpg",
+      "bytes": 26521,
+      "type": "image/jpeg"
+    },
+    {
+      "name": "billing-index-lesson-f62-0133.jpg",
+      "bytes": 26873,
+      "type": "image/jpeg"
+    }
+  ],
+  "submit_audit": [
+    {
+      "ts": "2026-10-21T13:30:05",
+      "method": "POST",
+      "path": "/runs",
+      "code": 200,
+      "run_id": "4df77d9c",
+      "total": 1,
+      "dedup": false,
+      "user": "u_a550fcca296f"
+    }
+  ],
+  "cost": {
+    "uid": "u_a550fcca296f",
+    "month": "2026-10-01T00:00:00",
+    "spend_usd": 0.009086,
+    "budget_usd": 0.0,
+    "usage": {
+      "spend_usd": 0.009086,
+      "llm_in_tok": 8545,
+      "llm_out_tok": 15609,
+      "gpu_s": 1780.114,
+      "runs_n": 6
+    },
+    "gpu_policy": "free",
+    "runs": [
+      {
+        "run_id": "4df77d9c",
+        "title": "数据库索引原理与查询优化",
+        "status": "done",
+        "created": "2026-10-21T13:30:05",
+        "deleted": false,
+        "usage": {
+          "gpu_s": 809.12,
+          "llm_in_tok": 6498,
+          "llm_out_tok": 6919
+        },
+        "cost_usd": 0.004434,
+        "cost_pricing": {
+          "gpu_min": 0.0,
+          "currency": "USD",
+          "gpu_policy": "free",
+          "llm_in_mtok": 0.15,
+          "llm_out_mtok": 0.5,
+          "llm_cached_in_mtok": 0.03
+        }
+      },
+      {
+        "run_id": "edfa1b1a",
+        "title": "ferosse.tech",
+        "status": "partial",
+        "created": "2026-10-21T13:09:14",
+        "deleted": false,
+        "usage": {
+          "gpu_s": 331.228,
+          "llm_in_tok": 2047,
+          "llm_out_tok": 8690
+        },
+        "cost_usd": 0.004652,
+        "cost_pricing": {
+          "gpu_min": 0.0,
+          "currency": "USD",
+          "gpu_policy": "free",
+          "llm_in_mtok": 0.15,
+          "llm_out_mtok": 0.5,
+          "llm_cached_in_mtok": 0.03
+        }
+      },
+      {
+        "run_id": "312e97ae",
+        "title": "ferosse.tech",
+        "status": "error",
+        "created": "2026-10-21T11:20:09",
+        "deleted": false,
+        "usage": {
+          "gpu_s": 204.669,
+          "llm_in_tok": 0,
+          "llm_out_tok": 0
+        },
+        "cost_usd": 0.0,
+        "cost_pricing": null
+      },
+      {
+        "run_id": "56835fed",
+        "title": "ferosse.tech",
+        "status": "error",
+        "created": "2026-10-21T08:15:42",
+        "deleted": false,
+        "usage": {
+          "gpu_s": 183.082,
+          "llm_in_tok": 0,
+          "llm_out_tok": 0
+        },
+        "cost_usd": 0.0,
+        "cost_pricing": null
+      },
+      {
+        "run_id": "aef9643a",
+        "title": "ferosse.tech",
+        "status": "error",
+        "created": "2026-10-21T07:37:06",
+        "deleted": false,
+        "usage": {
+          "gpu_s": 251.977,
+          "llm_in_tok": 0,
+          "llm_out_tok": 0
+        },
+        "cost_usd": 0.0,
+        "cost_pricing": null
+      },
+      {
+        "run_id": "9ad9ee9d",
+        "title": "ferosse.tech",
+        "status": "error",
+        "created": "2026-10-21T06:03:35",
+        "deleted": false,
+        "usage": {
+          "gpu_s": 0.038,
+          "llm_in_tok": 0,
+          "llm_out_tok": 0
+        },
+        "cost_usd": 0.0,
+        "cost_pricing": null
+      }
+    ],
+    "pricing_configured": true,
+    "prices": {
+      "llm_in_mtok": 0.15,
+      "llm_out_mtok": 0.5,
+      "gpu_min": 0.0,
+      "llm_cached_in_mtok": 0.03
+    }
+  }
+}

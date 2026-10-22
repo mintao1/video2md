@@ -1,0 +1,49 @@
+== 1. 单视频 → 一个条目 ==
+  ✅ 单条
+  ✅ 带 uploader
+  ✅ playlist_index 缺省为 None
+== 2. B站多P / 合集（playlist JSON）==
+  ✅ 3 条（跳过空条目）
+  ✅ 继承合集标题
+  ✅ 继承合集 id
+  ✅ 第 3 条索引回填 3
+  ✅ 短 url 兜底
+== 3. --part-items 过滤 ==
+  ✅ 取 1,3
+  ✅ 区间 2-3
+  ✅ 空 spec 全选
+== 4. URL 归一化（幂等键 / 分P 不丢）==
+  ✅ https://www.bilibili.com/video/BVabc123?p=2&spm_id_f…
+  ✅ https://www.bilibili.com/video/BVabc123…
+  ✅ https://www.youtube.com/watch?v=abc&list=PLxyz&index…
+  ✅ https://www.youtube.com/watch?v=abc&utm_source=x…
+  ✅ https://youtu.be/abc?list=PLxyz…
+== 5. 站点化错误提示 ==
+  ✅ 提示含「抖音」
+  ✅ 提示含「小红书」
+  ✅ 提示含「链接解析失败」
+== 6. 坏 JSON ==
+  ✅ 报 JSON 异常
+== 7. 短链重定向（xhslink / v.douyin）==
+  ✅ 短链被跟随
+  ✅ 解析回单条目
+  ✅ 长链不被改写
+== 8. 抖音博主主页归一化（剥页态参数）==
+  ✅ user 链接剥参数
+  ✅ user 路径下的 modal 仍按博主意图归一
+  ✅ 非 user 的 modal 不受影响
+== 9. aweme → entry 映射（视频/图文分流）==
+  ✅ 视频 url
+  ✅ 视频 media_type
+  ✅ 视频时长换算秒
+  ✅ 视频带直链
+  ✅ 视频带博主
+  ✅ 图文 url
+  ✅ 图文 media_type
+  ✅ 图文 images 每条取首链
+  ✅ 图文无 duration/direct_url
+== 10. resolve_url 路由：user 链接进 CDP 枚举 ==
+  ✅ 进入 douyin_user_resolve
+  ✅ 返回枚举条目
+
+✅ 全部通过

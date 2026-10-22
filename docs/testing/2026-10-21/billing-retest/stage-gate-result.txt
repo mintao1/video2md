@@ -1,0 +1,37 @@
+FAIL
+- pps-003: stage is blocked
+- pps-003: measured values do not satisfy the stage contract
+- pps-004: stage is blocked
+- pps-004: measured values do not satisfy the stage contract
+- pps-006: stage is blocked
+- pps-006: measured values do not satisfy the stage contract
+- pps-008: stage is blocked
+- pps-008: measured values do not satisfy the stage contract
+- pps-009: stage is fail
+- pps-009: measured values do not satisfy the stage contract
+- pps-010: stage is fail
+- pps-010: measured values do not satisfy the stage contract
+- pps-011: stage is fail
+- pps-011: measured values do not satisfy the stage contract
+- pps-012: stage is fail
+- pps-012: measured values do not satisfy the stage contract
+- pps-013: stage is blocked
+- pps-013: measured values do not satisfy the stage contract
+- pps-014: stage is fail
+- pps-014: measured values do not satisfy the stage contract
+- pps-016: stage is blocked
+- pps-016: measured values do not satisfy the stage contract
+- pps-017: stage is blocked
+- pps-017: measured values do not satisfy the stage contract
+- pps-018: stage is blocked
+- pps-018: measured values do not satisfy the stage contract
+- pps-020: stage is fail
+- pps-020: measured values do not satisfy the stage contract
+- pps-021: stage is fail
+- pps-021: measured values do not satisfy the stage contract
+- pps-022: stage is not_tested
+- pps-022: measured values do not satisfy the stage contract
+- pps-023: stage is not_tested
+- pps-023: measured values do not satisfy the stage contract
+- pps-024: stage is not_tested
+- pps-024: measured values do not satisfy the stage contract

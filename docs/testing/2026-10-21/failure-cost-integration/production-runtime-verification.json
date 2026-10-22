@@ -1,0 +1,29 @@
+{
+  "kind": "production_process_isolated_replay",
+  "source_sha256": {
+    "backend/video2md/api.py": "ad062f1928146856fb0739d8be570fa7a9123fe1eb77c7c4fe74bee53acfe360",
+    "backend/video2md/graph.py": "dbac35ada94f314a57b5e355cdcd81d64e1b5dcb725f08479a6d444c95caf489",
+    "backend/video2md/llm.py": "4825610b0cac0f54b5315ebdb98bb3ad7b6cd03756a790fb0991d3d547504a87",
+    "backend/video2md/bilibili.py": "52e3b2924ea1a102b69d38ae0b2eae7d540e164cdc76d1a8d8124f44e341ff3c",
+    "backend/video2md/download.py": "8b8457125b84600bf555dbf15429206187d1538f60320be7afa6a524c8e19956"
+  },
+  "historical_task_diagnostic": {
+    "stage": "clips",
+    "message": "视频剪辑未完成，暂时无法生成教材；请补跑失败条目。"
+  },
+  "dependency_replay": [
+    {
+      "failed_stage": "ocr",
+      "model_calls": 0,
+      "passed": true
+    },
+    {
+      "failed_stage": "clips",
+      "model_calls": 0,
+      "passed": true
+    }
+  ],
+  "health_status": 200,
+  "anonymous_me_status": 401,
+  "anonymous_cost_status": 401
+}

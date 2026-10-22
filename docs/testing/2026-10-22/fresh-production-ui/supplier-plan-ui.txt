@@ -1,0 +1,17 @@
+				992 heading Go Subscription, Value: 2
+					993 text Go Subscription
+				998 container Paid period ends 2026/11/6 01:26:00
+					999 text Renews  in  14d 19h
+					1002 heading Connect OpenCode CLI, Value: 2
+				1014 container Go usage limits
+					1015 text Rolling usage 0% used
+					1018 progress indicator Description: Rolling usage, Value: 0
+					1019 text Weekly usage 0% used
+					1022 progress indicator Description: Weekly usage, Value: 0
+					1023 text Monthly usage 68% used
+					1026 progress indicator Description: Monthly usage, Value: 68
+					1031 text Extra Usage
+						1034 switch (settable, boolean) Description: Use credit, Value: 0, ID: switch-cl-188-input
+						1035 text Use credit
+					1036 text $0.00 available credit
+					1037 link Description: Buy credits, Value: opencode.ai/console/wrk_01KVDRA02ACZ6CR9XVVYQWQK3A/settings/billing

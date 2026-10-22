@@ -1,0 +1,39 @@
+  ⚠ LLM retry-accounting 第 1 次调用失败（空回包（HTTP 200 但零内容）），30s 后重试
+{
+  "kind": "synthetic_zero_network_reproduction",
+  "empty_response_parser_preserves_usage": true,
+  "results": [
+    {
+      "case": "single_success_control",
+      "requests": 1,
+      "observations": 1,
+      "expected_usage": {
+        "llm_in_tok": 200,
+        "llm_out_tok": 60
+      },
+      "recorded_usage": {
+        "llm_in_tok": 200,
+        "llm_out_tok": 60
+      },
+      "passed": true
+    },
+    {
+      "case": "empty_200_then_success",
+      "requests": 2,
+      "observations": 1,
+      "expected_usage": {
+        "llm_in_tok": 300,
+        "llm_out_tok": 100
+      },
+      "recorded_usage": {
+        "llm_in_tok": 200,
+        "llm_out_tok": 60
+      },
+      "passed": false
+    }
+  ]
+}
+Traceback (most recent call last):
+  File "<stdin>", line 82, in <module>
+AssertionError: Retry usage is lost before successful completion
+command terminated with exit code 1

@@ -1,0 +1,12 @@
+{
+  "base_image": "video2md:0.2.0-resume-billing-20261022c",
+  "image": "video2md:0.2.0-ocr-guard-20261022d",
+  "changed_functions": [
+    "_stage_ocr",
+    "_run_stage_inner",
+    "settle_cost (local type annotation only)"
+  ],
+  "source_sha256": {
+    "runs.py": "d43f578562d67e685ad729f3424bb01b475f586cb612df24c5d8e67603fc2edc"
+  }
+}

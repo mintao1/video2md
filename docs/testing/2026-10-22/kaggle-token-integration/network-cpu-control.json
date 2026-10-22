@@ -1,0 +1,18 @@
+{
+  "control_id": "22cfaae50723458582d99e04c85faca1",
+  "ffmpeg": "/usr/bin/ffmpeg",
+  "files": [
+    {
+      "name": "clip-src.mp4",
+      "bytes": 406492
+    },
+    {
+      "name": "clip_job.json",
+      "bytes": 125
+    }
+  ],
+  "status": "done",
+  "elapsed_s": 39.393,
+  "llm_calls": 0,
+  "fresh_control_id_matches": true
+}

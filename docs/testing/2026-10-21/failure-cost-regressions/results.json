@@ -1,0 +1,24 @@
+{
+  "date": "2026-10-21",
+  "scope": "local regression fixes and evaluation gates",
+  "new_test_instances": 106,
+  "backend_tests_passed": 890,
+  "frontend_tests_passed": 45,
+  "behavioral_red_before_fix": {
+    "failed": 13,
+    "passed": 3
+  },
+  "oauth_red_before_fix": {
+    "failed": 3,
+    "passed": 4
+  },
+  "lint": "pass",
+  "changed_file_typecheck": "pass",
+  "typecheck_with_imports": "8 pre-existing errors in bilibili.py and download.py",
+  "historical_production_gate": "expected FAIL on all four IDs",
+  "deployed": false,
+  "new_paid_model_calls": 0,
+  "supplier_actual_debit_verified": false,
+  "production_findings_closed": false,
+  "production_retest_required": true
+}

@@ -1,0 +1,21 @@
+{
+  "exit_code": 0,
+  "quota": [
+    {
+      "resource": "GPU",
+      "used": "0.00h",
+      "remaining": "30.00h",
+      "total": "30.00h",
+      "refreshAt": "2026-10-24T00:00:00"
+    },
+    {
+      "resource": "TPU",
+      "used": "0.00h",
+      "remaining": "20.00h",
+      "total": "20.00h",
+      "refreshAt": "2026-10-24T00:00:00"
+    }
+  ],
+  "phone_verification": false,
+  "permission_denied": false
+}

@@ -19,9 +19,9 @@ export const useQueueStore = defineStore('queue', () => {
       case 'queued':
         return runs.value.filter((r) => r.status === 'queued')
       case 'done':
-        return runs.value.filter((r) => r.status === 'done' || r.status === 'partial')
+        return runs.value.filter((r) => (r.status === 'done' || r.status === 'partial') && r.readable)
       case 'error':
-        return runs.value.filter((r) => r.status === 'error')
+        return runs.value.filter((r) => r.status === 'error' || (r.status === 'partial' && !r.readable))
       default:
         return runs.value
     }
@@ -36,8 +36,8 @@ export const useQueueStore = defineStore('queue', () => {
     all: runs.value.length,
     active: runs.value.filter((r) => r.status === 'running' || r.status === 'paused' || r.status === 'cancelling').length,
     queued: runs.value.filter((r) => r.status === 'queued').length,
-    done: runs.value.filter((r) => r.status === 'done' || r.status === 'partial').length,
-    error: runs.value.filter((r) => r.status === 'error').length,
+    done: runs.value.filter((r) => (r.status === 'done' || r.status === 'partial') && r.readable).length,
+    error: runs.value.filter((r) => r.status === 'error' || (r.status === 'partial' && !r.readable)).length,
   }))
 
   let revision = 0
@@ -55,7 +55,11 @@ export const useQueueStore = defineStore('queue', () => {
   async function createRun(url: string, title?: string) {
     const run = await api.createRun({ url, title })
     revision++
-    runs.value.unshift(run)
+    if (runs.value.some((existing) => existing.run_id === run.run_id)) {
+      await load() // Reused runs retain their authoritative usage and artifact state.
+    } else {
+      runs.value.unshift(run)
+    }
   }
 
   async function pause(id: string) {

@@ -1,0 +1,21 @@
+{
+  "source_sha256": "7bacacd567ed7dd34e23b47d5e8fb0cc9c72cb1ceba39d0d4a9f707594cbd3d3",
+  "measurements": [
+    {
+      "status": 200,
+      "elapsed_s": 1.2042,
+      "cache_control": "public, max-age=20928, must-revalidate, no-transform",
+      "age": "3",
+      "cert_count": 2
+    },
+    {
+      "status": 200,
+      "elapsed_s": 0.0,
+      "cache_control": "public, max-age=20928, must-revalidate, no-transform",
+      "age": "3",
+      "cert_count": 2
+    }
+  ],
+  "cached_entries": 1,
+  "same_response_object": true
+}

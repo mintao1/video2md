@@ -1,0 +1,30 @@
+PASS generated worker contains input resolver
+PASS generated GPU worker verifies actual CUDA allocation
+PASS CUDA allocation check for available=False
+PASS CUDA allocation check for available=True
+PASS generated resolver reads input for lesson
+PASS generated resolver reads input for datasets/fixture/lesson
+PASS generated resolver reads input for fixture/lesson
+PASS missing expected dataset rejects another owner
+PASS GPU task explicitly requests supported T4 accelerator
+PASS CPU diagnostic does not request accelerator
+PASS zero-exit CLI push rejection cannot reuse stale kernel output
+PASS ASR worker pins released faster-whisper version
+PASS ASR worker pins compatible PyAV decoder
+PASS OCR uploads one archive plus manifest to avoid one HTTP upload per frame
+PASS OCR archive contains exact manifest names for platform extraction
+PASS OCR manifest binds exact filenames and fresh control identifier
+PASS OCR rejects stale job output
+PASS OCR pins explicit engine and runtime dependencies
+PASS OCR provider rejects frame-error rather than reporting healthy success
+PASS OCR provider rejects missing-row rather than reporting healthy success
+PASS generated OCR worker reads explicit manifest
+PASS auto-extracted flat JPEG is readable without TAR
+PASS OCR manifest rejects invalid/missing input []
+PASS OCR manifest rejects invalid/missing input ['../outside.jpg']
+PASS OCR manifest rejects invalid/missing input ['frame.jpg', 'frame.jpg']
+PASS OCR manifest rejects invalid/missing input [None]
+PASS OCR manifest rejects invalid/missing input ['missing.jpg']
+PASS measured Kaggle frames/ extraction is supported
+PASS stale root file cannot override matching archived input
+PASS OCR input content must match manifest digest

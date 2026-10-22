@@ -1,0 +1,53 @@
+{
+  "observed_at": "2026-10-21T20:46:38.063Z",
+  "images": [
+    {
+      "loaded": true,
+      "name": "p002-BV1LV411r77C_p2-f01-0000.jpg"
+    },
+    {
+      "loaded": true,
+      "name": "p002-BV1LV411r77C_p2-f15-0012.jpg"
+    },
+    {
+      "loaded": true,
+      "name": "p002-BV1LV411r77C_p2-f21-0018.jpg"
+    },
+    {
+      "loaded": true,
+      "name": "p002-BV1LV411r77C_p2-f34-0031.jpg"
+    },
+    {
+      "loaded": true,
+      "name": "p002-BV1LV411r77C_p2-f56-0053.jpg"
+    }
+  ],
+  "videos": [
+    {
+      "error": 0,
+      "label": "p002-BV1LV411r77C_p2-c01-0000.mp4",
+      "readyState": 4
+    },
+    {
+      "error": 0,
+      "label": "p002-BV1LV411r77C_p2-c15-0012.mp4",
+      "readyState": 4
+    },
+    {
+      "error": 0,
+      "label": "p002-BV1LV411r77C_p2-c21-0018.mp4",
+      "readyState": 4
+    },
+    {
+      "error": 0,
+      "label": "p002-BV1LV411r77C_p2-c34-0031.mp4",
+      "readyState": 4
+    },
+    {
+      "error": 0,
+      "label": "p002-BV1LV411r77C_p2-c56-0053.mp4",
+      "readyState": 4
+    }
+  ],
+  "pending": []
+}

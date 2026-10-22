@@ -1,0 +1,6 @@
+{
+  "before_opencode_bypassed": false,
+  "added_direct_host": "opencode.ai",
+  "preserved_existing_hosts": true,
+  "tls_verification_enabled": true
+}

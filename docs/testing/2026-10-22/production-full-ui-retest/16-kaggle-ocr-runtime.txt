@@ -1,0 +1,244 @@
+Browser tab: 7, Title: "gpu-router-job", URL: "https://www.kaggle.com/code/mintaolin/gpu-router-job/log".
+0 AXWebArea gpu-router-job, URL: kaggle.com/code/mintaolin/gpu-router-job/log
+	1 container root
+		2 container Main Kaggle page navigation
+			3 button Navigation menu
+			4 link Description: Skip to content, Value: kaggle.com/code/mintaolin/gpu-router-job/log#site-content
+			5 link Description: Return to Kaggle home page, Value: kaggle.com/
+			6 pop up button Create on Kaggle
+				7 text Create
+			8 container
+				9 container
+					10 content list
+						11 container Home List Item
+							12 link Description: Home, Value: kaggle.com/
+						13 container Competitions List Item
+							14 link Description: Competitions, Value: kaggle.com/competitions
+						15 container Benchmarks List Item
+							16 link Description: Benchmarks, Value: kaggle.com/benchmarks
+						17 container Arenas List Item
+							18 link Description: Arenas, Value: kaggle.com/arenas
+						19 container Game Arena List Item
+							20 link Description: Game Arena, Value: kaggle.com/game-arena
+					21 content list
+						22 container Data Hub List Item
+							23 container
+								24 link (collapsed) Description: Data Hub, Value: kaggle.com/code/mintaolin/gpu-router-job/log#, Secondary Actions: Expand
+								25 button Expand
+					26 content list
+						27 container More on Kaggle List Item
+							28 container
+								29 link (collapsed) Description: More on Kaggle, Value: kaggle.com/code/mintaolin/gpu-router-job/log#, Secondary Actions: Expand
+								30 button Expand
+				31 content list
+					32 container Your Work List Item
+						33 container
+							34 link Description: Your Work, Value: kaggle.com/work
+							35 button (expanded) Description: Collapse Your Work, Help: Collapse
+					36 container Collapse Viewed List Item
+						37 container
+							38 link (expanded) Description: Collapse Viewed, Value: kaggle.com/code/mintaolin/gpu-router-job/log#, Secondary Actions: Collapse
+							39 button Collapse Viewed
+					40 content list
+						41 container gpu-router-job List Item
+							42 link Description: gpu-router-job, Value: kaggle.com/code/mintaolin/gpu-router-job
+					43 container Collapse Edited List Item
+						44 container
+							45 link (expanded) Description: Collapse Edited, Value: kaggle.com/code/mintaolin/gpu-router-job/log#, Secondary Actions: Collapse
+							46 button Collapse Edited
+					47 content list
+						48 container gpu-router-job List Item
+							49 link Description: gpu-router-job, Value: kaggle.com/code/mintaolin/gpu-router-job
+				50 button (collapsed) Open Active Events dialog View Active Events, Secondary Actions: Expand
+					122 container Open Active Events dialog
+						123 text auto_awesome_motion
+					124 text View Active Events
+		51 container Main menu, search and your account
+			52 container
+				53 text field (settable) :r6:
+				54 button Mintao Lin
+					55 image
+		56 container site-content
+			57 container
+				58 text Kaggle uses cookies from Google to deliver and enhance the quality of its services and to analyze traffic.
+				59 link Description: Learn more, Value: kaggle.com/cookies
+				60 text OK, Got it.
+			61 link Description: Mintao Lin's profile, Value: kaggle.com/mintaolin
+			62 text Mintao Lin · 
+			63 container Description: 5 minutes ago, Help: Thu Oct 22 2026 07:46:38 GMT+0800 (中国标准时间)
+				64 text 5m ago
+			65 text  ·  8 views  ·  Private
+			66 container
+				67 button Upvote
+				68 button 0 votes
+			69 button Share
+			70 link Description: Edit, Value: kaggle.com/code/mintaolin/gpu-router-job/edit/run/360943461
+			71 pop up button (collapsed) Download, Secondary Actions: Expand
+			72 button More options for this notebook
+			73 heading gpu-router-job, Value: 1
+				74 text gpu-router-job
+			75 button Edit title
+			76 tab group
+				77 tab (selectable, settable, boolean) Description: Notebook, 1 of 6, Value: 0
+				78 tab (selectable, settable, boolean) Description: Input, 2 of 6, Value: 0
+				79 tab (selectable, settable, boolean) Description: Output, 3 of 6, Value: 0
+				80 tab (selected, settable, boolean) Description: Logs, 4 of 6, Value: 1
+				81 tab (selectable, settable, boolean) Description: Comments (0), 5 of 6, Value: 0
+				82 tab (selectable, settable, boolean) Description: Settings, 6 of 6, Value: 0
+			125 heading Logs, Value: 2
+				126 text Logs
+			134 link Download logs
+				135 button Download logs
+			127 container
+				128 heading Successfully ran in 203.7s, Value: 5
+					129 text Successfully ran in 203.7s
+				130 text Accelerator GPU T4 x2 Environment
+				131 link Description: Latest Container Image opens in new window, Value: gcr.io/kaggle-gpu-images/python@sha256:2757e0c7d1e0a9cb43da657b97e223c321a98f5014bdf64f44f2f6b083ad2b2f
+				132 button
+				133 text Output 45.04 kB
+			136 table
+				137 row
+					138 cell
+						139 text Time
+					140 cell
+						141 text #
+					142 cell
+						143 text Log Message
+				144 row
+					145 cell
+						146 text 14.3s
+					147 cell
+						148 text 1
+					149 cell
+						150 text    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 27.3/27.3 MB 72.8 MB/s eta 0:00:00
+
+				151 row
+					152 cell
+						153 text 14.5s
+					154 cell
+						155 text 2
+					156 cell
+						157 text    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 23.8/23.8 MB 71.9 MB/s eta 0:00:00
+
+				158 row
+					159 cell
+						160 text 60.2s
+					161 cell
+						162 text 3
+					163 cell
+						164 text [32m[INFO] 2026-10-21 23:47:42,290 [RapidOCR] base.py:23: Using engine_name: onnxruntime[0m
+
+				165 row
+					166 cell
+						167 text 60.2s
+					168 cell
+						169 text 4
+					170 cell
+						171 text [32m[INFO] 2026-10-21 23:47:42,321 [RapidOCR] download_file.py:60: File exists and is valid: /usr/local/lib/python3.13/dist-packages/rapidocr/models/PP-OCRv6_det_small.onnx[0m
+
+				172 row
+					173 cell
+						174 text 60.2s
+					175 cell
+						176 text 5
+					177 cell
+						178 text [32m[INFO] 2026-10-21 23:47:42,321 [RapidOCR] main.py:63: Using /usr/local/lib/python3.13/dist-packages/rapidocr/models/PP-OCRv6_det_small.onnx[0m
+
+				179 row
+					180 cell
+						181 text 61.3s
+					182 cell
+						183 text 6
+					184 cell
+						185 text [32m[INFO] 2026-10-21 23:47:43,428 [RapidOCR] base.py:23: Using engine_name: onnxruntime[0m
+
+				186 row
+					187 cell
+						188 text 61.3s
+					189 cell
+						190 text 7
+					191 cell
+						192 text [32m[INFO] 2026-10-21 23:47:43,431 [RapidOCR] download_file.py:60: File exists and is valid: /usr/local/lib/python3.13/dist-packages/rapidocr/models/ch_ppocr_mobile_v2.0_cls_mobile.onnx[0m
+
+				193 row
+					194 cell
+						195 text 61.3s
+					196 cell
+						197 text 8
+					198 cell
+						199 text [32m[INFO] 2026-10-21 23:47:43,431 [RapidOCR] main.py:63: Using /usr/local/lib/python3.13/dist-packages/rapidocr/models/ch_ppocr_mobile_v2.0_cls_mobile.onnx[0m
+
+				200 row
+					201 cell
+						202 text 61.4s
+					203 cell
+						204 text 9
+					205 cell
+						206 text [32m[INFO] 2026-10-21 23:47:43,506 [RapidOCR] base.py:23: Using engine_name: onnxruntime[0m
+
+				207 row
+					208 cell
+						209 text 61.4s
+					210 cell
+						211 text 10
+					212 cell
+						213 text [32m[INFO] 2026-10-21 23:47:43,563 [RapidOCR] download_file.py:60: File exists and is valid: /usr/local/lib/python3.13/dist-packages/rapidocr/models/PP-OCRv6_rec_small.onnx[0m
+
+				214 row
+					215 cell
+						216 text 61.4s
+					217 cell
+						218 text 11
+					219 cell
+						220 text [32m[INFO] 2026-10-21 23:47:43,564 [RapidOCR] main.py:63: Using /usr/local/lib/python3.13/dist-packages/rapidocr/models/PP-OCRv6_rec_small.onnx[0m
+
+				221 row
+					222 cell
+						223 text 200.6s
+					224 cell
+						225 text 12
+					226 cell
+						227 text /usr/local/lib/python3.13/dist-packages/mistune.py:435: SyntaxWarning: invalid escape sequence '\|'
+
+				228 row
+					229 cell
+						230 text 200.6s
+					231 cell
+						232 text 13
+					233 cell
+						234 text   cells[i][c] = re.sub('\\\\\|', '|', cell)
+
+				235 row
+					236 cell
+						237 text 200.9s
+					238 cell
+						239 text 14
+					240 cell
+						241 text /usr/local/lib/python3.13/dist-packages/nbconvert/filters/filter_links.py:36: SyntaxWarning: invalid escape sequence '\_'
+
+				242 row
+					243 cell
+						244 text 200.9s
+					245 cell
+						246 text 15
+					247 cell
+						248 text   text = re.sub(r'_', '\_', text) # Escape underscores in display text
+
+				249 row
+					250 cell
+						251 text 201.7s
+					252 cell
+						253 text 16
+					254 cell
+						255 text [NbConvertApp] Converting notebook __script__.ipynb to html
+
+				256 row
+					257 cell
+						258 text 202.8s
+					259 cell
+						260 text 17
+					261 cell
+						262 text [NbConvertApp] Writing 292998 bytes to __results__.html
+
+
+The focused UI element is 80 tab (selected, settable, boolean) Description: Logs, 4 of 6, Value: 1

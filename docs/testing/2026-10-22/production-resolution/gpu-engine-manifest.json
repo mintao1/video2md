@@ -1,0 +1,13 @@
+{
+  "base_image": "gpu-router:0.2.3-ocr-packet-20261022e",
+  "image": "gpu-router:0.2.3-ocr-engine-20261022f",
+  "changed_methods": [
+    "ocr"
+  ],
+  "changed_worker_body": "_KERNEL_OCR",
+  "source_sha256": "fa967db385c680dcbee7f37be20c911737e613fce0842dd9cbef515b3224075b",
+  "pinned_packages": {
+    "rapidocr": "3.10.0",
+    "onnxruntime": "1.31.0"
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "verdict": "PARTIAL_EXTERNAL_BLOCKERS",
+  "release": "video2md:0.2.0-failure-cost-20261021b",
+  "real_google_login_successes": 3,
+  "login_me_and_refresh_http_200": true,
+  "explicit_frontend_bilibili_submission": true,
+  "run_id": "f1fff0b8",
+  "parts": [
+    1,
+    2
+  ],
+  "run_status": "error",
+  "failure_stage": "transcribe",
+  "new_books": 0,
+  "application_usage_delta": {
+    "spend_usd": 0.0,
+    "llm_in_tok": 0,
+    "llm_out_tok": 0,
+    "gpu_s": 0.089,
+    "runs_n": 1
+  },
+  "supplier_cash_verified": false,
+  "source_hashes_match_previous_release": true,
+  "production_runtime_changed_this_turn": false,
+  "outstanding": [
+    "Colab quota cooldown",
+    "Kaggle credential fields empty",
+    "OCR/clips end-to-end and real retry observation",
+    "independent provider invoice/usage"
+  ],
+  "gate_expectation": "failure-cost-003 passes; 001/002/004 fail closed"
+}

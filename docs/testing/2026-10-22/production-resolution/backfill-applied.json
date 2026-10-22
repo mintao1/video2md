@@ -1,0 +1,48 @@
+{
+  "first": {
+    "run_id": "3c05faf8",
+    "correction_id": "20907c8c79017062036df5a8b13d0a794bd8ae1ddfb3e3813a27073f4452c176",
+    "changed": true,
+    "backup": "/app/data/usage-backups/20907c8c79017062036df5a8b13d0a794bd8ae1ddfb3e3813a27073f4452c176.json",
+    "usage": {
+      "gpu_s": 1460.57,
+      "llm_in_tok": 37863,
+      "llm_out_tok": 31495,
+      "llm_cached_in_tok": 18688
+    },
+    "cost_usd": 0.019184,
+    "supplier_cash_verified": false
+  },
+  "second": {
+    "run_id": "3c05faf8",
+    "correction_id": "20907c8c79017062036df5a8b13d0a794bd8ae1ddfb3e3813a27073f4452c176",
+    "changed": false,
+    "backup": null,
+    "usage": {
+      "gpu_s": 1460.57,
+      "llm_in_tok": 37863,
+      "llm_out_tok": 31495,
+      "llm_cached_in_tok": 18688
+    },
+    "cost_usd": 0.019184,
+    "supplier_cash_verified": false
+  },
+  "other_records_unchanged": true,
+  "run_keys_unchanged": true,
+  "before_month": {
+    "spend_usd": 0.032899,
+    "llm_in_tok": 43653,
+    "llm_out_tok": 54945,
+    "gpu_s": 5178.01,
+    "runs_n": 10
+  },
+  "after_month": {
+    "spend_usd": 0.038581,
+    "llm_in_tok": 62347,
+    "llm_out_tok": 62945,
+    "gpu_s": 5178.01,
+    "runs_n": 10
+  },
+  "audit_count": 1,
+  "non_accounting_fields_unchanged": true
+}

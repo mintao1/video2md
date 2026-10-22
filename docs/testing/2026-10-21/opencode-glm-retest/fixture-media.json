@@ -1,0 +1,24 @@
+{
+  "path": "frontend/web/public/test-assets/billing-index-lesson.mp4",
+  "bytes": 1054426,
+  "duration_s": 122.25,
+  "source": "agent-authored database lesson, local macOS Tingting speech, technical text slides",
+  "mock_model": false,
+  "audio_source_duration_s": 106.158503,
+  "streams": [
+    {
+      "codec_type": "video",
+      "codec_name": "h264",
+      "duration": "122.250000",
+      "width": 640,
+      "height": 360
+    },
+    {
+      "codec_type": "audio",
+      "codec_name": "aac",
+      "duration": "106.158005",
+      "width": null,
+      "height": null
+    }
+  ]
+}

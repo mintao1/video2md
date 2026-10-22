@@ -1,0 +1,12 @@
+{
+  "passed": false,
+  "provider_source_sha256": "fa967db385c680dcbee7f37be20c911737e613fce0842dd9cbef515b3224075b",
+  "isolated_dataset_and_kernel": true,
+  "error_type": "RuntimeError",
+  "error_summary": "Kaggle 内核报错: Expected OCR input image is missing",
+  "worker_status": {
+    "state": "error",
+    "error": "Expected OCR input image is missing"
+  },
+  "elapsed_s": 93.615
+}

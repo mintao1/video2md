@@ -1,0 +1,99 @@
+{
+  "kind": "independent_readback_of_persisted_audits",
+  "runs": [
+    {
+      "run_id": "3c05faf8",
+      "status": "partial",
+      "usage": {
+        "gpu_s": 1460.57,
+        "llm_in_tok": 37863,
+        "llm_out_tok": 31495,
+        "llm_cached_in_tok": 18688
+      },
+      "cost_usd": 0.019184,
+      "usage_corrections": [
+        {
+          "at": "2026-10-21T18:22:22.674661+00:00",
+          "reason": "independent_opencode_export_missing_attempt_usage",
+          "after_usage": {
+            "gpu_s": 1460.57,
+            "llm_in_tok": 37863,
+            "llm_out_tok": 31495,
+            "llm_cached_in_tok": 18688
+          },
+          "request_ids": [
+            "01a15eb6-835f-7416-9b41-b4535e01ff47",
+            "01a15eb5-32e5-7607-98a9-fe3ccb842567",
+            "01a15eb5-227c-7230-b806-051f000500c6",
+            "01a15eb4-8b84-7d31-9b57-3b7757b5fecb",
+            "01a15ea5-9408-78bf-8c34-1b1e02224eb5",
+            "01a15ea4-ac95-7cf0-9c4c-03b640fc5d86",
+            "01a15ea3-c77c-7def-a9a1-1f6a55e033de"
+          ],
+          "before_usage": {
+            "gpu_s": 1460.57,
+            "llm_in_tok": 19169,
+            "llm_out_tok": 23495,
+            "llm_cached_in_tok": 9344
+          },
+          "correction_id": "20907c8c79017062036df5a8b13d0a794bd8ae1ddfb3e3813a27073f4452c176",
+          "after_cost_usd": 0.019184,
+          "before_cost_usd": 0.013502,
+          "provider_export_sha256": "1da5cd296c772b48942f8269aebe404de0a1895058e2649934ddc79f2eb6d87d",
+          "supplier_cash_verified": false
+        }
+      ],
+      "usage_settlements": []
+    },
+    {
+      "run_id": "dd586072",
+      "status": "error",
+      "usage": {
+        "gpu_s": 1938.183,
+        "llm_in_tok": 0,
+        "llm_out_tok": 0,
+        "llm_cached_in_tok": 0
+      },
+      "cost_usd": 0.0,
+      "usage_corrections": [],
+      "usage_settlements": [
+        {
+          "at": "2026-10-22T02:47:50.291097",
+          "id": "ced4430b9c4d4524837de4247db98846",
+          "pricing": {
+            "gpu_min": 0.0,
+            "currency": "USD",
+            "gpu_policy": "free",
+            "llm_in_mtok": 0.15,
+            "llm_out_mtok": 0.5,
+            "llm_cached_in_mtok": 0.03
+          },
+          "usage_delta": {
+            "gpu_s": 383.854,
+            "llm_in_tok": 0,
+            "llm_out_tok": 0
+          },
+          "attribution_usd": 0.0
+        },
+        {
+          "at": "2026-10-22T03:12:22.726695",
+          "id": "1cb5a0f0c817435da7709ac07394d938",
+          "pricing": {
+            "gpu_min": 0.0,
+            "currency": "USD",
+            "gpu_policy": "free",
+            "llm_in_mtok": 0.15,
+            "llm_out_mtok": 0.5,
+            "llm_cached_in_mtok": 0.03
+          },
+          "usage_delta": {
+            "gpu_s": 893.542,
+            "llm_in_tok": 0,
+            "llm_out_tok": 0
+          },
+          "attribution_usd": 0.0
+        }
+      ]
+    }
+  ]
+}

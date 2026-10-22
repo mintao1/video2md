@@ -53,12 +53,12 @@ npm run preview    # 预览构建产物
 
 | 路由 | 页面 | 说明 |
 |---|---|---|
-| `/login` | 登录 | Google 登录按钮（跳 `{API}/auth/google/login`）；消费回跳 fragment `#id_token=` / `#auth_error=` |
+| `/` | 品牌首页与登录入口 | 展示“视书”品牌价值；协议同意后跳 `{API}/auth/google/login`；消费回跳 fragment `#id_token=` / `#auth_error=`，保留过期提示与安全站内回跳；不存在独立 `/login` 页面 |
 | `/library` | 教材库 | 搜索/分类/收藏夹过滤、继续阅读横幅、grid/list 视图、目录抽屉、导出弹窗 |
 | `/tasks` | 转换队列 | 快速链接导入、导入面板（来源 tab/开关/模板）、任务状态卡、批量管理、3s 后端状态轮询 |
 | `/profile` | 个人中心 | 资料卡、配额仪表、SVIP 推广、设置行、会员套餐底部弹层 |
 
-未登录访问受保护路由会跳 `/login?redirect=…`；token 存 `localStorage['v2md_token']`，任一 API 返回 401 即清除并跳回登录页。
+未登录访问受保护路由会跳 `/?redirect=…`；token 存 `localStorage['v2md_token']`，任一 API 返回 401 即清除并跳回品牌首页。
 后端 `V2MD_AUTH=off`（仅开发）时无凭据 `GET /me` 返回 200，前端据此进入匿名模式、不要求登录。
 生产由 FastAPI 同源托管本 bundle，前端路由不得与 API 路由重名（`GET /queue` 是 gpu_router 回读口，故队列页用 `/tasks`）；
 `backend/tests/test_api_contract.py::test_spa_routes_serve_index_not_api` 读取 `src/router/index.ts` 校验这一点。

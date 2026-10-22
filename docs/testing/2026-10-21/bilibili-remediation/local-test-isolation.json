@@ -1,0 +1,7 @@
+{
+  "incident": "首轮联合测试提前导入 config，API 契约用例写到了此前已含测试夹具的本地开发 JSON。未操作生产数据。",
+  "snapshot_directory": "/var/folders/1b/7r5v_kjj689_65rpwv0hxg8h0000gn/T/v2md-local-test-data-woozybiw",
+  "resolution": "新测试延迟导入并设置临时存储隔离；最终联合测试114项通过。未尝试猜测或覆盖历史本地夹具。",
+  "exact_preincident_values_restored": false,
+  "production_data_affected": false
+}

@@ -1,0 +1,33 @@
+{
+  "run_id": "628f38fc",
+  "baseline": {
+    "spend_usd": 0.045923,
+    "llm_in_tok": 99365,
+    "llm_out_tok": 66524,
+    "gpu_s": 7065.982,
+    "runs_n": 10
+  },
+  "final": {
+    "spend_usd": 0.067605,
+    "llm_in_tok": 221558,
+    "llm_out_tok": 73231,
+    "gpu_s": 8171.942,
+    "runs_n": 12
+  },
+  "delta": {
+    "spend_usd": "0.021682",
+    "llm_in_tok": "122193",
+    "llm_out_tok": "6707",
+    "gpu_s": "1105.960",
+    "runs_n": "2"
+  },
+  "checks": {
+    "input_delta_matches": true,
+    "output_delta_matches": true,
+    "cost_delta_matches": true,
+    "gpu_delta_matches": true,
+    "task_delta_is_two": true,
+    "no_active_runs": true
+  },
+  "all_passed": true
+}

@@ -1,0 +1,16 @@
+{"run_id":"aef9643a","results":[
+{"id":"pps-001","status":"pass","observed":"Google account chooser returned to the protected library with a valid session"},
+{"id":"pps-002","status":"pass","observed":"the controlled URL was explicitly set in the visible task input before submission"},
+{"id":"pps-003","status":"pass","observed":"41-second 640x360 MP4 downloaded before model execution"},
+{"id":"pps-004","status":"pass","observed":"Colab ASR completed in about 176 seconds with two segments and confidence 0.97"},
+{"id":"pps-005","status":"pass","observed":"Colab OCR completed in about 76 seconds over five frames"},
+{"id":"pps-006","status":"pass","observed":"local CPU clips completed 1 of 1 and were not charged as GPU"},
+{"id":"pps-007","status":"pass","observed":"gpu_s 251.977 reconciles with 176 seconds ASR plus 76 seconds OCR","metrics":{"gpu_s":251.977,"gpu_stage_seconds":[176.0,76.0]}},
+{"id":"pps-008","status":"pass","observed":"router log confirmed the Colab session closed when the queue became idle"},
+{"id":"pps-009","status":"fail","observed":"frame selection and textbook LLM requests returned HTTP 403 channel disabled","metrics":{"model_called":false,"http_status":403}},
+{"id":"pps-010","status":"fail","observed":"LLM input and output tokens are both zero","metrics":{"llm_in_tok":0,"llm_out_tok":0}},
+{"id":"pps-011","status":"fail","observed":"all three production prices are zero","metrics":{"gpu_per_min":0.0,"llm_in_per_mtok":0.0,"llm_out_per_mtok":0.0}},
+{"id":"pps-012","status":"fail","observed":"run cost is zero and cannot be accepted as successful billing","metrics":{"cost_usd":0.0,"monthly_rollup_includes_run":true}},
+{"id":"pps-013","status":"blocked","observed":"LLM failure prevented final textbook generation","metrics":{"markdown_nonempty":false,"reader_loads":false}},
+{"id":"pps-014","status":"pass","observed":"the visible task card reached and displayed conversion failure consistently with the backend"}
+]}

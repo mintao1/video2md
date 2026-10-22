@@ -1,0 +1,163 @@
+{
+  "run_id": "dd586072",
+  "release": "video2md:0.2.0-note-embeds-20261022f",
+  "provider": "OpenCode Go",
+  "provider_export_id": "e4a468f7578d7c3199299c4f84fb7f2e75230775a5aa98db54e7b1648d63c13e",
+  "provider_export_sha256": "e4a468f7578d7c3199299c4f84fb7f2e75230775a5aa98db54e7b1648d63c13e",
+  "account_ref": "90aae05929df",
+  "currency": "USD",
+  "scope": "run-isolated",
+  "settlement_status": "settled",
+  "application_cost_usd": 0.007342,
+  "application_requests": [
+    {
+      "request_id": "01a16002-9014-748d-a832-10ce4184bad2",
+      "input_tokens": 7014,
+      "output_tokens": 1158,
+      "cached_tokens": 0,
+      "outcome": "success",
+      "usage_source": "provider_response",
+      "request_id_correlation": "unique_usage_fingerprint",
+      "task": "llm:organize",
+      "run_id": "dd586072",
+      "account_ref": "90aae05929df",
+      "occurred_at": "2026-10-21T19:49:03.124000+00:00",
+      "occurred_at_source": "matched_supplier_export"
+    },
+    {
+      "request_id": "01a16002-de23-7a37-beb8-e20eb6ad4ae8",
+      "input_tokens": 1159,
+      "output_tokens": 78,
+      "cached_tokens": 0,
+      "outcome": "success",
+      "usage_source": "provider_response",
+      "request_id_correlation": "unique_usage_fingerprint",
+      "task": "llm:metadata",
+      "run_id": "dd586072",
+      "account_ref": "90aae05929df",
+      "occurred_at": "2026-10-21T19:49:23.107000+00:00",
+      "occurred_at_source": "matched_supplier_export"
+    },
+    {
+      "request_id": "01a16002-ef65-79fa-83aa-7021932fb368",
+      "input_tokens": 7164,
+      "output_tokens": 1404,
+      "cached_tokens": 0,
+      "outcome": "success",
+      "usage_source": "provider_response",
+      "request_id_correlation": "unique_usage_fingerprint",
+      "task": "llm:organize",
+      "run_id": "dd586072",
+      "account_ref": "90aae05929df",
+      "occurred_at": "2026-10-21T19:49:27.525000+00:00",
+      "occurred_at_source": "matched_supplier_export"
+    },
+    {
+      "request_id": "01a16003-4b93-7d3d-8f34-5215d487cf65",
+      "input_tokens": 1239,
+      "output_tokens": 87,
+      "cached_tokens": 0,
+      "outcome": "success",
+      "usage_source": "provider_response",
+      "request_id_correlation": "unique_usage_fingerprint",
+      "task": "llm:metadata",
+      "run_id": "dd586072",
+      "account_ref": "90aae05929df",
+      "occurred_at": "2026-10-21T19:49:51.123000+00:00",
+      "occurred_at_source": "matched_supplier_export"
+    },
+    {
+      "input_tokens": 20442,
+      "output_tokens": 852,
+      "cached_tokens": 0,
+      "request_id": "01a15fff-3911-7f41-b1b9-b13490db7fe8",
+      "outcome": "success",
+      "usage_source": "run_total_residual",
+      "request_id_correlation": "sole_unmatched_export_request_and_aggregate_residual",
+      "task": "select_frames",
+      "independent_attempt_span_available": false,
+      "run_id": "dd586072",
+      "account_ref": "90aae05929df",
+      "occurred_at": "2026-10-21T19:45:24.241000+00:00",
+      "occurred_at_source": "matched_supplier_export"
+    }
+  ],
+  "supplier_rows": [
+    {
+      "input_tokens": 1239,
+      "output_tokens": 87,
+      "cached_tokens": 0,
+      "request_id": "01a16003-4b93-7d3d-8f34-5215d487cf65",
+      "run_id": "dd586072",
+      "account_ref": "90aae05929df",
+      "product": "go",
+      "occurred_at": "2026-10-21T19:49:51.123000+00:00",
+      "attribution_usd": 0.00022935
+    },
+    {
+      "input_tokens": 7164,
+      "output_tokens": 1404,
+      "cached_tokens": 0,
+      "request_id": "01a16002-ef65-79fa-83aa-7021932fb368",
+      "run_id": "dd586072",
+      "account_ref": "90aae05929df",
+      "product": "go",
+      "occurred_at": "2026-10-21T19:49:27.525000+00:00",
+      "attribution_usd": 0.0017766
+    },
+    {
+      "input_tokens": 1159,
+      "output_tokens": 78,
+      "cached_tokens": 0,
+      "request_id": "01a16002-de23-7a37-beb8-e20eb6ad4ae8",
+      "run_id": "dd586072",
+      "account_ref": "90aae05929df",
+      "product": "go",
+      "occurred_at": "2026-10-21T19:49:23.107000+00:00",
+      "attribution_usd": 0.00021285
+    },
+    {
+      "input_tokens": 7014,
+      "output_tokens": 1158,
+      "cached_tokens": 0,
+      "request_id": "01a16002-9014-748d-a832-10ce4184bad2",
+      "run_id": "dd586072",
+      "account_ref": "90aae05929df",
+      "product": "go",
+      "occurred_at": "2026-10-21T19:49:03.124000+00:00",
+      "attribution_usd": 0.0016311
+    },
+    {
+      "input_tokens": 20442,
+      "output_tokens": 852,
+      "cached_tokens": 0,
+      "request_id": "01a15fff-3911-7f41-b1b9-b13490db7fe8",
+      "run_id": "dd586072",
+      "account_ref": "90aae05929df",
+      "product": "go",
+      "occurred_at": "2026-10-21T19:45:24.241000+00:00",
+      "attribution_usd": 0.0034923
+    }
+  ],
+  "billing_mode": "subscription_receipt",
+  "amount_source": "provider_export_attribution",
+  "product": "go",
+  "export_truncated": false,
+  "extra_usage_enabled": false,
+  "subscription_invoice": {
+    "invoice_id": "XPIMO8IF-0003",
+    "account_ref": "90aae05929df",
+    "product": "go",
+    "status": "paid",
+    "currency": "CNY",
+    "amount_paid": 67.72,
+    "receipt_date": "2026-10-05",
+    "paid_until": "2026-11-06T01:26:00+08:00",
+    "document_sha256": "e2d14accc09d45f4c7e5858f2deaa8eabcf89cf477e5bcdd57b0848daf6ba15f"
+  },
+  "limitations": [
+    "select_frames has no independent stored attempt span; its usage is the aggregate residual",
+    "request IDs correlate four spans by unique token fingerprint; timestamps come from the matched supplier export",
+    "USD attribution is not a second cash charge; the PDF amount-due text alone is not proof of payment"
+  ]
+}

@@ -1,8 +1,8 @@
-// 队列页 live 实现（签名对齐 mock/impl.ts，index.ts 换源零改上层）。
+// 队列页生产 API 实现。
 // 映射口径：GET /runs 的 total/done_entries → progress；POST /runs 同步 resolve
 // 建 run（RunCreatedOut 无 title/created，用 url 派生 + 当下时间，列表刷新后被服务端标题覆盖）。
 import { request, requestBlob } from '../client'
-import type { RunListItem, RunStatus } from '../../types'
+import type { RunListItem, RunStatus, RunUsage } from '../../types'
 
 interface RunListResp {
   items: {
@@ -14,6 +14,9 @@ interface RunListResp {
     total?: number | null
     done_entries: number
     queue_pos?: number | null
+    usage?: RunUsage | null
+    cost_usd?: number | null
+    diagnostic?: { stage: string; message: string } | null
     artifacts?: { present: boolean } | null
   }[]
   mode: string
@@ -59,6 +62,11 @@ function toItem(i: RunListResp['items'][number], mode: string): RunListItem {
   const done = i.done_entries ?? 0
   return {
     run_id: i.run_id,
+    readable: done > 0,
+    usage: i.usage,
+    cost_usd: i.cost_usd,
+    diagnostic: i.diagnostic,
+    error: i.diagnostic ? { code: i.diagnostic.stage, message: i.diagnostic.message } : undefined,
     url: i.url,
     title: i.title || deriveTitle(i.url),
     status: asStatus(i.status),

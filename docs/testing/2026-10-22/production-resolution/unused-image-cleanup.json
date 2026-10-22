@@ -1,0 +1,33 @@
+{
+  "retained_current_and_previous": true,
+  "all_pod_and_init_refs_checked": true,
+  "tags": [
+    {
+      "tag": "video2md:0.2.0-resume-billing-20261022c",
+      "referenced_by_pod": false,
+      "exit_codes": [
+        1,
+        0
+      ],
+      "verified_absent": true
+    },
+    {
+      "tag": "gpu-router:0.2.3-asr-decoder-20261022c",
+      "referenced_by_pod": false,
+      "exit_codes": [
+        0,
+        0
+      ],
+      "verified_absent": true
+    },
+    {
+      "tag": "gpu-router:0.2.3-ocr-packet-20261022e",
+      "referenced_by_pod": false,
+      "exit_codes": [
+        1,
+        0
+      ],
+      "verified_absent": true
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "image": "video2md:0.2.0-integration-20261021m",
+  "all_release_file_hashes_match": true,
+  "files_count": 27,
+  "manifest_sha256": "0ec68ad20cc988e5634f1f8fcdb3e785063aee12e516ea727ec5717cef7f20c7",
+  "health_status": 200,
+  "anonymous_media_status": 401,
+  "containers": [
+    {
+      "name": "api",
+      "image": "docker.io/library/video2md:0.2.0-integration-20261021m",
+      "imageID": "sha256:f69aba78f611da8b1e1a6a17bc8cb9cc262df27cdf87283efb2a228d185a2fbb",
+      "ready": true,
+      "restartCount": 0
+    }
+  ]
+}

@@ -156,7 +156,7 @@ def evaluate_repository(repo_root: Path) -> list[str]:
     api = (repo_root / "backend/video2md/api.py").read_text(encoding="utf-8")
     providers = (repo_root / "backend/acctkit/providers.py").read_text(encoding="utf-8")
     router = (repo_root / "frontend/web/src/router/index.ts").read_text(encoding="utf-8")
-    login = (repo_root / "frontend/web/src/views/LoginView.vue").read_text(encoding="utf-8")
+    login = (repo_root / "frontend/web/src/views/BrandView.vue").read_text(encoding="utf-8")
 
     require("repo-host-network", "hostNetwork: true" in deployment, "OAuth loopback tunnel requires hostNetwork")
     require(
@@ -204,6 +204,9 @@ def evaluate_repository(repo_root: Path) -> list[str]:
         and 'to="/privacy"' in login,
         "login must expose public terms and privacy routes",
     )
+    require("repo-brand-home", "path: '/'" in router and "BrandView.vue" in router
+            and "path: '/login'" not in router,
+            "the brand home must own sign-in; legacy login route must remain removed")
     return failures
 
 

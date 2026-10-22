@@ -122,5 +122,20 @@ onMounted(load)
       <button v-if="!loaded && !loading" type="button" class="text-primary text-label-md self-start" @click="load">重新加载配置</button>
       <p v-if="message" role="status" class="text-body-sm text-primary">{{ message }}</p>
     </form>
+    <nav aria-label="算力平台登录" class="bg-surface-container-lowest rounded-xl shadow-sm p-space-md flex flex-col gap-space-sm">
+      <p class="text-body-sm text-on-surface-variant">连接你自己的 Colab；Kaggle 登录将在新标签页打开。</p>
+      <div class="grid grid-cols-1 min-[360px]:grid-cols-2 gap-space-sm">
+        <RouterLink to="/profile/colab"
+          class="flex items-center justify-center gap-space-xs rounded-lg bg-primary text-on-primary py-3 px-4 text-label-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
+          登录 Colab
+          <span class="material-symbols-outlined text-[18px]" aria-hidden="true">cloud_sync</span>
+        </RouterLink>
+        <a href="https://www.kaggle.com/account/login" target="_blank" rel="noopener noreferrer"
+          class="flex items-center justify-center gap-space-xs rounded-lg border border-outline-variant text-primary py-3 px-4 text-label-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
+          登录 Kaggle
+          <span class="material-symbols-outlined text-[18px]" aria-hidden="true">open_in_new</span>
+        </a>
+      </div>
+    </nav>
   </section>
 </template>

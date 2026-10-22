@@ -1,0 +1,1 @@
+{"collection_parts": 100, "downloaded": [{"part": 1, "bytes": 3017797, "duration": "78.784649"}, {"part": 2, "bytes": 4486497, "duration": "78.041610"}], "pass": true}

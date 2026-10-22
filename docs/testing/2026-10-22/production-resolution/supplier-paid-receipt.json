@@ -1,0 +1,13 @@
+{
+  "observed_at": "2026-10-21T20:08:06.207Z",
+  "account_ref": "90aae05929df",
+  "invoice_id": "XPIMO8IF-0003",
+  "status": "paid",
+  "currency": "CNY",
+  "amount_paid": 67.72,
+  "receipt_date": "2026-10-05",
+  "product": "go",
+  "pdf_sha256": "e2d14accc09d45f4c7e5858f2deaa8eabcf89cf477e5bcdd57b0848daf6ba15f",
+  "safe_dom": "    - paragraph:\n      - generic: Go renewal\n      - generic: XPIMO8IF-0003\n    - generic: Paid\n    - generic: ·\n    - time: Oct 5, 2026\n    - paragraph: CN¥67.72 CNY\n    - button \"Download invoice XPIMO8IF-0003\":\n    - paragraph:",
+  "pdf_alone_shows_amount_due": true
+}

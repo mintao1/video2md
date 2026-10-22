@@ -1,0 +1,16 @@
+PASS generated worker contains input resolver
+PASS generated GPU worker verifies actual CUDA allocation
+PASS CUDA allocation check for available=False
+PASS CUDA allocation check for available=True
+PASS generated resolver reads input for lesson
+PASS generated resolver reads input for datasets/fixture/lesson
+PASS generated resolver reads input for fixture/lesson
+PASS missing expected dataset rejects another owner
+PASS GPU task explicitly requests supported T4 accelerator
+PASS CPU diagnostic does not request accelerator
+PASS zero-exit CLI push rejection cannot reuse stale kernel output
+PASS ASR worker pins released faster-whisper version
+PASS ASR worker pins compatible PyAV decoder
+FAIL OCR sends flat files plus manifest rather than auto-extracted TAR
+FAIL OCR manifest binds exact filenames and fresh control identifier
+FAIL OCR rejects stale job output

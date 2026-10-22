@@ -1,0 +1,8 @@
+{
+  "passed": false,
+  "provider_source_sha256": "fa967db385c680dcbee7f37be20c911737e613fce0842dd9cbef515b3224075b",
+  "isolated_dataset_and_kernel": true,
+  "error_type": "RuntimeError",
+  "error_summary": "kaggle kernels push 失败: Warning: Your Kaggle API key is readable by other users on this system! To fix this, you can run 'chmod 600 /home/router/.kaggle/kaggle.json'\n409 Client Error: Conflict for url: https://api.kaggle.com/v1/kernels.KernelsApiService/SaveKernel\n",
+  "elapsed_s": 39.509
+}

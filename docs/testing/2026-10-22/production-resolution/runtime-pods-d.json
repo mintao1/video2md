@@ -1,0 +1,44 @@
+{
+  "video2md": {
+    "desired_images": [
+      "video2md:0.2.0-ocr-guard-20261022d"
+    ],
+    "ready_replicas": 1,
+    "pods": [
+      {
+        "name": "video2md-api-788cd75b7f-cvxm2",
+        "phase": "Running",
+        "containers": [
+          {
+            "name": "api",
+            "image": "docker.io/library/video2md:0.2.0-ocr-guard-20261022d",
+            "imageID": "sha256:9c8ef4226d913a3a2fdd9ddb93a2d6f32af1c9b231647c307b8cbd24dbba5bec",
+            "ready": true,
+            "restartCount": 0
+          }
+        ]
+      }
+    ]
+  },
+  "gpu-router": {
+    "desired_images": [
+      "gpu-router:0.2.3-ocr-input-20261022d"
+    ],
+    "ready_replicas": 1,
+    "pods": [
+      {
+        "name": "gpu-router-68b95dbfbc-d4cdc",
+        "phase": "Running",
+        "containers": [
+          {
+            "name": "router",
+            "image": "docker.io/library/gpu-router:0.2.3-ocr-input-20261022d",
+            "imageID": "sha256:30b2853e1d41fd8dff307b2bec66737137c8b4a99ea39146129c32a1e6027046",
+            "ready": true,
+            "restartCount": 0
+          }
+        ]
+      }
+    ]
+  }
+}

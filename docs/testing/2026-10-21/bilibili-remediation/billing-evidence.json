@@ -1,0 +1,75 @@
+{
+  "kind": "production",
+  "authentication": {
+    "logout_observed": true,
+    "oauth_login_succeeded": true,
+    "evidence": "../bilibili-collection-production/evidence.json，沿用同一连续会话；本轮登录过期后同账户重新认证两次。"
+  },
+  "source_resolution": {
+    "provider": "bilibili",
+    "resolved": true,
+    "parts_total": 100,
+    "selected_parts": [
+      1,
+      2
+    ]
+  },
+  "submission": {
+    "feedback_visible": true,
+    "run_id": "be188f78",
+    "submit_log_present": true,
+    "url_entered_explicitly": true,
+    "url": "https://www.bilibili.com/video/BV1vV411k7GB/",
+    "task_count_before": 6,
+    "task_count_after": 7
+  },
+  "execution": {
+    "status": "done",
+    "running_stage_observed": true,
+    "model_called": true,
+    "model_inference_succeeded": true,
+    "run_id_visible": true,
+    "model": "glm-5.3-flash",
+    "successful_logged_model_calls": 4,
+    "observed_models": [
+      "glm-5.3-flash"
+    ],
+    "evidence": "production-final.json 中 span_log 记录真实模型成功回包及用量；聚合用量还包含选帧阶段。"
+  },
+  "billing": {
+    "usage": {
+      "gpu_s": 1276.45,
+      "llm_in_tok": 15939,
+      "llm_out_tok": 15841
+    },
+    "cost_usd": 0.010311,
+    "monthly_rollup_includes_run": true,
+    "usage_visible": true,
+    "cost_visible": true,
+    "prices": {
+      "gpu_min": 0.0,
+      "currency": "USD",
+      "gpu_policy": "free",
+      "llm_in_mtok": 0.15,
+      "llm_out_mtok": 0.5,
+      "llm_cached_in_mtok": 0.03
+    },
+    "gpu_policy": "free",
+    "gpu_free_reason": "本次Colab GPU按生产配置免费计价；记录远程阶段耗时，不宣称硬件忙碌时间。",
+    "scope": "应用内按配置单价归因，非供应商现金扣款核验"
+  },
+  "artifact": {
+    "book_visible": true,
+    "markdown_nonempty": true,
+    "book_count_delta": 1,
+    "notes_count": 2
+  },
+  "references": [
+    "production-completed.txt",
+    "library-final.txt",
+    "progress-15.json",
+    "billing-reconciliation.json",
+    "production-final-url-entered.png",
+    "billing-final.txt"
+  ]
+}
