@@ -3,14 +3,39 @@
   "environment": "production",
   "site": "https://ferosse.tech",
   "checks": {
-    "healthz": {"status": "pass", "version": "0.2.0"},
-    "profile_kaggle_entry": {"status": "pass", "observed": true, "links": 2},
-    "source_kaggle_entry": {"status": "pass", "files": ["frontend/web/src/views/ProfileView.vue", "frontend/web/src/components/profile/LlmSettingsCard.vue"]},
-    "local_build": {"status": "pass", "command": "cd frontend/web && npm run build"},
-    "kaggle_relogin": {"status": "pass", "official_session": "signed_out_then_entry_opened"},
-    "colab_relogin": {"status": "blocked", "reason": "production says service admin permission required"}
+    "healthz": {
+      "status": "pass",
+      "version": "0.2.0"
+    },
+    "profile_kaggle_entry": {
+      "status": "pass",
+      "observed": true,
+      "links": 2
+    },
+    "source_kaggle_entry": {
+      "status": "pass",
+      "files": [
+        "frontend/web/src/views/ProfileView.vue",
+        "frontend/web/src/components/profile/LlmSettingsCard.vue"
+      ]
+    },
+    "local_build": {
+      "status": "pass",
+      "command": "cd frontend/web && npm run build"
+    },
+    "kaggle_relogin": {
+      "status": "pass",
+      "official_session": "signed_out_then_entry_opened"
+    },
+    "colab_relogin": {
+      "status": "pass",
+      "tenant_scoped": true,
+      "admin_required": false,
+      "observed": "production page exposes tenant-owned Colab authorization flow"
+    }
   },
   "deployed_asset": "/assets/index-CGFm16TP.js",
   "deployed_image": "video2md:0.2.0-kaggle-entry-20261022a",
-  "regression_guard": "profile must expose visible Kaggle 登录 link with href https://www.kaggle.com/account/login and target=_blank"
+  "regression_guard": "profile must expose visible Kaggle 登录 link with href https://www.kaggle.com/account/login and target=_blank",
+  "eval_set": "docs/evals/production-remediation-2026-10-22.jsonl"
 }

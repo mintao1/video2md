@@ -14,7 +14,7 @@
 | 本地源码 | 通过，`ProfileView.vue` 与 `LlmSettingsCard.vue` 均包含 Kaggle 登录链接 |
 | 本地构建 | 通过，`cd frontend/web && npm run build`，`vue-tsc` 和 Vite 均成功；本地 bundle 生成 `ProfileView-Dl9Dr1PM.js` 与 `index-CGFm16TP.js` |
 | Kaggle 会话 | 通过退出旧会话；生产入口可见并可打开官方登录页 |
-| Colab 入口 | 可见但授权被生产后端判定为“需要服务管理员权限” |
+| Colab 入口 | 修复后通过，按租户显示“连接我的 Google Colab”，不要求服务管理员权限 |
 
 ## 影响
 
@@ -35,3 +35,5 @@
 - 生产镜像 `video2md:0.2.0-kaggle-entry-20261022a` 已构建并导入节点。
 - `video2md-api` 已滚动更新，Pod `video2md-api-f4d9fdb86-jbdk5` 就绪。
 - `/healthz` 返回 `ok=true`；真实浏览器重新登录后，`/profile` 显示 Kaggle 入口，LLM URL/模型配置仍持久化。
+- Colab 后端已更新为按租户身份授权；真实生产页面显示“尚未连接我的 Colab”与“连接我的 Google Colab”，不再显示管理员权限阻塞。
+- 四项联调结果均登记在 `docs/evals/production-remediation-2026-10-22.jsonl`，其中 Colab 租户授权评测 `pr-20261022-002` 已通过。
