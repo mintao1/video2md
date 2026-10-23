@@ -38,7 +38,7 @@ const router = createRouter({
 
 router.beforeEach(async (to) => {
   if (to.name === 'terms' || to.name === 'privacy') return true
-  const signedIn = Boolean(getToken()) || await hasAnonymousSession()
+  const signedIn = Boolean(getToken()) || (await hasAnonymousSession())
   if (to.name === 'brand') {
     // The brand page owns sign-in and consumes the Google callback fragment.
     if (/(^|[#&])(id_token|auth_error)=/.test(to.hash)) return true

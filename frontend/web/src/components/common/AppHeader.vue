@@ -26,9 +26,7 @@ const avatarStyle = computed(() => {
 </script>
 
 <template>
-  <header
-    class="fixed top-0 inset-x-0 z-40 pt-safe bg-surface/85 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.04)]"
-  >
+  <header class="fixed top-0 inset-x-0 z-40 pt-safe bg-surface/85 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.04)]">
     <div class="h-16 px-margin flex items-center justify-between max-w-[430px] mx-auto">
       <div class="flex items-center gap-space-sm">
         <LogoMark class="h-8 w-8" />

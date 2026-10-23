@@ -8,7 +8,9 @@ before(async () => {
   vite = await createServer({ configFile: false, server: { middlewareMode: true } })
   reader = await vite.ssrLoadModule('/src/reader.ts')
 })
-after(async () => { await vite?.close() })
+after(async () => {
+  await vite?.close()
+})
 
 it('keeps invalid and fractional chapter parameters inside the note array', () => {
   for (const query of ['1.5', 'NaN', 'Infinity', '-1', ['2'], undefined]) {
@@ -22,18 +24,23 @@ it('keeps invalid and fractional chapter parameters inside the note array', () =
 it('renders Obsidian image and video references as actual media elements', () => {
   const md = '---\ntitle: Test\n---\n![[attachments/frame.jpg]]\n\n![[attachments/clip.mp4]]'
   assert.deepEqual(reader.mediaNames(md), ['frame.jpg', 'clip.mp4'])
-  const html = marked.parse(reader.mediaMarkdown(md, {
-    'frame.jpg': 'blob:frame', 'clip.mp4': 'blob:clip',
-  }))
+  const html = marked.parse(
+    reader.mediaMarkdown(md, {
+      'frame.jpg': 'blob:frame',
+      'clip.mp4': 'blob:clip',
+    }),
+  )
   assert.match(html, /<img src="blob:frame"/)
   assert.match(html, /<video src="blob:clip" controls/)
   assert.doesNotMatch(html, /!\[\[|title: Test/)
 })
 
 it('escapes unavailable media names and refuses arbitrary external URLs', () => {
-  const html = marked.parse(reader.mediaMarkdown('![[attachments/a" onerror="evil.jpg]]', {
-    'a" onerror="evil.jpg': 'https://attacker.test/tracker.jpg',
-  }))
+  const html = marked.parse(
+    reader.mediaMarkdown('![[attachments/a" onerror="evil.jpg]]', {
+      'a" onerror="evil.jpg': 'https://attacker.test/tracker.jpg',
+    }),
+  )
   assert.doesNotMatch(html, /<img|<video|attacker\.test/)
   assert.match(html, /&quot;/)
 })
@@ -43,12 +50,17 @@ it('shows a ready image while a slower clip is still loading, then reports a fai
   const pending = new Set(reader.mediaNames(md))
   const urls = {}
   const requests = {}
-  const stop = reader.startMediaLoad([...pending], name => new Promise((resolve, reject) => {
-    requests[name] = { resolve, reject }
-  }), (name, url) => {
-    if (url) urls[name] = url
-    pending.delete(name)
-  })
+  const stop = reader.startMediaLoad(
+    [...pending],
+    (name) =>
+      new Promise((resolve, reject) => {
+        requests[name] = { resolve, reject }
+      }),
+    (name, url) => {
+      if (url) urls[name] = url
+      pending.delete(name)
+    },
+  )
   const html = () => reader.mediaMarkdown(md, urls, [...pending])
   assert.doesNotMatch(html(), /暂不可用/)
   assert.match(html(), /role="status">媒体加载中：frame.jpg/)
@@ -68,9 +80,16 @@ it('shows a ready image while a slower clip is still loading, then reports a fai
 it('releases loaded URLs and ignores late media after leaving a chapter', async () => {
   let resolveLate
   const results = []
-  const stop = reader.startMediaLoad(['frame.jpg', 'late.mp4'], name => name === 'frame.jpg'
-    ? Promise.resolve(new Blob(['image']))
-    : new Promise(resolve => { resolveLate = resolve }), (name, url) => results.push([name, url]))
+  const stop = reader.startMediaLoad(
+    ['frame.jpg', 'late.mp4'],
+    (name) =>
+      name === 'frame.jpg'
+        ? Promise.resolve(new Blob(['image']))
+        : new Promise((resolve) => {
+            resolveLate = resolve
+          }),
+    (name, url) => results.push([name, url]),
+  )
   await Promise.resolve()
   await Promise.resolve()
   assert.equal(results.length, 1)
@@ -84,13 +103,18 @@ it('releases loaded URLs and ignores late media after leaving a chapter', async 
 })
 
 it('retries a broken media transfer once without retrying HTTP rejections', async () => {
-  const calls = {}, results = []
-  const stop = reader.startMediaLoad(['transient.jpg', 'offline.mp4', 'forbidden.jpg'], async name => {
-    calls[name] = (calls[name] || 0) + 1
-    if (name === 'forbidden.jpg') throw new Error('HTTP_403')
-    if (name === 'offline.mp4' || calls[name] === 1) throw new TypeError('Failed to fetch')
-    return new Blob(['image'])
-  }, (name, url) => results.push([name, url]))
+  const calls = {},
+    results = []
+  const stop = reader.startMediaLoad(
+    ['transient.jpg', 'offline.mp4', 'forbidden.jpg'],
+    async (name) => {
+      calls[name] = (calls[name] || 0) + 1
+      if (name === 'forbidden.jpg') throw new Error('HTTP_403')
+      if (name === 'offline.mp4' || calls[name] === 1) throw new TypeError('Failed to fetch')
+      return new Blob(['image'])
+    },
+    (name, url) => results.push([name, url]),
+  )
   for (let i = 0; i < 8; i++) await Promise.resolve()
   assert.deepEqual(calls, { 'transient.jpg': 2, 'offline.mp4': 2, 'forbidden.jpg': 1 })
   assert.equal(results.length, 3)

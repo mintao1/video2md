@@ -10,23 +10,31 @@ export function chapterIndex(chapter: unknown, total: number, progress = 0): num
 const EMBED = /!\[\[attachments\/([^\]\n\\/|]+)(?:\|[^\]]*)?\]\]/g
 
 export function mediaNames(md: string): string[] {
-  return [...new Set([...md.matchAll(EMBED)].map((m) => m[1]!))]
-    .filter((name) => /\.(jpe?g|png|webp|mp4)$/i.test(name))
+  return [...new Set([...md.matchAll(EMBED)].map((m) => m[1]!))].filter((name) => /\.(jpe?g|png|webp|mp4)$/i.test(name))
 }
 
 function escape(value: string): string {
-  return value.replace(/[&<>"']/g, (c) => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
-  })[c]!)
+  return value.replace(
+    /[&<>"']/g,
+    (c) =>
+      ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;',
+      })[c]!,
+  )
 }
 
 /** URLs come exclusively from authenticated fetches, never from note text. */
 export function mediaMarkdown(md: string, urls: Record<string, string>, pending: readonly string[] = []): string {
   return md.replace(/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/, '').replace(EMBED, (_match, name: string) => {
     const url = urls[name]
-    if (!url?.startsWith('blob:')) return pending.includes(name)
-      ? `<span role="status">媒体加载中：${escape(name)}</span>`
-      : `<span>媒体暂不可用：${escape(name)}</span>`
+    if (!url?.startsWith('blob:'))
+      return pending.includes(name)
+        ? `<span role="status">媒体加载中：${escape(name)}</span>`
+        : `<span>媒体暂不可用：${escape(name)}</span>`
     const src = escape(url)
     return /\.mp4$/i.test(name)
       ? `<video src="${src}" controls preload="metadata" data-v2md-media="${escape(name)}" aria-label="${escape(name)}"></video>`
@@ -43,8 +51,9 @@ export function startMediaLoad(
   let stopped = false
   const urls: string[] = []
   const fetchAttachment = async (name: string) => {
-    try { return await fetchMedia(name) }
-    catch (error) {
+    try {
+      return await fetchMedia(name)
+    } catch (error) {
       // Fetch/body transport failures are TypeError. Retry the read once; HTTP
       // authorization/not-found errors must retain their original semantics.
       if (stopped || !(error instanceof TypeError)) throw error
@@ -52,14 +61,17 @@ export function startMediaLoad(
     }
   }
   for (const name of names) {
-    void fetchAttachment(name).then((blob) => {
-      if (stopped) return
-      const url = URL.createObjectURL(blob)
-      urls.push(url)
-      onResult(name, url)
-    }, () => {
-      if (!stopped) onResult(name, null)
-    })
+    void fetchAttachment(name).then(
+      (blob) => {
+        if (stopped) return
+        const url = URL.createObjectURL(blob)
+        urls.push(url)
+        onResult(name, url)
+      },
+      () => {
+        if (!stopped) onResult(name, null)
+      },
+    )
   }
   return () => {
     stopped = true

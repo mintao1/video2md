@@ -13,21 +13,15 @@ import BookCard from '../components/book/BookCard.vue'
 import BookGridItem from '../components/book/BookGridItem.vue'
 import ContinueReadingBanner from '../components/book/ContinueReadingBanner.vue'
 import TocSheet from '../components/book/TocSheet.vue'
-import ExportFormatModal from '../components/book/ExportFormatModal.vue'
+import { saveBundle } from '../download'
 
 const lib = useLibraryStore()
 const toast = useToastStore()
 const router = useRouter()
 
 const tocOpen = ref(false)
-const exportOpen = ref(false)
 const activeBook = ref<Book | null>(null)
 const tocChapters = ref<TocChapter[]>([])
-const syncedLabel = computed(() => {
-  const at = lib.loadedAt
-  if (!at) return '尚未同步'
-  return `上次同步于 ${at.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}`
-})
 
 const chips = computed(() => [
   { key: 'all', label: '全部教材', icon: 'auto_stories', count: lib.books.length },
@@ -52,23 +46,17 @@ async function openToc(book: Book) {
   tocOpen.value = true
 }
 
-function openExport(book: Book) {
-  activeBook.value = book
-  exportOpen.value = true
+async function onDownload(book: Book) {
+  try {
+    await saveBundle(book.id)
+    toast.show('下载已开始')
+  } catch (error) {
+    toast.show(error instanceof Error ? error.message : '下载失败，请稍后重试')
+  }
 }
-
 function onRead(book: Book) {
   // 进阅读器：起始讲由阅读器按 prefs 进度反推（0 → 第 1 讲）
   void router.push({ name: 'read', params: { id: book.id } })
-}
-
-function onShare(book: Book) {
-  void book
-  toast.show('已复制教材分享链接到剪贴板！')
-}
-
-function onExport(format: string) {
-  toast.show(`正在封装并打包生成 ${format} 格式教材文件...`)
 }
 
 function onOpenChapter(ch: TocChapter) {
@@ -172,8 +160,7 @@ function onClearSearch() {
             @toggle-fav="(id) => lib.toggleFav(id)"
             @read="onRead"
             @toc="openToc"
-            @export="openExport"
-            @share="onShare"
+            @download="onDownload"
           />
         </template>
         <template v-else>
@@ -194,26 +181,6 @@ function onClearSearch() {
           @action="lib.resetFilters()"
         />
       </section>
-
-      <!-- 同步状态条 -->
-      <section class="px-margin pt-space-lg pb-space-md">
-        <div class="flex items-center justify-between p-space-sm px-space-md rounded-xl bg-surface-container-low">
-          <div class="flex items-center gap-2">
-            <span class="material-symbols-outlined text-primary text-[20px]">cloud_sync</span>
-            <div class="flex flex-col">
-              <span class="font-label-md text-label-md text-on-surface">全端书籍与笔记自动同步已开启</span>
-              <span class="font-label-sm text-label-sm text-outline">{{ syncedLabel }}</span>
-            </div>
-          </div>
-          <button
-            class="text-primary font-label-md text-label-md flex items-center gap-0.5 active:scale-95 transition-transform"
-            @click="toast.show('已完成云端同步：所有教材与高亮标记已是最新！')"
-          >
-            <span>立即同步</span>
-            <span class="material-symbols-outlined text-[16px]">sync</span>
-          </button>
-        </div>
-      </section>
     </main>
 
     <TocSheet
@@ -221,11 +188,6 @@ function onClearSearch() {
       :book-title="activeBook?.title ?? ''"
       :chapters="tocChapters"
       @open-chapter="onOpenChapter"
-    />
-    <ExportFormatModal
-      v-model="exportOpen"
-      :book-title="activeBook?.title ?? ''"
-      @export="onExport"
     />
 
     <BottomNav />

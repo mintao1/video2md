@@ -156,7 +156,7 @@ jobs:
 
   web-integration:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
@@ -172,6 +172,10 @@ jobs:
           cache-dependency-path: frontend/web/package-lock.json
       - run: npm ci
         working-directory: frontend/web
+      - run: npm run lint
+        working-directory: frontend/web
+      - run: npm run format:check
+        working-directory: frontend/web
       - run: npm run build
         working-directory: frontend/web
       - name: Production platform entry bundle gate
@@ -180,6 +184,16 @@ jobs:
         working-directory: frontend/web
       - run: npm run test:regression
         working-directory: frontend/web
+      - run: npx playwright install --with-deps chromium
+        working-directory: frontend/web
+      - run: npm run test:e2e
+        working-directory: frontend/web
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: frontend/web/playwright-report
+          retention-days: 7
 
   # 生产镜像构建路径验证（此前只在服务器上验证过）
   # 2026-10-08：GHCR 灾备副本与 artifact 制品通道已终止（平台仓 ADR-0023 / HC-02）。

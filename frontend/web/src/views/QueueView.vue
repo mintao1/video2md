@@ -22,12 +22,12 @@ const quickUrl = ref('')
 const submitting = ref(false)
 const quickError = ref('')
 const importError = ref('')
-watch(importOpen, (open) => { if (open) importError.value = '' })
+watch(importOpen, (open) => {
+  if (open) importError.value = ''
+})
 
 function submissionMessage(error: unknown): string {
-  return error instanceof Error && error.message
-    ? `提交失败：${error.message}`
-    : '提交失败，请稍后重试'
+  return error instanceof Error && error.message ? `提交失败：${error.message}` : '提交失败，请稍后重试'
 }
 
 function openImportFromRoute(): void {
@@ -110,7 +110,9 @@ function setFilter(key: string) {
     <main class="flex flex-col relative w-full pt-16 pb-nav bg-surface min-h-screen">
       <div class="px-margin pt-space-md pb-space-lg flex flex-col gap-space-lg">
         <!-- 快速导入条 -->
-        <div class="bg-surface-container-lowest rounded-xl p-space-md shadow-md border border-outline-variant/30 flex flex-col gap-space-sm">
+        <div
+          class="bg-surface-container-lowest rounded-xl p-space-md shadow-md border border-outline-variant/30 flex flex-col gap-space-sm"
+        >
           <div
             class="flex items-center gap-space-xs bg-surface-container-low rounded-lg p-1.5 border border-outline-variant/40 focus-within:border-primary transition-colors shadow-sm"
           >
@@ -149,8 +151,8 @@ function setFilter(key: string) {
               class="px-2.5 py-1 rounded-md bg-surface-container text-on-surface-variant hover:text-on-surface font-label-sm text-[12px] font-semibold flex items-center gap-1 border border-outline-variant/30 active:scale-95 transition-transform shrink-0"
               @click="importOpen = true"
             >
-              <span class="material-symbols-outlined text-[15px] text-primary">upload_file</span>
-              <span>更多导入方式</span>
+              <span class="material-symbols-outlined text-[15px] text-primary">video_settings</span>
+              <span>打开导入面板</span>
             </button>
           </div>
         </div>
@@ -211,7 +213,7 @@ function setFilter(key: string) {
       </div>
     </main>
 
-    <ImportModal v-model="importOpen" :error="importError" :busy="submitting" @start="startConvert" @draft="toast.show('草稿已保存（mock）')" />
+    <ImportModal v-model="importOpen" :error="importError" :busy="submitting" @start="startConvert" />
     <BottomNav />
   </div>
 </template>

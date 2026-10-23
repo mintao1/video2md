@@ -57,9 +57,7 @@ function stateIcon(state: TocChapter['state']) {
           <span
             class="w-6 h-6 shrink-0 rounded-full font-label-sm text-label-sm flex items-center justify-center font-bold"
             :class="
-              selected === ch.no
-                ? 'bg-primary text-on-primary'
-                : 'bg-surface-container-highest text-on-surface-variant'
+              selected === ch.no ? 'bg-primary text-on-primary' : 'bg-surface-container-highest text-on-surface-variant'
             "
           >
             {{ ch.no }}
@@ -89,8 +87,12 @@ function stateIcon(state: TocChapter['state']) {
       <button
         class="w-full py-2.5 rounded-lg bg-primary text-on-primary font-title-sm text-title-sm flex items-center justify-center gap-1 shadow-sm active:scale-95 transition-transform"
         @click="
-          selected !== null && emit('openChapter', chapters.find((c) => c.no === selected)!),
-            emit('update:modelValue', false)
+          (selected !== null &&
+            emit(
+              'openChapter',
+              chapters.find((c) => c.no === selected)!,
+            ),
+          emit('update:modelValue', false))
         "
       >
         <span>定位并打开所选章节</span>

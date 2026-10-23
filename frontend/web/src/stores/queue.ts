@@ -29,12 +29,16 @@ export const useQueueStore = defineStore('queue', () => {
 
   /** BottomNav 角标 = 进行中（running/paused + queued） */
   const activeCount = computed(
-    () => runs.value.filter((r) => r.status === 'running' || r.status === 'queued' || r.status === 'paused' || r.status === 'cancelling').length,
+    () =>
+      runs.value.filter(
+        (r) => r.status === 'running' || r.status === 'queued' || r.status === 'paused' || r.status === 'cancelling',
+      ).length,
   )
 
   const counts = computed(() => ({
     all: runs.value.length,
-    active: runs.value.filter((r) => r.status === 'running' || r.status === 'paused' || r.status === 'cancelling').length,
+    active: runs.value.filter((r) => r.status === 'running' || r.status === 'paused' || r.status === 'cancelling')
+      .length,
     queued: runs.value.filter((r) => r.status === 'queued').length,
     done: runs.value.filter((r) => (r.status === 'done' || r.status === 'partial') && r.readable).length,
     error: runs.value.filter((r) => r.status === 'error' || (r.status === 'partial' && !r.readable)).length,

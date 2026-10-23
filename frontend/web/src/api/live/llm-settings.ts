@@ -11,11 +11,7 @@ export function getLlmSettings(): Promise<LlmSettings> {
   return request('/settings/llm')
 }
 
-export function saveLlmSettings(body: {
-  base_url: string
-  api_key?: string
-  model: string
-}): Promise<LlmSettings> {
+export function saveLlmSettings(body: { base_url: string; api_key?: string; model: string }): Promise<LlmSettings> {
   return request('/settings/llm', { method: 'PUT', body: JSON.stringify(body) })
 }
 

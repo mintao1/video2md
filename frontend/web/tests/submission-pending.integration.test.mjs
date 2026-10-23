@@ -11,10 +11,16 @@ import vue from '@vitejs/plugin-vue'
 let vite, Queue, ImportModal, useQueueStore
 const originalStorage = Object.getOwnPropertyDescriptor(globalThis, 'localStorage')
 before(async () => {
-  Object.defineProperty(globalThis, 'localStorage', { configurable: true,
-    value: { getItem: () => null, setItem() {}, removeItem() {} } })
-  vite = await createServer({ root: fileURLToPath(new URL('..', import.meta.url)),
-    configFile: false, plugins: [vue()], server: { middlewareMode: true } })
+  Object.defineProperty(globalThis, 'localStorage', {
+    configurable: true,
+    value: { getItem: () => null, setItem() {}, removeItem() {} },
+  })
+  vite = await createServer({
+    root: fileURLToPath(new URL('..', import.meta.url)),
+    configFile: false,
+    plugins: [vue()],
+    server: { middlewareMode: true },
+  })
   Queue = (await vite.ssrLoadModule('/src/views/QueueView.vue')).default
   ImportModal = (await vite.ssrLoadModule('/src/components/queue/ImportModal.vue')).default
   ;({ useQueueStore } = await vite.ssrLoadModule('/src/stores/queue.ts'))
@@ -27,17 +33,31 @@ after(async () => {
 
 test('an unresolved submission visibly waits, blocks duplicates, then restores the input on failure', async () => {
   const pinia = createPinia()
-  const router = createRouter({ history: createMemoryHistory(), routes:
-    ['/tasks', '/profile', '/library'].map(path => ({ path, component: Queue })) })
+  const router = createRouter({
+    history: createMemoryHistory(),
+    routes: ['/tasks', '/profile', '/library'].map((path) => ({ path, component: Queue })),
+  })
   await router.push('/tasks')
   await router.isReady()
   let state
-  const capture = { ...Queue, setup(props, context) { state = Queue.setup(props, context); return state } }
+  const capture = {
+    ...Queue,
+    setup(props, context) {
+      state = Queue.setup(props, context)
+      return state
+    },
+  }
   const app = (component) => createSSRApp(component).use(pinia).use(router)
   await renderToString(app(capture))
   const store = useQueueStore(pinia)
-  let reject, calls = 0
-  store.createRun = () => { calls++; return new Promise((_, fail) => { reject = fail }) }
+  let reject,
+    calls = 0
+  store.createRun = () => {
+    calls++
+    return new Promise((_, fail) => {
+      reject = fail
+    })
+  }
   state.quickUrl.value = 'https://www.bilibili.com/video/BV1vV411k7GB/'
   const request = state.quickSubmit()
   await state.quickSubmit()

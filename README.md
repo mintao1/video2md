@@ -6,6 +6,14 @@ video2md 从视频链接或本地文件开始，完成解析、下载、转写�
 
 [![CI](https://github.com/mintao1/video2md/actions/workflows/ci.yml/badge.svg)](https://github.com/mintao1/video2md/actions/workflows/ci.yml)
 
+## 📱 界面
+
+| 品牌首页 | 教材库 | 转换队列 | 阅读器 | 我的 |
+| --- | --- | --- | --- | --- |
+| ![品牌首页](docs/screenshots/brand.png) | ![教材库](docs/screenshots/library.png) | ![转换队列](docs/screenshots/tasks.png) | ![阅读器](docs/screenshots/reader.png) | ![我的](docs/screenshots/profile.png) |
+
+截图由 `cd frontend/web && npm run screenshots` 在真实 API 测试夹具上生成。
+
 ## 🌟 功能
 
 | 能力 | 说明 |
@@ -125,7 +133,7 @@ V2MD_COLAB_SESSION=v2md-whisper
 
 ```text
 video2md/
-├── frontend/web/       Vue Web 前端、页面和集成测试
+├── frontend/web/       Vue Web 前端、页面、集成测试与 Playwright E2E
 ├── backend/video2md/   FastAPI、LangGraph 管线、存储和任务状态
 ├── backend/acctkit/    可复用的账号鉴权模块
 ├── backend/gpu_plugins/    算力池 provider 与参考实现
@@ -147,15 +155,20 @@ cd ..
 bash scripts/smoke_ci.sh
 ```
 
-前端构建和集成测试：
+前端检查（集成测试与 E2E 需要先完成后端 `uv sync --frozen`）：
 
 ```bash
 cd frontend/web
+npm ci
+npm run lint && npm run format:check
 npm run build
 npm run test:integration
+npm run test:regression
+npm run test:e2e
 ```
 
-CI 在 push 和 pull request 中运行后端测试、lint、进程级冒烟测试及 Docker 构建。
+CI 在 push 和 pull request 中运行后端测试与 lint、前端 lint/格式/构建/集成/防回退/Playwright E2E、进程级冒烟测试及 Docker 构建。
+前端质量评测集见 [docs/evals/frontend-quality-eval-set.jsonl](docs/evals/frontend-quality-eval-set.jsonl)。
 
 ## 📖 相关文档
 

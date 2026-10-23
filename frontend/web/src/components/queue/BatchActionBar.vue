@@ -5,8 +5,12 @@ import { useQueueStore } from '../../stores/queue'
 const queue = useQueueStore()
 const toast = useToastStore()
 async function remove() {
-  try { await queue.removeSelected(); toast.show('任务记录已删除') }
-  catch (error) { toast.show(error instanceof Error ? error.message : '删除失败，请稍后重试') }
+  try {
+    await queue.removeSelected()
+    toast.show('任务记录已删除')
+  } catch (error) {
+    toast.show(error instanceof Error ? error.message : '删除失败，请稍后重试')
+  }
 }
 </script>
 
@@ -15,7 +19,9 @@ async function remove() {
     class="bg-surface-container-high rounded-xl p-space-md border border-outline-variant/30 shadow-md flex items-center justify-between transition-all"
   >
     <div class="flex items-center gap-space-sm">
-      <div class="flex items-center gap-1 bg-primary text-on-primary px-2 py-0.5 rounded-full font-label-sm text-[11px] font-semibold">
+      <div
+        class="flex items-center gap-1 bg-primary text-on-primary px-2 py-0.5 rounded-full font-label-sm text-[11px] font-semibold"
+      >
         <span class="material-symbols-outlined text-[14px]">done_all</span>
         <span>已选 {{ queue.selected.size }} 项</span>
       </div>
@@ -35,11 +41,7 @@ async function remove() {
     </div>
     <button
       class="flex items-center gap-1 px-space-md py-1.5 rounded-lg font-label-md text-label-md font-semibold shadow-sm active:scale-95 transition-transform"
-      :class="
-        queue.selected.size > 0
-          ? 'bg-error text-on-error'
-          : 'bg-error/30 text-on-error/50 cursor-not-allowed'
-      "
+      :class="queue.selected.size > 0 ? 'bg-error text-on-error' : 'bg-error/30 text-on-error/50 cursor-not-allowed'"
       :disabled="queue.selected.size === 0"
       @click="remove()"
     >

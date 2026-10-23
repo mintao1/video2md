@@ -98,6 +98,14 @@
 | 生命周期 | 永久（vault 归用户） | TTL（默认 24h）到期惰性焚 + 周期 sweep + 启动兜底；**ACK 即焚不等 TTL** |
 | 幂等跳过 | 同 URL 处理过即跳 | 仅当**同 owner 且源产物还在架**才跳（否则老实重烧——产物在别人手里，跳过=给个拿不到东西的空条目）；命中时响应条目带 `from_run` |
 
+## 用户 LLM 配置（`/settings/llm`，自前端 README 迁入）
+
+鉴权的 `GET/PUT/DELETE /settings/llm`。JSON 档写入 `V2MD_PREFS_FILE` 同目录的
+`llm-settings.json`（0600，可用 `V2MD_LLM_SETTINGS_FILE` 覆盖）；`V2MD_PREFS_STORE=postgres`
+时写入独立的 `v2md_llm_settings` 表。升级 PG 部署前运行
+`uv run --project backend python -m video2md migrate`，然后重启后端。
+凭据为服务端可读取的配置数据，应按服务端机密文件/数据库管理，不包含在 run 记录与图 checkpoint 中。
+
 ## 匿名面清单（安全敏感，与 05 篇联动）
 
 | 端点 | 暴露内容 | 现状防线 | ROADMAP |
