@@ -64,10 +64,11 @@ export class ApiRequestError extends Error {
 
 async function response(path: string, init: RequestInit = {}): Promise<Response> {
   const token = getToken()
+  const isFormData = typeof FormData !== 'undefined' && init.body instanceof FormData
   const res = await fetch(`${BASE_URL}${path}`, {
     ...init,
     headers: {
-      'Content-Type': 'application/json',
+      ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...init.headers,
     },
