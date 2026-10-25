@@ -30,6 +30,17 @@ it('renders Obsidian image and video references as actual media elements', () =>
   assert.doesNotMatch(html, /!\[\[|title: Test/)
 })
 
+it('extracts Obsidian callouts into stable typed blocks without losing body markdown', () => {
+  const result = reader.extractCallouts('> [!info] 视频信息\n> - 来源：测试\n\n> [!tip]- 章节导航\n> - [00:00] 开始')
+  assert.equal(result.callouts.length, 2)
+  assert.deepEqual(result.callouts.map(c => [c.type, c.fold, c.title]), [
+    ['info', false, '视频信息'], ['tip', true, '章节导航'],
+  ])
+  assert.match(result.callouts[0].body, /来源：测试/)
+  assert.match(result.markdown, /V2MD_CALLOUT_0/)
+  assert.doesNotMatch(result.markdown, /\[!info\]|\[!tip\]/)
+})
+
 it('escapes unavailable media names and refuses arbitrary external URLs', () => {
   const html = marked.parse(reader.mediaMarkdown('![[attachments/a" onerror="evil.jpg]]', {
     'a" onerror="evil.jpg': 'https://attacker.test/tracker.jpg',
