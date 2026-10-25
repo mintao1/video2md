@@ -8,6 +8,34 @@ export function chapterIndex(chapter: unknown, total: number, progress = 0): num
 }
 
 const EMBED = /!\[\[attachments\/([^\]\n\\/|]+)(?:\|[^\]]*)?\]\]/g
+const CALLOUT_START = /^>\s*\[!(info|tip|warning|example)\](-)?(?:\s+(.*))?\s*$/
+
+export type Callout = { type: 'info' | 'tip' | 'warning' | 'example'; fold: boolean; title: string; body: string }
+
+/** Extract Obsidian blockquote callouts before marked parses them as plain text. */
+export function extractCallouts(md: string): { markdown: string; callouts: Callout[] } {
+  const lines = md.split(/\r?\n/)
+  const output: string[] = []
+  const callouts: Callout[] = []
+  for (let i = 0; i < lines.length; i++) {
+    const match = CALLOUT_START.exec(lines[i] ?? '')
+    if (!match) {
+      output.push(lines[i] ?? '')
+      continue
+    }
+    const body: string[] = []
+    while (i + 1 < lines.length) {
+      const next = lines[i + 1] ?? ''
+      if (!/^>\s?/.test(next)) break
+      i += 1
+      body.push(next.replace(/^>\s?/, ''))
+    }
+    const type = match[1] as Callout['type']
+    callouts.push({ type, fold: Boolean(match[2]), title: match[3]?.trim() || type, body: body.join('\n').trim() })
+    output.push(`<!--V2MD_CALLOUT_${callouts.length - 1}-->`)
+  }
+  return { markdown: output.join('\n'), callouts }
+}
 
 export function mediaNames(md: string): string[] {
   return [...new Set([...md.matchAll(EMBED)].map((m) => m[1]!))]
