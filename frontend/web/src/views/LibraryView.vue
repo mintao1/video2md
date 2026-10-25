@@ -3,7 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useLibraryStore } from '../stores/library'
 import { useToastStore } from '../stores/toast'
-import { getToc } from '../api'
+import { getNotes, getToc } from '../api'
 import type { Book, TocChapter } from '../types'
 import AppHeader from '../components/common/AppHeader.vue'
 import BottomNav from '../components/common/BottomNav.vue'
@@ -67,8 +67,28 @@ function onShare(book: Book) {
   toast.show('已复制教材分享链接到剪贴板！')
 }
 
-function onExport(format: string) {
-  toast.show(`正在封装并打包生成 ${format} 格式教材文件...`)
+async function onExport(format: string) {
+  const book = activeBook.value
+  if (!book) return
+  if (format !== 'Markdown') {
+    toast.show(`${format} 导出暂未开放，请先选择 Markdown`)
+    return
+  }
+  try {
+    const notes = await getNotes(book.id)
+    if (!notes.length) throw new Error('暂无可导出的笔记')
+    const content = notes.map((note) => note.md.trim()).join('\n\n') + '\n'
+    const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' })
+    const href = URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = href
+    anchor.download = `${book.title.replace(/[\\/:*?"<>|]/g, '_')}.md`
+    anchor.click()
+    URL.revokeObjectURL(href)
+    toast.show('Markdown 已开始下载')
+  } catch (error) {
+    toast.show(error instanceof Error ? error.message : 'Markdown 导出失败，请稍后重试')
+  }
 }
 
 function onOpenChapter(ch: TocChapter) {
