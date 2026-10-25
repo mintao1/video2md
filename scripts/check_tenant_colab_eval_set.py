@@ -13,9 +13,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 DATASET = ROOT / "docs/evals/tenant-colab-login-eval-set.jsonl"
-IDS = [f"tenant-colab-{index:03d}" for index in range(1, 13)]
+IDS = [f"tenant-colab-{index:03d}" for index in range(1, 14)]
 AREAS = {"onboarding", "authorization", "tenant-isolation", "account-match", "execution",
-         "platform-entry", "website-auth"}
+         "platform-entry", "website-auth", "production-ui-bundle"}
 RETIRED = ("frontend-login-interaction-set.jsonl", "production-login-ui-eval-set.jsonl")
 
 
@@ -38,8 +38,11 @@ def _regression(reference: object) -> bool:
         tree = ast.parse(path.read_text())
         return any(isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == name
                    for node in tree.body)
-    return (filename.startswith("frontend/web/tests/") and filename.endswith(".integration.test.mjs")
-            and not name)
+    if filename.startswith("frontend/web/tests/") and filename.endswith(".integration.test.mjs"):
+        return not name
+    if filename.startswith(("scripts/", ".github/workflows/")):
+        return not name
+    return False
 
 
 def validate(rows: object) -> list[str]:
