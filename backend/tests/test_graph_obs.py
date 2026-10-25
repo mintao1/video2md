@@ -29,6 +29,7 @@ _ORIG_STATE_FILE = util.STATE_FILE
 _ORIG_LOG_DIR = util.LOG_DIR
 _ORIG_RUNS_FILE = runs.RUNS_FILE
 _ORIG_RUNS_LOCKFILE = runs._RUNS_LOCKFILE
+_ORIG_STAGE_FNS = dict(runs._STAGE_FNS)
 util.STATE_FILE = _TMP / "state.json"
 util.LOG_DIR = _TMP / "logs"
 runs.RUNS_FILE = _TMP / "runs.json"
@@ -118,10 +119,11 @@ assert ev[-1]["event"] == "graph:end" and ev[-1]["status"] == "done", ev[-1]
 nodes = [e["node"] for e in ev if e["event"] == "graph:node"]
 assert nodes == ["resolve", "download", "transcribe", "frames", "ocr",
                  "select_frames_llm", "select", "clips", "note_entry", "finalize"], nodes
-# 条件边路由决策（select_frames_llm/finalize 无条件边 → 无 route 事件，dict 精确等值钉住）
+# 条件边路由决策（finalize 无条件边 → 无 route 事件；select_frames_llm 失败可路由到 fail，dict 精确等值钉住）
 routes = {e["frm"]: e["decision"] for e in ev if e["event"] == "graph:route"}
 assert routes == {"resolve": "ok", "download": "ok", "transcribe": "ok", "frames": "ok",
-                  "ocr": "ok", "select": "ok", "clips": "ok", "note_entry": "done"}, routes
+                  "ocr": "ok", "select_frames_llm": "ok", "select": "ok", "clips": "ok",
+                  "note_entry": "done"}, routes
 states = {e["node"]: e for e in ev if e["event"] == "graph:state"}
 assert all("keys" in e and "step" in e and "durMs" in e for e in states.values())
 assert states["note_entry"]["entry_idx"] == 2, states["note_entry"]       # 回环游标
@@ -215,6 +217,8 @@ util.STATE_FILE = _ORIG_STATE_FILE
 util.LOG_DIR = _ORIG_LOG_DIR
 runs.RUNS_FILE = _ORIG_RUNS_FILE
 runs._RUNS_LOCKFILE = _ORIG_RUNS_LOCKFILE
+runs._STAGE_FNS.clear()
+runs._STAGE_FNS.update(_ORIG_STAGE_FNS)  # 阶段打桩不许漏给后续测试模块
 print("✅ 5. 兜底：graph 事件写失败被吞，run 照常 done 无留痕（注册先于写事件）")
 
 print("\n✅ test_graph_obs.py 全部通过")
