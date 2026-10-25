@@ -20,8 +20,8 @@ spec.loader.exec_module(catalog)
 def test_current_catalog_covers_all_requirements_and_retires_superseded_sets():
     rows = catalog.load()
     assert catalog.validate(rows) == []
-    assert len(rows) == 12
-    assert sum(len(row["counterexamples"]) for row in rows) == 29
+    assert len(rows) == 13
+    assert sum(len(row["counterexamples"]) for row in rows) == 31
 
 
 @pytest.mark.parametrize("defect", ["missing", "duplicate", "unknown", "no-input", "no-criteria",
@@ -59,7 +59,7 @@ def test_incomplete_or_unlinked_catalog_cannot_pass(defect):
 
 def test_catalog_cli_checks_definitions_without_claiming_production_or_echoing_bad_input(tmp_path):
     passed = subprocess.run([sys.executable, str(SCRIPT)], capture_output=True, text=True)
-    assert passed.returncode == 0 and "12 cases, 29 counterexamples" in passed.stdout
+    assert passed.returncode == 0 and "13 cases, 31 counterexamples" in passed.stdout
     assert "No production acceptance" in passed.stdout
     source = tmp_path / "bad.jsonl"
     source.write_text("private-invalid-input")
