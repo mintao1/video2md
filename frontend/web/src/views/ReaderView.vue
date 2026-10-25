@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 import { getBooks, getNotes, getMedia, saveProgress } from '../api'
-import { chapterIndex, mediaMarkdown, mediaNames, startMediaLoad } from '../reader'
+import { chapterIndex, extractCallouts, mediaMarkdown, mediaNames, startMediaLoad } from '../reader'
 import { useToastStore } from '../stores/toast'
 import type { Book, TocChapter } from '../types'
 import EmptyState from '../components/common/EmptyState.vue'
@@ -68,8 +68,18 @@ const chapters = computed<TocChapter[]>(() =>
 
 function renderMd(md: string): string {
   // md 源自外部视频转录经 LLM 生成 → v-html 必须过 DOMPurify（防注入，token 在 localStorage）
+  const extracted = extractCallouts(md)
+  let source = mediaMarkdown(extracted.markdown, mediaUrls.value, pendingMedia.value)
+  const calloutHtml = extracted.callouts.map((callout) => {
+    const body = marked.parse(mediaMarkdown(callout.body, mediaUrls.value, pendingMedia.value), { async: false }) as string
+    const open = callout.fold ? '' : ' open'
+    return `<aside class="md-callout md-callout-${callout.type}" data-callout-type="${callout.type}"><details${open}><summary>${callout.title}</summary><div class="md-callout-body">${body}</div></details></aside>`
+  })
+  extracted.callouts.forEach((_callout, index) => {
+    source = source.replace(`<!--V2MD_CALLOUT_${index}-->`, calloutHtml[index] ?? '')
+  })
   const fragment = DOMPurify.sanitize(
-    marked.parse(mediaMarkdown(md, mediaUrls.value, pendingMedia.value), { async: false }) as string,
+    marked.parse(source, { async: false }) as string,
     { RETURN_DOM_FRAGMENT: true },
   )
   // DOMPurify intentionally strips blob: URIs. Restore only object URLs created
@@ -324,6 +334,23 @@ watch(() => [route.params.id, route.query.ch], async () => {
   border-top: 1px solid #cac4d0;
   margin: 1rem 0;
 }
+.prose-v2md :deep(.md-callout) {
+  margin: 0.9rem 0;
+  border-left: 4px solid #79747e;
+  border-radius: 0.5rem;
+  background: #f7f2fa;
+  padding: 0.15rem 0.8rem;
+}
+.prose-v2md :deep(.md-callout-info) { border-left-color: #3f51b5; }
+.prose-v2md :deep(.md-callout-tip) { border-left-color: #008577; }
+.prose-v2md :deep(.md-callout-warning) { border-left-color: #b26a00; }
+.prose-v2md :deep(.md-callout-example) { border-left-color: #7b1fa2; }
+.prose-v2md :deep(.md-callout summary) {
+  cursor: pointer;
+  font-weight: 700;
+  padding: 0.45rem 0;
+}
+.prose-v2md :deep(.md-callout-body) { padding-bottom: 0.45rem; }
 .prose-v2md :deep(img) {
   max-width: 100%;
   border-radius: 0.75rem;
