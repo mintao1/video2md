@@ -28,7 +28,7 @@ test('brand home owns the OAuth entry and the standalone login page stays delete
 test('the tenant login evaluation set preserves brand contracts and covers personal Colab connections', async () => {
   const text = await readFile(`${repo}/docs/evals/tenant-colab-login-eval-set.jsonl`, 'utf8')
   const rows = text.trim().split('\n').map((line) => JSON.parse(line))
-  assert.deepEqual(rows.map(row => row.id), Array.from({ length: 12 }, (_, i) => `tenant-colab-${String(i + 1).padStart(3, '0')}`))
+  assert.deepEqual(rows.map(row => row.id), Array.from({ length: 13 }, (_, i) => `tenant-colab-${String(i + 1).padStart(3, '0')}`))
   assert.ok(rows.every(row => row.input.actions.length && row.expectedOutput.criteria.length && row.counterexamples.length >= 2))
   assert.ok(rows.every(row => row.metadata.offline_can_close_production === false))
   assert.deepEqual(new Set(rows.map(row => row.metadata.area)), new Set([

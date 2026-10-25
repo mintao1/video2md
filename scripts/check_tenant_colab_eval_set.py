@@ -13,7 +13,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 DATASET = ROOT / "docs/evals/tenant-colab-login-eval-set.jsonl"
-IDS = [f"tenant-colab-{index:03d}" for index in range(1, 13)]
+IDS = [f"tenant-colab-{index:03d}" for index in range(1, 14)]
 AREAS = {"onboarding", "authorization", "tenant-isolation", "account-match", "execution",
          "platform-entry", "website-auth"}
 RETIRED = ("frontend-login-interaction-set.jsonl", "production-login-ui-eval-set.jsonl")
@@ -115,7 +115,7 @@ def run_regressions() -> int:
         commands = [
             ([str(python) if python.is_file() else sys.executable, "-m", "pytest",
               "backend/tests/test_colab_auth.py", "backend/tests/test_colab_cli.py",
-              "backend/tests/test_tenant_colab_eval_set.py", "-q"], ROOT),
+              "backend/tests/test_tenant_colab_eval_set.py", "backend/tests/test_frontend_bundle_gate.py", "-q"], ROOT),
             (["node", "--test", "tests/colab-tenant.integration.test.mjs",
               "tests/login-production.integration.test.mjs"], ROOT / "frontend/web"),
         ]
