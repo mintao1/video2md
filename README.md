@@ -180,3 +180,7 @@ CI 在 push 和 pull request 中运行后端测试、lint、进程级冒烟测�
 ## 📄 项目状态
 
 项目仍在持续开发中。部署参数、API 字段和前端页面可能随版本调整；生产环境请以 `docs/architecture/` 中的契约和部署文档为准。
+
+## ⚖️ 许可证
+
+[MIT](LICENSE)
