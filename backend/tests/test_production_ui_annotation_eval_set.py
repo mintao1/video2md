@@ -224,7 +224,7 @@ def test_cli_separates_evidence_replay_from_production_acceptance():
 
 
 def test_collection_never_initializes_project_configuration_or_real_services():
-    code = 'import runpy,sys; runpy.run_path(sys.argv[1]); assert "video2md.config" not in sys.modules'
+    code = 'import runpy,sys; runpy.run_path(sys.argv[1]); assert "video2pdf.config" not in sys.modules'
     result = subprocess.run([sys.executable, "-c", code, str(Path(__file__))],
                             capture_output=True, text=True, timeout=20)
     assert result.returncode == 0, result.stderr

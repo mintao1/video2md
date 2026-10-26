@@ -180,8 +180,8 @@ import importlib.util, sys
 spec = importlib.util.spec_from_file_location('resolver_test_collection', sys.argv[1])
 module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(module)
-assert 'video2md.config' not in sys.modules
-assert 'video2md.api' not in sys.modules
+assert 'video2pdf.config' not in sys.modules
+assert 'video2pdf.api' not in sys.modules
 '''
     result = subprocess.run([sys.executable, '-c', code, str(source)], capture_output=True, text=True)
     assert result.returncode == 0, result.stderr

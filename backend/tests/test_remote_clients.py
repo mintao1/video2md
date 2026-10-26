@@ -1,7 +1,7 @@
 """远端算力薄客户端单测：remote_cut_clips / ocr_remote（GPU 路由或参考服务端的 HTTP 契约）。
 
 GPU 路由本体已独立成 ~/Desktop/开发项目/gpu_router（那边 tests/ 管路由逻辑）；
-这里只保 video2md 侧的客户端行为。不联网、MockTransport 桩。
+这里只保 video2pdf 侧的客户端行为。不联网、MockTransport 桩。
 
 跑法：python3 test_remote_clients.py
 """
@@ -17,8 +17,8 @@ from pathlib import Path
 import httpx
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # backend/（包根）
-from video2md import clips as clips_mod
-from video2md import frames as frames_mod
+from video2pdf import clips as clips_mod
+from video2pdf import frames as frames_mod
 
 FAILED: list[str] = []
 
@@ -29,7 +29,7 @@ def check(name: str, cond: bool, detail: str = "") -> None:
         FAILED.append(name)
 
 
-_TMP = Path(tempfile.mkdtemp(prefix="v2md-remote-clients-"))
+_TMP = Path(tempfile.mkdtemp(prefix="v2pdf-remote-clients-"))
 
 
 def _tar_bytes() -> bytes:
@@ -48,11 +48,11 @@ def _tar_bytes() -> bytes:
 
 # ---- clips 客户端
 # Phase 2 后 attach 落点走 artsink.attach_dir()（动态读 config），重定向打在 config 缝上
-from video2md import config as _cfg
+from video2pdf import config as _cfg
 
 _cfg.ATTACH_DIR = _TMP / "attachments"  # 重定向：别碰真 vault
 _cfg.ATTACH_DIR.mkdir(exist_ok=True)
-clips_mod.ENV = {**clips_mod.ENV, "V2MD_CLIPS_SOURCE": ""}  # 钉死上传路径（与 .env 无关）
+clips_mod.ENV = {**clips_mod.ENV, "V2PDF_CLIPS_SOURCE": ""}  # 钉死上传路径（与 .env 无关）
 (_TMP / "fake.mp4").touch()
 
 
@@ -101,8 +101,8 @@ items, _raw2 = frames_mod.ocr_candidates([(1.0, _TMP / "g_001.jpg")], "remote",
                                          base="http://r", client=mc2)
 check("ocr_candidates remote 分支 + LOW_CONF 过滤", items == [(1.0, "要点一", 0.92)])
 
-# ---- Bearer 头传播（V2MD_POOL_TOKEN → 三个池调用点统一带 Authorization）
-from video2md import util as util_mod
+# ---- Bearer 头传播（V2PDF_POOL_TOKEN → 三个池调用点统一带 Authorization）
+from video2pdf import util as util_mod
 
 _seen: dict[str, str] = {}
 def auth_handler(req: httpx.Request) -> httpx.Response:
@@ -116,16 +116,16 @@ def auth_handler(req: httpx.Request) -> httpx.Response:
 auth_client = httpx.Client(transport=httpx.MockTransport(auth_handler), base_url="http://r")
 _orig_env = util_mod.ENV
 try:
-    util_mod.ENV = {**_orig_env, "V2MD_POOL_TOKEN": "tok-abc"}
+    util_mod.ENV = {**_orig_env, "V2PDF_POOL_TOKEN": "tok-abc"}
     clips_mod.remote_cut_clips([("c-f01-0002.jpg", "00:02")], _TMP / "fake.mp4",
                                120.0, [], _TMP, "http://r", client=auth_client)
-    check("V2MD_POOL_TOKEN 设定 → clips 调用带 Bearer", _seen["auth"] == "Bearer tok-abc")
+    check("V2PDF_POOL_TOKEN 设定 → clips 调用带 Bearer", _seen["auth"] == "Bearer tok-abc")
     frames_mod.ocr_remote([(1.0, _TMP / "g_001.jpg")], "http://r", client=auth_client)
-    check("V2MD_POOL_TOKEN 设定 → ocr 调用带 Bearer", _seen["auth"] == "Bearer tok-abc")
-    util_mod.ENV = {k: v for k, v in _orig_env.items() if k != "V2MD_POOL_TOKEN"}
+    check("V2PDF_POOL_TOKEN 设定 → ocr 调用带 Bearer", _seen["auth"] == "Bearer tok-abc")
+    util_mod.ENV = {k: v for k, v in _orig_env.items() if k != "V2PDF_POOL_TOKEN"}
     clips_mod.remote_cut_clips([("d-f01-0003.jpg", "00:03")], _TMP / "fake.mp4",
                                120.0, [], _TMP, "http://r", client=auth_client)
-    check("V2MD_POOL_TOKEN 未设 → 不带鉴权头（回环裸池向后兼容）", _seen["auth"] == "")
+    check("V2PDF_POOL_TOKEN 未设 → 不带鉴权头（回环裸池向后兼容）", _seen["auth"] == "")
 finally:
     util_mod.ENV = _orig_env
     auth_client.close()

@@ -32,7 +32,7 @@ export function extractCallouts(md: string): { markdown: string; callouts: Callo
     }
     const type = match[1] as Callout['type']
     callouts.push({ type, fold: Boolean(match[2]), title: match[3]?.trim() || type, body: body.join('\n').trim() })
-    output.push(`<!--V2MD_CALLOUT_${callouts.length - 1}-->`)
+    output.push(`<!--V2PDF_CALLOUT_${callouts.length - 1}-->`)
   }
   return { markdown: output.join('\n'), callouts }
 }
@@ -57,8 +57,8 @@ export function mediaMarkdown(md: string, urls: Record<string, string>, pending:
       : `<span>媒体暂不可用：${escape(name)}</span>`
     const src = escape(url)
     return /\.mp4$/i.test(name)
-      ? `<video src="${src}" controls preload="metadata" data-v2md-media="${escape(name)}" aria-label="${escape(name)}"></video>`
-      : `<img src="${src}" data-v2md-media="${escape(name)}" alt="${escape(name)}">`
+      ? `<video src="${src}" controls preload="metadata" data-v2pdf-media="${escape(name)}" aria-label="${escape(name)}"></video>`
+      : `<img src="${src}" data-v2pdf-media="${escape(name)}" alt="${escape(name)}">`
   })
 }
 

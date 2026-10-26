@@ -3,7 +3,7 @@ from pathlib import Path
 import subprocess
 import sys
 
-from video2md import evals, runs, util
+from video2pdf import evals, runs, util
 
 
 def test_eval_targets_skip_legacy_scalar_entries(tmp_path):
@@ -31,10 +31,10 @@ def test_current_run_can_be_cleared_after_direct_binding():
 
 def test_import_contract_from_repo_root():
     root = Path(__file__).resolve().parents[2]
-    code = "import video2md.config as c; print(c.TASKS_STORE, c.UPLOADS_TTL_H)"
+    code = "import video2pdf.config as c; print(c.TASKS_STORE, c.UPLOADS_TTL_H)"
     env = dict(__import__("os").environ)
-    env["V2MD_TASKS_STORE"] = ""
-    env["V2MD_UPLOADS_TTL_H"] = ""
+    env["V2PDF_TASKS_STORE"] = ""
+    env["V2PDF_UPLOADS_TTL_H"] = ""
     result = subprocess.run([sys.executable, "-c", code], cwd=root / "backend",
                             capture_output=True, text=True, env=env, check=False)
     assert result.returncode == 0, result.stderr

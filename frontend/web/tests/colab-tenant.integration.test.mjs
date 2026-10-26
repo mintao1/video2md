@@ -72,7 +72,7 @@ for (const connected of [false, true]) {
   test(`Google callback ${connected ? 'reuses an existing Colab connection' : 'guides an unconnected tenant and preserves the intended page'}`, async () => {
     const page = await mounted(Brand, '/?redirect=%2Ftasks%3FopenImport%3D1', () => json({ can_authorize: true, has_credentials: connected }))
     try {
-      assert.equal(page.storage.get('v2md_token'), 'website-id-token')
+      assert.equal(page.storage.get('v2pdf_token'), 'website-id-token')
       assert.equal(page.fragmentCleared, true)
       assert.match(page.calls[0].url, /\/settings\/colab$/)
       assert.equal(page.calls[0].init.headers.Authorization, 'Bearer website-id-token')
@@ -140,7 +140,7 @@ test('OAuth errors clear the fragment without storing a token or starting Colab 
   try {
     assert.equal(page.state.error.value, 'Google login failed')
     assert.equal(page.fragmentCleared, true)
-    assert.equal(page.storage.get('v2md_token'), undefined)
+    assert.equal(page.storage.get('v2pdf_token'), undefined)
     assert.equal(page.calls.length, 0)
     assert.equal(page.router.currentRoute.value.path, '/')
   } finally { page.close() }

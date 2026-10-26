@@ -76,7 +76,7 @@ function renderMd(md: string): string {
     return `<aside class="md-callout md-callout-${callout.type}" data-callout-type="${callout.type}"><details${open}><summary>${callout.title}</summary><div class="md-callout-body">${body}</div></details></aside>`
   })
   extracted.callouts.forEach((_callout, index) => {
-    source = source.replace(`<!--V2MD_CALLOUT_${index}-->`, calloutHtml[index] ?? '')
+    source = source.replace(`<!--V2PDF_CALLOUT_${index}-->`, calloutHtml[index] ?? '')
   })
   const fragment = DOMPurify.sanitize(
     marked.parse(source, { async: false }) as string,
@@ -84,11 +84,11 @@ function renderMd(md: string): string {
   )
   // DOMPurify intentionally strips blob: URIs. Restore only object URLs created
   // by our authenticated media loader, after sanitizing all generated markup.
-  for (const element of fragment.querySelectorAll('img[data-v2md-media], video[data-v2md-media]')) {
-    const name = element.getAttribute('data-v2md-media') ?? ''
+  for (const element of fragment.querySelectorAll('img[data-v2pdf-media], video[data-v2pdf-media]')) {
+    const name = element.getAttribute('data-v2pdf-media') ?? ''
     const url = mediaUrls.value[name]
     if (url?.startsWith('blob:')) element.setAttribute('src', url)
-    element.removeAttribute('data-v2md-media')
+    element.removeAttribute('data-v2pdf-media')
   }
   const container = document.createElement('div')
   container.append(fragment)
@@ -190,7 +190,7 @@ watch(() => [route.params.id, route.query.ch], async () => {
 
       <article
         v-else
-        class="prose-v2md text-on-surface px-5 py-5 pb-24"
+        class="prose-v2pdf text-on-surface px-5 py-5 pb-24"
         v-html="html"
       />
     </main>
@@ -246,53 +246,53 @@ watch(() => [route.params.id, route.query.ch], async () => {
 
 <style scoped>
 /* 手写精讲笔记排版（tailwind 无 typography 插件，不为此加插件）；颜色继承 text-on-surface */
-.prose-v2md :deep(h1) {
+.prose-v2pdf :deep(h1) {
   font-size: 1.35rem;
   font-weight: 700;
   margin: 1.25rem 0 0.75rem;
   line-height: 1.4;
 }
-.prose-v2md :deep(h2) {
+.prose-v2pdf :deep(h2) {
   font-size: 1.15rem;
   font-weight: 700;
   margin: 1.25rem 0 0.5rem;
   line-height: 1.4;
 }
-.prose-v2md :deep(h3) {
+.prose-v2pdf :deep(h3) {
   font-size: 1.02rem;
   font-weight: 600;
   margin: 1rem 0 0.5rem;
 }
-.prose-v2md :deep(p) {
+.prose-v2pdf :deep(p) {
   margin: 0.65rem 0;
 }
-.prose-v2md :deep(ul),
-.prose-v2md :deep(ol) {
+.prose-v2pdf :deep(ul),
+.prose-v2pdf :deep(ol) {
   padding-left: 1.4rem;
   margin: 0.65rem 0;
 }
-.prose-v2md :deep(ul) {
+.prose-v2pdf :deep(ul) {
   list-style: disc;
 }
-.prose-v2md :deep(ol) {
+.prose-v2pdf :deep(ol) {
   list-style: decimal;
 }
-.prose-v2md :deep(li) {
+.prose-v2pdf :deep(li) {
   margin: 0.3rem 0;
 }
-.prose-v2md :deep(blockquote) {
+.prose-v2pdf :deep(blockquote) {
   border-left: 3px solid #cac4d0;
   padding-left: 0.9rem;
   margin: 0.75rem 0;
   color: #49454f;
 }
-.prose-v2md :deep(code) {
+.prose-v2pdf :deep(code) {
   background: #ece6f0;
   padding: 0.1rem 0.35rem;
   border-radius: 4px;
   font-size: 0.85em;
 }
-.prose-v2md :deep(pre) {
+.prose-v2pdf :deep(pre) {
   background: #1f1b24;
   color: #e6e0e9;
   padding: 0.85rem 1rem;
@@ -300,13 +300,13 @@ watch(() => [route.params.id, route.query.ch], async () => {
   overflow-x: auto;
   margin: 0.75rem 0;
 }
-.prose-v2md :deep(pre code) {
+.prose-v2pdf :deep(pre code) {
   background: none;
   padding: 0;
   color: inherit;
   font-size: 0.82em;
 }
-.prose-v2md :deep(table) {
+.prose-v2pdf :deep(table) {
   width: 100%;
   border-collapse: collapse;
   margin: 0.75rem 0;
@@ -314,44 +314,44 @@ watch(() => [route.params.id, route.query.ch], async () => {
   display: block;
   overflow-x: auto;
 }
-.prose-v2md :deep(th),
-.prose-v2md :deep(td) {
+.prose-v2pdf :deep(th),
+.prose-v2pdf :deep(td) {
   border: 1px solid #cac4d0;
   padding: 0.4rem 0.55rem;
   text-align: left;
 }
-.prose-v2md :deep(th) {
+.prose-v2pdf :deep(th) {
   background: #f3edf7;
   font-weight: 600;
 }
-.prose-v2md :deep(a) {
+.prose-v2pdf :deep(a) {
   color: inherit;
   text-decoration: underline;
   word-break: break-all;
 }
-.prose-v2md :deep(hr) {
+.prose-v2pdf :deep(hr) {
   border: none;
   border-top: 1px solid #cac4d0;
   margin: 1rem 0;
 }
-.prose-v2md :deep(.md-callout) {
+.prose-v2pdf :deep(.md-callout) {
   margin: 0.9rem 0;
   border-left: 4px solid #79747e;
   border-radius: 0.5rem;
   background: #f7f2fa;
   padding: 0.15rem 0.8rem;
 }
-.prose-v2md :deep(.md-callout-info) { border-left-color: #3f51b5; }
-.prose-v2md :deep(.md-callout-tip) { border-left-color: #008577; }
-.prose-v2md :deep(.md-callout-warning) { border-left-color: #b26a00; }
-.prose-v2md :deep(.md-callout-example) { border-left-color: #7b1fa2; }
-.prose-v2md :deep(.md-callout summary) {
+.prose-v2pdf :deep(.md-callout-info) { border-left-color: #3f51b5; }
+.prose-v2pdf :deep(.md-callout-tip) { border-left-color: #008577; }
+.prose-v2pdf :deep(.md-callout-warning) { border-left-color: #b26a00; }
+.prose-v2pdf :deep(.md-callout-example) { border-left-color: #7b1fa2; }
+.prose-v2pdf :deep(.md-callout summary) {
   cursor: pointer;
   font-weight: 700;
   padding: 0.45rem 0;
 }
-.prose-v2md :deep(.md-callout-body) { padding-bottom: 0.45rem; }
-.prose-v2md :deep(img) {
+.prose-v2pdf :deep(.md-callout-body) { padding-bottom: 0.45rem; }
+.prose-v2pdf :deep(img) {
   max-width: 100%;
   border-radius: 0.75rem;
 }

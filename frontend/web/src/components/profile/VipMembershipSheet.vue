@@ -16,7 +16,7 @@ const svipFeatures = [
   '<strong>独立 A100 GPU 算力通道</strong> · 免排队秒级调度',
   '<strong>4K 超清板书提纯</strong> · 智能去除手影/反光/偏色',
   '<strong>全学科专著排版模板库</strong> + LaTeX 源码实时同步',
-  '<strong>一键双向同步 Notion &amp; Obsidian</strong> 知识图谱',
+  '<strong>一键同步 Notion</strong> 知识库',
 ]
 
 const proFeatures = ['每月 50 小时 4K 转录', 'Whisper-v3 语音转写', '20GB 专属云端库空间', '导出 LaTeX & 高清 PDF']
