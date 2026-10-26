@@ -9,7 +9,7 @@ const emit = defineEmits<{
 }>()
 
 const formats = [
-  { key: 'PDF', icon: 'picture_as_pdf', iconCls: 'text-error', label: '出版级 PDF', hint: '含矢量公式与超链' },
+  { key: 'PDF', icon: 'picture_as_pdf', iconCls: 'text-error', label: 'PDF（打印保存）', hint: '保留公式与超链' },
   { key: 'Markdown', icon: 'markdown', iconCls: 'text-primary', label: 'Markdown (.md)', hint: '适配 Obsidian/Notion' },
   { key: 'EPUB', icon: 'book', iconCls: 'text-secondary', label: '电子书 EPUB', hint: '支持微信读书/Kindle' },
   { key: 'LaTeX', icon: 'code', iconCls: 'text-tertiary', label: 'LaTeX 源码包', hint: '含 Overleaf 模板' },
