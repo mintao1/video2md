@@ -1705,6 +1705,46 @@ def test_web_media_requires_owner_and_referenced_file(client, tmp_path):
     assert client.get("/runs/web_media/media/escape.jpg", headers=h).status_code == 404
 
 
+def test_web_pdf_export_is_owner_only_and_downloadable(client, monkeypatch):
+    from video2pdf import api as api_mod
+    from video2pdf.config import OUT_DIR
+    put_identity("test", "alice", "uid_alice")
+    put_identity("test", "bob", "uid_bob")
+    _seed_run("web_pdf", "uid_alice")
+    records = runs._load_runs()
+    art = next(iter(records["web_pdf"]["artifacts"].values()))
+    art.update(title="强化学习入门", note=str(OUT_DIR / "web-pdf.md"), md="## 第一节\n\n正文")
+    runs._save_runs(records)
+    seen = {}
+
+    def fake_render(title, notes, attachments, source=""):
+        seen.update(title=title, notes=notes, attachments=attachments)
+        return b"%PDF-fixture"
+
+    monkeypatch.setattr(api_mod.pdf, "render_pdf", fake_render)
+    response = client.get("/runs/web_pdf/pdf", headers={"X-Test-Auth": "alice"})
+    assert response.status_code == 200 and response.content == b"%PDF-fixture"
+    assert response.headers["content-type"] == "application/pdf"
+    assert response.headers["cache-control"] == "no-store"
+    assert "filename*=UTF-8''" in response.headers["content-disposition"]
+    assert seen["title"] == "强化学习入门" and seen["notes"][0]["md"] == "## 第一节\n\n正文"
+    assert seen["attachments"] == OUT_DIR / "attachments"
+    assert client.get("/runs/web_pdf/pdf", headers={"X-Test-Auth": "bob"}).status_code == 403
+
+    art.update(md="   ")
+    runs._save_runs(records)
+    assert client.get("/runs/web_pdf/pdf", headers={"X-Test-Auth": "alice"}).status_code == 404
+
+    def broken_render(*args, **kwargs):
+        raise OSError("cannot load library 'libpango-1.0-0'")
+
+    art.update(md="正文")
+    runs._save_runs(records)
+    monkeypatch.setattr(api_mod.pdf, "render_pdf", broken_render)
+    unavailable = client.get("/runs/web_pdf/pdf", headers={"X-Test-Auth": "alice"})
+    assert unavailable.status_code == 503 and "libpango" not in unavailable.text
+
+
 def test_promote_changes_actual_execution_order(client, monkeypatch):
     """Three real enqueued coroutines; external video work is deterministic and gated."""
     started = threading.Event()

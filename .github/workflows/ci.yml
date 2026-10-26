@@ -42,7 +42,7 @@ jobs:
       - run: uv sync --frozen
         working-directory: backend
       - name: pytest（API 契约 + acctkit）
-        run: uv run pytest tests/test_api_contract.py tests/test_acctkit.py tests/test_google_cert_cache.py tests/test_rename_compat.py -q
+        run: uv run pytest tests/test_api_contract.py tests/test_acctkit.py tests/test_google_cert_cache.py tests/test_rename_compat.py tests/test_pdf_export.py -q
         working-directory: backend
       - name: 个人租户 Colab 评测（普通用户授权、同账号核对、凭证与执行隔离；离线）
         run: uv run pytest tests/test_colab_auth.py tests/test_colab_cli.py tests/test_tenant_colab_eval_set.py -q

@@ -18,6 +18,9 @@
 - `GET /runs/{id}/media/{name}`：只提供本人笔记明确引用的图片/视频；验证平铺文件名、扩展名、
   实际路径边界，拒绝未引用文件及外指符号链接。deliver 已焚或过期遵循 410。
   响应 `Cache-Control: no-store`；前端使用 Bearer 拉取 Blob，不把 token 放进 URL。
+- `GET /runs/{id}/pdf`：现渲染整本 PDF（封面、目录、每讲一节），不落盘。正文与图片取自本人
+  笔记，归属与已焚口径同 `/note`、`/media`；图片只取附件目录内的真实文件并内嵌，正文不放行
+  原始 HTML，渲染器只允许 `data:` 资源（外链与本地路径一律不取）。缺 Pango/字体时 503。
 - `GET /prefs`、`PUT /prefs/{id}`：收藏和 0–100 阅读进度，按 uid 隔离、部分更新；
   JSON 首次请求会创建目录，容器默认 `/app/data/prefs.json`；PG 使用 0003 迁移。
 
@@ -31,6 +34,7 @@
 | GET /runs | owner | 本人名下列表（created 倒序，deliver 附在架态） | `api.py:763` |
 | GET /runs/{id} | owner | 终态 + 逐条目 done map + partial_failures；`task` 段=本进程实时视图 | `api.py:849` |
 | GET /runs/{id}/note | owner | 产出 markdown（deliver 下从在架文件现读，已焚 410） | `api.py:883` |
+| GET /runs/{id}/pdf | owner | 整本 PDF 下载（weasyprint 现渲染；已焚 410，缺渲染依赖 503） | `pdf.py` |
 | GET /runs/{id}/bundle | owner+deliver | 产物整包 zip，现打包发完即删 | `api.py:924` |
 | DELETE /runs/{id}/artifacts | owner+deliver | ACK 即焚（rmtree 物理销毁），再删 410 | `api.py:940` |
 | POST /runs/{id}/cancel | owner | 撤销进行中 run（P1-2）：排队立即 error(cancelled) 留痕；运行中协作式（条目循环头 SystemExit，长单阶段内无取消点）；他副本驱动走 cmd 广播回 cancelling；终态 409 `NOT_CANCELLABLE` | `api.py` cancel_run |

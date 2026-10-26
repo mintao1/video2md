@@ -138,6 +138,11 @@ export async function getNotes(bookId: string): Promise<{ title: string; md: str
   }
 }
 
+/** 服务端现渲染整本 PDF（全部讲次 + 插图）；产物已焚时后端回 410，由调用方提示。 */
+export async function getPdf(bookId: string): Promise<Blob> {
+  return requestBlob(`/runs/${encodeURIComponent(bookId)}/pdf`)
+}
+
 export async function getMedia(bookId: string, name: string): Promise<Blob> {
   const path = `/runs/${encodeURIComponent(bookId)}/media/${encodeURIComponent(name)}`
   return /\.mp4$/i.test(name) ? requestMediaBlob(path) : requestBlob(path)

@@ -54,11 +54,11 @@ import uvicorn
 from fastapi import Depends, FastAPI, HTTPException, Request, UploadFile
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response, StreamingResponse
 from starlette.background import BackgroundTask
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from . import artsink, events, observability, watchdog
+from . import artsink, events, observability, pdf, watchdog
 from .auth import AuthError, Identity, current_identity, optional_identity
 from .colab_auth import router as colab_auth_router
 from .config import (
@@ -1628,6 +1628,11 @@ def get_run_notes(run_id: str, ident: Identity = Depends(current_identity)) -> d
     return {"run_id": run_id, "status": run.get("status"), "notes": notes}
 
 
+def _attachment_shelf(run_id: str, ident: Identity) -> Path:
+    """笔记附件所在目录的上一级：deliver 为本 run 在架 outbox（已焚 410），vault 为输出目录。"""
+    return _deliver_outbox(run_id, ident) if artsink.current_mode() == "deliver" else OUT_DIR
+
+
 @app.get("/runs/{run_id}/media/{name}", summary="读取本人笔记引用的图片或视频")
 def get_run_media(run_id: str, name: str, ident: Identity = Depends(current_identity)):
     run = _require_run_access(run_id, ident)
@@ -1638,8 +1643,7 @@ def get_run_media(run_id: str, name: str, ident: Identity = Depends(current_iden
                    ".webp": "image/webp", ".mp4": "video/mp4"}
     if suffix not in media_types:
         raise HTTPException(404, "媒体不存在")
-    deliver = artsink.current_mode() == "deliver"
-    shelf = _deliver_outbox(run_id, ident) if deliver else OUT_DIR
+    shelf = _attachment_shelf(run_id, ident)
     notes = get_run_notes(run_id, ident)["notes"]
     referenced = any(name in re.findall(r"!\[\[attachments/([^\]|]+)(?:\|[^\]]*)?\]\]", n["md"])
                      for n in notes)
@@ -1648,6 +1652,33 @@ def get_run_media(run_id: str, name: str, ident: Identity = Depends(current_iden
     if not referenced or not path.resolve().is_relative_to(allowed_root) or not path.is_file():
         raise HTTPException(404, "媒体不存在")
     return FileResponse(path, media_type=media_types[suffix], headers={"Cache-Control": "no-store"})
+
+
+@app.get("/runs/{run_id}/pdf", summary="导出 PDF：全部讲次 + 插图（视频片段以时间点提示代替）",
+         response_class=Response)
+def get_run_pdf(run_id: str, ident: Identity = Depends(current_identity)) -> Response:
+    """现渲染、不落盘：正文与图片取自本人笔记（同 /note 与 /media 的归属与已焚口径）。
+
+    404=run 不存在或无笔记；410=deliver 产物已焚；503=服务端缺 PDF 渲染依赖（Pango/字体）。
+    """
+    run = _require_run_access(run_id, ident)
+    if not run:
+        raise HTTPException(404, "任务不存在")
+    notes = [n for n in get_run_notes(run_id, ident)["notes"] if n["md"].strip()]
+    if not notes:
+        raise HTTPException(404, "暂无可导出的笔记")
+    title = _run_title(run)
+    try:
+        data = pdf.render_pdf(title, notes, _attachment_shelf(run_id, ident) / "attachments",
+                              source=run.get("url") or "")
+    except OSError as exc:  # weasyprint 加载 Pango 失败等环境问题，细节只进日志
+        _req_log("GET", f"/runs/{run_id}/pdf", 503, user=ident.uid, err=type(exc).__name__)
+        raise HTTPException(503, "PDF 导出暂不可用，请先导出 Markdown") from None
+    _req_log("GET", f"/runs/{run_id}/pdf", 200, user=ident.uid, pdf_bytes=len(data))
+    filename = urllib.parse.quote(f"{title or run_id}.pdf")
+    return Response(data, media_type="application/pdf",
+                    headers={"Content-Disposition": f"attachment; filename*=UTF-8''{filename}",
+                             "Cache-Control": "no-store"})
 
 
 def _zip_dir(src: Path) -> tuple[str, int]:

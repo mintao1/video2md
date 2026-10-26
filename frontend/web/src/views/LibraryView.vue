@@ -3,7 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useLibraryStore } from '../stores/library'
 import { useToastStore } from '../stores/toast'
-import { getNotes, getToc } from '../api'
+import { getNotes, getPdf, getToc } from '../api'
 import type { Book, TocChapter } from '../types'
 import AppHeader from '../components/common/AppHeader.vue'
 import BottomNav from '../components/common/BottomNav.vue'
@@ -67,27 +67,40 @@ function onShare(book: Book) {
   toast.show('已复制教材分享链接到剪贴板！')
 }
 
+function download(blob: Blob, filename: string) {
+  const href = URL.createObjectURL(blob)
+  const anchor = document.createElement('a')
+  anchor.href = href
+  anchor.download = filename
+  // Attach and revoke later: a detached anchor or an immediately revoked URL loses the filename.
+  document.body.appendChild(anchor)
+  anchor.click()
+  anchor.remove()
+  setTimeout(() => URL.revokeObjectURL(href), 0)
+}
+
 async function onExport(format: string) {
   const book = activeBook.value
   if (!book) return
-  if (format !== 'Markdown') {
-    toast.show(`${format} 导出暂未开放，请先选择 Markdown`)
+  if (format !== 'Markdown' && format !== 'PDF') {
+    toast.show(`${format} 导出暂未开放，请选择 PDF 或 Markdown`)
     return
   }
+  const base = book.title.replace(/[\\/:*?"<>|]/g, '_')
   try {
+    if (format === 'PDF') {
+      toast.show('正在生成 PDF…')
+      download(await getPdf(book.id), `${base}.pdf`)
+      toast.show('PDF 已开始下载')
+      return
+    }
     const notes = await getNotes(book.id)
     if (!notes.length) throw new Error('暂无可导出的笔记')
     const content = notes.map((note) => note.md.trim()).join('\n\n') + '\n'
-    const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' })
-    const href = URL.createObjectURL(blob)
-    const anchor = document.createElement('a')
-    anchor.href = href
-    anchor.download = `${book.title.replace(/[\\/:*?"<>|]/g, '_')}.md`
-    anchor.click()
-    URL.revokeObjectURL(href)
+    download(new Blob([content], { type: 'text/markdown;charset=utf-8' }), `${base}.md`)
     toast.show('Markdown 已开始下载')
   } catch (error) {
-    toast.show(error instanceof Error ? error.message : 'Markdown 导出失败，请稍后重试')
+    toast.show(error instanceof Error ? error.message : `${format} 导出失败，请稍后重试`)
   }
 }
 

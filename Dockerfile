@@ -27,9 +27,12 @@ LABEL org.opencontainers.image.title="video2pdf" \
 
 # Debian 源换清华镜像（国内服务器从 deb.debian.org 拉 ffmpeg 依赖龟速实测 ~60KB/s；
 # Mac/海外构建也无害——tuna 全球可达）
+# PDF 导出（weasyprint）：Pango 排版 + 中文字体；构建期生成字体缓存，只读根文件系统下无需再写
 RUN sed -i 's|deb.debian.org|mirrors.tuna.tsinghua.edu.cn|g' /etc/apt/sources.list.d/debian.sources \
  && apt-get update \
  && apt-get install -y --no-install-recommends ffmpeg \
+    libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz-subset0 fontconfig fonts-noto-cjk \
+ && fc-cache -f \
  && rm -rf /var/lib/apt/lists/*
 
 # uv 以 pip 包安装（ghcr.io 在国内服务器拉不动；PyPI 走镜像站即可）。
@@ -65,7 +68,8 @@ ENV PATH="/app/.venv/bin:$PATH" \
     V2PDF_STATE_FILE=/app/data/state.json \
     V2PDF_RUNS_FILE=/app/data/runs.json \
     V2PDF_PREFS_FILE=/app/data/prefs.json \
-    V2PDF_LOG_DIR=/app/data/logs
+    V2PDF_LOG_DIR=/app/data/logs \
+    XDG_CACHE_HOME=/tmp/.cache
 
 VOLUME ["/app/data", "/vault"]
 EXPOSE 8790

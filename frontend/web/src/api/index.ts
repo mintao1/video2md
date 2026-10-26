@@ -4,7 +4,7 @@
 // 队列页主链（listRuns/createRun/cancelRun → GET/POST /runs）。
 export { currentUser, getQuota, getCost } from './live/profile'
 export { getLlmSettings, saveLlmSettings, clearLlmSettings } from './live/llm-settings'
-export { getBooks, toggleFav, getToc, getNotes, getMedia, saveProgress } from './live/books'
+export { getBooks, toggleFav, getToc, getNotes, getMedia, getPdf, saveProgress } from './live/books'
 export { listRuns, createRun, cancelRun, resumeRun, promoteRun, deleteRuns, downloadBundle } from './live/runs'
 export { uploadFile } from './live/uploads'
 
