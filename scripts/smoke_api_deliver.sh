@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
 # deliver 形态路子的真 LLM 冒烟（开发机）：「云端不储存，只发送到用户端」全链路——
-#   合成短视频 → 起 api（V2MD_ARTIFACT_MODE=deliver，outbox 指 tmp）→ POST /runs →
+#   合成短视频 → 起 api（V2PDF_ARTIFACT_MODE=deliver，outbox 指 tmp）→ POST /runs →
 #   SSE 旁观 + 轮询终态 → 断言真 vault **零写入** → GET /bundle 拉整包 zip 解包 →
 #   解包内容与 GET /note 一致（ground truth 句在）→ DELETE /artifacts ACK 即焚 →
 #   bundle/note 再取全 410、在架目录物理消失。
 # 与 smoke_api_vault.sh 的分工：vault 冒烟管「本机制库」形态，这条管「多用户投递」形态；
 # 两者共用同一段合成视频工艺（<10s 片段 whisper 空返回的时长档、Meijia/Tingting 音色）。
 #   ./scripts/smoke_api_deliver.sh                  # 真实 LLM（烧少量 token，~2min）
-#   V2MD_FAKE_LLM=1 ./scripts/smoke_api_deliver.sh  # 零 token 纯通道冒烟
+#   V2PDF_FAKE_LLM=1 ./scripts/smoke_api_deliver.sh  # 零 token 纯通道冒烟
 set -euo pipefail
 cd "$(dirname "$0")/.."
-export PYTHONPATH="$PWD/backend"   # package=false：python -m video2md 靠包根上 path
+export PYTHONPATH="$PWD/backend"   # package=false：python -m video2pdf 靠包根上 path
 
 PORT="${SMOKE_PORT:-8793}"
 API="http://127.0.0.1:$PORT"
@@ -22,7 +22,7 @@ command -v ffmpeg >/dev/null || fail "缺 ffmpeg"
 command -v unzip >/dev/null || fail "缺 unzip"
 uv run --project backend python -c "import Vision" 2>/dev/null || echo "⚠ 无 mac extra：OCR 通道缺席（冒烟不拦截，run 可能 partial）"
 
-TMP=$(mktemp -d /tmp/v2md-smoked-XXXXXX)
+TMP=$(mktemp -d /tmp/v2pdf-smoked-XXXXXX)
 SHELF="$TMP/outbox-shelf"
 API_PID=""
 STAMP="$TMP/.start-stamp"
@@ -34,7 +34,7 @@ cleanup() {
   rm -rf "$TMP"
 }
 trap cleanup EXIT
-sed -i '' -E 's/^(V2MD_REMOTE|V2MD_CLIPS_REMOTE|V2MD_CLIPS_SOURCE)=/# smoke 本地算力 \1=/' .env
+sed -i '' -E 's/^(V2PDF_REMOTE|V2PDF_CLIPS_REMOTE|V2PDF_CLIPS_SOURCE)=/# smoke 本地算力 \1=/' .env
 
 # —— 1. 合成 ~30s 测试视频（与 vault 冒烟同款：三句 + 同步烧录字幕）——
 SENTS=("量子纠缠是粒子之间的奇妙关联" "时间管理的第一步是记录时间去向" "光合作用将光能转化为化学能")
@@ -77,9 +77,9 @@ ffmpeg -y -hide_banner -loglevel error "${INPUTS[@]}" -i "$TMP/all.wav" \
 
 # —— 2. 起 api：deliver 模式 + 在架根进本测 tmp（不污染 data/outbox）——
 touch "$STAMP"  # 真 vault 零写入的比较基准先落地
-V2MD_WHISPER_MODEL="${WHISPER_MODEL:-small}" V2MD_MIN_TRANSCRIPT_CHARS=5 \
-V2MD_ARTIFACT_MODE=deliver V2MD_OUTBOX_DIR="$SHELF" V2MD_OUTBOX_TTL_H=24 \
-  uv run --project backend python -m video2md api --port "$PORT" \
+V2PDF_WHISPER_MODEL="${WHISPER_MODEL:-small}" V2PDF_MIN_TRANSCRIPT_CHARS=5 \
+V2PDF_ARTIFACT_MODE=deliver V2PDF_OUTBOX_DIR="$SHELF" V2PDF_OUTBOX_TTL_H=24 \
+  uv run --project backend python -m video2pdf api --port "$PORT" \
   > "$TMP/api.log" 2>&1 &
 API_PID=$!
 for _ in $(seq 1 40); do curl -s -m 2 "$API/healthz" >/dev/null 2>&1 && break; sleep 1; done
@@ -132,7 +132,7 @@ HTTP=$(curl -s -o "$TMP/bundle.zip" -w '%{http_code}' -m 60 "$API/runs/$RUN_ID/b
 unzip -q -o "$TMP/bundle.zip" -d "$TMP/unpacked"
 NOTE=$(find "$TMP/unpacked" -maxdepth 1 -name "*.md" ! -name "索引*" | head -1)
 [ -n "$NOTE" ] || fail "bundle 里没有笔记 md（整包内容见 $TMP/unpacked）"
-grep -q "processor: video2md" "$NOTE" || fail "frontmatter 缺 processor"
+grep -q "processor: video2pdf" "$NOTE" || fail "frontmatter 缺 processor"
 # ground truth 句查转录本（whisper 真输出，fake/真 LLM 两档都在），不查正文（正文由 LLM 整理，fake 档无实义）
 TR_FILE=$(ls "$TMP/unpacked/transcripts/"*.txt 2>/dev/null | head -1)
 [ -n "$TR_FILE" ] && grep -q "光合作用" "$TR_FILE" || fail "转录本不含 ground truth 句（转写失败？）"

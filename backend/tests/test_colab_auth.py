@@ -6,15 +6,15 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from video2md import colab_auth as auth
-from video2md.auth import Identity, current_identity
+from video2pdf import colab_auth as auth
+from video2pdf.auth import Identity, current_identity
 
 
 @pytest.fixture
 def web(monkeypatch, tmp_path):
-    monkeypatch.setitem(auth.ENV, "V2MD_COLAB_USERS_DIR", str(tmp_path / "users"))
-    monkeypatch.setitem(auth.ENV, "V2MD_COLAB_LOCK", str(tmp_path / "session.lock"))
-    monkeypatch.setitem(auth.ENV, "V2MD_AUTH", "google")
+    monkeypatch.setitem(auth.ENV, "V2PDF_COLAB_USERS_DIR", str(tmp_path / "users"))
+    monkeypatch.setitem(auth.ENV, "V2PDF_COLAB_LOCK", str(tmp_path / "session.lock"))
+    monkeypatch.setitem(auth.ENV, "V2PDF_AUTH", "google")
     identity = Identity("regular-user", "google", "google-user")
     calls = []
 
@@ -88,7 +88,7 @@ def test_non_google_identity_cannot_claim_a_google_account(web):
 
 def test_ordinary_google_user_is_not_gated_by_a_legacy_admin_list(web, monkeypatch):
     client, _, _, _ = web
-    monkeypatch.setitem(auth.ENV, "V2MD_COLAB_ADMIN_UIDS", "unrelated-legacy-admin")
+    monkeypatch.setitem(auth.ENV, "V2PDF_COLAB_ADMIN_UIDS", "unrelated-legacy-admin")
     assert client.get("/settings/colab").json()["can_authorize"] is True
     assert client.post("/settings/colab/start").status_code == 200
 
@@ -188,7 +188,7 @@ def test_google_identity_check_failure_never_exposes_upstream_data(web, monkeypa
 
 def test_colab_oauth_uses_the_configured_google_proxy(monkeypatch, tmp_path):
     proxy = "http://127.0.0.1:18080"
-    monkeypatch.setitem(auth.ENV, "V2MD_GOOGLE_OAUTH_PROXY_URL", proxy)
+    monkeypatch.setitem(auth.ENV, "V2PDF_GOOGLE_OAUTH_PROXY_URL", proxy)
     monkeypatch.setattr(auth.Path, "home", classmethod(lambda cls: tmp_path))
     flow = auth._flow(autogenerate_code_verifier=True)
     assert flow.oauth2session.proxies == {"http": proxy, "https": proxy}
@@ -198,7 +198,7 @@ def test_colab_account_verification_uses_the_configured_google_proxy(monkeypatch
     import google.auth.transport.requests
 
     proxy = "http://127.0.0.1:18080"
-    monkeypatch.setitem(auth.ENV, "V2MD_GOOGLE_OAUTH_PROXY_URL", proxy)
+    monkeypatch.setitem(auth.ENV, "V2PDF_GOOGLE_OAUTH_PROXY_URL", proxy)
     session = SimpleNamespace(proxies={}, get=lambda url, **kwargs: SimpleNamespace(
         raise_for_status=lambda: None, json=lambda: {"id": "google-subject"}))
 
@@ -219,19 +219,19 @@ def test_colab_account_verification_uses_the_configured_google_proxy(monkeypatch
 
 def test_auth_disabled_allows_only_local_development(web, monkeypatch):
     client, identity, _, _ = web
-    monkeypatch.setitem(auth.ENV, "V2MD_AUTH", "off")
-    monkeypatch.setitem(auth.ENV, "V2MD_ENV", "development")
+    monkeypatch.setitem(auth.ENV, "V2PDF_AUTH", "off")
+    monkeypatch.setitem(auth.ENV, "V2PDF_ENV", "development")
     assert client.post("/settings/colab/start").status_code == 403  # TestClient host is not loopback.
     request = SimpleNamespace(client=SimpleNamespace(host="127.0.0.1"))
     assert auth._allowed(request, identity)
-    monkeypatch.setitem(auth.ENV, "V2MD_ENV", "production")
+    monkeypatch.setitem(auth.ENV, "V2PDF_ENV", "production")
     assert not auth._allowed(request, identity)
 
 
 def test_validation_never_echoes_submitted_code(web):
     from fastapi.exceptions import RequestValidationError
 
-    from video2md.api import _on_validation_error
+    from video2pdf.api import _on_validation_error
 
     app = FastAPI(exception_handlers={RequestValidationError: _on_validation_error})
     app.include_router(auth.router)

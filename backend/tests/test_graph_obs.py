@@ -21,10 +21,10 @@ os.environ["OTEL_EXPORTER_OTLP_ENDPOINT"] = ""
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # backend/（包根）
 
-from video2md import graph, graph_obs, observability, runs, util
-from video2md.util import RunLog
+from video2pdf import graph, graph_obs, observability, runs, util
+from video2pdf.util import RunLog
 
-_TMP = Path(tempfile.mkdtemp(prefix="video2md-test-graphobs-"))
+_TMP = Path(tempfile.mkdtemp(prefix="video2pdf-test-graphobs-"))
 _ORIG_STATE_FILE = util.STATE_FILE
 _ORIG_LOG_DIR = util.LOG_DIR
 _ORIG_RUNS_FILE = runs.RUNS_FILE

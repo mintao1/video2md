@@ -18,7 +18,7 @@ def record():
 
 @pytest.mark.parametrize('stage', ['transcribe', 'frames', 'ocr', 'select', 'clips'])
 def test_failed_dependency_spends_no_note_tokens(stage, monkeypatch):
-    from video2md import graph
+    from video2pdf import graph
 
     run = record()
     run['partial_failures'] = {stage: ['1']}
@@ -32,10 +32,10 @@ def test_failed_dependency_spends_no_note_tokens(stage, monkeypatch):
 
 
 def test_missing_remote_clips_rejected_before_model(monkeypatch):
-    from video2md import graph
+    from video2pdf import graph
 
     run = record()
-    monkeypatch.setitem(graph.ENV, 'V2MD_CLIPS_REMOTE', 'http://gpu.test')
+    monkeypatch.setitem(graph.ENV, 'V2PDF_CLIPS_REMOTE', 'http://gpu.test')
     monkeypatch.setattr(graph, '_reload', lambda *args: run)
     monkeypatch.setattr(graph, '_persist', lambda *args: None)
     monkeypatch.setattr(graph, 'llm_task', lambda *a, **kw: pytest.fail('missing clips must not spend'))
@@ -45,7 +45,7 @@ def test_missing_remote_clips_rejected_before_model(monkeypatch):
 
 @pytest.mark.parametrize('image_post', [False, True])
 def test_healthy_entry_still_generates(image_post, monkeypatch, tmp_path):
-    from video2md import graph
+    from video2pdf import graph
 
     run = record()
     run['tmp'] = str(tmp_path)
@@ -55,7 +55,7 @@ def test_healthy_entry_still_generates(image_post, monkeypatch, tmp_path):
         art['images'] = ['photo.jpg']
         art.pop('clips')
     tasks = []
-    monkeypatch.setitem(graph.ENV, 'V2MD_CLIPS_REMOTE', 'http://gpu.test')
+    monkeypatch.setitem(graph.ENV, 'V2PDF_CLIPS_REMOTE', 'http://gpu.test')
     monkeypatch.setattr(graph, '_reload', lambda *args: run)
     monkeypatch.setattr(graph, '_persist', lambda *args: None)
     monkeypatch.setattr(graph, 'RunLog', lambda *a, **kw: SimpleNamespace(spans=[]))
@@ -69,7 +69,7 @@ def test_healthy_entry_still_generates(image_post, monkeypatch, tmp_path):
 
 
 def test_selection_excludes_failed_ocr_entry_but_keeps_original_index(monkeypatch):
-    from video2md import graph
+    from video2pdf import graph
 
     run = record()
     run['total'] = 2
@@ -88,7 +88,7 @@ def test_selection_excludes_failed_ocr_entry_but_keeps_original_index(monkeypatc
 
 
 def test_all_ocr_failures_skip_selection_model(monkeypatch):
-    from video2md import graph
+    from video2pdf import graph
 
     run = record()
     run['partial_failures'] = {'ocr': ['1']}
@@ -100,7 +100,7 @@ def test_all_ocr_failures_skip_selection_model(monkeypatch):
 
 @pytest.mark.parametrize('mode', ['empty_then_success', 'exhausted', 'parse_failure', 'stream_failure', 'auth_after_empty', 'success', 'no_usage'])
 def test_retry_accounts_every_observed_usage_once(mode, monkeypatch):
-    from video2md import llm, llm_settings, observability, runs
+    from video2pdf import llm, llm_settings, observability, runs
 
     monkeypatch.setattr(llm_settings, 'current', lambda: None)
     monkeypatch.setattr(llm, '_FAKE_LLM', False)
@@ -176,7 +176,7 @@ def test_retry_accounts_every_observed_usage_once(mode, monkeypatch):
 @pytest.mark.parametrize('rows', [[[0, '', 0, 'decode failed']],
                                   [[0, 'ok', .9, None], [1, '', 0, 'decode failed']]])
 def test_ocr_frame_errors_cannot_be_promoted_to_success(rows, monkeypatch, tmp_path):
-    from video2md import runs
+    from video2pdf import runs
     art = {'candidates': [[i, f'f{i}.jpg'] for i in range(len(rows))],
            'segs': [{'start':0,'end':2,'text':'healthy speech','conf':.95}], 'video':'fixture.mp4'}
     monkeypatch.setattr(runs, 'ocr_candidates', lambda *a, **kw: ([], rows))
@@ -186,7 +186,7 @@ def test_ocr_frame_errors_cannot_be_promoted_to_success(rows, monkeypatch, tmp_p
 
 
 def test_ocr_empty_text_without_error_is_valid_and_does_not_force_retry(monkeypatch, tmp_path):
-    from video2md import runs
+    from video2pdf import runs
     art = {'candidates': [[0, 'f.jpg']], 'segs': [{'start':0,'end':2,'text':'healthy speech','conf':.95}],
            'video':'fixture.mp4'}
     monkeypatch.setattr(runs, 'ocr_candidates', lambda *a, **kw: ([], [[0,'',0,None]]))
@@ -195,7 +195,7 @@ def test_ocr_empty_text_without_error_is_valid_and_does_not_force_retry(monkeypa
 
 
 def test_invalid_cached_ocr_is_retried(monkeypatch, tmp_path):
-    from video2md import runs
+    from video2pdf import runs
     art = {'candidates': [[0,'f.jpg']], 'segs':[{'start':0,'end':2,'text':'speech','conf':.95}],
            'video':'fixture.mp4', 'ocr_raw':[[0,'',0,'old failure']]}
     calls = []
@@ -207,7 +207,7 @@ def test_invalid_cached_ocr_is_retried(monkeypatch, tmp_path):
 def test_stage_loop_does_not_skip_failed_cached_ocr(monkeypatch, tmp_path):
     from contextlib import contextmanager, nullcontext
 
-    from video2md import runs
+    from video2pdf import runs
     art = {'candidates': [[0,'f.jpg']], 'segs':[{'start':0,'end':2,'text':'speech','conf':.95}],
            'video':'fixture.mp4', 'ocr_raw':[[0,'',0,'old failure']]}
     run = {'run_id':'ocr-cache-fixture','tmp':str(tmp_path),'entries':[{'url':'entry'}],

@@ -42,7 +42,7 @@ test('every authentication exit targets the brand home instead of a standalone l
   const router = await readFile(`${root}/src/router/index.ts`, 'utf8')
   const auth = await readFile(`${root}/src/stores/auth.ts`, 'utf8')
   const client = await readFile(`${root}/src/api/client.ts`, 'utf8')
-  const backend = await readFile(`${repo}/backend/video2md/api.py`, 'utf8')
+  const backend = await readFile(`${repo}/backend/video2pdf/api.py`, 'utf8')
   const terms = await readFile(`${root}/src/views/TermsView.vue`, 'utf8')
   const privacy = await readFile(`${root}/src/views/PrivacyView.vue`, 'utf8')
   const readme = await readFile(`${root}/README.md`, 'utf8')

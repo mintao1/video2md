@@ -15,7 +15,7 @@ def _sse(text="ok"):
 
 
 def test_chat_routes_model_and_task_params(monkeypatch):
-    from video2md import llm
+    from video2pdf import llm
 
     seen = []
 
@@ -36,7 +36,7 @@ def test_chat_routes_model_and_task_params(monkeypatch):
 
 
 def test_chat_retries_empty_stream_then_succeeds(monkeypatch):
-    from video2md import llm
+    from video2pdf import llm
 
     calls = []
 

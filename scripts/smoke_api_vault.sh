@@ -5,10 +5,10 @@
 # 用途：验证「GUI 后端只靠 API 就能驱动 + 取产出物」这条解耦通道活着
 #（产物存储正式解耦是 Phase 2；这里 vault 直写仍是图内行为，API 是读取面）。
 #   ./scripts/smoke_api_vault.sh              # 真实 LLM（烧少量 token，~2min）
-#   V2MD_FAKE_LLM=1 ./scripts/smoke_api_vault.sh  # 零 token 纯通道冒烟
+#   V2PDF_FAKE_LLM=1 ./scripts/smoke_api_vault.sh  # 零 token 纯通道冒烟
 set -euo pipefail
 cd "$(dirname "$0")/.."
-export PYTHONPATH="$PWD/backend"   # package=false：python -m video2md 靠包根上 path
+export PYTHONPATH="$PWD/backend"   # package=false：python -m video2pdf 靠包根上 path
 
 PORT="${SMOKE_PORT:-8792}"
 API="http://127.0.0.1:$PORT"
@@ -19,7 +19,7 @@ jqv() { python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get(sys.arg
 command -v ffmpeg >/dev/null || fail "缺 ffmpeg"
 uv run --project backend python -c "import Vision" 2>/dev/null || echo "⚠ 无 mac extra：OCR 通道缺席（冒烟不拦截，run 可能 partial）"
 
-TMP=$(mktemp -d /tmp/v2md-smoke-XXXXXX)
+TMP=$(mktemp -d /tmp/v2pdf-smoke-XXXXXX)
 API_PID=""
 STAMP="$TMP/.start-stamp"
 # .env 临时切本地算力（与 test_e2e 同口径：本机池子 9700 没起时，远程转录会把
@@ -31,7 +31,7 @@ cleanup() {
   rm -rf "$TMP"
 }
 trap cleanup EXIT
-sed -i '' -E 's/^(V2MD_REMOTE|V2MD_CLIPS_REMOTE|V2MD_CLIPS_SOURCE)=/# smoke 本地算力 \1=/' .env
+sed -i '' -E 's/^(V2PDF_REMOTE|V2PDF_CLIPS_REMOTE|V2PDF_CLIPS_SOURCE)=/# smoke 本地算力 \1=/' .env
 
 # —— 1. 合成 ~30s 测试视频（与 e2e 同款句子集：whisper condition_on_previous_text=False
 #     对 <10s 超短片段会整段空返回（实测），必须取 e2e 验证过的时长档）——
@@ -76,10 +76,10 @@ ffmpeg -y -hide_banner -loglevel error "${INPUTS[@]}" -i "$TMP/all.wav" \
   -c:v libx264 -pix_fmt yuv420p -c:a aac -shortest "$TMP/smoke.mp4"
 
 # —— 2. 起 api（本地算力；冒烟端口不扰 8790/8791）——
-# V2MD_MIN_TRANSCRIPT_CHARS 放宽：单句测试视频转录本远不到 200 字写盘门禁
+# V2PDF_MIN_TRANSCRIPT_CHARS 放宽：单句测试视频转录本远不到 200 字写盘门禁
 touch "$STAMP"  # vault 新文件的比较基准先落地
-V2MD_WHISPER_MODEL="${WHISPER_MODEL:-small}" V2MD_MIN_TRANSCRIPT_CHARS=5 \
-  uv run --project backend python -m video2md api --port "$PORT" \
+V2PDF_WHISPER_MODEL="${WHISPER_MODEL:-small}" V2PDF_MIN_TRANSCRIPT_CHARS=5 \
+  uv run --project backend python -m video2pdf api --port "$PORT" \
   > "$TMP/api.log" 2>&1 &
 API_PID=$!
 for _ in $(seq 1 40); do curl -s -m 2 "$API/healthz" >/dev/null 2>&1 && break; sleep 1; done
@@ -117,7 +117,7 @@ echo "  ✅ SSE 旁观 $N_EVT 事件、graph:end 关流（解耦进度面）"
 # —— 5. 产物：API 取回 == vault 落盘 ——
 NOTE=$(find "$NOTEDIR" -name "*.md" -newer "$STAMP" ! -name "索引*" | head -1)
 [ -n "$NOTE" ] || fail "vault 未出现新笔记（${NOTEDIR}）"
-grep -q "processor: video2md" "$NOTE" || fail "frontmatter 缺 processor"
+grep -q "processor: video2pdf" "$NOTE" || fail "frontmatter 缺 processor"
 # ground truth 句查转录本（whisper 真输出，fake/真 LLM 两档都在），不查正文（fake 档正文无语义）
 # （ls 无匹配/while 末轮测试失败都会以非零收尾——pipefail 下会静默杀掉赋值语句，双兜底）
 TR_FILE=$( (ls "$NOTEDIR/transcripts/"*.txt 2>/dev/null || true) | while read -r f; do if [ "$f" -nt "$STAMP" ]; then echo "$f"; fi; done | head -1)

@@ -5,12 +5,12 @@ from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
-from video2md import pg, pgmigrate
-from video2md.pgstore import PostgresRunsStore
-from video2md.prefs import PostgresPrefsStore
+from video2pdf import pg, pgmigrate
+from video2pdf.pgstore import PostgresRunsStore
+from video2pdf.prefs import PostgresPrefsStore
 
-DSN = os.environ.get("V2MD_TEST_PG_DSN")
-pytestmark = pytest.mark.skipif(not DSN, reason="requires disposable V2MD_TEST_PG_DSN")
+DSN = os.environ.get("V2PDF_TEST_PG_DSN")
+pytestmark = pytest.mark.skipif(not DSN, reason="requires disposable V2PDF_TEST_PG_DSN")
 
 
 @pytest.fixture
@@ -22,8 +22,8 @@ def stores():
         yield PostgresRunsStore(pool), PostgresPrefsStore(pool), uid
     finally:
         with pool.connection() as conn:
-            conn.execute("DELETE FROM v2md_runs WHERE owner=%s", (uid,))
-            conn.execute("DELETE FROM v2md_prefs WHERE uid=%s", (uid,))
+            conn.execute("DELETE FROM v2pdf_runs WHERE owner=%s", (uid,))
+            conn.execute("DELETE FROM v2pdf_prefs WHERE uid=%s", (uid,))
         pool.close()
 
 
@@ -71,7 +71,7 @@ def test_concurrent_preference_fields_merge_and_other_users_see_nothing(stores):
 
 
 def test_llm_settings_pg_isolates_and_preserves_keys(stores, monkeypatch):
-    from video2md import llm_settings
+    from video2pdf import llm_settings
     runs, _prefs, uid = stores
     monkeypatch.setattr(llm_settings, "_pool", lambda: runs.pool)
     try:

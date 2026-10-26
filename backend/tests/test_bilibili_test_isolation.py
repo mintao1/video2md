@@ -15,9 +15,9 @@ def test_collecting_bilibili_tests_does_not_import_application_configuration(tmp
     program = """
 import runpy,sys
 runpy.run_path('tests/test_bilibili_public_fallback.py')
-assert 'video2md.config' not in sys.modules, 'eager config import captures development storage'
+assert 'video2pdf.config' not in sys.modules, 'eager config import captures development storage'
 """
-    env = {**os.environ, "V2MD_SECRETS_FILE": str(tmp_path / "missing.env")}
+    env = {**os.environ, "V2PDF_SECRETS_FILE": str(tmp_path / "missing.env")}
     result = subprocess.run(
         [sys.executable, "-c", program], cwd=ROOT / "backend", env=env, capture_output=True, text=True
     )
@@ -28,10 +28,10 @@ def test_fallback_then_api_suite_preserves_external_sentinel_records(tmp_path):
     sentinel = tmp_path / "development-records"
     sentinel.mkdir()
     keys = {
-        "V2MD_RUNS_FILE": "runs.json",
-        "V2MD_STATE_FILE": "state.json",
-        "V2MD_USERS_FILE": "users.json",
-        "V2MD_PREFS_FILE": "prefs.json",
+        "V2PDF_RUNS_FILE": "runs.json",
+        "V2PDF_STATE_FILE": "state.json",
+        "V2PDF_USERS_FILE": "users.json",
+        "V2PDF_PREFS_FILE": "prefs.json",
     }
     paths = {key: sentinel / name for key, name in keys.items()}
     for path in paths.values():
@@ -40,20 +40,20 @@ def test_fallback_then_api_suite_preserves_external_sentinel_records(tmp_path):
     env = {
         **os.environ,
         **{key: str(path) for key, path in paths.items()},
-        "V2MD_ENV": "development",
-        "V2MD_AUTH": "off",
-        "V2MD_FAKE_LLM": "1",
-        "V2MD_SECRETS_FILE": str(tmp_path / "missing.env"),
-        "V2MD_PG_DSN": "",
-        "V2MD_RUNS_STORE": "json",
-        "V2MD_STATE_STORE": "json",
-        "V2MD_USERS_STORE": "json",
-        "V2MD_EVENTS": "local",
-        "V2MD_CHECKPOINTER": "sqlite",
+        "V2PDF_ENV": "development",
+        "V2PDF_AUTH": "off",
+        "V2PDF_FAKE_LLM": "1",
+        "V2PDF_SECRETS_FILE": str(tmp_path / "missing.env"),
+        "V2PDF_PG_DSN": "",
+        "V2PDF_RUNS_STORE": "json",
+        "V2PDF_STATE_STORE": "json",
+        "V2PDF_USERS_STORE": "json",
+        "V2PDF_EVENTS": "local",
+        "V2PDF_CHECKPOINTER": "sqlite",
         "OBSIDIAN_VAULT": str(sentinel / "vault"),
-        "V2MD_LOG_DIR": str(sentinel / "logs"),
-        "V2MD_UPLOADS_DIR": str(sentinel / "uploads"),
-        "V2MD_REMOTE": "off",
+        "V2PDF_LOG_DIR": str(sentinel / "logs"),
+        "V2PDF_UPLOADS_DIR": str(sentinel / "uploads"),
+        "V2PDF_REMOTE": "off",
     }
     # A regressed import would bind these sandbox sentinel paths before the API
     # suite sets its own temp paths. It can damage only the sandbox, never real data.

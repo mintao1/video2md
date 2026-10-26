@@ -16,14 +16,14 @@ CHECKER = ROOT / "scripts/check_video_resolver_runtime.py"
 def isolated_runtime_imports(monkeypatch, tmp_path):
     """Keep application imports after collection and outside local persisted data."""
     for key, name in {
-        "V2MD_RUNS_FILE": "runs.json", "V2MD_STATE_FILE": "state.json",
-        "V2MD_USERS_FILE": "users.json", "V2MD_PREFS_FILE": "prefs.json",
-        "V2MD_SECRETS_FILE": "nonexistent.env", "V2MD_LOG_DIR": "logs",
-        "V2MD_UPLOADS_DIR": "uploads", "OBSIDIAN_VAULT": "vault",
+        "V2PDF_RUNS_FILE": "runs.json", "V2PDF_STATE_FILE": "state.json",
+        "V2PDF_USERS_FILE": "users.json", "V2PDF_PREFS_FILE": "prefs.json",
+        "V2PDF_SECRETS_FILE": "nonexistent.env", "V2PDF_LOG_DIR": "logs",
+        "V2PDF_UPLOADS_DIR": "uploads", "OBSIDIAN_VAULT": "vault",
     }.items():
         monkeypatch.setenv(key, str(tmp_path / name))
-    monkeypatch.setenv("V2MD_AUTH", "off")
-    monkeypatch.setenv("V2MD_FAKE_LLM", "1")
+    monkeypatch.setenv("V2PDF_AUTH", "off")
+    monkeypatch.setenv("V2PDF_FAKE_LLM", "1")
 
 
 def _cases() -> list[dict]:
@@ -31,7 +31,7 @@ def _cases() -> list[dict]:
 
 
 def test_api_runtime_path_finds_venv_yt_dlp(monkeypatch):
-    from video2md import api
+    from video2pdf import api
 
     monkeypatch.setenv("PATH", "/usr/bin:/bin")
     configured = api.configure_subprocess_path()
@@ -40,9 +40,9 @@ def test_api_runtime_path_finds_venv_yt_dlp(monkeypatch):
 
 
 def test_explicit_direct_host_strips_ambient_proxy(monkeypatch):
-    from video2md import resolve
+    from video2pdf import resolve
 
-    monkeypatch.setenv("V2MD_DIRECT_HOSTS", "ferosse.tech,.internal.example")
+    monkeypatch.setenv("V2PDF_DIRECT_HOSTS", "ferosse.tech,.internal.example")
     monkeypatch.setenv("HTTP_PROXY", "http://127.0.0.1:17898")
     monkeypatch.setenv("HTTPS_PROXY", "http://127.0.0.1:17898")
     direct = resolve._subprocess_env(
@@ -57,16 +57,16 @@ def test_explicit_direct_host_strips_ambient_proxy(monkeypatch):
 
 
 def test_direct_host_suffix_does_not_match_lookalike(monkeypatch):
-    from video2md import resolve
+    from video2pdf import resolve
 
-    monkeypatch.setenv("V2MD_DIRECT_HOSTS", ".ferosse.tech")
+    monkeypatch.setenv("V2PDF_DIRECT_HOSTS", ".ferosse.tech")
     monkeypatch.setenv("HTTP_PROXY", "http://127.0.0.1:17898")
     assert "HTTP_PROXY" not in resolve._subprocess_env("https://cdn.ferosse.tech/v.mp4")
     assert resolve._subprocess_env("https://ferosse.tech.evil.example/v.mp4") is None
 
 
 def test_download_selector_accepts_single_format_mp4():
-    from video2md import download
+    from video2pdf import download
 
     assert download._FORMAT_SELECTOR.endswith("/best")
 

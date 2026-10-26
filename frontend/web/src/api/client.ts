@@ -14,16 +14,28 @@ export const BASE_URL = configuredBaseUrl ||
     (typeof window !== 'undefined' ? window.location.origin : 'http://127.0.0.1:8790'))
 
 // Google ID token is carried as a Bearer credential for every API request.
+// The pre-rename key (v2md_token) is moved over on first read so signed-in users stay signed in.
+const TOKEN_KEY = 'v2pdf_token'
+const LEGACY_TOKEN_KEY = 'v2md_token'
+
 export function getToken(): string | null {
-  return localStorage.getItem('v2md_token')
+  const token = localStorage.getItem(TOKEN_KEY)
+  if (token) return token
+  const legacy = localStorage.getItem(LEGACY_TOKEN_KEY)
+  if (legacy) {
+    localStorage.setItem(TOKEN_KEY, legacy)
+    localStorage.removeItem(LEGACY_TOKEN_KEY)
+  }
+  return legacy
 }
 
 export function setToken(token: string): void {
-  localStorage.setItem('v2md_token', token)
+  localStorage.setItem(TOKEN_KEY, token)
 }
 
 export function clearToken(): void {
-  localStorage.removeItem('v2md_token')
+  localStorage.removeItem(TOKEN_KEY)
+  localStorage.removeItem(LEGACY_TOKEN_KEY)
 }
 
 /** Only same-site absolute paths are accepted as post-login targets. */
@@ -34,7 +46,7 @@ export function safeRedirect(value: unknown, fallback = '/library'): string {
   return value
 }
 
-// With V2MD_AUTH=off (development only; production config rejects it) the API
+// With V2PDF_AUTH=off (development only; production config rejects it) the API
 // answers credential-less requests with a fixed dev identity. Ask the backend
 // instead of mirroring its auth mode in a build flag. Cached per page load;
 // a network failure is not cached so a late-starting API is picked up.
