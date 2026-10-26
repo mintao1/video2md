@@ -4,7 +4,7 @@
 
 粘贴 B 站、YouTube、抖音、小红书链接或上传本地视频，video2pdf 自动完成转写、抽帧、OCR、关键画面选择和正文整理，产出带时间戳章节、插图、视频片段和完整转录本的文稿，在网页阅读器里阅读或导出。
 
-> 导出格式：目前支持 Markdown；PDF 导出正在开发中，导出面板里的 PDF 选项暂未开放。
+> 导出格式：PDF（浏览器打印窗口中选择「保存为 PDF」，保留插图与公式）和 Markdown。EPUB 与 LaTeX 暂未开放。
 
 [![CI](https://github.com/mintao1/video2md/actions/workflows/ci.yml/badge.svg)](https://github.com/mintao1/video2md/actions/workflows/ci.yml) · 在线服务：[ferosse.tech](https://ferosse.tech)
 
@@ -20,7 +20,7 @@ video2pdf 产出的不是转录稿，而是**可阅读的文稿**：LLM 按章�
 2. **连接算力**：在「我的 → Colab 授权」连接自己的 Google Colab，转写和剪辑在用户自己的 T4 上跑。
 3. **提交视频**：粘贴链接或上传文件；合集可以按条目选择或整批处理。
 4. **看进度**：转换队列实时显示每个阶段的进度，失败的条目可以单独重试。
-5. **读与导出**：在阅读器里看文稿，或导出 Markdown、下载整包（正文 + 转录本 + 图片 + 片段）。
+5. **读与导出**：在阅读器里看文稿，或导出 PDF / Markdown、下载整包（正文 + 转录本 + 图片 + 片段）。
 
 ## 📦 产品边界
 
