@@ -3991,7 +3991,7 @@ wheels = [
 ]
 
 [[package]]
-name = "video2md"
+name = "video2pdf"
 version = "0.2.0"
 source = { virtual = "." }
 dependencies = [

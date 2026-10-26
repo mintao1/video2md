@@ -175,7 +175,7 @@ class WeChatProvider(AuthProvider):
     external_id 用 unionid（跨应用账号归并主键，配 put_identity 联动），否则 openid。
 
     零新依赖：urllib 直连且显式禁代理——api.weixin.qq.com 是国内站，进程环境里为
-    境外源准备的 HTTP_PROXY/V2MD_PROXY 隧道出口不该也不能参与微信换票。
+    境外源准备的 HTTP_PROXY/V2PDF_PROXY 隧道出口不该也不能参与微信换票。
     access_token 只用于顺带拉昵称头像（best-effort，失败不挡登录），不外发不落盘。
     """
     name = "wechat"
@@ -279,7 +279,7 @@ FactoriesT = dict[str, Callable[[Mapping[str, str]], AuthProvider]]
 _FACTORIES: FactoriesT = {
     GoogleProvider.name: lambda env: GoogleProvider(
         env.get("GOOGLE_CLIENT_ID", ""),
-        proxy_url=env.get("V2MD_GOOGLE_OAUTH_PROXY_URL", ""),
+        proxy_url=env.get("V2PDF_GOOGLE_OAUTH_PROXY_URL", ""),
     ),
     WeChatProvider.name: lambda env: WeChatProvider(env.get("WECHAT_APP_ID", ""),
                                                      env.get("WECHAT_APP_SECRET", "")),

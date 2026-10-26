@@ -35,13 +35,13 @@ def deployment(monkeypatch, tmp_path):
     before = {
         "metadata": {"managedFields": [{"manager": "fixture"}], "annotations": {
             "kubectl.kubernetes.io/last-applied-configuration": json.dumps({"env": [
-                {"name": "V2MD_ENV", "value": "production"},
-                {"name": "V2MD_ENV", "value": "production"},
+                {"name": "V2PDF_ENV", "value": "production"},
+                {"name": "V2PDF_ENV", "value": "production"},
             ]}),
         }},
         "spec": {"replicas": 1, "template": {"spec": {
             "containers": [{"name": "api", "image": "video2md:old", "env": [
-                {"name": "V2MD_ENV", "value": "production"},
+                {"name": "V2PDF_ENV", "value": "production"},
                 {"name": "SECRET", "valueFrom": {"secretKeyRef": {"name": "fixture", "key": "key"}}},
             ], "resources": {"limits": {"memory": "768Mi"}}}],
             "volumes": [{"name": "data", "persistentVolumeClaim": {"claimName": "data"}}],

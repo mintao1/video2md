@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # CI/跨平台全链路冒烟：进程级 mockpool（不起 docker、不依赖 gpu_router 仓库）+ 假 LLM。
-# 与 docker-compose.smoke.yml 同一套语义（V2MD_REMOTE/OCR_REMOTE/CLIPS_REMOTE → mockpool
+# 与 docker-compose.smoke.yml 同一套语义（V2PDF_REMOTE/OCR_REMOTE/CLIPS_REMOTE → mockpool
 # 契约假实现），夹具视频用 ffmpeg testsrc2（跨平台：无 say、无 mac 字体、无 Vision OCR）。
 # 验证：图整链跑通 + mockpool 契约 + SSE/轮询通道 + vault 产物（帧/节段/转录本画面通道）。
 #   scripts/smoke_ci.sh              # 起冒烟栈跑全链，产物落 $TMP 冒烟 vault
 #   KEEP_UP=1 scripts/smoke_ci.sh    # 跑完不杀 api（排查用）
 set -euo pipefail
 cd "$(dirname "$0")/.."
-export PYTHONPATH="$PWD/backend"   # package=false：python -m video2md 靠包根上 path
+export PYTHONPATH="$PWD/backend"   # package=false：python -m video2pdf 靠包根上 path
 
 PORT="${SMOKE_PORT:-8795}"
 API="http://127.0.0.1:$PORT"
@@ -17,7 +17,7 @@ jqv() { python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get(sys.arg
 
 command -v ffmpeg >/dev/null || fail "缺 ffmpeg"
 
-TMP=$(mktemp -d /tmp/v2md-smoke-ci-XXXXXX)
+TMP=$(mktemp -d /tmp/v2pdf-smoke-ci-XXXXXX)
 API_PID=""; POOL_PID=""
 VAULT="$TMP/vault"
 cleanup() {
@@ -43,13 +43,13 @@ echo "mockpool 就绪 :9795"
 
 # —— 3. 起 api（remote 算力三件套指 mockpool；vault 指 tmp，不碰真 vault）——
 mkdir -p "$VAULT/资料库/视频笔记"
-V2MD_FAKE_LLM=1 \
-V2MD_REMOTE="$POOL" V2MD_OCR_REMOTE="$POOL" V2MD_CLIPS_REMOTE="$POOL" \
-V2MD_CLIPS_SOURCE=remote \
+V2PDF_FAKE_LLM=1 \
+V2PDF_REMOTE="$POOL" V2PDF_OCR_REMOTE="$POOL" V2PDF_CLIPS_REMOTE="$POOL" \
+V2PDF_CLIPS_SOURCE=remote \
 OBSIDIAN_VAULT="$VAULT" \
-V2MD_STATE_FILE="$TMP/state.json" V2MD_RUNS_FILE="$TMP/runs.json" \
-V2MD_LOG_DIR="$TMP/logs" LANGFUSE_PK="" LANGFUSE_SK="" OTEL_EXPORTER_OTLP_ENDPOINT="" \
-  uv run --project backend python -m video2md api --port "$PORT" > "$TMP/api.log" 2>&1 &
+V2PDF_STATE_FILE="$TMP/state.json" V2PDF_RUNS_FILE="$TMP/runs.json" \
+V2PDF_LOG_DIR="$TMP/logs" LANGFUSE_PK="" LANGFUSE_SK="" OTEL_EXPORTER_OTLP_ENDPOINT="" \
+  uv run --project backend python -m video2pdf api --port "$PORT" > "$TMP/api.log" 2>&1 &
 API_PID=$!
 for _ in $(seq 1 40); do curl -s -m 2 "$API/healthz" >/dev/null 2>&1 && break; sleep 1; done
 curl -s -m 2 "$API/healthz" >/dev/null || fail "api 未起"

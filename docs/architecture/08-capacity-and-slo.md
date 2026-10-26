@@ -11,8 +11,8 @@
 
 | SLI | 精确口径 | 目标 | 测量管道 | 燃烧告警 |
 |---|---|---|---|---|
-| **run 成功率** | 7d 窗口：终态 error ÷ 全部终态（done\|partial\|error）。输入错误在 resolve 期 4xx、**不产生 run 记录**故天然剔除；**cancelled 无法与管线 error 区分，计入失败侧（保守：宁紧勿松）** | ≥ 99%（预算 1% = 1.68h/7d） | ✅ `v2md_runs_total{status}`（Prometheus） | ✅ RunSLOBudgetFastBurn 14.4×/1h+5m 双窗；RunSLOBudgetSlowBurn 6×/6h+30m 双窗（多窗多燃率：长短窗同燃才报） |
-| **SSE 首事件延迟** | connected 快照发出 → 首个业务事件转发（同连接） | p95 < 3s | ✅ `v2md_sse_first_event_seconds` 直方图（P1-5 本批落，桶 0.1–10s 含 3s 判读点） | 暂无（直方图先攒分布，告警阈值待基线） |
+| **run 成功率** | 7d 窗口：终态 error ÷ 全部终态（done\|partial\|error）。输入错误在 resolve 期 4xx、**不产生 run 记录**故天然剔除；**cancelled 无法与管线 error 区分，计入失败侧（保守：宁紧勿松）** | ≥ 99%（预算 1% = 1.68h/7d） | ✅ `v2pdf_runs_total{status}`（Prometheus） | ✅ RunSLOBudgetFastBurn 14.4×/1h+5m 双窗；RunSLOBudgetSlowBurn 6×/6h+30m 双窗（多窗多燃率：长短窗同燃才报） |
+| **SSE 首事件延迟** | connected 快照发出 → 首个业务事件转发（同连接） | p95 < 3s | ✅ `v2pdf_sse_first_event_seconds` 直方图（P1-5 本批落，桶 0.1–10s 含 3s 判读点） | 暂无（直方图先攒分布，告警阈值待基线） |
 | 提交接纳可用性 | POST /runs 非 5xx ÷ 全部（429 配额拒绝**不计失败**——配额闸按设计工作） | ≥ 99.9%（30d） | ⚠️ 请求级计数器缺位：现状只能事后审计 `api-requests.jsonl`（非实时）；Prometheus 化待请求计数仪表（下批）或反代 access log（P0-4） | 待管道 |
 | bundle 投递成功率 | bundle 200 ÷ (200+410 非过期口径) | ≥ 99% | ⚠️ 同上 jsonl 事后审计 | 待管道 |
 
@@ -27,10 +27,10 @@ RunFailed/RunPartial 事件告警仍是主力，燃烧告警是 SLO 问责口径
 
 | 参数 | 值 | 出处 |
 |---|---|---|
-| 执行并发 | `V2MD_MAX_CONCURRENT_RUNS` 默认 1（单 worker 语义） | `config.py:133` |
-| 总队列上限 | `V2MD_QUEUE_MAX` 默认 100 | `config.py:134` |
-| 每用户在途 | `V2MD_USER_QUEUE_MAX` 默认 5 | `config.py:135` |
-| 提交滑窗 | `V2MD_USER_SUBMIT_PER_MIN` 默认 30/分 | `config.py:136` |
+| 执行并发 | `V2PDF_MAX_CONCURRENT_RUNS` 默认 1（单 worker 语义） | `config.py:133` |
+| 总队列上限 | `V2PDF_QUEUE_MAX` 默认 100 | `config.py:134` |
+| 每用户在途 | `V2PDF_USER_QUEUE_MAX` 默认 5 | `config.py:135` |
+| 提交滑窗 | `V2PDF_USER_SUBMIT_PER_MIN` 默认 30/分 | `config.py:136` |
 | 上传单文件/配额/TTL | 2GB / 5GB每用户 / 24h | `config.py:141-143` |
 | outbox TTL | 24h | `config.py:119` |
 | 内存任务表 | `_TASKS_KEEP=200` 裁最老完成项 | `api.py:236` |
@@ -44,11 +44,11 @@ RunFailed/RunPartial 事件告警仍是主力，燃烧告警是 SLO 问责口径
 | 单 worker 吞吐 | `backend/scripts/loadtest.py --runs N`（mockpool+假LLM，串行闸=1，8s 夹具） | json 档 **0.1–0.3 s/run**（两轮方差=冷热缓存）≈ 1.2万–2.5万 run/h 上限；PG 档全链 **0.8 s/run** ≈ 4800 run/h |
 | 单 run 资源画像 | RSS 增量 + tmp 构成（转录/OCR 在远端不驻留本地） | api RSS 增量 ≈ **1 MB/run 量级**（10 run +12MB）；tmp 以视频轨主导：8s 夹具 2.8MB → 1h 外推 **≈1.2 GB**（×450 线性）+ 帧上限 60 + 节段 20s×N；阶段耗时 mock 口径无意义不填 |
 | 队列积压拐点 | 同用户并发斜坡 1→50（默认限流档） | 429 首现 **c=10（RATE_LIMITED 30/min）**；c=6 并发无 USER_QUEUE_FULL——**admit TOCTOU 窗口**（补遗②）；50 并发无 5xx |
-| 磁盘增长 | runs.json 字节/N；`pg_total_relation_size('v2md_runs')`/N | runs.json **≈1 KB/run**；PG v2md_runs **≈32 KB/run**（含索引；10 行小样本——表/索引固定页未摊薄，大样本会显著低于此值）；uploads 稳态=单文件≤2GB×TTL 24h 内活跃数，outbox 同式 |
+| 磁盘增长 | runs.json 字节/N；`pg_total_relation_size('v2pdf_runs')`/N | runs.json **≈1 KB/run**；PG v2pdf_runs **≈32 KB/run**（含索引；10 行小样本——表/索引固定页未摊薄，大样本会显著低于此值）；uploads 稳态=单文件≤2GB×TTL 24h 内活跃数，outbox 同式 |
 | PG 池压力 | PG 档全链 N run 观测 PoolTimeout | 10 run **零 PoolTimeout**（P1-8 预算 10s）；代价=每 run ~0.7s 落库开销（0.8 vs 0.1–0.3s，如实计价）；并发>1 的饱和观测待真实多副本形态 |
 | SSE 扇出上限 | 单 run N 并发 SSE 订阅收终态 | **N=20：20/20 无丢失**；队列上限 500 事件/订阅=理论界（短 run ~60 事件未触及），慢消费者超 500 积压才开始丢新事件 |
 
-复跑：`uv run --project backend python backend/scripts/loadtest.py --runs 10 --sse 20 [--pg]`（需 `V2MD_TEST_PG_DSN`）。
+复跑：`uv run --project backend python backend/scripts/loadtest.py --runs 10 --sse 20 [--pg]`（需 `V2PDF_TEST_PG_DSN`）。
 
 ### 扩容经验法则（实测前的保守口径）
 
@@ -69,9 +69,9 @@ Langfuse 按 uid 归因 token/成本（`observability.py:203-215`）；gpu_route
 
 | 键 | 语义 | 缺省 |
 |---|---|---|
-| `V2MD_PRICE_LLM_IN_MTOK` / `V2MD_PRICE_LLM_OUT_MTOK` | LLM 单价（USD/1M tokens，in/out 分列） | 0（不定价） |
-| `V2MD_PRICE_GPU_MIN` | GPU 单价（USD/远程调用分钟） | 0 |
-| `V2MD_BUDGET_MONTH_USD` | 每用户月度预算（USD；超限 POST /runs → 429） | 0（不设闸） |
+| `V2PDF_PRICE_LLM_IN_MTOK` / `V2PDF_PRICE_LLM_OUT_MTOK` | LLM 单价（USD/1M tokens，in/out 分列） | 0（不定价） |
+| `V2PDF_PRICE_GPU_MIN` | GPU 单价（USD/远程调用分钟） | 0 |
+| `V2PDF_BUDGET_MONTH_USD` | 每用户月度预算（USD；超限 POST /runs → 429） | 0（不设闸） |
 
 口径三条（诚实记账）：① GPU 按**远程调用墙钟时长**记（含传输/排队，上界非占用真值——
 与 P1-6 测量上界纪律同款）；② 崩溃丢未结算 usage（恢复重投重新累计，不重复计费）；

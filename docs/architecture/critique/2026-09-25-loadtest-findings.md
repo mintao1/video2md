@@ -22,8 +22,8 @@ resolve/入队之前，计数只反映已入队者）。真正兜住并发突发
 
 ## 发现③ 负载测试自身的沙箱纪律（已修，教训入档）
 
-loadtest A 节点首轮漏钉 `V2MD_RUNS_FILE/V2MD_STATE_FILE` 三件套 → **读写仓库根的
+loadtest A 节点首轮漏钉 `V2PDF_RUNS_FILE/V2PDF_STATE_FILE` 三件套 → **读写仓库根的
 真实开发数据**（所幸 POST 全被发现①的 500 挡在写入之前，未造成实际污染；另清点出
-11 条历史 v2md-smoke 夹具 run 残留在真实 runs.json，属既往批次的同类渗漏）。
+11 条历史 v2pdf-smoke 夹具 run 残留在真实 runs.json，属既往批次的同类渗漏）。
 已修：脚本每节点强制钉三件套至临时目录；起前端口清场 + 崩溃安全清理（try/finally
 收进程）——「测量工具不许污染被测系统」自此成文。

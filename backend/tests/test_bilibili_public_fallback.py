@@ -17,15 +17,15 @@ VIEW = {"code": 0, "data": {
 def isolated_modules(monkeypatch, tmp_path):
     # Import after collection: the API contract suite configures storage before
     # importing the application. Eager imports here would capture real paths.
-    for key, name in {"V2MD_RUNS_FILE": "runs.json", "V2MD_STATE_FILE": "state.json",
-                      "V2MD_USERS_FILE": "users.json", "V2MD_PREFS_FILE": "prefs.json",
-                      "V2MD_SECRETS_FILE": "missing.env", "V2MD_LOG_DIR": "logs",
-                      "V2MD_UPLOADS_DIR": "uploads", "OBSIDIAN_VAULT": "vault"}.items():
+    for key, name in {"V2PDF_RUNS_FILE": "runs.json", "V2PDF_STATE_FILE": "state.json",
+                      "V2PDF_USERS_FILE": "users.json", "V2PDF_PREFS_FILE": "prefs.json",
+                      "V2PDF_SECRETS_FILE": "missing.env", "V2PDF_LOG_DIR": "logs",
+                      "V2PDF_UPLOADS_DIR": "uploads", "OBSIDIAN_VAULT": "vault"}.items():
         monkeypatch.setenv(key, str(tmp_path / name))
-    monkeypatch.setenv("V2MD_AUTH", "off")
-    monkeypatch.setenv("V2MD_FAKE_LLM", "1")
+    monkeypatch.setenv("V2PDF_AUTH", "off")
+    monkeypatch.setenv("V2PDF_FAKE_LLM", "1")
     global download, resolve
-    from video2md import download, resolve
+    from video2pdf import download, resolve
 
 
 @pytest.fixture
@@ -71,7 +71,7 @@ def fail_webpage(monkeypatch, *, timeout=False):
 @pytest.mark.parametrize("view_412", [False, True])
 def test_proxy_outage_preserves_every_part_in_both_collection_sizes(monkeypatch, api_transport, count, view_412):
     calls, responses = api_transport
-    monkeypatch.setenv("V2MD_PROXY", "http://127.0.0.1:1")
+    monkeypatch.setenv("V2PDF_PROXY", "http://127.0.0.1:1")
     responses["view"] = {"code": 0, "data": {"title": "collection", "pages": [
         {"page": i, "cid": 1000 + i, "part": f"P{i}", "duration": 78}
         for i in range(1, count + 1)]}}

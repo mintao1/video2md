@@ -7,12 +7,12 @@ import threading
 # Bind to loopback by default. Compose deployments opt into the Docker bridge
 # address so containers can reach the relay without exposing it publicly.
 LISTEN = (
-    os.environ.get("V2MD_OAUTH_RELAY_HOST", "127.0.0.1"),
-    int(os.environ.get("V2MD_OAUTH_RELAY_PORT", "18080")),
+    os.environ.get("V2PDF_OAUTH_RELAY_HOST", "127.0.0.1"),
+    int(os.environ.get("V2PDF_OAUTH_RELAY_PORT", "18080")),
 )
 ALLOWED_IPS = {
     value.strip()
-    for value in os.environ.get("V2MD_OAUTH_RELAY_ALLOWED_IPS", "127.0.0.1").split(",")
+    for value in os.environ.get("V2PDF_OAUTH_RELAY_ALLOWED_IPS", "127.0.0.1").split(",")
     if value.strip()
 }
 

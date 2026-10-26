@@ -5,7 +5,7 @@ import type { Book } from '../types'
 
 export type ViewMode = 'list' | 'grid'
 
-const VIEW_KEY = 'v2md_library_view'
+const VIEW_KEY = 'v2pdf_library_view'
 
 export const useLibraryStore = defineStore('library', () => {
   const books = ref<Book[]>([])

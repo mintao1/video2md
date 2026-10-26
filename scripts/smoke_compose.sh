@@ -21,7 +21,7 @@ ffmpeg -y -hide_banner -loglevel error -f lavfi -i "testsrc2=duration=15:size=12
   -shortest deploy/fixtures/smoke.mp4
 echo "夹具就绪: deploy/fixtures/smoke.mp4"
 
-echo "—— 2. 构建生产镜像（video2md + gpu_router）——"
+echo "—— 2. 构建生产镜像（video2pdf + gpu_router）——"
 docker compose build -q
 
 echo "—— 3. 起冒烟栈 ——"
@@ -29,7 +29,7 @@ docker compose -f docker-compose.smoke.yml down -v >/dev/null 2>&1 || true
 rm -rf deploy/smoke-vault/* 2>/dev/null || true
 docker compose -f docker-compose.smoke.yml up -d --wait
 for _ in $(seq 1 30); do curl -s -m 2 "$API/healthz" >/dev/null 2>&1 && break; sleep 1; done
-curl -s -m 2 "$API/healthz" >/dev/null || fail "video2md 冒烟实例未起来"
+curl -s -m 2 "$API/healthz" >/dev/null || fail "video2pdf 冒烟实例未起来"
 curl -s -m 5 "$API/preflight" | grep -q '"ok": *true' || fail "preflight 未过（mockpool 不可达？）"
 echo "冒烟栈就绪"
 

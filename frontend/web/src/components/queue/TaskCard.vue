@@ -29,7 +29,7 @@ async function action(kind: 'cancel' | 'resume' | 'promote' | 'download') {
       const url = URL.createObjectURL(await downloadBundle(props.run.run_id))
       const anchor = document.createElement('a')
       anchor.href = url
-      anchor.download = `video2md-${props.run.run_id}.zip`
+      anchor.download = `video2pdf-${props.run.run_id}.zip`
       document.body.append(anchor)
       anchor.click()
       anchor.remove()

@@ -1,5 +1,5 @@
 // 生产 API 出口：视图/store 只从这里导入业务能力。
-// 会员/配额（getQuota/currentUser，v2md_membership）、
+// 会员/配额（getQuota/currentUser，v2pdf_membership）、
 // 教材库（getBooks/toggleFav/getToc/getNotes/saveProgress，/runs+/prefs）、
 // 队列页主链（listRuns/createRun/cancelRun → GET/POST /runs）。
 export { currentUser, getQuota, getCost } from './live/profile'

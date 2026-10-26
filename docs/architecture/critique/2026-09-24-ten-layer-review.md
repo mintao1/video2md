@@ -28,7 +28,7 @@
 |---|---|
 | **叙述** | 「域名 + 反代 TLS 是唯一公网入口（SSE 不缓冲；`/docs` `/openapi.json` 网关侧关闭）；安全组只放 80/443，api/算力池/观测栈全回环」（README L263） |
 | **现实** | 反代配置**只有 README 内嵌示例**（L121–147），仓内无 nginx/caddy 配置实体，`deploy/` 目录只有观测栈配置；`/docs` `/openapi.json` 在代码里无条件开放（`api.py:620-621`），关闭动作完全依赖运维者手工照抄示例并记得加 deny 规则；「安全组只放 80/443」是文字口径，仓内无任何 IaC/防火墙脚本承载 |
-| **定级依据** | 机制本体（`V2MD_HOST=127.0.0.1` 回环绑定，`api.py:1046-1048`；compose `network_mode: host`）真实存在，但「网关侧关闭 /docs」这一安全关键动作无资产、无校验、无测试——教科书定义的 *policy without mechanism* |
+| **定级依据** | 机制本体（`V2PDF_HOST=127.0.0.1` 回环绑定，`api.py:1046-1048`；compose `network_mode: host`）真实存在，但「网关侧关闭 /docs」这一安全关键动作无资产、无校验、无测试——教科书定义的 *policy without mechanism* |
 
 **批判**：入口层是公网系统的第一防线，此层的「半档」不在绑定（做对了），而在**把安全关键配置留在文档里**。`deploy.sh`（`scripts/deploy.sh:49-50`）起栈后不验证 `/docs` 是否被反代拦掉——漏配反代 deny 规则的部署会静默裸奔 OpenAPI。企业基线要求：反代配置入仓、版本化、随部署生效、上线检查自动化。
 
@@ -37,16 +37,16 @@
 | | 内容 |
 |---|---|
 | **叙述** | acctkit 登录（Google id_token / 设备流 / 微信扫码，provider 可插拔）；run 按 uid 归属——越权 403、dedup 按 owner 隔离（README L264） |
-| **现实** | 机制真实且扎实：`_require_run_access` 越权 403（`api.py:283-296`）、acctkit 引擎按序尝试 provider、Google+微信 unionid 归并有测试（`test_acctkit.py`）。**但**：`V2MD_AUTH=off` 是缺省值（`acctkit/providers.py` Fake+Dev 兜底），与 `V2MD_ENV=production`（compose 已配，`docker-compose.yml:56`）可以**共存而系统不抗议**——忘了配 AUTH 的生产部署会以「所有人共享 dev uid」形态裸奔，无任何启动校验拦它 |
+| **现实** | 机制真实且扎实：`_require_run_access` 越权 403（`api.py:283-296`）、acctkit 引擎按序尝试 provider、Google+微信 unionid 归并有测试（`test_acctkit.py`）。**但**：`V2PDF_AUTH=off` 是缺省值（`acctkit/providers.py` Fake+Dev 兜底），与 `V2PDF_ENV=production`（compose 已配，`docker-compose.yml:56`）可以**共存而系统不抗议**——忘了配 AUTH 的生产部署会以「所有人共享 dev uid」形态裸奔，无任何启动校验拦它 |
 | **定级依据** | 鉴权机制本身 ✅；「绝不 off 上公网」目前只是 README L156 检查清单里的一行字，靠部署者自律 |
 
-**批判**：这是**可防呆而未防呆**的典型案例。`config.py` 已有 fail-fast 先例（`V2MD_ARTIFACT_MODE` 非法值直接 raise，`config.py:113-115`），同样的纪律一行代码就能覆盖「production + auth=off」组合，却没做。企业基线：危险配置的非法组合必须在启动期爆炸，而不是在检查清单里祈祷。
+**批判**：这是**可防呆而未防呆**的典型案例。`config.py` 已有 fail-fast 先例（`V2PDF_ARTIFACT_MODE` 非法值直接 raise，`config.py:113-115`），同样的纪律一行代码就能覆盖「production + auth=off」组合，却没做。企业基线：危险配置的非法组合必须在启动期爆炸，而不是在检查清单里祈祷。
 
 ### 3. 执行层 — ❌ 含硬矛盾（十层中问题最重）
 
 | | 内容 |
 |---|---|
-| **叙述** | 「多 worker 并发：**队列调度** + 每用户并发上限 + **公平排队**……任务表 PG 真相源（`V2MD_TASKS_STORE=postgres`……多副本下各实例看到的是同一个队列）」（README L265）；落地状态表称 P4b「全落地」（L280） |
+| **叙述** | 「多 worker 并发：**队列调度** + 每用户并发上限 + **公平排队**……任务表 PG 真相源（`V2PDF_TASKS_STORE=postgres`……多副本下各实例看到的是同一个队列）」（README L265）；落地状态表称 P4b「全落地」（L280） |
 | **现实** | ①「任务表 PG 真相源」是**读侧真相源**：`_TASKS` 写路径仍是进程内 dict（`api.py:230`，代码注释自述「写路径保留不动」`api.py:240-243`）；`GET /runs/{id}` 的 `task` 字段只读本进程内存（`api.py:852-856`）——副本 B 看不到副本 A 驱动的 run 的实时任务段，只能靠 SSE 扇出和 runs 表 status 列补。②「队列调度」不存在：并发控制是一个 `asyncio.Semaphore`（`api.py:231`），无调度器、无优先级、**无公平排队**（FIFO 唤醒序不保证跨用户公平，单用户灌满队列时他人照样排队——`USER_QUEUE_MAX` 限的是数量不是调度公平）。③「多 worker」的真实语义 = 单进程内信号量计数，不是多副本 worker 池 |
 | **定级依据** | 叙述三个关键词（队列调度/公平排队/多 worker）全部溢出实现；且 README 自列出界项四条（L282–287）与「P1–P4b 全落地」标题（L274）在同一小节内互相打架 |
 
@@ -88,7 +88,7 @@
 | | 内容 |
 |---|---|
 | **叙述** | gpu_router 算力池独立伸缩，与 api 解耦——api 侧零 GPU（README L269） |
-| **现实** | 解耦真实（api 只是 HTTP 客户端，`V2MD_REMOTE` 指向）；插件协议清晰（`gpu_plugins/v2md/__init__.py:42-65` 能力契约 + `PROVIDER_IMPL` 装载）。**但**：① gpu_router `:9700` **无认证面**——`docker-compose.yml:25-26` 注释自述「无认证不暴露公网」，防线 = 安全组叙述 + 运维者读注释；② `reference/colab_cell_server.py` 的 cloudflared quick tunnel 是**无鉴权公网 URL**（模块自述），知道这个临时域名即可白嫖 GPU 工时 |
+| **现实** | 解耦真实（api 只是 HTTP 客户端，`V2PDF_REMOTE` 指向）；插件协议清晰（`gpu_plugins/v2md/__init__.py:42-65` 能力契约 + `PROVIDER_IMPL` 装载）。**但**：① gpu_router `:9700` **无认证面**——`docker-compose.yml:25-26` 注释自述「无认证不暴露公网」，防线 = 安全组叙述 + 运维者读注释；② `reference/colab_cell_server.py` 的 cloudflared quick tunnel 是**无鉴权公网 URL**（模块自述），知道这个临时域名即可白嫖 GPU 工时 |
 | **定级依据** | 架构解耦做对了；安全模型是「网络位置即信任」——在单宿主回环内成立，但 quick tunnel 把这个模型打出了公网缺口 |
 
 ### 8. 数据安全层 — 🟡 半档
@@ -128,7 +128,7 @@
 | E4 | 提交 `3f7bb1a`/`f6a4a0e`「双进程冒烟全绿」 | 测试是单进程双实例模拟（`test_pg_stores.py:159-211`，`_simulate_other_proc` 手工 NOTIFY） | 「真库 + 双实例模拟全绿；真双进程冒烟待固化」（=出界项四） |
 | E5 | L263「`/docs` 网关侧关闭」+ L160 检查清单 | 无机制承载：仓内无反代配置，`api.py:620-621` 无条件开放 | 标注为「待反代配置入仓后闭环」（ROADMAP P0-4），当前是人工纪律 |
 | E6 | L271/L204「GHCR 镜像同时是灾备存档」 | `deploy.sh:49` 主路径是目标机 `compose build`，不消费 GHCR 镜像 | 灾备口径限定为「手动 `docker pull` 兜底」（`deploy.sh:12-13` 注释的真实含义），或 ROADMAP 立项改 pull 部署 |
-| E7 | L156 检查清单「`V2MD_AUTH` 必须 google」 | 无防呆：`production + off` 组合启动不抗议 | 标注 ROADMAP P0-1（启动期 fail-fast）闭环前，此为人工纪律 |
+| E7 | L156 检查清单「`V2PDF_AUTH` 必须 google」 | 无防呆：`production + off` 组合启动不抗议 | 标注 ROADMAP P0-1（启动期 fail-fast）闭环前，此为人工纪律 |
 
 ## 批判结论
 
