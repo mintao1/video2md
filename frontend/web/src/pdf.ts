@@ -1,9 +1,37 @@
 import DOMPurify from 'dompurify'
 import { marked } from 'marked'
-import { extractCallouts, mediaMarkdown, mediaNames } from './reader'
+import { mediaMarkdown, mediaNames } from './reader'
 
 export type PdfNote = { title: string; md: string }
 export type PdfMediaLoader = (name: string) => Promise<Blob>
+type PdfCallout = { type: 'info' | 'tip' | 'warning' | 'example'; title: string; body: string }
+
+const CALLOUT_START = /^>\s*\[!(info|tip|warning|example)\](?:-)?(?:\s+(.*))?\s*$/
+
+function extractCallouts(md: string): { markdown: string; callouts: PdfCallout[] } {
+  const lines = md.split(/\r?\n/)
+  const output: string[] = []
+  const callouts: PdfCallout[] = []
+  for (let i = 0; i < lines.length; i++) {
+    const match = CALLOUT_START.exec(lines[i] ?? '')
+    if (!match) {
+      output.push(lines[i] ?? '')
+      continue
+    }
+    const body: string[] = []
+    while (i + 1 < lines.length && /^>\s?/.test(lines[i + 1] ?? '')) {
+      i += 1
+      body.push((lines[i] ?? '').replace(/^>\s?/, ''))
+    }
+    callouts.push({
+      type: match[1] as PdfCallout['type'],
+      title: match[2]?.trim() || match[1],
+      body: body.join('\n').trim(),
+    })
+    output.push(`<!--V2MD_PDF_CALLOUT_${callouts.length - 1}-->`)
+  }
+  return { markdown: output.join('\n'), callouts }
+}
 
 function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/g, (char) => ({
@@ -23,7 +51,7 @@ function renderNote(md: string, mediaUrls: Record<string, string>): string {
     return `<aside class="md-callout md-callout-${callout.type}"><h3>${escapeHtml(callout.title)}</h3><div>${body}</div></aside>`
   })
   extracted.callouts.forEach((_callout, index) => {
-    source = source.replace(`<!--V2MD_CALLOUT_${index}-->`, calloutHtml[index] ?? '')
+    source = source.replace(`<!--V2MD_PDF_CALLOUT_${index}-->`, calloutHtml[index] ?? '')
   })
 
   const fragment = DOMPurify.sanitize(marked.parse(source, { async: false }) as string, {
