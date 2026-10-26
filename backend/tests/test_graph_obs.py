@@ -118,10 +118,11 @@ assert ev[-1]["event"] == "graph:end" and ev[-1]["status"] == "done", ev[-1]
 nodes = [e["node"] for e in ev if e["event"] == "graph:node"]
 assert nodes == ["resolve", "download", "transcribe", "frames", "ocr",
                  "select_frames_llm", "select", "clips", "note_entry", "finalize"], nodes
-# 条件边路由决策（select_frames_llm/finalize 无条件边 → 无 route 事件，dict 精确等值钉住）
+# 条件边路由决策（finalize 无条件边 → 无 route 事件，dict 精确等值钉住）
 routes = {e["frm"]: e["decision"] for e in ev if e["event"] == "graph:route"}
 assert routes == {"resolve": "ok", "download": "ok", "transcribe": "ok", "frames": "ok",
-                  "ocr": "ok", "select": "ok", "clips": "ok", "note_entry": "done"}, routes
+                  "ocr": "ok", "select_frames_llm": "ok", "select": "ok", "clips": "ok",
+                  "note_entry": "done"}, routes
 states = {e["node"]: e for e in ev if e["event"] == "graph:state"}
 assert all("keys" in e and "step" in e and "durMs" in e for e in states.values())
 assert states["note_entry"]["entry_idx"] == 2, states["note_entry"]       # 回环游标
