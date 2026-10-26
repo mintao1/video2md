@@ -166,6 +166,7 @@ CI 在 push 和 pull request 中运行后端测试、lint、进程级冒烟测�
 ## 📖 相关文档
 
 - [设计决策](docs/design-decisions.md)
+- [评测汇总](docs/evals/SUMMARY.md)
 - [前端说明](frontend/web/README.md)
 - [API 契约](docs/architecture/03-api-contract.md)
 - [数据与一致性](docs/architecture/04-data-and-consistency.md)
