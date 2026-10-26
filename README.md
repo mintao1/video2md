@@ -6,6 +6,12 @@ video2md 从视频链接或本地文件开始，完成解析、下载、转写�
 
 [![CI](https://github.com/mintao1/video2md/actions/workflows/ci.yml/badge.svg)](https://github.com/mintao1/video2md/actions/workflows/ci.yml)
 
+## 🎯 核心与外围
+
+**核心**是视频 → Obsidian 笔记这条管线：`backend/video2md/` 中的 LangGraph 编排（`graph.py`）、各处理阶段、LLM 整理与质量门禁。为什么失败时不重试、为什么三连败判错、为什么 GPU 不可用时不默认降级，见 [设计决策](docs/design-decisions.md)。
+
+**外围**是为云端多用户部署准备的能力：鉴权与 OAuth、配额与计费、多 GPU 供应商路由、Kubernetes、灾备、OpenTelemetry/Prometheus/Langfuse。本地自用只需要核心部分。
+
 ## 🌟 功能
 
 | 能力 | 说明 |
@@ -159,6 +165,7 @@ CI 在 push 和 pull request 中运行后端测试、lint、进程级冒烟测�
 
 ## 📖 相关文档
 
+- [设计决策](docs/design-decisions.md)
 - [前端说明](frontend/web/README.md)
 - [API 契约](docs/architecture/03-api-contract.md)
 - [数据与一致性](docs/architecture/04-data-and-consistency.md)
