@@ -194,7 +194,7 @@ def evaluate_repository(repo_root: Path) -> list[str]:
     )
     require(
         "repo-google-httpx-transport",
-        "class _GoogleHttpxRequest" in providers and "httpx.Client(proxy=proxy_url or None)" in providers,
+        "class _GoogleHttpxRequest" in providers and "httpx.Client(proxy=self.proxy_url or None)" in providers,
         "Google certificate retrieval must use the proven HTTPX proxy path",
     )
     require(
