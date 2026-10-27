@@ -1,0 +1,286 @@
+# === 平台 CI 部署步骤模板 ===
+# GitHub Actions Deploy workflow。
+# 流程：runner 渲染清单（kustomize build，monorepo 布局）→ ssh 到节点 checkout
+#       目标 SHA 并 docker build → sudo k3s ctr images import → 渲染结果管道给
+#       服务器 kubectl apply → rollout + smoke。
+# ⚠️ 不要在服务器上 apply -k：产品 components 引用平台仓相对路径，服务器副本解析不到（HC-01）。
+# ⚠️ 镜像唯一来源 = 节点构建 + ctr import（HC-02）：不 pull/push 任何外部镜像仓库。
+#
+# 前置条件：
+#   - 服务器 SSH key 配置在 GitHub Secrets (SSH_HOST, SSH_USER, SSH_KEY)
+#   - 服务器存在 ~/stack/<product>-git（git 管理的产品仓 checkout；部署时
+#     fetch + checkout 到目标 SHA，不是手工副本，见 HC-03）
+#   - 产品 deploy/k8s/base/kustomization.yaml 已就绪；发布时由临时渲染层
+#     注入本次版本，不依赖仓库预先存在 images.newTag。
+#   - 平台仓/产品仓为私有时另配 PLATFORM_REPO_TOKEN / PRODUCT_REPO_TOKEN（contents:read）
+#
+# OVERRIDE-POINT 约定（DEP-01 / DEP-02）：
+#   产品仓复制本模板后，只允许改 `# OVERRIDE-POINT: <name>` 与
+#   `# OVERRIDE-POINT-END: <name>` 之间的内容；区块之外必须逐字一致。
+#   其余偏离必须登记于产品仓 `.platform/overrides.yml`（含 reason/adr/owner/expires）。
+#   初始集合：smoke_path / version_source / network_mode。
+name: Deploy
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      product:
+        description: '产品名（如 gpu-router, video2md）'
+        required: true
+      version:
+        description: '版本号（如 0.2.1）；version_source 覆盖时可不填'
+        required: false
+      deployment:
+        description: 'Deployment 名称（默认按产品名推导；video2md 默认 video2md-api）'
+        required: false
+      environment:
+        description: '目标环境'
+        required: true
+        type: choice
+        options: [dev, prod]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment || 'prod' }}
+    steps:
+      # ── 清单在 runner 渲染，不在服务器 ──────────────────────────────
+      # 产品 base 经 components: 引用平台仓 templates/k8s-base/components，
+      # 相对路径 ../../../../ 只在「平台仓根含各产品目录」的 monorepo 布局下成立。
+      # 服务器上没有平台仓副本，apply -k 必挂（accumulating components）；
+      # 服务器 snap kustomize 自带的 git 也缺 libpcre2，远程 URL 引用同样不可用。
+      # 故 runner 里还原 monorepo 布局：平台仓 checkout 到 workspace 根、
+      # 产品仓 checkout 到子目录，再 kustomize build → 渲染结果管道给服务器
+      # kubectl apply。服务器全程不需要 kustomize/git（HC-01）。
+      - uses: actions/checkout@v4
+        with:
+          repository: mintao1/cloud-deploy-platform
+          token: ${{ secrets.PLATFORM_REPO_TOKEN || github.token }}
+
+      - uses: actions/checkout@v4
+        with:
+          repository: mintao1/${{ inputs.product || 'video2md' }}
+          path: ${{ inputs.product || 'video2md' }}
+          token: ${{ secrets.PRODUCT_REPO_TOKEN || github.token }}
+
+      # 钉死 kustomize 版本：runner 默认不带 kustomize；kubectl kustomize 将随
+      # KEP-4706 移除，不作依赖。
+      - name: Install kustomize
+        run: |
+          curl -sL "https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv5.4.3/kustomize_v5.4.3_linux_amd64.tar.gz" \
+            | tar xz -C /usr/local/bin kustomize
+          kustomize version
+
+      # OVERRIDE-POINT: version_source —— 默认：workflow 输入作为版本号
+      - name: Resolve version (workflow input)
+        id: ver
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          VERSION="${INPUT_VERSION:-${GITHUB_SHA::12}}"
+          # Docker/Kubernetes image tags must not contain whitespace or shell
+          # metacharacters. Semver, release tags, and the short SHA are valid.
+          if [[ ! "$VERSION" =~ ^[A-Za-z0-9_][A-Za-z0-9_.-]*$ ]]; then
+            echo "invalid image version: $VERSION" >&2
+            exit 2
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+      # OVERRIDE-POINT-END: version_source
+
+      - name: Resolve node disk guard threshold (platform SSOT)
+        id: limits
+        run: |
+          set -euo pipefail
+          MIN_FREE_GIB="$(awk -F: '$1 == "min_free_disk_gb" { value=$2; sub(/#.*/, "", value); gsub(/[[:space:]]/, "", value); print value; exit }' rules/node-limits.yml)"
+          if [[ ! "$MIN_FREE_GIB" =~ ^[1-9][0-9]*$ ]]; then
+            echo "invalid min_free_disk_gb in rules/node-limits.yml: $MIN_FREE_GIB" >&2
+            exit 2
+          fi
+          echo "min_free_gib=$MIN_FREE_GIB" >> "$GITHUB_OUTPUT"
+
+      - name: Render manifests
+        run: |
+          set -euo pipefail
+          PRODUCT="${{ inputs.product || 'video2md' }}"
+          VERSION="${{ steps.ver.outputs.version }}"
+          cd "${PRODUCT}/deploy/k8s/base"
+          # Inject the exact image built on the node below through a temporary
+          # overlay. The product kustomization remains unchanged in the checkout.
+          # Kustomize rejects absolute resource paths. Keep the temporary
+          # overlay inside the checked-out monorepo so the product base can be
+          # referenced relatively while its shared platform components remain
+          # resolvable.
+          RENDER_DIR="$(mktemp -d "${GITHUB_WORKSPACE}/.deploy-render.XXXXXX")"
+          trap 'rm -rf "$RENDER_DIR"' EXIT
+          cat > "$RENDER_DIR/kustomization.yaml" <<EOF
+          apiVersion: kustomize.config.k8s.io/v1beta1
+          kind: Kustomization
+          resources:
+            - ../${PRODUCT}/deploy/k8s/base
+          images:
+            - name: ${PRODUCT}
+              newName: ${PRODUCT}
+              newTag: ${VERSION}
+          EOF
+          # The base imports shared platform components outside the product
+          # directory; this is intentional and only the runner renders it.
+          kustomize build "$RENDER_DIR" --load-restrictor LoadRestrictionsNone > /tmp/rendered.yaml
+          grep -q "image: ${PRODUCT}:${VERSION}" /tmp/rendered.yaml || {
+            echo "rendered manifest does not contain ${PRODUCT}:${VERSION}" >&2
+            exit 1
+          }
+          # Keep every image reference, including initContainers, in the
+          # deployment handoff.  The node must import each local image into
+          # k3s containerd before apply; relying on Docker's image store alone
+          # leaves a Pod in ErrImagePull after a node restart.
+          awk '$1 == "image:" {print $2}' /tmp/rendered.yaml \
+            | sed -E 's/^["'"'']//; s/["'"'']$//' \
+            | sort -u > /tmp/deploy-images.txt
+          test -s /tmp/deploy-images.txt || {
+            echo "rendered manifest contains no image references" >&2
+            exit 1
+          }
+          echo "── images to import ──"
+          cat /tmp/deploy-images.txt
+          echo "── 渲染 $(grep -c '^kind:' /tmp/rendered.yaml) 个资源 ──"
+
+      # 后面三步都走同一把 key（key 注入不落到 runner ssh config）
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H "${{ secrets.SSH_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Guard node disk pressure before build
+        env:
+          MIN_FREE_GIB: ${{ steps.limits.outputs.min_free_gib }}
+        run: |
+          set -euo pipefail
+          set +e
+          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
+            "MIN_FREE_GIB=${MIN_FREE_GIB} bash -s" < scripts/node-build-guard.sh
+          STATUS=$?
+          set -e
+          if [[ "$STATUS" -ne 0 ]]; then
+            echo "::error title=Deployment blocked by node disk pressure::K3s node failed the disk-pressure/ephemeral-storage guard; no build or apply was attempted."
+            exit "$STATUS"
+          fi
+
+      # ── 节点：checkout 目标 SHA → docker build → ctr import（HC-02 唯一来源）──
+      # ~/stack/<product>-git 是 git 管理的 checkout：每次部署 fetch + checkout
+      # 到触发本次 workflow 的 SHA，版本从该 commit 读，不依赖手工副本（HC-03）。
+      - name: Build and import image on node
+        run: |
+          set -euo pipefail
+          PRODUCT="${{ inputs.product || 'video2md' }}"
+          VERSION="${{ steps.ver.outputs.version }}"
+          SHA="${{ github.sha }}"
+          IMAGE_LIST="/tmp/${PRODUCT}-images-${GITHUB_RUN_ID}.txt"
+          # Transfer only the rendered image names.  The manifest remains
+          # rendered on the runner and is still applied with kubectl -f -.
+          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
+            "cat > '${IMAGE_LIST}'" < /tmp/deploy-images.txt
+          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "
+            set -euo pipefail
+            trap 'rm -f \"${IMAGE_LIST}\"' EXIT
+            REPO=~/stack/${PRODUCT}-git
+            if [ ! -d \"\$REPO/.git\" ]; then
+              git clone git@github.com:mintao1/${PRODUCT}.git \"\$REPO\"
+            fi
+            cd \"\$REPO\"
+            git fetch --quiet origin
+            git checkout --quiet --detach ${SHA}
+            echo \"  源码 commit \$(git rev-parse HEAD)\"
+            docker build \
+              --build-arg PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple \
+              --build-arg VERSION=${VERSION} \
+              --build-arg GIT_SHA=${SHA} \
+              -t ${PRODUCT}:${VERSION} .
+            while IFS= read -r IMAGE; do
+              [[ -n \"\$IMAGE\" ]] || continue
+              if docker image inspect \"\$IMAGE\" >/dev/null 2>&1; then
+                echo \"  importing \$IMAGE into k3s containerd\"
+                docker save \"\$IMAGE\" | sudo k3s ctr images import -
+              elif sudo k3s ctr images list -q | grep -Fxq \"\$IMAGE\" \\
+                || sudo k3s ctr images list -q | grep -Fxq \"docker.io/library/\$IMAGE\"; then
+                echo \"  \$IMAGE already present in k3s containerd\"
+              else
+                echo \"✗ rendered image is absent from Docker and k3s: \$IMAGE\" >&2
+                echo '  Build/import every initContainer image on the node before apply.' >&2
+                exit 43
+              fi
+              if ! sudo k3s ctr images list -q | grep -Fxq \"\$IMAGE\" \\
+                && ! sudo k3s ctr images list -q | grep -Fxq \"docker.io/library/\$IMAGE\"; then
+                echo \"✗ k3s containerd import verification failed: \$IMAGE\" >&2
+                exit 44
+              fi
+            done < \"${IMAGE_LIST}\"
+            echo '✓ all rendered images imported and verified in k3s containerd'
+          "
+
+      - name: Guard node disk pressure before apply
+        env:
+          MIN_FREE_GIB: ${{ steps.limits.outputs.min_free_gib }}
+        run: |
+          set -euo pipefail
+          set +e
+          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
+            "MIN_FREE_GIB=${MIN_FREE_GIB} bash -s" < scripts/node-build-guard.sh
+          STATUS=$?
+          set -e
+          if [[ "$STATUS" -ne 0 ]]; then
+            echo "::error title=Deployment blocked before apply::Node disk pressure or low ephemeral storage was detected after image import; rendered manifests were not applied."
+            exit "$STATUS"
+          fi
+
+      # ── 服务器：apply 渲染结果（清单来自 runner，不在服务器构建）──
+      - name: Apply rendered manifests
+        run: |
+          set -euo pipefail
+          NS="${{ inputs.product || 'video2md' }}"
+          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
+            "sudo k3s kubectl apply -n ${NS} -f -" < /tmp/rendered.yaml
+
+      - name: Rollout status + smoke
+        run: |
+          set -euo pipefail
+          NS="${{ inputs.product || 'video2md' }}"
+          PRODUCT="${{ inputs.product || 'video2md' }}"
+          VERSION="${{ steps.ver.outputs.version }}"
+          DEPLOYMENT="${{ inputs.deployment }}"
+          if [[ -z "$DEPLOYMENT" ]]; then
+            case "$PRODUCT" in
+              video2md) DEPLOYMENT=video2md-api ;;
+              *) DEPLOYMENT="$PRODUCT" ;;
+            esac
+          fi
+          # OVERRIDE-POINT: network_mode —— 默认：从 deployment 读容器端口（非 hostNetwork 服务）
+          # k3s is only available on the target node; keep this lookup inside
+          # the SSH command instead of running it on the GitHub runner.
+          # OVERRIDE-POINT-END: network_mode
+          # OVERRIDE-POINT: smoke_path —— 默认 /healthz；hostNetwork 服务可覆盖（如 /ping）
+          SMOKE_PATH=/healthz
+          # OVERRIDE-POINT-END: smoke_path
+          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "
+            set -euo pipefail
+            PORT=\$(sudo k3s kubectl -n ${NS} get deploy/${DEPLOYMENT} -o jsonpath='{.spec.template.spec.containers[0].ports[0].containerPort}')
+            sudo k3s kubectl -n ${NS} rollout status deploy/${DEPLOYMENT} --timeout=180s
+            CODE=\$(curl -s -o /dev/null -w '%{http_code}' -m 10 http://127.0.0.1:\${PORT}${SMOKE_PATH} || echo '000')
+            echo '  冒烟 http://127.0.0.1:'\"\${PORT}\"'${SMOKE_PATH} → '\${CODE}
+            if [ \"\${CODE}\" != '200' ]; then
+              echo '✗ 冒烟失败，执行回滚'
+              sudo k3s kubectl -n ${NS} rollout undo deploy/${DEPLOYMENT}
+              exit 1
+            fi
+            echo '✓ ${PRODUCT}:${VERSION} (${DEPLOYMENT}) 部署成功'
+            echo '  回滚命令: sudo k3s kubectl -n ${NS} rollout undo deploy/${DEPLOYMENT}'
+          "
+
+      # ── 失败通知 ──
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "::error::部署 ${{ inputs.product }}:${{ steps.ver.outputs.version || inputs.version }} 失败，请检查服务器日志"
