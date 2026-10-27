@@ -141,6 +141,21 @@ def evaluate(evidence: dict[str, Any], *, require_browser: bool) -> list[str]:
     return failures
 
 
+def _google_httpx_proxy_transport(providers: str) -> bool:
+    """Accept equivalent local-variable formatting without weakening the proxy check."""
+    class_start = providers.find("class _GoogleHttpxRequest")
+    if class_start < 0:
+        return False
+    next_class = providers.find("\nclass ", class_start + 1)
+    request_class = providers[class_start:next_class if next_class >= 0 else None]
+    return re.search(
+        r"httpx\.Client\(\s*proxy\s*=\s*(?:self\.proxy_url|proxy_url)\s+or\s+None\s*\)",
+        request_class,
+    ) is not None and (
+        "proxy_url = self.proxy_url" in request_class or "proxy=self.proxy_url" in request_class
+    )
+
+
 def evaluate_repository(repo_root: Path) -> list[str]:
     """Check deployable repository contracts without network or secret access."""
     failures: list[str] = []
@@ -194,7 +209,7 @@ def evaluate_repository(repo_root: Path) -> list[str]:
     )
     require(
         "repo-google-httpx-transport",
-        "class _GoogleHttpxRequest" in providers and "httpx.Client(proxy=self.proxy_url or None)" in providers,
+        _google_httpx_proxy_transport(providers),
         "Google certificate retrieval must use the proven HTTPX proxy path",
     )
     require(

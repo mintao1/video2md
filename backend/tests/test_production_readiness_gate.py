@@ -88,6 +88,30 @@ def test_repository_deployment_contract_is_guarded() -> None:
     assert gate.evaluate_repository(ROOT) == []
 
 
+def test_google_proxy_contract_accepts_local_binding_only() -> None:
+    assert gate._google_httpx_proxy_transport(
+        """
+class _GoogleHttpxRequest:
+    def _fetch(self):
+        proxy_url = self.proxy_url
+        with httpx.Client(proxy=proxy_url or None):
+            pass
+class Other:
+    pass
+"""
+    )
+    assert not gate._google_httpx_proxy_transport(
+        """
+class _GoogleHttpxRequest:
+    def _fetch(self):
+        with httpx.Client():
+            pass
+class Other:
+    pass
+"""
+    )
+
+
 def test_eval_set_covers_every_remediated_production_behavior() -> None:
     path = ROOT / "docs/evals/production-fullsite-remediation-eval-set.jsonl"
     rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line]
