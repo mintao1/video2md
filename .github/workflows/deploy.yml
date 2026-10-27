@@ -201,6 +201,7 @@ jobs:
             git checkout --quiet --detach ${SHA}
             echo \"  源码 commit \$(git rev-parse HEAD)\"
             docker build \
+              --network=host \
               --build-arg PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple \
               --build-arg VERSION=${VERSION} \
               --build-arg GIT_SHA=${SHA} \
