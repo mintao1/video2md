@@ -193,6 +193,11 @@ jobs:
             fi
             cd \"\$REPO\"
             git fetch --quiet origin
+            # This checkout is deployment-only. Discard stale local edits and
+            # untracked non-ignored files before selecting the requested SHA;
+            # production data lives outside this git checkout.
+            git reset --hard --quiet
+            git clean -fd --quiet
             git checkout --quiet --detach ${SHA}
             echo \"  源码 commit \$(git rev-parse HEAD)\"
             docker build \
