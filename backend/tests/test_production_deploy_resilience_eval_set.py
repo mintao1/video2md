@@ -50,6 +50,7 @@ def test_workflow_imports_rendered_images_before_apply_and_smokes_healthz() -> N
     assert "steps.limits.outputs.min_free_gib" in source
     assert "path: ${{ inputs.product || 'video2md' }}" in source
     assert 'NS="${{ inputs.product || \'video2md\' }}"' in source
+    assert '"${PRODUCT}/scripts/node-build-guard.sh"' in source
     assert "healthz" in source and "rollout status" in source
 
 
