@@ -48,7 +48,8 @@ WORKDIR /app
 # --extra evals：离线评测旁路（backend/scripts/eval_notes.py）在容器内可跑（deepeval/ragas/langfuse SDK）
 COPY backend/pyproject.toml backend/uv.lock ./
 COPY backend/vendor/ ./vendor/
-RUN uv sync --frozen --no-dev --extra evals
+# 评测依赖在 CI/评测旁路安装；生产镜像只装运行时依赖，避免拉入大型科学计算栈。
+RUN uv sync --frozen --no-dev
 # 无 mac extra：pyobjc 是 macOS 专属，Linux 镜像天然不含
 
 COPY backend/video2pdf/ ./video2pdf/
