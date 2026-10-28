@@ -200,9 +200,9 @@ jobs:
             git clean -fd --quiet
             git checkout --quiet --detach ${SHA}
             echo \"  源码 commit \$(git rev-parse HEAD)\"
-            if sudo k3s ctr images list -q | grep -Fxq "docker.io/library/${PRODUCT}:${VERSION}" \
-              || sudo k3s ctr images list -q | grep -Fxq "${PRODUCT}:${VERSION}"; then
-              echo "  ${PRODUCT}:${VERSION} already present in k3s containerd; reusing imported image"
+            if sudo k3s ctr images list -q | grep -Fxq \"docker.io/library/${PRODUCT}:${VERSION}\" \
+              || sudo k3s ctr images list -q | grep -Fxq \"${PRODUCT}:${VERSION}\"; then
+              echo \"  ${PRODUCT}:${VERSION} already present in k3s containerd; reusing imported image\"
             else
               docker build \
                 --network=host \
