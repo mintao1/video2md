@@ -49,7 +49,13 @@ WORKDIR /app
 COPY backend/pyproject.toml backend/uv.lock ./
 COPY backend/vendor/ ./vendor/
 # 评测依赖在 CI/评测旁路安装；生产镜像只装运行时依赖，避免拉入大型科学计算栈。
-RUN uv sync --frozen --no-dev
+# uv.lock 记录了 files.pythonhosted.org 的固定 artifact URL；构建时将其映射到
+# workflow 传入的镜像根地址，版本/哈希不变，避免节点直连上游慢链路。
+RUN if [ -n "${PIP_INDEX_URL}" ]; then \
+      MIRROR_ROOT="${PIP_INDEX_URL%/simple}"; \
+      sed -i "s#https://files.pythonhosted.org#${MIRROR_ROOT}#g" uv.lock; \
+    fi \
+ && uv sync --frozen --no-dev
 # 无 mac extra：pyobjc 是 macOS 专属，Linux 镜像天然不含
 
 COPY backend/video2pdf/ ./video2pdf/
