@@ -231,6 +231,11 @@ jobs:
                 exit 44
               fi
             done < \"${IMAGE_LIST}\"
+            # The image is already in k3s containerd; release the duplicate
+            # Docker layer before the post-import disk-pressure guard.
+            if docker image inspect \"${PRODUCT}:${VERSION}\" >/dev/null 2>&1; then
+              docker image rm \"${PRODUCT}:${VERSION}\" >/dev/null || true
+            fi
             echo '✓ all rendered images imported and verified in k3s containerd'
           "
 
