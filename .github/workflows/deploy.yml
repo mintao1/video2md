@@ -200,12 +200,17 @@ jobs:
             git clean -fd --quiet
             git checkout --quiet --detach ${SHA}
             echo \"  源码 commit \$(git rev-parse HEAD)\"
-            docker build \
-              --network=host \
-              --build-arg PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple \
-              --build-arg VERSION=${VERSION} \
-              --build-arg GIT_SHA=${SHA} \
-              -t ${PRODUCT}:${VERSION} .
+            if sudo k3s ctr images list -q | grep -Fxq "docker.io/library/${PRODUCT}:${VERSION}" \
+              || sudo k3s ctr images list -q | grep -Fxq "${PRODUCT}:${VERSION}"; then
+              echo "  ${PRODUCT}:${VERSION} already present in k3s containerd; reusing imported image"
+            else
+              docker build \
+                --network=host \
+                --build-arg PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple \
+                --build-arg VERSION=${VERSION} \
+                --build-arg GIT_SHA=${SHA} \
+                -t ${PRODUCT}:${VERSION} .
+            fi
             while IFS= read -r IMAGE; do
               [[ -n \"\$IMAGE\" ]] || continue
               if docker image inspect \"\$IMAGE\" >/dev/null 2>&1; then
