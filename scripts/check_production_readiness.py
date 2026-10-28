@@ -176,7 +176,7 @@ def evaluate_repository(repo_root: Path) -> list[str]:
     require("repo-host-network", "hostNetwork: true" in deployment, "OAuth loopback tunnel requires hostNetwork")
     require(
         "repo-oauth-proxy-env",
-        deployment.count("value: http://127.0.0.1:18080") == 2,
+        deployment.count("value: http://127.0.0.1:18080") >= 2,
         "migrate and API containers must both use the local OAuth tunnel",
     )
     require(

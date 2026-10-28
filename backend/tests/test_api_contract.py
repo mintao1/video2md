@@ -704,7 +704,7 @@ def test_auth_google_login_redirects_to_google(client, monkeypatch):
 
     import video2pdf.api as _api
     monkeypatch.setattr(_api, "ENV", dict(_GENV))
-    r = client.get("/auth/google/login", follow_redirects=False)
+    r = client.get("/auth/google/login", params={"terms_accepted": "1"}, follow_redirects=False)
     assert r.status_code == 302
     loc = r.headers["location"]
     u = _up.urlparse(loc)
@@ -719,13 +719,31 @@ def test_auth_google_login_redirects_to_google(client, monkeypatch):
     assert "v2pdf_oauth_state" in r.headers.get("set-cookie", "")  # CSRF 绑定 cookie
 
 
+def test_auth_google_login_requires_terms_before_oauth(client, monkeypatch):
+    import urllib.parse as _up
+
+    import video2pdf.api as _api
+    monkeypatch.setattr(_api, "ENV", dict(_GENV))
+    blocked = client.get("/auth/google/login", follow_redirects=False)
+    assert blocked.status_code == 302
+    assert "auth_error=" in blocked.headers["location"]
+    assert "请先阅读并同意" in _up.unquote(blocked.headers["location"])
+    assert "accounts.google.com" not in blocked.headers["location"]
+    assert not _api._GOOGLE_OAUTH_STATES
+
+    allowed = client.get("/auth/google/login", params={"terms_accepted": "1"}, follow_redirects=False)
+    assert allowed.status_code == 302
+    assert "accounts.google.com" in allowed.headers["location"]
+    assert _api._GOOGLE_OAUTH_STATES
+
+
 def test_auth_google_login_missing_config(client, monkeypatch):
     import video2pdf.api as _api
     monkeypatch.setattr(_api, "ENV", {})
-    r = client.get("/auth/google/login", follow_redirects=False)
+    r = client.get("/auth/google/login", params={"terms_accepted": "1"}, follow_redirects=False)
     assert r.status_code == 302
     assert "auth_error=" in r.headers["location"]  # 未配凭据 → fragment 错误出口
-    r = client.get("/auth/google/login", params={"redirect": "/tasks"}, follow_redirects=False)
+    r = client.get("/auth/google/login", params={"redirect": "/tasks", "terms_accepted": "1"}, follow_redirects=False)
     assert r.headers["location"].startswith("http://localhost:5173/?redirect=%2Ftasks#auth_error=")
 
 
@@ -736,9 +754,9 @@ def test_auth_google_login_rate_limit(client):
         mp.setattr(_api, "DEVICE_RATE_PER_MIN", 2)
         _api._DEVICE_WIN.clear()
         for _ in range(2):
-            ok = client.get("/auth/google/login", follow_redirects=False)
+            ok = client.get("/auth/google/login", params={"terms_accepted": "1"}, follow_redirects=False)
             assert ok.status_code == 302 and "auth_error=" not in ok.headers["location"]
-        over = client.get("/auth/google/login", follow_redirects=False)
+        over = client.get("/auth/google/login", params={"terms_accepted": "1"}, follow_redirects=False)
         assert over.status_code == 302  # 浏览器导航端点：429 折叠进 fragment 错误出口
         assert "auth_error=" in over.headers["location"]
 
@@ -801,10 +819,10 @@ def test_auth_google_redirect_round_trip(client, monkeypatch):
         return _up.parse_qs(_up.urlparse(r.headers["location"]).query)["state"][0]
 
     for bad in ("//evil.test/x", "/\\evil.test", "https://evil.test/", "read/x"):
-        st = _state_of(client.get("/auth/google/login", params={"redirect": bad},
+        st = _state_of(client.get("/auth/google/login", params={"redirect": bad, "terms_accepted": "1"},
                                   follow_redirects=False))
         assert st not in _api._GOOGLE_OAUTH_REDIRECTS, bad
-    st = _state_of(client.get("/auth/google/login", params={"redirect": "/read/r1?p=2"},
+    st = _state_of(client.get("/auth/google/login", params={"redirect": "/read/r1?p=2", "terms_accepted": "1"},
                               follow_redirects=False))
     assert _api._GOOGLE_OAUTH_REDIRECTS[st] == "/read/r1?p=2"
 
@@ -2140,7 +2158,7 @@ def test_oauth_transport_failure_is_safe_and_fresh_login_recovers(client, monkey
         return httpx.Response(200, json={'id_token': 'synthetic.id.token'})
 
     monkeypatch.setattr(httpx.AsyncClient, 'post', token)
-    login = client.get('/auth/google/login?redirect=%2Ftasks', follow_redirects=False)
+    login = client.get('/auth/google/login?redirect=%2Ftasks&terms_accepted=1', follow_redirects=False)
     state = up.parse_qs(up.urlparse(login.headers['location']).query)['state'][0]
     callback = client.get('/auth/google/callback', params={'code': 'synthetic-code', 'state': state},
                           follow_redirects=False)
@@ -2159,7 +2177,7 @@ def test_oauth_transport_failure_is_safe_and_fresh_login_recovers(client, monkey
         assert sensitive not in repr(events) and sensitive not in location
     assert any(args[2] == 503 and fields['error_type'] == error.__name__ for args, fields in events)
     # Recovery uses a fresh login, CSRF cookie and code, with the original destination.
-    login = client.get('/auth/google/login?redirect=%2Ftasks', follow_redirects=False)
+    login = client.get('/auth/google/login?redirect=%2Ftasks&terms_accepted=1', follow_redirects=False)
     fresh = up.parse_qs(up.urlparse(login.headers['location']).query)['state'][0]
     assert fresh != state
     recovered = client.get('/auth/google/callback', params={'code': 'fresh-code', 'state': fresh},

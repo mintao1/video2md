@@ -18,6 +18,8 @@ test('brand home owns the OAuth entry and the standalone login page stays delete
   assert.match(view, /视频一键转成可精读的教材/)
   assert.match(view, /LogoMark/)
   assert.match(view, /\/auth\/google\/login/)
+  assert.match(view, /terms_accepted: '1'/)
+  assert.match(view, /:disabled="busy \|\| !agreed"/)
   assert.match(view, /reason === 'expired'/)
   assert.match(view, /safeRedirect/)
   assert.match(view, /id_token/)

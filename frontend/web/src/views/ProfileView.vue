@@ -33,17 +33,10 @@ async function toggleBilling() {
 // AUTH=off development has no token and nothing to sign out of.
 const canSignOut = Boolean(getToken())
 
-const user = computed(
-  () =>
-    auth.user ?? {
-      uid: 'u_mock',
-      name: '视书用户',
-      display_name: '视书用户',
-      avatar_hue: 258,
-      plan: 'free' as const,
-      id_label: 'ID: ----',
-    },
-)
+// Production must never render a fabricated identity while /me is loading or
+// unavailable. Keep the real quota/billing controls, but leave the profile
+// card absent until the authenticated user has been fetched.
+const user = computed(() => auth.user)
 
 onMounted(async () => {
   try {
@@ -65,7 +58,7 @@ function onNotionToggle() {
     <main class="flex flex-col relative w-full pt-16 pb-nav bg-surface min-h-screen">
       <div class="w-full px-margin pt-space-md pb-space-lg flex flex-col gap-space-lg">
         <!-- 资料卡 -->
-        <ProfileCard :user="user" :quota="profile.quota" />
+        <ProfileCard v-if="user" :user="user" :quota="profile.quota" />
 
         <RouterLink to="/profile/colab" class="bg-surface-container-lowest rounded-xl shadow-sm p-space-md flex items-center justify-between gap-space-md hover:bg-surface-container-low transition-colors">
           <div class="flex items-center gap-space-md">
@@ -94,7 +87,7 @@ function onNotionToggle() {
         <div class="flex flex-col gap-space-sm">
           <QuotaDashboard :quota="profile.quota" @details="toggleBilling" />
           <BillingPanel v-if="billingOpen" :report="billing" :loading="billingLoading" :error="billingError" />
-          <SvipPromoBanner :plan="user.plan" @upgrade="vipOpen = true" />
+          <SvipPromoBanner v-if="user" :plan="user.plan" @upgrade="vipOpen = true" />
         </div>
 
         <!-- 排版与引擎配置 -->

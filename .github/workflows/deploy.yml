@@ -62,6 +62,7 @@ jobs:
         with:
           repository: mintao1/${{ inputs.product || 'video2md' }}
           path: ${{ inputs.product || 'video2md' }}
+          ref: ${{ github.sha }}
           token: ${{ secrets.PRODUCT_REPO_TOKEN || github.token }}
 
       # 钉死 kustomize 版本：runner 默认不带 kustomize；kubectl kustomize 将随
@@ -287,6 +288,15 @@ jobs:
               echo '✗ 冒烟失败，执行回滚'
               sudo k3s kubectl -n ${NS} rollout undo deploy/${DEPLOYMENT}
               exit 1
+            fi
+            if [ '${PRODUCT}' = 'video2md' ]; then
+              PREFLIGHT=\$(curl -fsS -m 10 http://127.0.0.1:\${PORT}/preflight)
+              echo \"  预检 \${PREFLIGHT}\"
+              if ! printf '%s' \"\${PREFLIGHT}\" | python3 -c 'import json,sys; payload=json.load(sys.stdin); raise SystemExit(0 if payload.get(\"ok\") is True else 1)'; then
+                echo '✗ 生产预检未通过，执行回滚'
+                sudo k3s kubectl -n ${NS} rollout undo deploy/${DEPLOYMENT}
+                exit 1
+              fi
             fi
             echo '✓ ${PRODUCT}:${VERSION} (${DEPLOYMENT}) 部署成功'
             echo '  回滚命令: sudo k3s kubectl -n ${NS} rollout undo deploy/${DEPLOYMENT}'

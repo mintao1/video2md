@@ -81,7 +81,17 @@ if [[ $DRY_RUN -eq 0 ]]; then
     echo "  回滚：scripts/deploy.sh <上一个可用 tag>" >&2
     exit 1
   fi
-  ssh "$HOST" 'curl -s localhost:8790/preflight' || true   # 体检项逐项看 detail，失败不挡部署
+  PREFLIGHT=$(ssh "$HOST" 'curl -fsS localhost:8790/preflight') || {
+    echo "✗ preflight 请求失败：无法确认生产依赖是否就绪" >&2
+    echo "  回滚：scripts/deploy.sh <上一个可用 tag>" >&2
+    exit 1
+  }
+  echo "$PREFLIGHT"
+  if ! printf '%s' "$PREFLIGHT" | python3 -c 'import json, sys; payload=json.load(sys.stdin); raise SystemExit(0 if payload.get("ok") is True else 1)'; then
+    echo "✗ preflight 未通过：禁止把未就绪的部署标记为成功" >&2
+    echo "  回滚：scripts/deploy.sh <上一个可用 tag>" >&2
+    exit 1
+  fi
   ssh "$HOST" "curl -s localhost:8790/healthz" && echo
 else
   echo "[dry-run] ssh $HOST 'curl -sf localhost:8790/healthz'  # 起栈后验证"

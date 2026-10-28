@@ -7,16 +7,24 @@ resources:
   - ../../base
 
 patches:
-  # 17898 is retired; prevent the shared platform ConfigMap from reintroducing
-  # it as ambient proxy settings for OAuth requests.
+  # 17898 is retired. Keep the shared ConfigMap aligned with the verified
+  # 18080 CONNECT relay so auxiliary workloads do not reintroduce the old route.
   - target:
       kind: ConfigMap
       name: common-config
     patch: |-
-      - op: remove
+      - op: replace
         path: /data/HTTP_PROXY
-      - op: remove
+        value: "http://127.0.0.1:18080"
+      - op: replace
         path: /data/HTTPS_PROXY
+        value: "http://127.0.0.1:18080"
+      - op: add
+        path: /data/ALL_PROXY
+        value: "http://127.0.0.1:18080"
+      - op: replace
+        path: /data/NO_PROXY
+        value: "127.0.0.1,localhost,10.0.0.7,10.43.,.svc,ferosse.tech,.ferosse.tech,api2.niubi.win"
   - target:
       kind: Deployment
       name: video2md-api

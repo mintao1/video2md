@@ -77,6 +77,12 @@ def _flow(**kwargs):
     return flow
 
 
+def _oauth_proxy_options() -> dict[str, str] | None:
+    """Pass the CONNECT relay explicitly to requests-oauthlib exchanges."""
+    proxy = (ENV.get("V2PDF_GOOGLE_OAUTH_PROXY_URL") or "").strip()
+    return {"http": proxy, "https": proxy} if proxy else None
+
+
 def _credential_subject(credentials) -> str:
     from google.auth.transport.requests import AuthorizedSession
 
@@ -84,7 +90,15 @@ def _credential_subject(credentials) -> str:
         proxy = (ENV.get("V2PDF_GOOGLE_OAUTH_PROXY_URL") or "").strip()
         if proxy:
             session.proxies.update({"http": proxy, "https": proxy})
-        response = session.get("https://www.googleapis.com/oauth2/v2/userinfo", timeout=15)
+        proxy_options = _oauth_proxy_options()
+        if proxy_options:
+            response = session.get(
+                "https://www.googleapis.com/oauth2/v2/userinfo",
+                timeout=15,
+                proxies=proxy_options,
+            )
+        else:
+            response = session.get("https://www.googleapis.com/oauth2/v2/userinfo", timeout=15)
         response.raise_for_status()
         return str(response.json().get("id") or "")
 
@@ -128,7 +142,12 @@ def complete(body: CompleteBody, request: Request, ident: Identity = Depends(cur
             path.unlink()  # One exchange per flow, including failures; never replay a code.
             flow = _flow(state=pending["state"], code_verifier=pending["verifier"])
             try:
-                flow.fetch_token(code=body.code.get_secret_value().strip(), timeout=30)
+                code = body.code.get_secret_value().strip()
+                proxy = _oauth_proxy_options()
+                if proxy:
+                    flow.fetch_token(code=code, timeout=30, proxies=proxy)
+                else:
+                    flow.fetch_token(code=code, timeout=30)
             except Exception:
                 # Upstream OAuth errors can contain codes/tokens; never return them.
                 raise HTTPException(400, "授权未完成，请重新打开授权页并填写新的授权码") from None

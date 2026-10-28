@@ -11,6 +11,7 @@ import EmptyState from '../components/common/EmptyState.vue'
 import TaskCard from '../components/queue/TaskCard.vue'
 import ImportModal from '../components/queue/ImportModal.vue'
 import BatchActionBar from '../components/queue/BatchActionBar.vue'
+import { uploadFile } from '../api'
 
 const queue = useQueueStore()
 const toast = useToastStore()
@@ -79,12 +80,13 @@ async function quickSubmit() {
   }
 }
 
-async function startConvert(payload: { url: string; title?: string }) {
+async function startConvert(payload: { url: string; title?: string; file?: File }) {
   if (submitting.value) return
   importError.value = ''
   submitting.value = true
   try {
-    await queue.createRun(payload.url, payload.title)
+    const url = payload.file ? (await uploadFile(payload.file)).path : payload.url
+    await queue.createRun(url, payload.title)
     importOpen.value = false
     toast.show('已加入转换队列，稍后可在教材库查看')
   } catch (error) {
@@ -211,7 +213,7 @@ function setFilter(key: string) {
       </div>
     </main>
 
-    <ImportModal v-model="importOpen" :error="importError" :busy="submitting" @start="startConvert" @draft="toast.show('草稿已保存（mock）')" />
+    <ImportModal v-model="importOpen" :error="importError" :busy="submitting" @start="startConvert" @draft="toast.show('草稿已保存')" />
     <BottomNav />
   </div>
 </template>
