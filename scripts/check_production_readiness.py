@@ -209,18 +209,21 @@ def evaluate_repository(repo_root: Path) -> list[str]:
 
     deployment = (repo_root / "deploy/k8s/base/deployment-api.yaml").read_text(encoding="utf-8")
     compose = (repo_root / "deploy/docker-compose.prod.yml").read_text(encoding="utf-8")
+    package_root = repo_root / "backend/video2pdf"
+    if not package_root.exists():
+        package_root = repo_root / "backend/video2md"
     api_start = compose.find("\n  api:")
     api_end = compose.find("\nvolumes:", api_start)
     api_compose = compose[api_start:api_end if api_end >= 0 else None]
     role_bootstrap = (repo_root / "deploy/postgres/000-provision-roles.sh").read_text(encoding="utf-8")
     role_init = (repo_root / "deploy/postgres/001-roles.sql").read_text(encoding="utf-8")
     deploy_script = (repo_root / "scripts/deploy.sh").read_text(encoding="utf-8")
-    migration = (repo_root / "backend/video2md/migrations/0005_tenant_rls.sql").read_text(encoding="utf-8")
-    key_migration = (repo_root / "backend/video2md/migrations/0006_llm_key_ciphertext.sql").read_text(encoding="utf-8")
-    key_store = (repo_root / "backend/video2md/llm_settings.py").read_text(encoding="utf-8")
-    config_source = (repo_root / "backend/video2md/config.py").read_text(encoding="utf-8")
+    migration = (package_root / "migrations/0005_tenant_rls.sql").read_text(encoding="utf-8")
+    key_migration = (package_root / "migrations/0006_llm_key_ciphertext.sql").read_text(encoding="utf-8")
+    key_store = (package_root / "llm_settings.py").read_text(encoding="utf-8")
+    config_source = (package_root / "config.py").read_text(encoding="utf-8")
     backup = (repo_root / "scripts/backup.sh").read_text(encoding="utf-8")
-    observability = (repo_root / "backend/video2md/observability.py").read_text(encoding="utf-8")
+    observability = (package_root / "observability.py").read_text(encoding="utf-8")
     nginx = (repo_root / "deploy/nginx.conf").read_text(encoding="utf-8")
     relay = (repo_root / "deploy/oauth-relay/oauth-relay.service").read_text(encoding="utf-8")
     tunnel = (repo_root / "deploy/oauth-relay/oauth-tunnel.service").read_text(encoding="utf-8")
@@ -327,7 +330,7 @@ def evaluate_repository(repo_root: Path) -> list[str]:
     require(
         "repo-observability-redaction",
         "OTEL_INCLUDE_CONTENT" in config_source
-        and "config.OTEL_INCLUDE_CONTENT" in (repo_root / "backend/video2md/llm.py").read_text(encoding="utf-8")
+        and "config.OTEL_INCLUDE_CONTENT" in (package_root / "llm.py").read_text(encoding="utf-8")
         and "otel_attrs" in observability
         and "trace_content" in observability
         and deployment.count(

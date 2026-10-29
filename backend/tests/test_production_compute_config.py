@@ -7,7 +7,7 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
 MANIFEST = ROOT / "deploy/k8s/base/deployment-api.yaml"
-RLS_MIGRATION = ROOT / "backend/video2md/migrations/0005_tenant_rls.sql"
+RLS_MIGRATION = ROOT / "backend/video2pdf/migrations/0005_tenant_rls.sql"
 ROLE_INIT = ROOT / "deploy/postgres/001-roles.sql"
 
 
