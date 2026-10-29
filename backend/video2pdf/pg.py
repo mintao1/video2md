@@ -63,6 +63,17 @@ def pg_dsn() -> str:
     return (ENV.get("V2PDF_PG_DSN") or "").strip()
 
 
+def pg_migrate_dsn() -> str:
+    """Return the least-privilege DSN reserved for schema migrations.
+
+    Production keeps API traffic on ``video2md_app`` and grants DDL only to
+    ``video2md_migrate``.  Development/test environments may omit the
+    dedicated value, in which case the application DSN remains the historical
+    fallback.
+    """
+    return (ENV.get("V2PDF_PG_MIGRATE_DSN") or pg_dsn()).strip()
+
+
 def pg_enabled() -> bool:
     return bool(pg_dsn())
 

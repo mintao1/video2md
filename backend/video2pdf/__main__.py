@@ -27,7 +27,9 @@ def main() -> None:
         if not pg.pg_enabled():
             print("· V2PDF_PG_DSN 未配置（json 档）：无 schema 可迁移")
             return
-        pool = pg.make_pool(pg.pg_dsn())
+        # Migrations are the sole component allowed to use the DDL-capable
+        # role.  The API DSN is intentionally restricted to tenant-scoped DML.
+        pool = pg.make_pool(pg.pg_migrate_dsn())
         try:
             applied = apply_migrations(pool)
             print(f"✅ 迁移就绪：库版本 {SCHEMA_LATEST}"
