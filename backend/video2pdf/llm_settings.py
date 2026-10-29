@@ -1,9 +1,9 @@
 """Per-user LLM credentials. Secrets stay out of API responses and graph checkpoints."""
 from __future__ import annotations
 
+import base64
 import contextlib
 import contextvars
-import base64
 import fcntl
 import json
 import os

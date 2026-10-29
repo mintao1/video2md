@@ -49,9 +49,9 @@ from .util import (
     load_state,
     redact,
     save_state,
+    state_file_lock,
     state_key,
     state_record,
-    state_file_lock,
 )
 
 CHECKPOINT_DB = PROJ / "data" / "checkpoints.sqlite"
@@ -555,8 +555,8 @@ def run_graph(url: str, *, part_items: str = "", force: bool = False, review: bo
     deadman.ping("start", run_id=run_id, trace_name=url)
     try:
         from .colab import session_scope
-        from .pg import tenant_scope
         from .llm_settings import user_scope
+        from .pg import tenant_scope
         with tenant_scope(owner), user_scope(owner), session_scope(owner=owner):
             final = graph.invoke(initial, config=config)
     except Exception:
