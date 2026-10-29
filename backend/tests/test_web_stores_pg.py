@@ -5,6 +5,11 @@ from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
+# The PG web-store suite exercises the same encrypted credential path as the
+# production API. Use a deterministic test-only envelope key before importing
+# ``video2pdf.config`` (which snapshots the environment at import time).
+os.environ.setdefault("V2PDF_LLM_SETTINGS_KEY", "hex:" + "11" * 32)
+
 from video2pdf import pg, pgmigrate
 from video2pdf.pgstore import PostgresRunsStore
 from video2pdf.prefs import PostgresPrefsStore
