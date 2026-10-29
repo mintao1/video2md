@@ -20,16 +20,16 @@
 │    │    ├─ asyncio 信号量闸门（V2MD_MAX_CONCURRENT_RUNS，默认 1）
 │    │    ├─ 工作线程跑同步 graph（asyncio.to_thread）
 │    │    ├─ 常驻周期任务：watchdog 巡检 / outbox sweeper / uploads sweeper
-│    │    └─ events PG 泵线程（V2MD_EVENTS=pg 时，LISTEN v2md_events+v2md_cmds）
+│    │    └─ events PG 泵线程（V2PDF_EVENTS=pg 时，LISTEN v2pdf_events+v2pdf_cmds）
 │    ├─ gpu_router 容器    :9700（无认证面，安全组兜底——见已知限制）
 │    └─ postgres 服务（deploy/docker-compose.prod.yml）  postgres:16-alpine；127.0.0.1:5432
 ├─ 平台统一观测栈（~/stack/platform-obs，2026-09-26 obs 双栈合并——平台 Phase 1.1/M1；
 │    本仓自有 docker-compose.obs.yml 退役为本地预览资产，服务器不再使用）
 │    ├─ otel-collector :4318 → traces 按 service.name 路由各自 Langfuse 项目 / prometheus exporter :8889
 │    ├─ prometheus :9090 → grafana :3000（匿名 Viewer，仅回环+隧道）
-│    └─ alertmanager :9093 → feishu-webhook :9760（v2md 群）/9761（book 群）→ 飞书
-└─ 卷：v2md-data（state/runs/users/checkpoints/logs/outbox/uploads）
-       vault（vault 模式产物）、gpu-router-logs、v2md-pg
+│    └─ alertmanager :9093 → feishu-webhook :9760（v2pdf 群）/9761（book 群）→ 飞书
+└─ 卷：v2pdf-data（state/runs/users/checkpoints/logs/outbox/uploads）
+       vault（vault 模式产物）、gpu-router-logs、v2pdf-pg
 ```
 
 ## 网络口径
@@ -46,8 +46,8 @@
 
 ## 出网与风控（硬约束）
 
-- 境外源（YouTube/Colab/Kaggle/HF/Langfuse）：`V2MD_PROXY` 只作用于 yt-dlp 等子进程；进程内 httpx（LLM）直连。gpu_router 侧代理走 `secrets/gpu_router.env`。
-- 国内站（B站/抖音/小红书）对机房 IP 风控：需 `V2MD_PROXY_DOMESTIC=1` 且代理侧有**大陆住宅类出口**——部署前必须先验证，否则下载阶段必炸。
+- 境外源（YouTube/Colab/Kaggle/HF/Langfuse）：`V2PDF_PROXY` 只作用于 yt-dlp 等子进程；进程内 httpx（LLM）直连。gpu_router 侧代理走 `secrets/gpu_router.env`。
+- 国内站（B站/抖音/小红书）对机房 IP 风控：需 `V2PDF_PROXY_DOMESTIC=1` 且代理侧有**大陆住宅类出口**——部署前必须先验证，否则下载阶段必炸。
 
 ## 部署前提与步骤（自 README 部署章迁入）
 
@@ -57,33 +57,33 @@
 - LLM 端点凭证（openai-compatible 三键）
 - 至少一家 GPU provider 凭证（colab-cli token / kaggle.json / …，缺了对应 provider 自动冷却）
 - Google OAuth「Web」客户端 client_id（后端只验签不持 secret）；CLI 无浏览器登录另备「TV 与 Limited Input」型 client（设备流，需 client_secret）
-- 两仓库同级放 `~/stack/{video2md,gpu_router}`（别处则设 `GPU_ROUTER_DIR`）
+- 两仓库同级放 `~/stack/{video2pdf,gpu_router}`（别处则设 `GPU_ROUTER_DIR`）
 
 **1. 代码与凭证**（secrets 0600，只放服务器，不进 git）：
 
 ```bash
-git clone <本仓库地址> ~/stack/video2md
+git clone <本仓库地址> ~/stack/video2pdf
 git clone <gpu_router 地址>  ~/stack/gpu_router
 # secrets/ 目录：
-#   secrets/video2md.env   ← LLM 三键 + 多用户生产档键 + V2MD_DEADMAN_PING_URL（可选）
+#   secrets/video2pdf.env   ← LLM 三键 + 多用户生产档键 + V2PDF_DEADMAN_PING_URL（可选）
 #   secrets/gpu_router.env ← 出网代理 env（HTTP_PROXY 等，可选但强烈建议）
 #   secrets/obs.env        ← LANGFUSE_BASIC / GF_SECURITY_ADMIN_PASSWORD（观测栈，可选）
 #   secrets/colab-cli/token.json、secrets/kaggle/kaggle.json（可选）
 ```
 
-`secrets/video2md.env` 多用户生产档（完整键义见 `.env.example`）：
+`secrets/video2pdf.env` 多用户生产档（完整键义见 `.env.example`）：
 
 ```ini
-V2MD_AUTH=google                            # 必须非 off（P0-1 后由启动防呆机制保证）
-V2MD_AUTH_PROVIDERS=google,google_device    # 接微信扫码改 google,wechat
-V2MD_ARTIFACT_MODE=deliver                  # 云端不储存：outbox + ACK/TTL 即焚
-V2MD_CORS_ORIGINS=https://app.example.com   # GUI 前端 origin 白名单
-V2MD_ENV=production                         # 遥测环境标签（compose 已默认）
+V2PDF_AUTH=google                            # 必须非 off（P0-1 后由启动防呆机制保证）
+V2PDF_AUTH_PROVIDERS=google,google_device    # 接微信扫码改 google,wechat
+V2PDF_ARTIFACT_MODE=deliver                  # 云端不储存：outbox + ACK/TTL 即焚
+V2PDF_CORS_ORIGINS=https://app.example.com   # GUI 前端 origin 白名单
+V2PDF_ENV=production                         # 遥测环境标签（compose 已默认）
 GOOGLE_CLIENT_ID=xxxxx.apps.googleusercontent.com
 # GOOGLE_CLIENT_SECRET=…     # 仅设备流需要（TV/Limited-Input 型 client）
 # WECHAT_APP_ID / WECHAT_APP_SECRET=…        # 微信扫码（可选）
-# V2MD_PG_DSN=postgresql://… # Postgres 可选档：checkpointer + 存储三件
-#                            # + V2MD_EVENTS=pg + V2MD_TASKS_STORE=postgres（04 篇）
+# V2PDF_PG_DSN=postgresql://… # Postgres 可选档：checkpointer + 存储三件
+#                            # + V2PDF_EVENTS=pg + V2PDF_TASKS_STORE=postgres（04 篇）
 ```
 
 **2. 构建 + 起栈 + 体检**（国内服务器可 `PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple` 加速）：
@@ -145,7 +145,7 @@ scripts/deploy.sh <上一个 tag> --host …          # 回滚 = 部署旧 tag
 
 进程重启 → lifespan（`api.py:558-595`）：runs 表里 `running` 的 run 重新入队（tmp 已清的翻 error 不重跑）；PG 档走 `FOR UPDATE SKIP LOCKED` 认领，并发起的副本只有一份拿到候选集（`pgstore.py:214-238`）。error 的 run 不自动重跑（避免双份产物）。
 
-watchdog `V2MD_WATCHDOG_ACTION=exit`（compose 生产已配）：判定卡死 → 标 error → `os._exit(70)` → compose `restart: unless-stopped` 拉起（`watchdog.py:299-309`）。⚠ 裸跑/systemd 形态无对应资产（ROADMAP P2-1）。
+watchdog `V2PDF_WATCHDOG_ACTION=exit`（compose 生产已配）：判定卡死 → 标 error → `os._exit(70)` → compose `restart: unless-stopped` 拉起（`watchdog.py:299-309`）。⚠ 裸跑/systemd 形态无对应资产（ROADMAP P2-1）。
 
 ## 运行面开关速查（自 README「运行面要点」迁入）
 

@@ -3,8 +3,9 @@ import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useLibraryStore } from '../stores/library'
 import { useToastStore } from '../stores/toast'
-import { getNotes, getToc } from '../api'
+import { getMedia, getNotes, getToc } from '../api'
 import type { Book, TocChapter } from '../types'
+import { printNotesAsPdf } from '../pdf'
 import AppHeader from '../components/common/AppHeader.vue'
 import BottomNav from '../components/common/BottomNav.vue'
 import FilterChips from '../components/common/FilterChips.vue'
@@ -70,6 +71,26 @@ function onShare(book: Book) {
 async function onExport(format: string) {
   const book = activeBook.value
   if (!book) return
+  if (format === 'PDF') {
+    // Open synchronously from the click handler so browsers do not classify the
+    // print window as an unsolicited popup while notes/media are loading.
+    const popup = window.open('', '_blank', 'popup,width=960,height=1200')
+    if (!popup) {
+      toast.show('浏览器阻止了打印窗口，请允许本站弹窗后重试')
+      return
+    }
+    try {
+      toast.show('正在准备 PDF…')
+      const notes = await getNotes(book.id)
+      if (!notes.length) throw new Error('暂无可导出的笔记')
+      await printNotesAsPdf(book.title, notes, (name) => getMedia(book.id, name), popup)
+      toast.show('PDF 打印窗口已打开，请选择“保存为 PDF”')
+    } catch (error) {
+      popup.close()
+      toast.show(error instanceof Error ? error.message : 'PDF 导出失败，请稍后重试')
+    }
+    return
+  }
   if (format !== 'Markdown') {
     toast.show(`${format} 导出暂未开放，请先选择 Markdown`)
     return

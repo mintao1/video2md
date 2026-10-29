@@ -4,9 +4,9 @@ After=network-online.target
 Wants=network-online.target
 
 [Service]
-Environment=V2MD_OAUTH_RELAY_HOST=127.0.0.1
-Environment=V2MD_OAUTH_RELAY_ALLOWED_IPS=127.0.0.1
-ExecStart=/usr/bin/python3 /opt/video2md-oauth-relay/relay.py
+Environment=V2PDF_OAUTH_RELAY_HOST=127.0.0.1
+Environment=V2PDF_OAUTH_RELAY_ALLOWED_IPS=127.0.0.1
+ExecStart=/usr/bin/python3 /opt/video2pdf-oauth-relay/relay.py
 Restart=always
 RestartSec=3
 User=root

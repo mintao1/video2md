@@ -9,7 +9,7 @@
 1. **社区的答案是分层的，不是一个工具通吃**：脚本死活层 = cron 监控/死人开关（healthchecks.io 类）；调用链层 = OpenTelemetry（2025 年起 GenAI semconv 成为事实标准）；LLM 质量层 = Langfuse 类 trace 工具 + evals。
 2. **Langfuse 确实是自托管派的默认选项**（被 ClickHouse 收购=其架构获背书），但 2026 年的新风向是「trace 收集已解决，痛点转移到自动分析/RCA」——一批新工具专做"别让我盯 dashboard"。
 3. **优化闭环 = traces → evals**，但一线开发者泼冷水：LLM 输出是定性的，自动评分容易"修一个引入一个"，人工看 trace 仍是主流；告警层面社区推荐 LLM-as-judge 的 task-completion rate。
-4. 对 dify-video2md：**现有的 Langfuse probe + 引擎 OTLP 双轨恰好就是社区正在收敛的架构**；缺的只是脚本层的死人开关和 evals 闭环，补上即完整。
+4. 对 dify-video2pdf：**现有的 Langfuse probe + 引擎 OTLP 双轨恰好就是社区正在收敛的架构**；缺的只是脚本层的死人开关和 evals 闭环，补上即完整。
 
 ---
 
@@ -69,7 +69,7 @@ HN 2026 年出现一批"后 trace 时代"工具，共同论点：**Langfuse/Lang
 
 ---
 
-## 对 dify-video2md 的落地建议
+## 对 dify-video2pdf 的落地建议
 
 | 层 | 社区共识做法 | 项目现状 | 差距/动作 |
 |---|---|---|---|

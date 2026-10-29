@@ -207,7 +207,7 @@ class _RaiseOpener:
 
 
 def test_build_from_env_google_device_wiring():
-    eng = build_from_env({"V2MD_AUTH": "on", "V2MD_AUTH_PROVIDERS": "google_device",
+    eng = build_from_env({"V2PDF_AUTH": "on", "V2PDF_AUTH_PROVIDERS": "google_device",
                           "GOOGLE_CLIENT_ID": "cid"}, store=MemoryStore())
     assert [type(p).__name__ for p in eng.providers] == ["GoogleDeviceProvider"]
 
@@ -324,8 +324,8 @@ def test_put_identity_account_linking_reserve(tmp_path: Path):
 # ---------------------------------------------------------------- build_from_env
 
 def test_build_from_env_off_and_prefix(tmp_path: Path):
-    env = {"V2MD_AUTH": "off", "V2MD_USERS_FILE": str(tmp_path / "u.json")}
-    eng = build_from_env(env, "V2MD_")
+    env = {"V2PDF_AUTH": "off", "V2PDF_USERS_FILE": str(tmp_path / "u.json")}
+    eng = build_from_env(env, "V2PDF_")
     assert [p.name for p in eng.providers] == ["fake", "dev"]  # off 的按序兜底装配
     assert _auth(eng, {}).provider == "dev"
     # 换前缀 = 换项目零改（store 也随前缀键走）
@@ -335,12 +335,12 @@ def test_build_from_env_off_and_prefix(tmp_path: Path):
 
 
 def test_build_from_env_provider_list_and_unknown():
-    env = {"V2MD_AUTH": "google", "V2MD_AUTH_PROVIDERS": "google,wechat",
+    env = {"V2PDF_AUTH": "google", "V2PDF_AUTH_PROVIDERS": "google,wechat",
            "GOOGLE_CLIENT_ID": "cid-xyz",
            "WECHAT_APP_ID": "wx-id", "WECHAT_APP_SECRET": "wx-secret",
-           "V2MD_USERS_FILE": "unused"}
-    eng = build_from_env(env, "V2MD_", store=MemoryStore())
-    # google 工厂可被宿主扩展同名覆盖（video2md/auth/ext_google.py 多 audience 档，
+           "V2PDF_USERS_FILE": "unused"}
+    eng = build_from_env(env, "V2PDF_", store=MemoryStore())
+    # google 工厂可被宿主扩展同名覆盖（video2pdf/auth/ext_google.py 多 audience 档，
     # register_provider 是 core 认可的挂点）——断言 provider 家族（isinstance）而非具体
     # 类名，否则宿主 ext 一 import 就把本测试染红（同进程全量跑时注册表是全局的）
     assert isinstance(eng.providers[0], GoogleProvider)
@@ -348,8 +348,8 @@ def test_build_from_env_provider_list_and_unknown():
     assert eng.providers[0].client_id == "cid-xyz"  # env 凭据注入构造（不带入引擎次序）
     assert (eng.providers[1].app_id, eng.providers[1].app_secret) == ("wx-id", "wx-secret")
     with pytest.raises(AuthError) as ei:
-        build_from_env({"V2MD_AUTH": "google", "V2MD_AUTH_PROVIDERS": "sms"},
-                       "V2MD_", store=MemoryStore())
+        build_from_env({"V2PDF_AUTH": "google", "V2PDF_AUTH_PROVIDERS": "sms"},
+                       "V2PDF_", store=MemoryStore())
     assert ei.value.status == 500  # 未注册的 provider 名（自定义登录 = register_provider 挂点）
 
 

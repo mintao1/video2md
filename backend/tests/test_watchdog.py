@@ -16,18 +16,18 @@ from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # backend/（包根）
 
-_TMP = tempfile.mkdtemp(prefix="v2md-test-wd-")
-# —— 必须在 import video2md.config 之前设好（config 在 import 时读 env）——
+_TMP = tempfile.mkdtemp(prefix="v2pdf-test-wd-")
+# —— 必须在 import video2pdf.config 之前设好（config 在 import 时读 env）——
 os.environ.update({
-    "V2MD_RUNS_FILE": str(Path(_TMP) / "runs.json"),
-    "V2MD_STATE_FILE": str(Path(_TMP) / "state.json"),
-    "V2MD_LOG_DIR": str(Path(_TMP) / "logs"),
-    "V2MD_SECRETS_FILE": str(Path(_TMP) / "nonexistent.env"),
-    "V2MD_DEADMAN_PING_URL": "",  # 关死人开关（trip 里会 ping）
+    "V2PDF_RUNS_FILE": str(Path(_TMP) / "runs.json"),
+    "V2PDF_STATE_FILE": str(Path(_TMP) / "state.json"),
+    "V2PDF_LOG_DIR": str(Path(_TMP) / "logs"),
+    "V2PDF_SECRETS_FILE": str(Path(_TMP) / "nonexistent.env"),
+    "V2PDF_DEADMAN_PING_URL": "",  # 关死人开关（trip 里会 ping）
 })
 
-from video2md import runs, watchdog  # noqa: E402
-from video2md.util import RunLog  # noqa: E402
+from video2pdf import runs, watchdog  # noqa: E402
+from video2pdf.util import RunLog  # noqa: E402
 
 NOW_WALL = 1_800_000_000.0  # 固定墙钟（epoch 秒）
 NOW_MONO = 500_000.0        # 固定单调钟
@@ -133,7 +133,7 @@ assert runs._load_runs().get("fresh") is None, "健康 run 不落盘（只有 tr
 
 # exit 动作：os._exit(70) 被调用（mock 掉，验证调用链）
 watchdog._reset_for_tests()
-with mock.patch.dict(os.environ, {"V2MD_WATCHDOG_ACTION": "exit"}), \
+with mock.patch.dict(os.environ, {"V2PDF_WATCHDOG_ACTION": "exit"}), \
         mock.patch.object(watchdog, "WATCHDOG_ACTION", "exit"), \
         mock.patch.object(watchdog.deadman, "ping"), \
         mock.patch.object(watchdog.os, "_exit") as m_exit:
@@ -162,7 +162,7 @@ assert tripped == ["boom"] and tasks3["boom"]["status"] == "error", "读炸应�
 watchdog._reset_for_tests()
 tasks4 = {"boom2": _task(NOW_WALL - 999)}
 with mock.patch.object(watchdog.deadman, "ping"), \
-        mock.patch("video2md.runs._runs_merge", side_effect=OSError("disk full")):
+        mock.patch("video2pdf.runs._runs_merge", side_effect=OSError("disk full")):
     tripped = watchdog.check_once(tasks4, load_runs=runs._load_runs,
                                   timeout_s=TIMEOUT, now_mono=NOW_MONO, now_wall=NOW_WALL)
 assert tripped == [] and tasks4["boom2"]["status"] == "running", "写炸应静默放过"
@@ -274,7 +274,7 @@ _seed_runs_file(_run(stage_ts_epoch=NOW_WALL - 999))
 task_live = _task(NOW_WALL - 999)
 local_tasks = {"r1": task_live}
 be = _FakeClusterStore([_row("r1", claimed_by="me")])
-import video2md.api as _api  # noqa: E402
+import video2pdf.api as _api  # noqa: E402
 
 with mock.patch.object(watchdog, "_tasks_backend_safe", lambda: be), \
         mock.patch.object(_api, "_PROC_ID", "me"), \

@@ -1,4 +1,4 @@
-# video2md 容器镜像：python3.12-slim + ffmpeg + 项目依赖（不含 whisper/torch——
+# video2pdf 容器镜像：python3.12-slim + ffmpeg + 项目依赖（不含 whisper/torch——
 # 转写/OCR/剪辑默认走 Colab CLI，见 README 的 Colab CLI GPU 配置）。
 # 在目标架构上构建（服务器 x86：直接在目标机上 docker build，避免 Mac arm64 交叉构建；
 # CI/registry 走 buildx 多架构，见 .github/workflows/ci.yml 的 release job）。
@@ -19,7 +19,7 @@ FROM python:3.12-slim
 # 版本注入（CI release job 传 --build-arg；本地构建缺省空，运行时版本以 pyproject 兜底为准）
 ARG VERSION=""
 ARG GIT_SHA=""
-LABEL org.opencontainers.image.title="video2md" \
+LABEL org.opencontainers.image.title="video2pdf" \
       org.opencontainers.image.version="${VERSION}" \
       org.opencontainers.image.revision="${GIT_SHA}" \
       org.opencontainers.image.source="https://github.com/mintao1/video2md" \
@@ -48,9 +48,18 @@ WORKDIR /app
 # --extra evals：离线评测旁路（backend/scripts/eval_notes.py）在容器内可跑（deepeval/ragas/langfuse SDK）
 COPY backend/pyproject.toml backend/uv.lock ./
 COPY backend/vendor/ ./vendor/
-RUN uv sync --frozen --no-dev --extra evals
+# 评测依赖在 CI/评测旁路安装；生产镜像只装运行时依赖，避免拉入大型科学计算栈。
+# uv.lock 记录了 files.pythonhosted.org 的固定 artifact URL；构建时将其映射到
+# workflow 传入的镜像根地址，版本/哈希不变，避免节点直连上游慢链路。
+RUN if [ -n "${PIP_INDEX_URL}" ]; then \
+      MIRROR_ROOT="${PIP_INDEX_URL%/simple}"; \
+      sed -i "s#https://files.pythonhosted.org#${MIRROR_ROOT}#g" uv.lock; \
+    fi \
+ && uv sync --frozen --no-dev
 # 无 mac extra：pyobjc 是 macOS 专属，Linux 镜像天然不含
 
+COPY backend/video2pdf/ ./video2pdf/
+# 改名过渡期垫片：旧清单的 `python -m video2md` 仍可用
 COPY backend/video2md/ ./video2md/
 COPY backend/acctkit/ ./acctkit/
 COPY backend/gpu_plugins/ ./gpu_plugins/
@@ -59,11 +68,11 @@ COPY README.md ./
 
 ENV PATH="/app/.venv/bin:$PATH" \
     PYTHONUNBUFFERED=1 \
-    V2MD_HOST=0.0.0.0 \
-    V2MD_STATE_FILE=/app/data/state.json \
-    V2MD_RUNS_FILE=/app/data/runs.json \
-    V2MD_PREFS_FILE=/app/data/prefs.json \
-    V2MD_LOG_DIR=/app/data/logs
+    V2PDF_HOST=0.0.0.0 \
+    V2PDF_STATE_FILE=/app/data/state.json \
+    V2PDF_RUNS_FILE=/app/data/runs.json \
+    V2PDF_PREFS_FILE=/app/data/prefs.json \
+    V2PDF_LOG_DIR=/app/data/logs
 
 VOLUME ["/app/data", "/vault"]
 EXPOSE 8790
@@ -77,4 +86,4 @@ USER 10001
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s \
   CMD ["python", "-c", "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8790/healthz', timeout=4)"]
 
-CMD ["python", "-m", "video2md", "api", "--port", "8790"]
+CMD ["python", "-m", "video2pdf", "api", "--port", "8790"]

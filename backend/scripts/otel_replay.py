@@ -5,7 +5,7 @@
 Langfuse 网页里就能翻看历史 run 的完整 trace（root→stage→entry→llm），
 含 evals/deadman 写进同一 jsonl 的事件（按 run_id 分组自动归位同一条 trace）。
 
-约定与 video2md/observability.py 逐字对齐（在线/回放同一棵树）：
+约定与 video2pdf/observability.py 逐字对齐（在线/回放同一棵树）：
 - trace_id = sha256(trace_prefix+run_id)[:32]（确定性；evals 分数回挂同一约定。
   前缀 2026-09-22 起为 "video2md-"；更早的 run 用 --trace-prefix serve- 回放才能
   落回 Langfuse 里的旧 trace）
@@ -59,7 +59,7 @@ from opentelemetry.trace import (
 )
 from platform_otel_sdk._otel import _endpoint  # _endpoint 随 otel 迁移入 SDK（033ae72）
 
-from video2md.observability import _scalar_attrs
+from video2pdf.observability import _scalar_attrs
 
 PROJ = Path(__file__).resolve().parents[2]
 
@@ -228,7 +228,7 @@ def main(argv: list[str] | None = None) -> int:
 
     # 与在线同一 resource（Langfuse 同一 service 归组）；span 侧带 replayed 区分
     provider = TracerProvider(resource=Resource.create(
-        {"service.name": "video2md-serve", "service.namespace": "video2md"}))
+        {"service.name": "video2pdf-serve", "service.namespace": "video2pdf"}))
     if args.dry_run:
         from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
         provider.add_span_processor(SimpleSpanProcessor(InMemorySpanExporter()))
@@ -238,7 +238,7 @@ def main(argv: list[str] | None = None) -> int:
         else:
             cfg = _endpoint()
             if cfg is None:
-                print("未配置端点：设 --endpoint，或在 ~/.config/video2md.env 配 LANGFUSE_PK/SK",
+                print("未配置端点：设 --endpoint，或在 ~/.config/video2pdf.env 配 LANGFUSE_PK/SK",
                       file=sys.stderr)
                 return 1
             base, hdrs, _ = cfg
@@ -249,7 +249,7 @@ def main(argv: list[str] | None = None) -> int:
             OTLPSpanExporter(endpoint=f"{base}/v1/traces", headers=hdrs),
             max_queue_size=200000, max_export_batch_size=512, schedule_delay_millis=2000))
         print(f"导出 → {base}/v1/traces")
-    tracer = provider.get_tracer("video2md")
+    tracer = provider.get_tracer("video2pdf")
 
     total = {"spans": 0, "info": 0, "synth": 0, "dangling": 0}
     for run_id, rs in runs.items():

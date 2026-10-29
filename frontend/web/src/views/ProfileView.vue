@@ -44,7 +44,7 @@ onMounted(async () => {
           <div class="bg-surface-container-lowest rounded-xl shadow-sm overflow-hidden flex flex-col">
             <button
               class="p-space-md flex items-center justify-between hover:bg-surface-container-low transition-colors text-left"
-              @click="toast.show('视书 v0.1.0 · 基于 video2md 后端')"
+              @click="toast.show('视书 v0.1.0 · 基于 video2pdf 后端')"
             >
               <div class="flex items-center gap-space-md">
                 <div class="w-9 h-9 rounded-lg bg-surface-container flex items-center justify-center text-outline">

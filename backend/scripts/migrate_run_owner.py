@@ -20,11 +20,11 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from video2md import runs  # noqa: E402
+from video2pdf import runs  # noqa: E402
 
-if (runs.ENV.get("V2MD_RUNS_STORE") or "").strip().lower() == "postgres":
-    sys.exit("本工具面向 JSON 文件档（runs.json）；V2MD_RUNS_STORE=postgres 下数据在 PG——"
-             "owner 收编用 SQL（UPDATE v2md_runs SET record = jsonb_set(...)）处理")
+if (runs.ENV.get("V2PDF_RUNS_STORE") or "").strip().lower() == "postgres":
+    sys.exit("本工具面向 JSON 文件档（runs.json）；V2PDF_RUNS_STORE=postgres 下数据在 PG——"
+             "owner 收编用 SQL（UPDATE v2pdf_runs SET record = jsonb_set(...)）处理")
 
 
 def main() -> int:
@@ -38,7 +38,7 @@ def main() -> int:
     a = ap.parse_args()
 
     if a.show_users:
-        uf = Path(runs.ENV.get("V2MD_USERS_FILE", "users.json"))
+        uf = Path(runs.ENV.get("V2PDF_USERS_FILE", "users.json"))
         print(json.dumps(json.loads(uf.read_text()) if uf.exists() else {},
                          ensure_ascii=False, indent=1))
         return 0

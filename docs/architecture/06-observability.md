@@ -6,7 +6,7 @@
 ## 三层模型（2026-09-22 定稿）
 
 ```
-video2md（OTel SDK：traces + metrics）
+video2pdf（OTel SDK：traces + metrics）
      │ OTLP HTTP :4318
      ▼
 otel-collector（memory_limiter → batch）
@@ -22,13 +22,13 @@ otel-collector（memory_limiter → batch）
 
 | 指标 | 类型 | 说明 |
 |---|---|---|
-| `v2md_runs` | counter | 完成的 run（按终态标签） |
-| `v2md_circuit_breaker_trips` | counter | 熔断次数（按阶段） |
-| `v2md_watchdog_trips` | counter | 看门狗卡死判定 |
-| `v2md_stage_entries` | counter | 阶段条目结果（ok/failed/skipped） |
-| `v2md_llm_requests` / `v2md_llm_tokens` | counter | LLM 调用/token（按任务/方向） |
-| `v2md_stage_seconds` / `v2md_llm_seconds` | histogram | 阶段/LLM 耗时 |
-| `v2md_queue_queued` / `v2md_run_active` | gauge | 队列深度/活跃 run（api 注册取数回调；PG 档读全盘） |
+| `v2pdf_runs` | counter | 完成的 run（按终态标签） |
+| `v2pdf_circuit_breaker_trips` | counter | 熔断次数（按阶段） |
+| `v2pdf_watchdog_trips` | counter | 看门狗卡死判定 |
+| `v2pdf_stage_entries` | counter | 阶段条目结果（ok/failed/skipped） |
+| `v2pdf_llm_requests` / `v2pdf_llm_tokens` | counter | LLM 调用/token（按任务/方向） |
+| `v2pdf_stage_seconds` / `v2pdf_llm_seconds` | histogram | 阶段/LLM 耗时 |
+| `v2pdf_queue_queued` / `v2pdf_run_active` | gauge | 队列深度/活跃 run（api 注册取数回调；PG 档读全盘） |
 
 ⚠ 指标进程内存态，重启清零（运行态非账本）——Grafana 面板在重启后断档是预期行为。
 
@@ -53,17 +53,17 @@ otel-collector（memory_limiter → batch）
 
 ## 卡死看门狗（`watchdog.py`）
 
-- **判定**：心跳三源取最小龄（RunLog 每条事件 touch / 阶段循环头 touch / started+stages ts 兜底），超 `V2MD_WATCHDOG_TIMEOUT_S`（默认 7200s）判卡死；三层全无信号则放过（不误杀）。
+- **判定**：心跳三源取最小龄（RunLog 每条事件 touch / 阶段循环头 touch / started+stages ts 兜底），超 `V2PDF_WATCHDOG_TIMEOUT_S`（默认 7200s）判卡死；三层全无信号则放过（不误杀）。
 - **动作**：`mark`（默认，开发）= 标 error + deadman /fail + 指标（线程无法强杀，信号量仍占，需人工重启）；`exit`（生产 compose 已配）= 标记后 `os._exit(70)`，restart 自愈。
 - **PG 档大盘巡检**（`check_cluster`）：扫全盘 running 中 DB 侧超龄行 → 三层复核 → 本进程的走既有 trip；他进程/无主残档 `steal_if_unclaimed` 条件 UPDATE 抢锁 → 持锁窗口内二次复核（cmd 心跳刚到的不冤枉杀）→ 翻 error + 交 stealer 重驱。
 
 ## 死人开关
 
-配 `V2MD_DEADMAN_PING_URL`：run 开始 ping `/start`、done/partial ping 原 URL、error ping `/fail`——「任务压根没跑/挂死」只有外部监控看得见。
+配 `V2PDF_DEADMAN_PING_URL`：run 开始 ping `/start`、done/partial ping 原 URL、error ping `/fail`——「任务压根没跑/挂死」只有外部监控看得见。
 
 ## evals 旁路
 
-`backend/scripts/eval_notes.py` 对已完成条目批量打分（DeepEval G-Eval/Faithfulness/Summarization + RAGAS faithfulness），分数回写同 trace，本地落 `docs/evals/baseline-<date>.json` 回归基线（`--compare` 均值跌 >0.05 退出码 2）。在线模式 `V2MD_EVAL=1` 逐条目即评（失败只留痕）。
+`backend/scripts/eval_notes.py` 对已完成条目批量打分（DeepEval G-Eval/Faithfulness/Summarization + RAGAS faithfulness），分数回写同 trace，本地落 `docs/evals/baseline-<date>.json` 回归基线（`--compare` 均值跌 >0.05 退出码 2）。在线模式 `V2PDF_EVAL=1` 逐条目即评（失败只留痕）。
 
 ## 已知限制
 
