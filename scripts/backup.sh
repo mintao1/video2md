@@ -31,6 +31,7 @@ KEEP_WEEKLY=4
 DRY_RUN=0
 COMPOSE_FILE="$REPO_DIR/deploy/docker-compose.prod.yml"
 BACKUP_REMOTE="${V2MD_BACKUP_REMOTE:-}"   # rclone remote（如 b2:v2md-backup）；空=只备本地
+BACKUP_TRANSPORT="${V2MD_BACKUP_TRANSPORT:-rclone}"  # rclone（默认）或 scp（受限 SFTP 主机）
 BACKUP_RECIPIENT="${V2MD_BACKUP_AGE_RECIPIENT:-}"
 BACKUP_RETENTION_DAYS="${V2MD_BACKUP_RETENTION_DAYS:-}"
 
@@ -205,7 +206,19 @@ fi
 #    生产已在上方强制配置远端；失败用退出码 3 阻断备份成功。
 REMOTE_RC=0
 if [[ -n "$BACKUP_REMOTE" ]]; then
-  if command -v rclone >/dev/null 2>&1; then
+  if [[ "$BACKUP_TRANSPORT" == "scp" ]]; then
+    if [[ -x "$REPO_DIR/scripts/backup_scp_sync.sh" ]]; then
+      if run "$REPO_DIR/scripts/backup_scp_sync.sh" "$DST_DIR" "$BACKUP_REMOTE"; then
+        [[ $DRY_RUN -eq 0 ]] && echo "✓ 异地推送 → $BACKUP_REMOTE（scp）"
+      else
+        echo "❌ scp 异地推送失败（生产备份不允许只留本地副本）" >&2
+        REMOTE_RC=3
+      fi
+    else
+      echo "❌ scp 同步脚本不存在：$REPO_DIR/scripts/backup_scp_sync.sh" >&2
+      REMOTE_RC=3
+    fi
+  elif [[ "$BACKUP_TRANSPORT" == "rclone" ]] && command -v rclone >/dev/null 2>&1; then
     # Sync the retained local set so remote storage does not grow forever with
     # deleted tenant archives. The local age-encrypted files remain the source
     # of truth; rclone only transports ciphertext.
@@ -216,7 +229,7 @@ if [[ -n "$BACKUP_REMOTE" ]]; then
       REMOTE_RC=3
     fi
   else
-    echo "❌ V2MD_BACKUP_REMOTE 已配但服务器无 rclone" >&2
+    echo "❌ V2MD_BACKUP_REMOTE 传输配置无效或缺少 rclone" >&2
     REMOTE_RC=3
   fi
 fi

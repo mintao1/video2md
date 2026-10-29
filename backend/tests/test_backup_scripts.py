@@ -179,7 +179,7 @@ assert (dst9 / "manifest.sha256").exists(), "失败不阻断本地保留"
 (SHIM / "rclone").unlink()
 dst10 = TMP / "bak-remote-nobin"
 r = run_backup_env(ENV_REMOTE, "--dst", str(dst10))
-assert r.returncode == 3 and "无 rclone" in r.stderr, (r.returncode, r.stderr)
+assert r.returncode == 3 and "传输配置无效或缺少 rclone" in r.stderr, (r.returncode, r.stderr)
 assert (dst10 / "manifest.sha256").exists()
 
 shutil.rmtree(TMP, ignore_errors=True)
