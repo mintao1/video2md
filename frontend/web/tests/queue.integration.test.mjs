@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
 import { once } from 'node:events'
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
 import { after, afterEach, before, beforeEach, describe, it } from 'node:test'
@@ -285,6 +285,9 @@ it('persists private LLM settings through the live API without returning or cach
     assert.equal(saved.configured, true)
     assert.equal(saved.has_api_key, true)
     assert.doesNotMatch(JSON.stringify(saved), /fixture-only-secret/)
+    const persisted = JSON.parse(await readFile(resolve(temp, 'llm-settings.json'), 'utf8'))
+    assert.match(persisted.alice.api_key, /^v1:aesgcm:/)
+    assert.doesNotMatch(persisted.alice.api_key, /fixture-only-secret/)
     assert.equal((await api.getLlmSettings()).base_url, 'https://llm.example.test/v1')
     await api.saveLlmSettings({ base_url: 'https://llm.example.test/v2', model: 'new-model' })
     assert.equal((await api.getLlmSettings()).has_api_key, true)

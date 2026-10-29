@@ -21,9 +21,14 @@ os.environ.update({
     "V2PDF_TASKS_STORE": "json", "V2PDF_PREFS_STORE": "json", "V2PDF_ARTIFACT_MODE": "vault",
     "V2PDF_RUNS_FILE": str(root / "runs.json"), "V2PDF_STATE_FILE": str(root / "state.json"),
     "V2PDF_USERS_FILE": str(root / "users.json"), "V2PDF_PREFS_FILE": str(root / "prefs.json"),
+    "V2PDF_LLM_SETTINGS_FILE": str(root / "llm-settings.json"),
     "V2PDF_LOG_DIR": str(root / "logs"), "V2PDF_UPLOADS_DIR": str(root / "uploads"),
     "OBSIDIAN_VAULT": str(root / "vault"), "V2PDF_REMOTE": "off", "V2PDF_OCR_REMOTE": "off",
     "V2PDF_CLIPS_REMOTE": "off", "V2PDF_FAKE_LLM": "1", "V2PDF_EVAL": "off",
+    # The live LLM-settings endpoint now encrypts credentials in every mode.
+    # Keep the fixture deterministic while exercising the same encryption path;
+    # this is test-only material and never represents a production secret.
+    "V2PDF_LLM_SETTINGS_KEY": "hex:" + "11" * 32,
     "V2PDF_LOCAL_PATHS": "deny", "V2PDF_BUDGET_MONTH_USD": "0",
     "OTEL_EXPORTER_OTLP_ENDPOINT": "", "LANGFUSE_PK": "", "LANGFUSE_SK": "",
     "TMPDIR": str(root),
