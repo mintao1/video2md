@@ -294,7 +294,7 @@ def evaluate_repository(repo_root: Path) -> list[str]:
     require(
         "repo-database-roles",
         all(text in migration for text in (
-            "ENABLE ROW LEVEL SECURITY", "REVOKE ALL ON ALL TABLES IN SCHEMA public FROM PUBLIC",
+            "ENABLE ROW LEVEL SECURITY", "REVOKE ALL ON TABLE",
             "REVOKE INSERT, UPDATE, DELETE ON v2pdf_schema_version FROM video2md_app",
         ))
         and all(text in (role_init + role_bootstrap) for text in ("video2md_app", "video2md_migrate"))

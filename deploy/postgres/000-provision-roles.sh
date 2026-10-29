@@ -46,7 +46,7 @@ BEGIN
         SELECT schemaname, tablename
           FROM pg_tables
          WHERE schemaname = 'public'
-           AND (tablename LIKE 'v2md_%' OR tablename LIKE 'checkpoints%')
+           AND (tablename LIKE 'v2md_%' OR tablename LIKE 'v2pdf_%' OR tablename LIKE 'checkpoint%')
     LOOP
         EXECUTE format('ALTER TABLE %I.%I OWNER TO video2md_migrate', t.schemaname, t.tablename);
     END LOOP;

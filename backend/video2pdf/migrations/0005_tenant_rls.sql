@@ -117,17 +117,53 @@ CREATE POLICY v2pdf_llm_settings_tenant ON v2pdf_llm_settings
     WITH CHECK (v2pdf_tenant_visible(uid));
 
 -- Remove accidental public access, then grant only the operations used by the
--- API.  Sequence grants are harmless today and cover future serial columns.
-REVOKE ALL ON ALL TABLES IN SCHEMA public FROM PUBLIC;
-REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM PUBLIC;
+-- API.  This database also contains unrelated Buzuti tables owned by another
+-- role, so never use ON ALL TABLES/SEQUENCES here: it would make this migration
+-- role attempt to revoke/grant privileges on objects it does not own.
+DO $$
+DECLARE t record;
+BEGIN
+    FOR t IN
+        SELECT tablename FROM pg_tables
+         WHERE schemaname = 'public'
+           AND (tablename LIKE 'v2pdf_%' OR tablename LIKE 'checkpoint%')
+    LOOP
+        EXECUTE format('REVOKE ALL ON TABLE %I.%I FROM PUBLIC', 'public', t.tablename);
+    END LOOP;
+    FOR t IN
+        SELECT sequence_name FROM information_schema.sequences
+         WHERE sequence_schema = 'public'
+           AND (sequence_name LIKE 'v2pdf_%' OR sequence_name LIKE 'checkpoint%')
+    LOOP
+        EXECUTE format('REVOKE ALL ON SEQUENCE %I.%I FROM PUBLIC', 'public', t.sequence_name);
+    END LOOP;
+END
+$$;
 GRANT USAGE ON SCHEMA public TO video2md_app, video2md_owner, video2md_migrate;
-GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO video2md_app;
-GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO video2md_app;
+DO $$
+DECLARE t record;
+BEGIN
+    FOR t IN
+        SELECT tablename FROM pg_tables
+         WHERE schemaname = 'public'
+           AND (tablename LIKE 'v2pdf_%' OR tablename LIKE 'checkpoint%')
+    LOOP
+        EXECUTE format('GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE %I.%I TO video2md_app', 'public', t.tablename);
+        EXECUTE format('GRANT ALL PRIVILEGES ON TABLE %I.%I TO video2md_owner, video2md_migrate', 'public', t.tablename);
+    END LOOP;
+    FOR t IN
+        SELECT sequence_name FROM information_schema.sequences
+         WHERE sequence_schema = 'public'
+           AND (sequence_name LIKE 'v2pdf_%' OR sequence_name LIKE 'checkpoint%')
+    LOOP
+        EXECUTE format('GRANT USAGE, SELECT ON SEQUENCE %I.%I TO video2md_app', 'public', t.sequence_name);
+        EXECUTE format('GRANT ALL PRIVILEGES ON SEQUENCE %I.%I TO video2md_owner, video2md_migrate', 'public', t.sequence_name);
+    END LOOP;
+END
+$$;
 -- The API only reads the migration ledger during startup; it must not be able
 -- to rewrite schema history and hide an incomplete deployment.
 REVOKE INSERT, UPDATE, DELETE ON v2pdf_schema_version FROM video2md_app;
-GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO video2md_owner, video2md_migrate;
-GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO video2md_owner, video2md_migrate;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public
     GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO video2md_app;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public
