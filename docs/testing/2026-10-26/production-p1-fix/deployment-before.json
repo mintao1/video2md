@@ -1,0 +1,506 @@
+{
+    "apiVersion": "apps/v1",
+    "kind": "Deployment",
+    "metadata": {
+        "annotations": {
+            "deployment.kubernetes.io/revision": "77",
+            "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"apps/v1\",\"kind\":\"Deployment\",\"metadata\":{\"annotations\":{},\"labels\":{\"app.kubernetes.io/component\":\"api\",\"app.kubernetes.io/environment\":\"production\",\"app.kubernetes.io/name\":\"video2md\",\"app.kubernetes.io/part-of\":\"lcode-platform\"},\"name\":\"video2md-api\",\"namespace\":\"video2md\"},\"spec\":{\"replicas\":1,\"selector\":{\"matchLabels\":{\"app.kubernetes.io/component\":\"api\",\"app.kubernetes.io/name\":\"video2md\"}},\"strategy\":{\"type\":\"Recreate\"},\"template\":{\"metadata\":{\"labels\":{\"app.kubernetes.io/component\":\"api\",\"app.kubernetes.io/name\":\"video2md\"}},\"spec\":{\"containers\":[{\"env\":[{\"name\":\"TZ\",\"value\":\"Asia/Shanghai\"},{\"name\":\"V2MD_HOST\",\"value\":\"0.0.0.0\"},{\"name\":\"V2MD_TRUST_XFF\",\"value\":\"on\"},{\"name\":\"V2MD_GPU_PRICE_POLICY\",\"value\":\"free\"},{\"name\":\"V2MD_PRICE_GPU_MIN\",\"value\":\"0\"},{\"name\":\"V2MD_PRICE_LLM_IN_MTOK\",\"value\":\"0.15\"},{\"name\":\"V2MD_PRICE_LLM_OUT_MTOK\",\"value\":\"0.50\"},{\"name\":\"V2MD_PRICE_LLM_CACHED_IN_MTOK\",\"value\":\"0.03\"},{\"name\":\"V2MD_ENV\",\"value\":\"production\"},{\"name\":\"V2MD_AUTH\",\"value\":\"google\"},{\"name\":\"V2MD_AUTH_PROVIDERS\",\"value\":\"google\"},{\"name\":\"V2MD_PUBLIC_BASE_URL\",\"value\":\"https://ferosse.tech\"},{\"name\":\"V2MD_WEB_BASE_URL\",\"value\":\"https://ferosse.tech\"},{\"name\":\"V2MD_GOOGLE_OAUTH_TIMEOUT_S\",\"value\":\"15\"},{\"name\":\"V2MD_GOOGLE_OAUTH_PROXY_URL\",\"value\":\"http://127.0.0.1:18080\"},{\"name\":\"V2MD_SECRETS_FILE\",\"value\":\"/run/video2md.env\"},{\"name\":\"V2MD_CHECKPOINTER\",\"value\":\"postgres\"},{\"name\":\"V2MD_RUNS_STORE\",\"value\":\"postgres\"},{\"name\":\"V2MD_STATE_STORE\",\"value\":\"postgres\"},{\"name\":\"V2MD_USERS_STORE\",\"value\":\"postgres\"},{\"name\":\"V2MD_TASKS_STORE\",\"value\":\"postgres\"},{\"name\":\"V2MD_PREFS_STORE\",\"value\":\"postgres\"},{\"name\":\"V2MD_EVENTS\",\"value\":\"pg\"},{\"name\":\"V2MD_REMOTE\",\"value\":\"colab-cli\"},{\"name\":\"V2MD_OCR_REMOTE\",\"value\":\"colab-cli\"},{\"name\":\"V2MD_CLIPS_REMOTE\",\"value\":\"colab-cli\"},{\"name\":\"V2MD_COLAB_USERS_DIR\",\"value\":\"/app/data/colab-users\"},{\"name\":\"V2MD_COLAB_BIN\",\"value\":\"/app/.venv/bin/colab\"},{\"name\":\"V2MD_CLIPS_SOURCE\",\"value\":\"remote\"},{\"name\":\"OTEL_EXPORTER_OTLP_ENDPOINT\",\"value\":\"http://127.0.0.1:4318\"},{\"name\":\"OTEL_SERVICE_NAME\",\"value\":\"video2md\"},{\"name\":\"V2MD_PROXY_DOMESTIC\",\"value\":\"1\"},{\"name\":\"V2MD_DIRECT_HOSTS\",\"value\":\"ferosse.tech,.ferosse.tech\"},{\"name\":\"NO_PROXY\",\"value\":\"127.0.0.1,localhost,10.0.0.7,10.43.,.svc,ferosse.tech,.ferosse.tech,api2.niubi.win\"},{\"name\":\"no_proxy\",\"value\":\"127.0.0.1,localhost,10.0.0.7,10.43.,.svc,ferosse.tech,.ferosse.tech,api2.niubi.win\"},{\"name\":\"HTTP_PROXY\",\"value\":\"http://127.0.0.1:18080\"},{\"name\":\"HTTPS_PROXY\",\"value\":\"http://127.0.0.1:18080\"},{\"name\":\"ALL_PROXY\",\"value\":\"http://127.0.0.1:18080\"},{\"name\":\"V2MD_WATCHDOG_ACTION\",\"value\":\"exit\"},{\"name\":\"OBSIDIAN_VAULT\",\"value\":\"/vault\"},{\"name\":\"V2MD_ENV\",\"value\":\"production\"},{\"name\":\"LOG_LEVEL\",\"value\":\"INFO\"}],\"image\":\"video2md:0.2.0-colab-tenant-20261026d\",\"imagePullPolicy\":\"IfNotPresent\",\"livenessProbe\":{\"httpGet\":{\"path\":\"/healthz\",\"port\":8790},\"initialDelaySeconds\":30,\"periodSeconds\":30},\"name\":\"api\",\"ports\":[{\"containerPort\":8790,\"name\":\"http\"}],\"readinessProbe\":{\"httpGet\":{\"path\":\"/healthz\",\"port\":8790},\"initialDelaySeconds\":10,\"periodSeconds\":10},\"resources\":{\"limits\":{\"cpu\":\"1\",\"memory\":\"1Gi\"},\"requests\":{\"cpu\":\"100m\",\"memory\":\"256Mi\"}},\"securityContext\":{\"allowPrivilegeEscalation\":false,\"capabilities\":{\"drop\":[\"ALL\"]},\"readOnlyRootFilesystem\":true},\"startupProbe\":{\"failureThreshold\":30,\"httpGet\":{\"path\":\"/healthz\",\"port\":8790},\"periodSeconds\":5},\"volumeMounts\":[{\"mountPath\":\"/app/data\",\"name\":\"data\"},{\"mountPath\":\"/vault\",\"name\":\"vault\"},{\"mountPath\":\"/run/video2md.env\",\"name\":\"secrets\",\"readOnly\":true,\"subPath\":\"video2md.env\"},{\"mountPath\":\"/tmp\",\"name\":\"tmp\"}]}],\"dnsPolicy\":\"ClusterFirstWithHostNet\",\"enableServiceLinks\":false,\"hostNetwork\":true,\"initContainers\":[{\"command\":[\"sh\",\"-lc\",\"mkdir -p /app/data/logs /vault \\u0026\\u0026 chown -R 10001:10001 /app/data /vault\"],\"image\":\"video2md:0.2.0-hotfix-20261021l\",\"imagePullPolicy\":\"IfNotPresent\",\"name\":\"fix-volume-permissions\",\"securityContext\":{\"allowPrivilegeEscalation\":false,\"capabilities\":{\"add\":[\"CHOWN\"],\"drop\":[\"ALL\"]},\"runAsNonRoot\":false,\"runAsUser\":0},\"volumeMounts\":[{\"mountPath\":\"/app/data\",\"name\":\"data\"},{\"mountPath\":\"/vault\",\"name\":\"vault\"}]},{\"command\":[\"python\",\"-m\",\"video2md\",\"migrate\"],\"env\":[{\"name\":\"V2MD_ENV\",\"value\":\"production\"},{\"name\":\"V2MD_AUTH\",\"value\":\"google\"},{\"name\":\"V2MD_AUTH_PROVIDERS\",\"value\":\"google\"},{\"name\":\"V2MD_PUBLIC_BASE_URL\",\"value\":\"https://ferosse.tech\"},{\"name\":\"V2MD_WEB_BASE_URL\",\"value\":\"https://ferosse.tech\"},{\"name\":\"V2MD_GOOGLE_OAUTH_TIMEOUT_S\",\"value\":\"15\"},{\"name\":\"V2MD_GOOGLE_OAUTH_PROXY_URL\",\"value\":\"http://127.0.0.1:18080\"},{\"name\":\"V2MD_SECRETS_FILE\",\"value\":\"/run/video2md.env\"}],\"image\":\"video2md:0.2.0-colab-tenant-20261026d\",\"imagePullPolicy\":\"IfNotPresent\",\"name\":\"migrate\",\"securityContext\":{\"allowPrivilegeEscalation\":false,\"capabilities\":{\"drop\":[\"ALL\"]}},\"volumeMounts\":[{\"mountPath\":\"/run/video2md.env\",\"name\":\"secrets\",\"readOnly\":true,\"subPath\":\"video2md.env\"}]}],\"securityContext\":{\"fsGroup\":10001,\"runAsGroup\":10001,\"runAsNonRoot\":true,\"runAsUser\":10001,\"seccompProfile\":{\"type\":\"RuntimeDefault\"}},\"serviceAccountName\":\"video2md\",\"terminationGracePeriodSeconds\":120,\"volumes\":[{\"emptyDir\":{},\"name\":\"tmp\"},{\"hostPath\":{\"path\":\"/var/lib/docker/volumes/video2md_v2md-data/_data\",\"type\":\"Directory\"},\"name\":\"data\"},{\"hostPath\":{\"path\":\"/var/lib/docker/volumes/video2md_vault/_data\",\"type\":\"Directory\"},\"name\":\"vault\"},{\"name\":\"secrets\",\"secret\":{\"defaultMode\":288,\"secretName\":\"video2md-secrets\"}}]}}}}\n"
+        },
+        "creationTimestamp": "2026-09-26T13:55:16Z",
+        "generation": 80,
+        "labels": {
+            "app.kubernetes.io/component": "api",
+            "app.kubernetes.io/environment": "production",
+            "app.kubernetes.io/name": "video2md",
+            "app.kubernetes.io/part-of": "lcode-platform"
+        },
+        "name": "video2md-api",
+        "namespace": "video2md",
+        "resourceVersion": "978166",
+        "uid": "a2fd0570-cae3-45d8-a6b4-0e2ea791acfa"
+    },
+    "spec": {
+        "progressDeadlineSeconds": 600,
+        "replicas": 1,
+        "revisionHistoryLimit": 10,
+        "selector": {
+            "matchLabels": {
+                "app.kubernetes.io/component": "api",
+                "app.kubernetes.io/name": "video2md"
+            }
+        },
+        "strategy": {
+            "type": "Recreate"
+        },
+        "template": {
+            "metadata": {
+                "labels": {
+                    "app.kubernetes.io/component": "api",
+                    "app.kubernetes.io/name": "video2md"
+                }
+            },
+            "spec": {
+                "containers": [
+                    {
+                        "env": [
+                            {
+                                "name": "TZ",
+                                "value": "Asia/Shanghai"
+                            },
+                            {
+                                "name": "V2MD_HOST",
+                                "value": "0.0.0.0"
+                            },
+                            {
+                                "name": "V2MD_TRUST_XFF",
+                                "value": "on"
+                            },
+                            {
+                                "name": "V2MD_GPU_PRICE_POLICY",
+                                "value": "free"
+                            },
+                            {
+                                "name": "V2MD_PRICE_GPU_MIN",
+                                "value": "0"
+                            },
+                            {
+                                "name": "V2MD_PRICE_LLM_IN_MTOK",
+                                "value": "0.15"
+                            },
+                            {
+                                "name": "V2MD_PRICE_LLM_OUT_MTOK",
+                                "value": "0.50"
+                            },
+                            {
+                                "name": "V2MD_PRICE_LLM_CACHED_IN_MTOK",
+                                "value": "0.03"
+                            },
+                            {
+                                "name": "V2MD_ENV",
+                                "value": "production"
+                            },
+                            {
+                                "name": "V2MD_AUTH",
+                                "value": "google"
+                            },
+                            {
+                                "name": "V2MD_AUTH_PROVIDERS",
+                                "value": "google"
+                            },
+                            {
+                                "name": "V2MD_PUBLIC_BASE_URL",
+                                "value": "https://ferosse.tech"
+                            },
+                            {
+                                "name": "V2MD_WEB_BASE_URL",
+                                "value": "https://ferosse.tech"
+                            },
+                            {
+                                "name": "V2MD_GOOGLE_OAUTH_TIMEOUT_S",
+                                "value": "15"
+                            },
+                            {
+                                "name": "V2MD_GOOGLE_OAUTH_PROXY_URL",
+                                "value": "http://127.0.0.1:18080"
+                            },
+                            {
+                                "name": "V2MD_SECRETS_FILE",
+                                "value": "/run/video2md.env"
+                            },
+                            {
+                                "name": "V2MD_CHECKPOINTER",
+                                "value": "postgres"
+                            },
+                            {
+                                "name": "V2MD_RUNS_STORE",
+                                "value": "postgres"
+                            },
+                            {
+                                "name": "V2MD_STATE_STORE",
+                                "value": "postgres"
+                            },
+                            {
+                                "name": "V2MD_USERS_STORE",
+                                "value": "postgres"
+                            },
+                            {
+                                "name": "V2MD_TASKS_STORE",
+                                "value": "postgres"
+                            },
+                            {
+                                "name": "V2MD_PREFS_STORE",
+                                "value": "postgres"
+                            },
+                            {
+                                "name": "V2MD_EVENTS",
+                                "value": "pg"
+                            },
+                            {
+                                "name": "V2MD_REMOTE",
+                                "value": "colab-cli"
+                            },
+                            {
+                                "name": "V2MD_OCR_REMOTE",
+                                "value": "colab-cli"
+                            },
+                            {
+                                "name": "V2MD_CLIPS_REMOTE",
+                                "value": "colab-cli"
+                            },
+                            {
+                                "name": "V2MD_COLAB_USERS_DIR",
+                                "value": "/app/data/colab-users"
+                            },
+                            {
+                                "name": "V2MD_COLAB_BIN",
+                                "value": "/app/.venv/bin/colab"
+                            },
+                            {
+                                "name": "V2MD_CLIPS_SOURCE",
+                                "value": "remote"
+                            },
+                            {
+                                "name": "OTEL_EXPORTER_OTLP_ENDPOINT",
+                                "value": "http://127.0.0.1:4318"
+                            },
+                            {
+                                "name": "OTEL_SERVICE_NAME",
+                                "value": "video2md"
+                            },
+                            {
+                                "name": "V2MD_PROXY_DOMESTIC",
+                                "value": "1"
+                            },
+                            {
+                                "name": "V2MD_DIRECT_HOSTS",
+                                "value": "ferosse.tech,.ferosse.tech"
+                            },
+                            {
+                                "name": "NO_PROXY",
+                                "value": "127.0.0.1,localhost,10.0.0.7,10.43.,.svc,ferosse.tech,.ferosse.tech,api2.niubi.win"
+                            },
+                            {
+                                "name": "no_proxy",
+                                "value": "127.0.0.1,localhost,10.0.0.7,10.43.,.svc,ferosse.tech,.ferosse.tech,api2.niubi.win"
+                            },
+                            {
+                                "name": "HTTP_PROXY",
+                                "value": "http://127.0.0.1:18080"
+                            },
+                            {
+                                "name": "HTTPS_PROXY",
+                                "value": "http://127.0.0.1:18080"
+                            },
+                            {
+                                "name": "ALL_PROXY",
+                                "value": "http://127.0.0.1:18080"
+                            },
+                            {
+                                "name": "V2MD_WATCHDOG_ACTION",
+                                "value": "exit"
+                            },
+                            {
+                                "name": "OBSIDIAN_VAULT",
+                                "value": "/vault"
+                            },
+                            {
+                                "name": "LOG_LEVEL",
+                                "value": "INFO"
+                            }
+                        ],
+                        "image": "video2md:0.2.0-colab-tenant-20261026d",
+                        "imagePullPolicy": "IfNotPresent",
+                        "livenessProbe": {
+                            "failureThreshold": 3,
+                            "httpGet": {
+                                "path": "/healthz",
+                                "port": 8790,
+                                "scheme": "HTTP"
+                            },
+                            "initialDelaySeconds": 30,
+                            "periodSeconds": 30,
+                            "successThreshold": 1,
+                            "timeoutSeconds": 1
+                        },
+                        "name": "api",
+                        "ports": [
+                            {
+                                "containerPort": 8790,
+                                "name": "http",
+                                "protocol": "TCP"
+                            }
+                        ],
+                        "readinessProbe": {
+                            "failureThreshold": 3,
+                            "httpGet": {
+                                "path": "/healthz",
+                                "port": 8790,
+                                "scheme": "HTTP"
+                            },
+                            "initialDelaySeconds": 10,
+                            "periodSeconds": 10,
+                            "successThreshold": 1,
+                            "timeoutSeconds": 1
+                        },
+                        "resources": {
+                            "limits": {
+                                "cpu": "1",
+                                "memory": "1Gi"
+                            },
+                            "requests": {
+                                "cpu": "100m",
+                                "memory": "256Mi"
+                            }
+                        },
+                        "securityContext": {
+                            "allowPrivilegeEscalation": false,
+                            "capabilities": {
+                                "drop": [
+                                    "ALL"
+                                ]
+                            },
+                            "readOnlyRootFilesystem": true
+                        },
+                        "startupProbe": {
+                            "failureThreshold": 30,
+                            "httpGet": {
+                                "path": "/healthz",
+                                "port": 8790,
+                                "scheme": "HTTP"
+                            },
+                            "periodSeconds": 5,
+                            "successThreshold": 1,
+                            "timeoutSeconds": 1
+                        },
+                        "terminationMessagePath": "/dev/termination-log",
+                        "terminationMessagePolicy": "File",
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/app/data",
+                                "name": "data"
+                            },
+                            {
+                                "mountPath": "/vault",
+                                "name": "vault"
+                            },
+                            {
+                                "mountPath": "/run/video2md.env",
+                                "name": "secrets",
+                                "readOnly": true,
+                                "subPath": "video2md.env"
+                            },
+                            {
+                                "mountPath": "/tmp",
+                                "name": "tmp"
+                            }
+                        ]
+                    }
+                ],
+                "dnsPolicy": "ClusterFirstWithHostNet",
+                "enableServiceLinks": false,
+                "hostNetwork": true,
+                "initContainers": [
+                    {
+                        "command": [
+                            "sh",
+                            "-lc",
+                            "mkdir -p /app/data/logs /vault \u0026\u0026 chown -R 10001:10001 /app/data /vault"
+                        ],
+                        "image": "video2md:0.2.0-hotfix-20261021l",
+                        "imagePullPolicy": "IfNotPresent",
+                        "name": "fix-volume-permissions",
+                        "resources": {},
+                        "securityContext": {
+                            "allowPrivilegeEscalation": false,
+                            "capabilities": {
+                                "add": [
+                                    "CHOWN"
+                                ],
+                                "drop": [
+                                    "ALL"
+                                ]
+                            },
+                            "runAsNonRoot": false,
+                            "runAsUser": 0
+                        },
+                        "terminationMessagePath": "/dev/termination-log",
+                        "terminationMessagePolicy": "File",
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/app/data",
+                                "name": "data"
+                            },
+                            {
+                                "mountPath": "/vault",
+                                "name": "vault"
+                            }
+                        ]
+                    },
+                    {
+                        "command": [
+                            "python",
+                            "-m",
+                            "video2md",
+                            "migrate"
+                        ],
+                        "env": [
+                            {
+                                "name": "V2MD_ENV",
+                                "value": "production"
+                            },
+                            {
+                                "name": "V2MD_REMOTE",
+                                "value": "colab-cli"
+                            },
+                            {
+                                "name": "V2MD_OCR_REMOTE",
+                                "value": "colab-cli"
+                            },
+                            {
+                                "name": "V2MD_CLIPS_REMOTE",
+                                "value": "colab-cli"
+                            },
+                            {
+                                "name": "V2MD_COLAB_BIN",
+                                "value": "/app/.venv/bin/colab"
+                            },
+                            {
+                                "name": "V2MD_AUTH",
+                                "value": "google"
+                            },
+                            {
+                                "name": "V2MD_AUTH_PROVIDERS",
+                                "value": "google"
+                            },
+                            {
+                                "name": "V2MD_PUBLIC_BASE_URL",
+                                "value": "https://ferosse.tech"
+                            },
+                            {
+                                "name": "V2MD_WEB_BASE_URL",
+                                "value": "https://ferosse.tech"
+                            },
+                            {
+                                "name": "V2MD_GOOGLE_OAUTH_TIMEOUT_S",
+                                "value": "15"
+                            },
+                            {
+                                "name": "V2MD_GOOGLE_OAUTH_PROXY_URL",
+                                "value": "http://127.0.0.1:18080"
+                            },
+                            {
+                                "name": "V2MD_SECRETS_FILE",
+                                "value": "/run/video2md.env"
+                            },
+                            {
+                                "name": "HTTP_PROXY",
+                                "value": "http://127.0.0.1:18080"
+                            },
+                            {
+                                "name": "HTTPS_PROXY",
+                                "value": "http://127.0.0.1:18080"
+                            },
+                            {
+                                "name": "ALL_PROXY",
+                                "value": "http://127.0.0.1:18080"
+                            },
+                            {
+                                "name": "no_proxy",
+                                "value": "127.0.0.1,localhost,10.0.0.7,10.43.,.svc,ferosse.tech,.ferosse.tech,api2.niubi.win"
+                            }
+                        ],
+                        "image": "video2md:0.2.0-colab-tenant-20261026d",
+                        "imagePullPolicy": "IfNotPresent",
+                        "name": "migrate",
+                        "resources": {},
+                        "securityContext": {
+                            "allowPrivilegeEscalation": false,
+                            "capabilities": {
+                                "drop": [
+                                    "ALL"
+                                ]
+                            }
+                        },
+                        "terminationMessagePath": "/dev/termination-log",
+                        "terminationMessagePolicy": "File",
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/run/video2md.env",
+                                "name": "secrets",
+                                "readOnly": true,
+                                "subPath": "video2md.env"
+                            }
+                        ]
+                    }
+                ],
+                "restartPolicy": "Always",
+                "schedulerName": "default-scheduler",
+                "securityContext": {
+                    "fsGroup": 10001,
+                    "runAsGroup": 10001,
+                    "runAsNonRoot": true,
+                    "runAsUser": 10001,
+                    "seccompProfile": {
+                        "type": "RuntimeDefault"
+                    }
+                },
+                "serviceAccount": "video2md",
+                "serviceAccountName": "video2md",
+                "terminationGracePeriodSeconds": 120,
+                "volumes": [
+                    {
+                        "emptyDir": {},
+                        "name": "tmp"
+                    },
+                    {
+                        "hostPath": {
+                            "path": "/var/lib/docker/volumes/video2md_v2md-data/_data",
+                            "type": "Directory"
+                        },
+                        "name": "data"
+                    },
+                    {
+                        "hostPath": {
+                            "path": "/var/lib/docker/volumes/video2md_vault/_data",
+                            "type": "Directory"
+                        },
+                        "name": "vault"
+                    },
+                    {
+                        "name": "secrets",
+                        "secret": {
+                            "defaultMode": 288,
+                            "secretName": "video2md-secrets"
+                        }
+                    }
+                ]
+            }
+        }
+    },
+    "status": {
+        "availableReplicas": 1,
+        "conditions": [
+            {
+                "lastTransitionTime": "2026-10-25T23:47:36Z",
+                "lastUpdateTime": "2026-10-25T23:47:36Z",
+                "message": "Deployment has minimum availability.",
+                "reason": "MinimumReplicasAvailable",
+                "status": "True",
+                "type": "Available"
+            },
+            {
+                "lastTransitionTime": "2026-10-19T23:15:53Z",
+                "lastUpdateTime": "2026-10-25T23:47:36Z",
+                "message": "ReplicaSet \"video2md-api-5c7f6b4cf8\" has successfully progressed.",
+                "reason": "NewReplicaSetAvailable",
+                "status": "True",
+                "type": "Progressing"
+            }
+        ],
+        "observedGeneration": 80,
+        "readyReplicas": 1,
+        "replicas": 1,
+        "terminatingReplicas": 0,
+        "updatedReplicas": 1
+    }
+}

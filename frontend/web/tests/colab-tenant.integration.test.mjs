@@ -131,6 +131,7 @@ test('agreement is required before starting Google login and the intended page i
     const destination = new URL(page.navigations[0])
     assert.equal(destination.pathname, '/auth/google/login')
     assert.equal(destination.searchParams.get('redirect'), '/tasks?openImport=1')
+    assert.equal(destination.searchParams.get('terms_accepted'), '1')
     assert.equal(page.calls.length, 0)
   } finally { page.close() }
 })

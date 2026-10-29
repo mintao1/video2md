@@ -1,0 +1,30 @@
+{
+  "kind": "production",
+  "environment": {
+    "host_alias": "lcode-4c",
+    "base_url": "https://ferosse.tech",
+    "release_version": "video2md:0.2.0-p1-terms-20261026c"
+  },
+  "run": {
+    "run_id": "be09c0fe",
+    "status": "error",
+    "source": "bilibili",
+    "entry_count": 1,
+    "failure_stage": "download",
+    "failure_reason_code": "source_access_unavailable",
+    "failure_reason_recorded": true,
+    "failure_reason_visible": false,
+    "failure_message": "B站未提供可匿名下载的完整 MP4，请使用可公开播放的视频",
+    "downstream_stages_started": false,
+    "model_called": false,
+    "usage": {"llm_in_tok": 0, "llm_out_tok": 0},
+    "cost_usd": 0.0,
+    "production_acceptance": false
+  },
+  "runtime": {
+    "remote": "colab-cli",
+    "proxy_domestic": true,
+    "pod_ready": true
+  },
+  "redacted": true
+}

@@ -22,6 +22,11 @@ _ORIG_STATE_FILE = util.STATE_FILE
 _ORIG_LOG_DIR = util.LOG_DIR
 _ORIG_RUNS_FILE = runs.RUNS_FILE
 _ORIG_RUNS_LOCKFILE = runs._RUNS_LOCKFILE
+_ORIG_STAGE_FNS = runs._STAGE_FNS.copy()
+_ORIG_RESOLVE_URL = runs.resolve_url
+_ORIG_GRAPH_LLM_TASK = graph.llm_task
+_ORIG_GRAPH_SELECT_FRAMES = graph.select_frames
+_ORIG_OBSERVABILITY_FLUSH = observability.flush
 util.STATE_FILE = _TMP / "state.json"
 util.LOG_DIR = _TMP / "logs"
 runs.RUNS_FILE = _TMP / "runs.json"
@@ -332,5 +337,11 @@ util.STATE_FILE = _ORIG_STATE_FILE
 util.LOG_DIR = _ORIG_LOG_DIR
 runs.RUNS_FILE = _ORIG_RUNS_FILE
 runs._RUNS_LOCKFILE = _ORIG_RUNS_LOCKFILE
+runs._STAGE_FNS.clear()
+runs._STAGE_FNS.update(_ORIG_STAGE_FNS)
+runs.resolve_url = _ORIG_RESOLVE_URL
+graph.llm_task = _ORIG_GRAPH_LLM_TASK
+graph.select_frames = _ORIG_GRAPH_SELECT_FRAMES
+observability.flush = _ORIG_OBSERVABILITY_FLUSH
 
 print("\n✅ test_graph.py 全部通过")

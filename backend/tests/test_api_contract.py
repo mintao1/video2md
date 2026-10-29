@@ -11,6 +11,7 @@ import os
 import tempfile
 import threading
 import time
+import urllib.parse
 from pathlib import Path
 
 _TMP = tempfile.mkdtemp(prefix="v2md-contract-")
@@ -148,18 +149,50 @@ def _import_config_with_env(**overrides):
 def test_production_anonymous_auth_is_rejected():
     assert _import_config_with_env(V2MD_ENV="production", V2MD_AUTH="off").returncode != 0
     assert _import_config_with_env(V2MD_ENV="production", V2MD_AUTH="").returncode != 0
-    urls = {"V2MD_PUBLIC_BASE_URL": "https://v.test", "V2MD_WEB_BASE_URL": "https://v.test"}
-    assert _import_config_with_env(V2MD_ENV="production", V2MD_AUTH="google", **urls).returncode == 0
+    urls = {"V2MD_PUBLIC_BASE_URL": "https://v.test", "V2MD_WEB_BASE_URL": "https://v.test",
+            "V2MD_LLM_SETTINGS_KEY": "hex:" + "11" * 32}
+    assert _import_config_with_env(V2MD_ENV="production", V2MD_AUTH="google",
+                                   V2MD_ARTIFACT_MODE="deliver",
+                                   V2MD_OTEL_INCLUDE_CONTENT="off", **urls).returncode == 0
+    assert _import_config_with_env(V2MD_ENV="production", V2MD_AUTH="google",
+                                   V2MD_ARTIFACT_MODE="vault", **urls).returncode != 0
+    assert _import_config_with_env(V2MD_ENV="production", V2MD_AUTH="google",
+                                   V2MD_ARTIFACT_MODE="deliver",
+                                   V2MD_OTEL_INCLUDE_CONTENT="on", **urls).returncode != 0
 
 
 def test_production_google_requires_public_urls():
     # 缺省回落 localhost 会让生产 Google 登录跳回本机——启动期拒绝
-    ok = {"V2MD_PUBLIC_BASE_URL": "https://v.test", "V2MD_WEB_BASE_URL": "https://v.test"}
-    for key in ok:
+    ok = {"V2MD_PUBLIC_BASE_URL": "https://v.test", "V2MD_WEB_BASE_URL": "https://v.test",
+          "V2MD_LLM_SETTINGS_KEY": "hex:" + "11" * 32}
+    for key in ("V2MD_PUBLIC_BASE_URL", "V2MD_WEB_BASE_URL"):
         for bad in ("", "http://localhost:5173"):
             env = {**ok, key: bad}
-            r = _import_config_with_env(V2MD_ENV="production", V2MD_AUTH="google", **env)
+            r = _import_config_with_env(V2MD_ENV="production", V2MD_AUTH="google",
+                                         V2MD_ARTIFACT_MODE="deliver",
+                                         V2MD_OTEL_INCLUDE_CONTENT="off", **env)
             assert r.returncode != 0 and key in r.stderr, (key, bad)
+
+
+def test_production_pg_requires_separate_app_and_migrate_roles():
+    urls = {"V2MD_PUBLIC_BASE_URL": "https://v.test", "V2MD_WEB_BASE_URL": "https://v.test",
+            "V2MD_LLM_SETTINGS_KEY": "hex:" + "11" * 32}
+    pg = {"V2MD_RUNS_STORE": "postgres", "V2MD_STATE_STORE": "postgres",
+          "V2MD_USERS_STORE": "postgres", "V2MD_TASKS_STORE": "postgres",
+          "V2MD_PREFS_STORE": "postgres", "V2MD_EVENTS": "pg",
+          "V2MD_CHECKPOINTER": "postgres"}
+    common = {**urls, **pg, "V2MD_ENV": "production", "V2MD_AUTH": "google",
+              "V2MD_ARTIFACT_MODE": "deliver", "V2MD_OTEL_INCLUDE_CONTENT": "off"}
+    bad = _import_config_with_env(
+        **common,
+        V2MD_PG_DSN="postgresql://postgres:secret@db/v2md",
+        V2MD_PG_MIGRATE_DSN="postgresql://video2md_migrate:secret@db/v2md")
+    assert bad.returncode != 0 and "video2md_app" in bad.stderr
+    good = _import_config_with_env(
+        **common,
+        V2MD_PG_DSN="postgresql://video2md_app:secret@db/v2md",
+        V2MD_PG_MIGRATE_DSN="postgresql://video2md_migrate:secret@db/v2md")
+    assert good.returncode == 0, good.stderr
 
 
 # ---------------------------------------------------------------- /preflight 信息收敛（P0-3）
@@ -478,6 +511,8 @@ def test_bundle_owner_isolation_and_mode_gates(client, deliver):
                       headers={"X-Test-Auth": "bob"}).status_code == 403
     assert client.delete("/runs/r_iso/artifacts",
                          headers={"X-Test-Auth": "bob"}).status_code == 403
+    assert client.get("/runs/r_iso/media/a-f001.jpg",
+                      headers={"X-Test-Auth": "bob"}).status_code == 403
     # 有 run 无产物（进行中）→ 404 不是 410
     _seed_run("r_noprod", "uid_alice", status="created")
     assert client.get("/runs/r_noprod/bundle",
@@ -540,6 +575,51 @@ def test_create_run_skip_requires_owner_and_shelf(deliver, monkeypatch):
         (Path(_TMP) / "state.json").write_text(json.dumps(st2), encoding="utf-8")
         d = _r.create_run(url, "", False, owner="uid_alice")
         assert not d["artifacts"][d["entries"][0]["url"]].get("skipped")
+
+
+def test_vault_state_dedup_is_owner_scoped(_clean_state, monkeypatch):
+    """A completed URL from Alice must not suppress Bob, even in legacy vault mode."""
+    import video2md.runs as _r
+
+    url = "https://example.test/shared-source"
+    monkeypatch.setattr(v2config, "ARTIFACT_MODE", "vault")
+    monkeypatch.setattr(_r, "resolve_url", lambda u: [{"url": u, "id": ""}])
+    (Path(_TMP) / "state.json").write_text(json.dumps({
+        "alice::fp": {"url": url, "owner": "uid_alice", "run_id": "a1",
+                       "status": "completed"},
+    }), encoding="utf-8")
+
+    bob = _r.create_run(url, "", False, owner="uid_bob")
+    assert not bob["artifacts"][url].get("skipped")
+
+
+def test_state_keys_are_tenant_namespaced():
+    from video2md.util import state_key
+
+    assert state_key("fp", "uid_alice") != state_key("fp", "uid_bob")
+    assert state_key("fp", "uid_alice") == "uid_alice::fp"
+    assert state_key("fp", "") == "fp"  # legacy CLI/development compatibility
+
+
+def test_deliver_outboxes_do_not_reuse_same_named_attachment(_clean_state, tmp_path, monkeypatch):
+    """Same basenames remain isolated because deliver uses one outbox per run."""
+    from video2md import artsink, frames
+
+    monkeypatch.setattr(v2config, "ARTIFACT_MODE", "deliver")
+    a_src = tmp_path / "alice.jpg"
+    b_src = tmp_path / "bob.jpg"
+    a_src.write_bytes(b"alice")
+    b_src.write_bytes(b"bob")
+    run_a = {"run_id": "a1", "tmp": str(tmp_path / "run-a")}
+    run_b = {"run_id": "b1", "tmp": str(tmp_path / "run-b")}
+
+    with artsink.sink_for(run_a):
+        frames.publish_named([(0.0, a_src, "same-f01-0000.jpg")], [])
+    with artsink.sink_for(run_b):
+        frames.publish_named([(0.0, b_src, "same-f01-0000.jpg")], [])
+
+    assert (Path(run_a["tmp"]) / "outbox/attachments/same-f01-0000.jpg").read_bytes() == b"alice"
+    assert (Path(run_b["tmp"]) / "outbox/attachments/same-f01-0000.jpg").read_bytes() == b"bob"
 
 
 def test_preflight_swaps_vault_for_outbox(client, deliver):
@@ -704,7 +784,7 @@ def test_auth_google_login_redirects_to_google(client, monkeypatch):
 
     import video2md.api as _api
     monkeypatch.setattr(_api, "ENV", dict(_GENV))
-    r = client.get("/auth/google/login", follow_redirects=False)
+    r = client.get("/auth/google/login", params={"terms_accepted": "1"}, follow_redirects=False)
     assert r.status_code == 302
     loc = r.headers["location"]
     u = _up.urlparse(loc)
@@ -719,13 +799,32 @@ def test_auth_google_login_redirects_to_google(client, monkeypatch):
     assert "v2md_oauth_state" in r.headers.get("set-cookie", "")  # CSRF 绑定 cookie
 
 
+def test_auth_google_login_requires_terms_before_oauth(client, monkeypatch):
+    """P1 回归：未同意协议时，入口必须在创建 OAuth state 前拒绝请求。"""
+    import video2md.api as _api
+
+    monkeypatch.setattr(_api, "ENV", dict(_GENV))
+    blocked = client.get("/auth/google/login", follow_redirects=False)
+    assert blocked.status_code == 302
+    assert "auth_error=" in blocked.headers["location"]
+    assert "请先阅读并同意" in urllib.parse.unquote(blocked.headers["location"])
+    assert not _api._GOOGLE_OAUTH_STATES
+    assert "accounts.google.com" not in blocked.headers["location"]
+
+    allowed = client.get("/auth/google/login", params={"terms_accepted": "1"},
+                         follow_redirects=False)
+    assert allowed.status_code == 302
+    assert "accounts.google.com" in allowed.headers["location"]
+    assert _api._GOOGLE_OAUTH_STATES
+
+
 def test_auth_google_login_missing_config(client, monkeypatch):
     import video2md.api as _api
     monkeypatch.setattr(_api, "ENV", {})
-    r = client.get("/auth/google/login", follow_redirects=False)
+    r = client.get("/auth/google/login", params={"terms_accepted": "1"}, follow_redirects=False)
     assert r.status_code == 302
     assert "auth_error=" in r.headers["location"]  # 未配凭据 → fragment 错误出口
-    r = client.get("/auth/google/login", params={"redirect": "/tasks"}, follow_redirects=False)
+    r = client.get("/auth/google/login", params={"redirect": "/tasks", "terms_accepted": "1"}, follow_redirects=False)
     assert r.headers["location"].startswith("http://localhost:5173/?redirect=%2Ftasks#auth_error=")
 
 
@@ -736,9 +835,9 @@ def test_auth_google_login_rate_limit(client):
         mp.setattr(_api, "DEVICE_RATE_PER_MIN", 2)
         _api._DEVICE_WIN.clear()
         for _ in range(2):
-            ok = client.get("/auth/google/login", follow_redirects=False)
+            ok = client.get("/auth/google/login", params={"terms_accepted": "1"}, follow_redirects=False)
             assert ok.status_code == 302 and "auth_error=" not in ok.headers["location"]
-        over = client.get("/auth/google/login", follow_redirects=False)
+        over = client.get("/auth/google/login", params={"terms_accepted": "1"}, follow_redirects=False)
         assert over.status_code == 302  # 浏览器导航端点：429 折叠进 fragment 错误出口
         assert "auth_error=" in over.headers["location"]
 
@@ -801,10 +900,10 @@ def test_auth_google_redirect_round_trip(client, monkeypatch):
         return _up.parse_qs(_up.urlparse(r.headers["location"]).query)["state"][0]
 
     for bad in ("//evil.test/x", "/\\evil.test", "https://evil.test/", "read/x"):
-        st = _state_of(client.get("/auth/google/login", params={"redirect": bad},
+        st = _state_of(client.get("/auth/google/login", params={"redirect": bad, "terms_accepted": "1"},
                                   follow_redirects=False))
         assert st not in _api._GOOGLE_OAUTH_REDIRECTS, bad
-    st = _state_of(client.get("/auth/google/login", params={"redirect": "/read/r1?p=2"},
+    st = _state_of(client.get("/auth/google/login", params={"redirect": "/read/r1?p=2", "terms_accepted": "1"},
                               follow_redirects=False))
     assert _api._GOOGLE_OAUTH_REDIRECTS[st] == "/read/r1?p=2"
 
@@ -1892,6 +1991,7 @@ def llm_settings_path(tmp_path, monkeypatch):
     from video2md import config
     monkeypatch.setattr(config, "PREFS_FILE", tmp_path / "prefs.json")
     monkeypatch.setattr(config, "PREFS_STORE", "json")
+    monkeypatch.setitem(config.ENV, "V2MD_LLM_SETTINGS_KEY", "hex:" + "11" * 32)
     monkeypatch.delitem(config.ENV, "V2MD_LLM_SETTINGS_FILE", raising=False)
     return tmp_path / "llm-settings.json"
 
@@ -1909,6 +2009,7 @@ def test_llm_settings_private_persistent_update_and_clear(client, llm_settings_p
     assert r.json() == {"base_url": "https://alice.example/v1", "model": "alice-model",
                         "has_api_key": True, "configured": True}
     assert "alice-secret" not in r.text
+    assert "alice-secret" not in llm_settings_path.read_text()
     assert "alice-secret" not in client.get(endpoint, headers=alice).text
     assert not client.get(endpoint, headers=bob).json()["configured"]
     assert llm_settings_path.stat().st_mode & 0o777 == 0o600
@@ -1919,6 +2020,46 @@ def test_llm_settings_private_persistent_update_and_clear(client, llm_settings_p
     assert client.delete(endpoint, headers=alice).json()["configured"] is False
     assert llm_settings.load("uid_alice") == {}
     assert llm_settings.load("uid_bob")["api_key"] == "bob-secret"
+
+
+def test_llm_settings_plaintext_migration_reencrypts_without_echo(llm_settings_path):
+    from video2md import llm_settings
+    llm_settings_path.write_text(json.dumps({
+        "uid_legacy": {"base_url": "https://legacy.example/v1",
+                        "api_key": "legacy-secret", "model": "legacy"}
+    }), encoding="utf-8")
+    assert llm_settings.migrate_plaintext() == 1
+    raw = llm_settings_path.read_text(encoding="utf-8")
+    assert "legacy-secret" not in raw and "v1:aesgcm:" in raw
+    assert llm_settings.load("uid_legacy")["api_key"] == "legacy-secret"
+
+
+def test_llm_settings_wrong_encryption_key_fails_closed(llm_settings_path, monkeypatch):
+    from video2md import llm_settings
+
+    llm_settings.update("uid_wrong_key", base_url="https://example.test/v1", api_key="secret")
+    monkeypatch.setitem(llm_settings.config.ENV, "V2MD_LLM_SETTINGS_KEY", "hex:" + "22" * 32)
+    with pytest.raises(llm_settings.CredentialEncryptionError, match="解密失败"):
+        llm_settings.load("uid_wrong_key")
+
+
+def test_production_llm_observability_redacts_prompt_and_completion(monkeypatch):
+    from video2md import config, llm
+
+    span = {}
+    monkeypatch.setattr(config, "OTEL_INCLUDE_CONTENT", False)
+    llm._llm_observed("note", "ok", 0.0, 1,
+                      {"usage": {"prompt_tokens": 3, "completion_tokens": 4}},
+                      span, "private system prompt", "private user prompt", "private completion", "model")
+    assert "_otel" not in span
+    assert span["prompt_chars"] > 0 and span["completion_chars"] > 0
+
+    monkeypatch.setattr(config, "OTEL_INCLUDE_CONTENT", True)
+    debug_span = {}
+    llm._llm_observed("note", "ok", 0.0, 1, {}, debug_span,
+                      "system", "user", "completion", "model")
+    assert debug_span["_otel"] == {"input": '[{"role": "system", "content": "system"}, {"role": "user", "content": "user"}]',
+                                    "output": "completion"}
 
 
 @pytest.mark.parametrize("url", ["file:///tmp/secret", "https://user:pass@example.com/v1",
@@ -2140,7 +2281,7 @@ def test_oauth_transport_failure_is_safe_and_fresh_login_recovers(client, monkey
         return httpx.Response(200, json={'id_token': 'synthetic.id.token'})
 
     monkeypatch.setattr(httpx.AsyncClient, 'post', token)
-    login = client.get('/auth/google/login?redirect=%2Ftasks', follow_redirects=False)
+    login = client.get('/auth/google/login?redirect=%2Ftasks&terms_accepted=1', follow_redirects=False)
     state = up.parse_qs(up.urlparse(login.headers['location']).query)['state'][0]
     callback = client.get('/auth/google/callback', params={'code': 'synthetic-code', 'state': state},
                           follow_redirects=False)
@@ -2159,7 +2300,7 @@ def test_oauth_transport_failure_is_safe_and_fresh_login_recovers(client, monkey
         assert sensitive not in repr(events) and sensitive not in location
     assert any(args[2] == 503 and fields['error_type'] == error.__name__ for args, fields in events)
     # Recovery uses a fresh login, CSRF cookie and code, with the original destination.
-    login = client.get('/auth/google/login?redirect=%2Ftasks', follow_redirects=False)
+    login = client.get('/auth/google/login?redirect=%2Ftasks&terms_accepted=1', follow_redirects=False)
     fresh = up.parse_qs(up.urlparse(login.headers['location']).query)['state'][0]
     assert fresh != state
     recovered = client.get('/auth/google/callback', params={'code': 'fresh-code', 'state': fresh},

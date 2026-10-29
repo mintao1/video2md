@@ -61,6 +61,12 @@ def _artifact_mode() -> str:
     return getattr(_c, "ARTIFACT_MODE", "vault")
 
 
+def _otel_content_enabled() -> bool:
+    """Return whether content-bearing trace fields are allowed for this process."""
+    from . import config as _c
+    return bool(getattr(_c, "OTEL_INCLUDE_CONTENT", False))
+
+
 def init(*, endpoint: str = "", headers: dict | None = None,
          span_exporter=None, metric_reader=None) -> bool:
     """起 Tracer/Meter Provider。幂等。无端点且未注入导出器 → 纯本地 jsonl（False）。
@@ -160,8 +166,9 @@ def record(rec: dict, *, run_id: str, label: str, trace_name: str = "",
            otel_attrs: dict | None = None) -> None:
     """RunLog._write 的双写钩子。rec 是已脱敏的事件记录（含 event/spanId/status/durationMs…）。
 
-    otel_attrs：只喂 OTel 的大字段（LLM prompt/completion 全文），按 Langfuse 映射
-    落到 generation 的 input/output——不经 jsonl/SSE（体积与「日志不养正文」口径）。
+    otel_attrs：仅在开发配置显式允许时喂 OTel 的大字段。生产通过
+    V2MD_OTEL_INCLUDE_CONTENT=off 阻断 LLM prompt/completion 正文，只保留 usage/长度
+    元数据；正文不经 collector/Langfuse，也不落 jsonl/SSE。
 
     注意：video2md 自有 record（而非 SDK 的 record）：
     - LLM gen_ai 映射、user_id 追溯传播、graph:end 根输出写入——均视频特有逻辑。
@@ -179,8 +186,13 @@ def record(rec: dict, *, run_id: str, label: str, trace_name: str = "",
 
     # 确保 run 存在
     rt = _RUNS.get(run_id)
+    # URLs can contain signed query parameters or local tenant paths.  Treat
+    # them as content too: production keeps the trace identity/metrics but
+    # drops the root input unless explicit local debugging opted in.
+    trace_content = _otel_content_enabled()
     if rt is None:
-        rt = _RunTrace(run_id, label, trace_name, trace_metadata or {}, user_id=uid)
+        rt = _RunTrace(run_id, label, trace_name if trace_content else "",
+                       trace_metadata if trace_content else {}, user_id=uid)
         _RUNS[run_id] = rt
     elif uid and not rt.user_id:
         rt.user_id = uid

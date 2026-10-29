@@ -1,0 +1,1 @@
+[req] GET /auth/google/login → 400 user=(anon:14.213.27.126) error_type=terms_not_accepted

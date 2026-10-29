@@ -44,8 +44,9 @@ function startGoogleLogin(): void {
   }
   error.value = ''
   busy.value = true
-  const query = redirect.value === '/library' ? '' : `?${new URLSearchParams({ redirect: redirect.value })}`
-  window.location.assign(`${BASE_URL}/auth/google/login${query}`)
+  const params = new URLSearchParams({ terms_accepted: '1' })
+  if (redirect.value !== '/library') params.set('redirect', redirect.value)
+  window.location.assign(`${BASE_URL}/auth/google/login?${params}`)
 }
 </script>
 
@@ -74,7 +75,7 @@ function startGoogleLogin(): void {
 
         <button
           class="mt-6 flex w-full items-center justify-center gap-3 rounded-xl bg-white px-4 py-3 font-semibold text-on-surface shadow-sm ring-1 ring-outline-variant transition hover:bg-surface active:scale-[0.99] disabled:opacity-60"
-          :disabled="busy"
+          :disabled="busy || !agreed"
           @click="startGoogleLogin"
         >
           <svg class="h-6 w-6 shrink-0" viewBox="0 0 48 48" aria-hidden="true">

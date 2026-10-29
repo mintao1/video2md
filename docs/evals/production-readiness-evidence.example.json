@@ -1,6 +1,9 @@
 {
   "postgres": {"status": "healthy"},
-  "schema": {"version": 4},
+  "schema": {"version": 6},
+  "database_roles": {"api_role": "video2md_app", "migrate_role": "video2md_migrate", "api_login": true, "migrate_login": true, "api_superuser": false, "migrate_superuser": false, "api_bypass_rls": false, "migrate_bypass_rls": false, "rls_enabled": true, "app_dsn_tls": true, "migrate_dsn_tls": true},
+  "backup": {"encrypted": true, "permissions_hardened": true, "remote_configured": true, "remote_tls": true, "retention_configured": true},
+  "observability": {"provider": "langfuse", "project": "production", "tls": true, "prompt_redaction": true, "acl_verified": true, "retention_configured": true},
   "api": {"status": "healthy", "version": "0.2.0"},
   "release": {"branch": "main", "expected_commit": "a83147d5be0d75253804e74663fefccbe70a904b", "source_commit": "a83147d5be0d75253804e74663fefccbe70a904b", "expected_image": "video2md:0.2.0-hotfix-20261021g", "deployed_image": "video2md:0.2.0-hotfix-20261021g"},
   "runtime": {"pod_phase": "Running", "pod_ready": true, "restart_count": 0, "recent_error_count": 0},

@@ -1,0 +1,86 @@
+{
+  "kind": "production",
+  "authentication": {
+    "logout_observed": true,
+    "oauth_login_succeeded": true,
+    "bearer_sse_live_subscription": true,
+    "sse_no_auth_http": 401,
+    "sse_bearer_http": 200
+  },
+  "source_resolution": {
+    "resolved": true
+  },
+  "submission": {
+    "feedback_visible": true,
+    "run_id": "70f4a4d4",
+    "submit_log_present": true,
+    "url_entered_explicitly": true,
+    "submission_channel": "authenticated_api",
+    "task_count_before": 17,
+    "task_count_after": 18
+  },
+  "execution": {
+    "status": "done",
+    "running_stage_observed": true,
+    "model_called": true,
+    "model_calls": 3,
+    "model": "glm-5.3-flash",
+    "model_inference_succeeded": true,
+    "run_id_visible": true,
+    "sse": {
+      "connected": true,
+      "connected_status": "running",
+      "http_status": 200,
+      "event_count": 61,
+      "stage_events": [
+        "stage:download",
+        "stage:transcribe",
+        "stage:frames",
+        "stage:ocr",
+        "stage:select",
+        "stage:clips"
+      ],
+      "terminal_event": "graph:end",
+      "terminal_status": "done"
+    }
+  },
+  "billing": {
+    "usage": {
+      "llm_in_tok": 6445,
+      "llm_out_tok": 8360,
+      "llm_cached_in_tok": 0,
+      "gpu_s": 486.728
+    },
+    "cost_usd": 0.005147,
+    "monthly_rollup_includes_run": true,
+    "usage_visible": true,
+    "cost_visible": true,
+    "gpu_policy": "free",
+    "gpu_free_reason": "生产明确采用免费 GPU 计价策略",
+    "monthly_rollup": {
+      "runs_n": 18,
+      "llm_in_tok": 333484,
+      "llm_out_tok": 97125,
+      "gpu_s": 10609.952,
+      "spend_usd": 0.096341
+    },
+    "prices": {
+      "llm_in_mtok": 0.15,
+      "llm_out_mtok": 0.5,
+      "llm_cached_in_mtok": 0.03,
+      "gpu_min": 0
+    }
+  },
+  "artifact": {
+    "book_visible": true,
+    "markdown_nonempty": true,
+    "book_count_delta": 1,
+    "title": "数据库索引与查询优化",
+    "path": "/vault/资料库/视频笔记/数据库索引与查询优化.md",
+    "markdown_chars": 2857,
+    "frames_kept": 8,
+    "frames_ocr": 80,
+    "transcribe_conf": 0.98,
+    "media_refs": 10
+  }
+}

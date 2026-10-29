@@ -263,9 +263,10 @@ except Exception as exc:
 
 # ---------------------------------------------------------------- CLI 基础
 def _colab_bin() -> str:
-    """定位 colab CLI（uv tool 默认装到 ~/.local/bin，服务进程 PATH 里常没有）。"""
+    """定位 colab CLI（服务进程 PATH 里可能没有 venv 入口）。"""
     return BIN_OVERRIDE or shutil.which("colab") or next(
         (str(p) for p in (Path.home() / ".local/bin/colab",
+                          Path("/app/.venv/bin/colab"),
                           Path("/opt/homebrew/bin/colab"),
                           Path("/usr/local/bin/colab")) if p.exists()), "colab")
 

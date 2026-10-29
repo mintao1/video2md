@@ -30,7 +30,7 @@ const syncedLabel = computed(() => {
 })
 
 const chips = computed(() => [
-  { key: 'all', label: '全部教材', icon: 'auto_stories', count: lib.books.length },
+  { key: 'all', label: '全部教材', icon: 'auto_stories', count: lib.loading ? undefined : lib.books.length },
   { key: 'ai', label: '计算机 / AI' },
   { key: 'math', label: '数学基础' },
   { key: 'econ', label: '商业管理' },
@@ -149,7 +149,8 @@ function onClearSearch() {
       <section class="px-margin pt-space-lg flex items-center justify-between">
         <div class="flex items-baseline gap-space-xs">
           <h2 class="font-headline-lg-mobile text-headline-lg-mobile text-on-surface">智能教材架</h2>
-          <span class="font-label-sm text-label-sm text-outline">共 {{ lib.filtered.length }} 本</span>
+          <span v-if="lib.loading" class="font-label-sm text-label-sm text-outline" role="status">正在同步教材…</span>
+          <span v-else class="font-label-sm text-label-sm text-outline">共 {{ lib.filtered.length }} 本</span>
         </div>
         <div class="flex items-center bg-surface-container-low rounded-lg p-0.5">
           <button
@@ -184,6 +185,9 @@ function onClearSearch() {
         class="px-margin pt-space-sm"
         :class="lib.viewMode === 'grid' ? 'grid grid-cols-3 gap-space-sm' : 'flex flex-col gap-space-md'"
       >
+        <div v-if="lib.loading" class="flex items-center justify-center py-12 text-on-surface-variant" role="status">
+          正在同步教材…
+        </div>
         <template v-if="lib.viewMode === 'list'">
           <BookCard
             v-for="b in lib.filtered"

@@ -17,6 +17,8 @@ from typing import TYPE_CHECKING
 
 from psycopg.types.json import Json
 
+from .pg import tenant_connection
+
 if TYPE_CHECKING:
     from psycopg_pool import ConnectionPool
 
@@ -48,7 +50,7 @@ class PostgresRunsStore:
         self.pool = pool  # 建表已上收 migrations/0001（P0-5），构造只接线
 
     def load(self) -> dict:
-        with self.pool.connection() as conn:
+        with tenant_connection(self.pool) as conn:
             rows = conn.execute("SELECT record FROM v2md_runs").fetchall()
         out: dict = {}
         for (rec,) in rows:
@@ -56,7 +58,7 @@ class PostgresRunsStore:
         return out
 
     def delete_terminal(self, run_id: str, owner: str) -> bool:
-        with self.pool.connection() as conn:
+        with tenant_connection(self.pool) as conn:
             row = conn.execute("""
                 UPDATE v2md_runs SET record=record || '{"deleted":true}'::jsonb, updated=now()
                 WHERE run_id=%s AND owner=%s AND record->>'deleted' IS DISTINCT FROM 'true'
@@ -65,7 +67,7 @@ class PostgresRunsStore:
         return row is not None
 
     def patch_owned(self, run_id: str, owner: str, statuses: tuple[str, ...], patch: dict) -> dict | None:
-        with self.pool.connection() as conn:
+        with tenant_connection(self.pool) as conn:
             row = conn.execute("""
                 UPDATE v2md_runs SET record = record || %s::jsonb, status = COALESCE(%s, status), updated = now()
                 WHERE run_id=%s AND owner=%s AND record->>'deleted' IS DISTINCT FROM 'true'
@@ -75,7 +77,7 @@ class PostgresRunsStore:
 
     def merge(self, run: dict) -> None:
         """行级 upsert（原子）。调用方无需持锁——文件档的锁纪律在此内化为行锁。"""
-        with self.pool.connection() as conn:
+        with tenant_connection(self.pool) as conn:
             conn.execute("""
                 INSERT INTO v2md_runs (run_id, owner, status, created, record)
                 VALUES (%(run_id)s, %(owner)s, %(status)s, %(created)s, %(rec)s)
@@ -94,7 +96,7 @@ class PostgresRunsStore:
 
 
 class PostgresStateStore:
-    """state 表：fp PK + record jsonb（幂等记录：note/transcript/title/url/owner…）。
+    """state 表：(owner, fp) PK + record jsonb（租户级幂等记录）。
 
     文件档的 fp 是外层 dict key（不进记录体），故表单存 fp 列。"""
 
@@ -102,18 +104,29 @@ class PostgresStateStore:
         self.pool = pool  # 建表已上收 migrations/0001（P0-5），构造只接线
 
     def load(self) -> dict:
-        with self.pool.connection() as conn:
-            rows = conn.execute("SELECT fp, record FROM v2md_state").fetchall()
+        from .pg import current_tenant, tenant_connection
+        with tenant_connection(self.pool) as conn:
+            # A concrete tenant is set by graph.run_graph through pg.tenant_scope.
+            # Keep the unscoped form for CLI/eval callers and migration tooling.
+            owner = current_tenant()
+            if owner is None:
+                rows = conn.execute("SELECT fp, record FROM v2md_state").fetchall()
+            else:
+                rows = conn.execute("SELECT fp, record FROM v2md_state WHERE owner=%s",
+                                    (owner,)).fetchall()
         return {fp: rec for fp, rec in rows}
 
     def save(self, s: dict) -> None:
         """逐 fp upsert（键只增不删 → 与文件档全量替换语义等价）。"""
-        with self.pool.connection() as conn:
+        from .pg import current_tenant, tenant_connection
+        with tenant_connection(self.pool) as conn:
+            tenant = current_tenant()
             with conn.cursor() as cur:
                 cur.executemany("""
-                    INSERT INTO v2md_state (fp, record) VALUES (%s, %s)
-                    ON CONFLICT (fp) DO UPDATE SET record = EXCLUDED.record, updated = now()
-                    """, [(fp, Json(rec)) for fp, rec in s.items()])
+                    INSERT INTO v2md_state (owner, fp, record) VALUES (%s, %s, %s)
+                    ON CONFLICT (owner, fp) DO UPDATE SET record = EXCLUDED.record, updated = now()
+                    """, [((tenant if tenant is not None else (rec.get("owner") or "")),
+                           fp, Json(rec)) for fp, rec in s.items()])
 
 
 class PostgresTaskStore:
@@ -135,7 +148,7 @@ class PostgresTaskStore:
 
     def counts(self) -> dict:
         """{queued, running} 全盘计数（status 索引扫描，仅两态）。"""
-        with self.pool.connection() as conn:
+        with tenant_connection(self.pool) as conn:
             rows = conn.execute(
                 "SELECT status, count(*) FROM v2md_runs "
                 "WHERE status IN ('queued','running') GROUP BY status").fetchall()
@@ -145,13 +158,13 @@ class PostgresTaskStore:
         return c
 
     def total_active(self) -> int:
-        with self.pool.connection() as conn:
+        with tenant_connection(self.pool) as conn:
             row = conn.execute(
                 "SELECT count(*) FROM v2md_runs WHERE status IN ('queued','running')").fetchone()
         return int(row[0]) if row else 0
 
     def active_for(self, uid: str) -> int:
-        with self.pool.connection() as conn:
+        with tenant_connection(self.pool) as conn:
             row = conn.execute(
                 "SELECT count(*) FROM v2md_runs "
                 "WHERE status IN ('queued','running') AND owner=%s", (uid,)).fetchone()
@@ -159,7 +172,7 @@ class PostgresTaskStore:
 
     def is_alive(self, run_id: str) -> bool:
         """dedup 判活：DB 视角该 run 是否仍 queued/running（他进程驱动也算活）。"""
-        with self.pool.connection() as conn:
+        with tenant_connection(self.pool) as conn:
             row = conn.execute(
                 "SELECT 1 FROM v2md_runs WHERE run_id=%s "
                 "AND status IN ('queued','running')", (run_id,)).fetchone()
@@ -167,7 +180,7 @@ class PostgresTaskStore:
 
     def get_status_url(self, run_id: str) -> tuple[str | None, str | None]:
         """SSE 收尾判定的 DB 兜底：两行内存皆 miss 时现读 (status, url)。"""
-        with self.pool.connection() as conn:
+        with tenant_connection(self.pool) as conn:
             row = conn.execute(
                 "SELECT status, record->>'url' FROM v2md_runs WHERE run_id=%s",
                 (run_id,)).fetchone()
@@ -181,7 +194,7 @@ class PostgresTaskStore:
         P1-1：queued 态也续——排队等待信号量期间由 api._queue_hb_loop 周期打点，
         「排队久」（健康）与「无主停滞」（属主死）靠 updated 新鲜度区分。
         """
-        with self.pool.connection() as conn:
+        with tenant_connection(self.pool) as conn:
             row = conn.execute(
                 "UPDATE v2md_runs SET updated=now() WHERE run_id=%s "
                 "AND status IN ('queued','running') RETURNING 1", (run_id,)).fetchone()
@@ -193,7 +206,7 @@ class PostgresTaskStore:
         直接 UPDATE 不走 merge——merge 整行覆盖会把 claimed_by 刷回默认 ''。
         返回是否命中（行不存在/已 running/终态 → False，调用方忽略）。
         """
-        with self.pool.connection() as conn:
+        with tenant_connection(self.pool) as conn:
             row = conn.execute("""
                 UPDATE v2md_runs
                    SET status='queued', updated=now(),
@@ -205,7 +218,7 @@ class PostgresTaskStore:
     def still_mine(self, run_id: str, proc: str) -> bool:
         """持有权复核（P1-1「不重」半边）：_drive 拿到信号量后先问——租约被大盘
         watchdog 划给别人（或已终态）则 False，调用方静默让位不驱动。"""
-        with self.pool.connection() as conn:
+        with tenant_connection(self.pool) as conn:
             row = conn.execute(
                 "SELECT 1 FROM v2md_runs WHERE run_id=%s AND claimed_by=%s "
                 "AND status IN ('queued','running')", (run_id, proc)).fetchone()
@@ -214,7 +227,7 @@ class PostgresTaskStore:
     def note_claimed_by(self, run_id: str, proc: str) -> None:
         """best-effort 登记属主（空值才钉，防竞态覆盖真属主）；失败静默。"""
         try:
-            with self.pool.connection() as conn:
+            with tenant_connection(self.pool) as conn:
                 conn.execute(
                     "UPDATE v2md_runs SET claimed_by=%s WHERE run_id=%s AND claimed_by=''",
                     (proc, run_id))
@@ -223,7 +236,7 @@ class PostgresTaskStore:
 
     def release_claim_for_retry(self, run_id: str) -> bool:
         """Clear a terminal run's dead process lease before it is enqueued again."""
-        with self.pool.connection() as conn:
+        with tenant_connection(self.pool) as conn:
             row = conn.execute(
                 "UPDATE v2md_runs SET claimed_by='', updated=now() "
                 "WHERE run_id=%s AND status='created' RETURNING 1", (run_id,)
@@ -236,7 +249,7 @@ class PostgresTaskStore:
         条件 UPDATE 自带互斥：别的副本正在接管（claimed_by=它且租约未过期）→ 抢不到返 None。
         P1-1：扩到 queued——排队项无在途工作，接管无损（调用方重投而非标 error）。
         """
-        with self.pool.connection() as conn:
+        with tenant_connection(self.pool) as conn:
             row = conn.execute("""
                 UPDATE v2md_runs
                    SET claimed_by=%(proc)s, updated=now()
@@ -254,7 +267,7 @@ class PostgresTaskStore:
         （原子互斥，替代旧 FOR UPDATE SKIP LOCKED 全量抢占——批判补遗②：那会偷走
         稳态健康副本的活 run）。tmp 缺失翻 error 用 mark_stuck_error（条件 running）。
         """
-        with self.pool.connection() as conn:
+        with tenant_connection(self.pool) as conn:
             rows = conn.execute(
                 "SELECT run_id, record, claimed_by FROM v2md_runs "
                 "WHERE status='running'").fetchall()
@@ -268,7 +281,7 @@ class PostgresTaskStore:
         输家返回 None 安全让位。区别于 steal_if_unclaimed（不要求 updated 租约过期——
         调用方已通过进程存活甄别确认属主死，鲜死属主的 updated 可能还很新鲜）。
         """
-        with self.pool.connection() as conn:
+        with tenant_connection(self.pool) as conn:
             row = conn.execute("""
                 UPDATE v2md_runs
                    SET claimed_by=%(new)s, updated=now()
@@ -286,7 +299,7 @@ class PostgresTaskStore:
         last_active_epoch 再叠加复核（_stage_ts_epoch——见模块头时钟域纪律）。
         SQL 只按 updated 粗筛——updated 被驱动进程心跳持续刷新，天然活性信号。
         """
-        with self.pool.connection() as conn:
+        with tenant_connection(self.pool) as conn:
             rows = conn.execute("""
                 SELECT run_id, record, claimed_by,
                        record->>'started' AS started,
@@ -309,7 +322,7 @@ class PostgresTaskStore:
         刷新，故用短租约（3×period）即足以区分「排队久（健康，心跳在续）」与
         「属主死（updated 停滞）」。本进程自己持有的排队项由调用方再甄别。
         """
-        with self.pool.connection() as conn:
+        with tenant_connection(self.pool) as conn:
             rows = conn.execute("""
                 SELECT run_id, record, claimed_by
                   FROM v2md_runs
@@ -326,14 +339,14 @@ class PostgresTaskStore:
         若复核含 updated 则永远「新鲜」、接管永不生效（P4b 潜 bug 修复）。ts 解析走
         应用时钟域（_stage_ts_epoch）：SQL cast naive 串会跨时区偏移（见模块头纪律）。
         """
-        with self.pool.connection() as conn:
+        with tenant_connection(self.pool) as conn:
             row = conn.execute(
                 "SELECT record FROM v2md_runs WHERE run_id=%s", (run_id,)).fetchone()
         return _stage_ts_epoch(row[0] or {}) if row else 0.0
 
     def mark_stuck_error(self, run_id: str, msg: str) -> bool:
         """大盘 watchdog 翻 error：record+status 同事务迁移（仍 running 才动，防竞态）。"""
-        with self.pool.connection() as conn:
+        with tenant_connection(self.pool) as conn:
             with conn.transaction():
                 row = conn.execute(
                     "SELECT record FROM v2md_runs WHERE run_id=%s AND status='running' "
@@ -354,7 +367,7 @@ class PostgresTaskStore:
     def month_spend(self, uid: str, since_iso: str) -> float:
         """uid 自 since_iso（含）起的已结算成本（预算闸读数；created 为 ISO 文本，
         同格式字典序=时间序）。"""
-        with self.pool.connection() as conn:
+        with tenant_connection(self.pool) as conn:
             row = conn.execute(
                 "SELECT COALESCE(SUM((record->>'cost_usd')::numeric), 0) FROM v2md_runs "
                 "WHERE owner=%s AND created >= %s AND record ? 'cost_usd'",
@@ -363,7 +376,7 @@ class PostgresTaskStore:
 
     def month_rollup(self, uid: str, since_iso: str) -> dict:
         """uid 月度汇总（/cost 与 CLI 导出同形：json 档 runs.month_rollup）。"""
-        with self.pool.connection() as conn:
+        with tenant_connection(self.pool) as conn:
             row = conn.execute("""
                 SELECT COALESCE(SUM((record->>'cost_usd')::numeric), 0),
                        COALESCE(SUM((record->'usage'->>'llm_in_tok')::bigint), 0),
@@ -385,7 +398,7 @@ class PostgresTaskStore:
         同 uid 并发提交在 UPDATE 行锁上串行，窗口不丢不重；返回值即「本次之前」的
         在窗计数——调用方判 >= per_min 即限流（本次仍登记时间戳，与 json 档滑窗一致）。
         """
-        with self.pool.connection() as conn:
+        with tenant_connection(self.pool) as conn:
             row = conn.execute("""
                 INSERT INTO v2md_submit_log (uid, ts, count) VALUES (%(uid)s, now(), 1)
                 ON CONFLICT (uid) DO UPDATE SET
@@ -407,7 +420,7 @@ class PostgresMembershipStore:
 
     def get(self, uid: str) -> dict | None:
         """单行读；无行回 None（端点据此给 free/全 0 默认视图）。"""
-        with self.pool.connection() as conn:
+        with tenant_connection(self.pool) as conn:
             row = conn.execute("""
                 SELECT uid, plan, display_name, avatar_hue,
                        ai_hours_used, ai_hours_total,
@@ -423,7 +436,7 @@ class PostgresMembershipStore:
 
     def upsert(self, data: dict) -> None:
         """全列 upsert（幂等可重跑）；record 预留扩展位（签名/备注等不进列的字段）。"""
-        with self.pool.connection() as conn:
+        with tenant_connection(self.pool) as conn:
             conn.execute("""
                 INSERT INTO v2md_membership
                     (uid, plan, display_name, avatar_hue,

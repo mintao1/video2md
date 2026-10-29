@@ -221,13 +221,16 @@ def _llm_observed(task: str, status: str, t0: float, attempts: int, meta: dict,
             span_rec["ttftMs"] = meta["ttft_ms"]
         if usage:
             span_rec["usage"] = usage
-        # generation 全文只走 _otel 旁路 → Langfuse input/output（Render 成对话视图）；
-        # RunLog._write 会把它从 jsonl/SSE 剥掉，span_log 摘要也不留副本
-        span_rec["_otel"] = {
-            "input": json.dumps([{"role": "system", "content": system},
-                                 {"role": "user", "content": user}], ensure_ascii=False),
-            "output": text,
-        }
+        # Production keeps metrics/usage but never exports prompt/completion
+        # bodies to the collector or Langfuse. Development may opt in for
+        # local debugging; config.py fails closed when production leaves this on.
+        from . import config
+        if config.OTEL_INCLUDE_CONTENT:
+            span_rec["_otel"] = {
+                "input": json.dumps([{"role": "system", "content": system},
+                                     {"role": "user", "content": user}], ensure_ascii=False),
+                "output": text,
+            }
     from . import observability
     observability.metric_llm(task, status, secs, in_tok, out_tok)
     if in_tok or out_tok:  # P2-2 用量归因：run 上下文内累计（CLI/测试直调不记）

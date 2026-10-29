@@ -1272,16 +1272,20 @@ def _google_finish(resp: RedirectResponse) -> RedirectResponse:
 
 
 @app.get("/auth/google/login", summary="Google 授权码流发起：302 到 Google 授权页")
-async def auth_google_login(request: Request, redirect: str = "") -> RedirectResponse:
+async def auth_google_login(request: Request, redirect: str = "", terms_accepted: bool = False) -> RedirectResponse:
     """网页端登录入口（整页跳转）：与设备流并存的第二条 Google 登录路——本端点只负责
     发起，真正换票/验签在 /auth/google/callback。IP 滑窗复用设备流闸（护 Google 出网
     配额；超限也走 fragment 错误出口——429 JSON 对浏览器导航无意义）。"""
+    back = _google_safe_redirect(redirect)
+    if not terms_accepted:
+        _req_log("GET", "/auth/google/login", 400,
+                 user=f"(anon:{_client_ip(request)})", error_type="terms_not_accepted")
+        return _google_error_redirect("请先阅读并同意《用户服务协议》与《隐私保护政策》", back)
     try:
         ip = _admit_device(request, label="GET /auth/google/login")
     except HTTPException:
         return _google_error_redirect(f"请求过频（限 {DEVICE_RATE_PER_MIN} 次/分钟/IP），稍后重试",
                                       _google_safe_redirect(redirect))
-    back = _google_safe_redirect(redirect)
     cid, secret = _google_web_creds()
     if not (cid and secret):
         _req_log("GET", "/auth/google/login", 500, user=f"(anon:{ip})")

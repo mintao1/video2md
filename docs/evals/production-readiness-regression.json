@@ -5,7 +5,10 @@
   "run": "python3 scripts/check_production_readiness.py <evidence.json>",
   "cases": [
     {"id":"prod-db-health","evidence":"postgres.status","expected":"healthy"},
-    {"id":"prod-schema-version","evidence":"schema.version","expected":{"minimum":4}},
+    {"id":"prod-schema-version","evidence":"schema.version","expected":{"minimum":6}},
+    {"id":"prod-db-roles","evidence":"database_roles","expected":{"api_role":"video2md_app","migrate_role":"video2md_migrate","api_superuser":false,"migrate_superuser":false,"api_bypass_rls":false,"migrate_bypass_rls":false,"rls_enabled":true,"app_dsn_tls":true,"migrate_dsn_tls":true}},
+    {"id":"prod-backup-protection","evidence":"backup","expected":{"encrypted":true,"permissions_hardened":true,"remote_configured":true,"remote_tls":true,"retention_configured":true}},
+    {"id":"prod-observability-protection","evidence":"observability","expected":{"provider":"langfuse","project":"production","tls":true,"prompt_redaction":true,"acl_verified":true,"retention_configured":true}},
     {"id":"prod-api-health","evidence":"api.status","expected":"healthy"},
     {"id":"prod-release-version","evidence":"api.version","expected":"0.2.0"},
     {"id":"prod-release-provenance","evidence":"release","expected":{"branch":"main","source_commit_equals_expected_commit":true,"deployed_image_equals_expected_image":true}},

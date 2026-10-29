@@ -29,6 +29,11 @@ _ORIG_STATE_FILE = util.STATE_FILE
 _ORIG_LOG_DIR = util.LOG_DIR
 _ORIG_RUNS_FILE = runs.RUNS_FILE
 _ORIG_RUNS_LOCKFILE = runs._RUNS_LOCKFILE
+_ORIG_STAGE_FNS = runs._STAGE_FNS.copy()
+_ORIG_RESOLVE_URL = runs.resolve_url
+_ORIG_GRAPH_LLM_TASK = graph.llm_task
+_ORIG_GRAPH_SELECT_FRAMES = graph.select_frames
+_ORIG_OBSERVABILITY_FLUSH = observability.flush
 util.STATE_FILE = _TMP / "state.json"
 util.LOG_DIR = _TMP / "logs"
 runs.RUNS_FILE = _TMP / "runs.json"
@@ -118,7 +123,7 @@ assert ev[-1]["event"] == "graph:end" and ev[-1]["status"] == "done", ev[-1]
 nodes = [e["node"] for e in ev if e["event"] == "graph:node"]
 assert nodes == ["resolve", "download", "transcribe", "frames", "ocr",
                  "select_frames_llm", "select", "clips", "note_entry", "finalize"], nodes
-# 条件边路由决策（finalize 无条件边 → 无 route 事件，dict 精确等值钉住）
+# 条件边路由决策（select_frames_llm 也有显式条件边；finalize 无条件边，dict 精确等值钉住）
 routes = {e["frm"]: e["decision"] for e in ev if e["event"] == "graph:route"}
 assert routes == {"resolve": "ok", "download": "ok", "transcribe": "ok", "frames": "ok",
                   "ocr": "ok", "select_frames_llm": "ok", "select": "ok", "clips": "ok",
@@ -216,6 +221,12 @@ util.STATE_FILE = _ORIG_STATE_FILE
 util.LOG_DIR = _ORIG_LOG_DIR
 runs.RUNS_FILE = _ORIG_RUNS_FILE
 runs._RUNS_LOCKFILE = _ORIG_RUNS_LOCKFILE
+runs._STAGE_FNS.clear()
+runs._STAGE_FNS.update(_ORIG_STAGE_FNS)
+runs.resolve_url = _ORIG_RESOLVE_URL
+graph.llm_task = _ORIG_GRAPH_LLM_TASK
+graph.select_frames = _ORIG_GRAPH_SELECT_FRAMES
+observability.flush = _ORIG_OBSERVABILITY_FLUSH
 print("✅ 5. 兜底：graph 事件写失败被吞，run 照常 done 无留痕（注册先于写事件）")
 
 print("\n✅ test_graph_obs.py 全部通过")

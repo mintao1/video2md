@@ -12,15 +12,16 @@
 #
 # 前置校验：sha256sum -c manifest.sha256（备份时生成；对不上 = 归档损坏，拒绝恢复）。
 set -euo pipefail
+umask 077
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-DST_DIR="$REPO_DIR/backups"
+DST_DIR="${V2MD_BACKUP_DIR:-/var/lib/video2md/backups}"
 STAMP=""
 ONLY="data,vault,pg"
 ASSUME_YES=0
 # 2026-09-26 obs 合并（平台 Phase 1.1/M1）后单文件：观测归 platform-obs 独立 project
 # （~/stack/platform-obs），与本栈容器不再同 project——恢复脚本无需（也不能）连带其容器。
-COMPOSE="docker compose -f $REPO_DIR/docker-compose.yml"
+COMPOSE_FILE="$REPO_DIR/deploy/docker-compose.prod.yml"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -66,14 +67,15 @@ if [[ -f "$DST_DIR/manifest.sha256" ]]; then
   done < "$DST_DIR/manifest.sha256"
   [[ $bad -eq 0 ]] || { echo "❌ manifest 校验失败：归档损坏/被篡改，拒绝恢复" >&2; exit 1; }
 else
-  echo "⚠ 无 manifest.sha256，跳过完整性校验"
+  echo "❌ 无 manifest.sha256，拒绝恢复（无法验证归档完整性）" >&2
+  exit 1
 fi
 
 # 1) 确认（覆盖现有卷！）
 echo "⚠⚠ 即将【覆盖】以下 Docker 卷（现有内容先做安全快照到 $DST_DIR/pre-restore-$STAMP/）："
 [[ ",$ONLY," == *,data,* ]] && echo "   - $DATA_VOL"
 [[ ",$ONLY," == *,vault,* ]] && echo "   - $VAULT_VOL"
-[[ ",$ONLY," == *,pg,* ]] && echo "   - video2md-postgres-1（PG 数据）"
+[[ ",$ONLY," == *,pg,* ]] && echo "   - postgres 服务（PG 数据）"
 if [[ $ASSUME_YES -ne 1 ]]; then
   read -r -p "确认恢复？输入 yes 继续：" ans
   [[ "$ans" == "yes" ]] || { echo "已取消"; exit 1; }
@@ -81,7 +83,7 @@ fi
 
 # 2) 停栈（恢复期间服务不可用；卷被占用时 tar 回灌会损坏）
 echo "· 停栈 …"
-$COMPOSE down
+docker compose -f "$COMPOSE_FILE" down
 
 # 3) 现有卷先做安全快照（恢复错了还能回来）
 SNAP_DIR="$DST_DIR/pre-restore-$STAMP"
@@ -99,8 +101,18 @@ fi
 
 # 4) 回灌（tar 解到空卷根；卷已存在则先清空内容再解——恢复语义是「回到备份时点」）
 untar_into() {  # $1=卷名 $2=归档
-  docker run --rm -v "$1:/dst" -v "$(dirname "$2"):/src:ro" alpine \
-    sh -c "rm -rf /dst/* /dst/..?* /dst/.[!.]* 2>/dev/null; tar xzf /src/$(basename "$2") -C /dst"
+  local archive="$2" tmp=""
+  if [[ "$archive" == *.age ]]; then
+    local identity="${V2MD_BACKUP_AGE_IDENTITY:-}"
+    [[ -f "$identity" ]] || { echo "❌ 加密归档需要 V2MD_BACKUP_AGE_IDENTITY 文件" >&2; exit 1; }
+    command -v age >/dev/null 2>&1 || { echo "❌ 加密归档恢复需要安装 age" >&2; exit 1; }
+    tmp="$(mktemp "$DST_DIR/.restore.XXXXXX.tar.gz")"
+    age -d -i "$identity" -o "$tmp" "$archive"
+    archive="$tmp"
+  fi
+  docker run --rm -v "$1:/dst" -v "$(dirname "$archive"):/src:ro" alpine \
+    sh -c "rm -rf /dst/* /dst/..?* /dst/.[!.]* 2>/dev/null; tar xzf /src/$(basename "$archive") -C /dst"
+  [[ -z "$tmp" ]] || rm -f "$tmp"
 }
 if [[ ",$ONLY," == *,data,* ]]; then
   F="$(find_file data)" || { echo "❌ 找不到 data-$STAMP 归档" >&2; exit 1; }
@@ -119,12 +131,23 @@ fi
 if [[ ",$ONLY," == *,pg,* ]]; then
   if F="$(find_file pg)"; then
     echo "· 恢复 Postgres ← $F"
-    $COMPOSE --profile pg up -d postgres
-    until docker exec video2md-postgres-1 pg_isready -U v2md -d v2md > /dev/null 2>&1; do
+    PG_ARCHIVE="$F"
+    PG_TMP=""
+    if [[ "$PG_ARCHIVE" == *.age ]]; then
+      identity="${V2MD_BACKUP_AGE_IDENTITY:-}"
+      [[ -f "$identity" ]] || { echo "❌ 加密 pg 归档需要 V2MD_BACKUP_AGE_IDENTITY 文件" >&2; exit 1; }
+      command -v age >/dev/null 2>&1 || { echo "❌ 加密 pg 归档恢复需要安装 age" >&2; exit 1; }
+      PG_TMP="$(mktemp "$DST_DIR/.restore-pg.XXXXXX.sql.gz")"
+      age -d -i "$identity" -o "$PG_TMP" "$PG_ARCHIVE"
+      PG_ARCHIVE="$PG_TMP"
+    fi
+    docker compose -f "$COMPOSE_FILE" up -d postgres
+    until docker compose -f "$COMPOSE_FILE" exec -T postgres sh -lc 'pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"' > /dev/null 2>&1; do
       sleep 2
     done
-    gunzip -c "$F" | docker exec -i video2md-postgres-1 psql -U v2md -d v2md > /dev/null
-    $COMPOSE --profile pg stop postgres
+    gunzip -c "$PG_ARCHIVE" | docker compose -f "$COMPOSE_FILE" exec -T postgres sh -lc 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"' > /dev/null
+    docker compose -f "$COMPOSE_FILE" stop postgres
+    [[ -z "$PG_TMP" ]] || rm -f "$PG_TMP"
     echo "✓ Postgres 恢复完成"
   else
     echo "· 无 pg-$STAMP 归档（备份时 PG 未启用），跳过"
@@ -133,5 +156,5 @@ fi
 
 # 6) 起栈
 echo "· 起栈 …"
-$COMPOSE up -d
+docker compose -f "$COMPOSE_FILE" up -d
 echo "── 恢复完成 $STAMP (现有卷快照留在 $SNAP_DIR/，确认服务正常后可删)"

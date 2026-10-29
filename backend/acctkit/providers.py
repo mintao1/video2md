@@ -95,7 +95,8 @@ class _GoogleHttpxRequest:
         from google.auth import exceptions as gexceptions
 
         try:
-            with httpx.Client(proxy=self.proxy_url or None) as client:
+            proxy_url = self.proxy_url
+            with httpx.Client(proxy=proxy_url or None) as client:
                 response = client.request(method, url, content=body, headers=headers, timeout=timeout)
         except httpx.HTTPError as exc:
             raise gexceptions.TransportError(str(exc)) from exc

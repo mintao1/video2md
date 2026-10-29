@@ -52,6 +52,9 @@ jobs:
       - name: 生产全站修复评测契约（部署/路由/OAuth 防回退）
         run: uv run pytest tests/test_production_readiness_gate.py -q
         working-directory: backend
+      - name: 502 部署韧性评测（镜像导入/磁盘压力/8790 冒烟；离线）
+        run: uv run pytest tests/test_production_deploy_resilience_eval_set.py -q
+        working-directory: backend
       - name: 逐阶段生产评测防回退（正反例、真实失败回放；零 token）
         run: >-
           uv run pytest tests/test_production_pipeline_stage_eval_set.py
@@ -98,6 +101,21 @@ jobs:
         working-directory: backend
       - name: 生产前端8条批注历史证据回放（保留失败与缺失项）
         run: python3 scripts/check_production_ui_annotations.py
+      - name: 2026-10-26 生产浏览器发现评测（离线，不代表生产验收）
+        run: >-
+          uv run pytest tests/test_production_browser_findings_eval_set.py -q
+          && python3 ../scripts/check_production_browser_findings.py
+        working-directory: backend
+      - name: 2026-10-26 生产复测开放项评测（离线，不代表生产验收）
+        run: >-
+          uv run pytest tests/test_production_followup_eval_set.py -q
+          && python3 ../scripts/check_production_followup_eval.py
+        working-directory: backend
+      - name: 2026-10-26 登录到任务边界评测（离线，不代表生产验收）
+        run: >-
+          uv run pytest tests/test_production_login_boundary_eval_set.py -q
+          && python3 ../scripts/check_production_login_boundaries.py
+        working-directory: backend
       - name: 脚本式测试（7 个，全离线）
         run: |
           for t in test_graph test_observability test_otel_replay \
@@ -152,6 +170,18 @@ jobs:
         working-directory: backend
       - name: Production UI annotation eval lint
         run: uv run ruff check ../scripts/check_production_ui_annotations.py tests/test_production_ui_annotation_eval_set.py
+        working-directory: backend
+      - name: Production browser findings eval lint
+        run: uv run ruff check ../scripts/check_production_browser_findings.py tests/test_production_browser_findings_eval_set.py
+        working-directory: backend
+      - name: Production follow-up eval lint
+        run: uv run ruff check ../scripts/check_production_followup_eval.py tests/test_production_followup_eval_set.py
+        working-directory: backend
+      - name: Production login boundary eval lint
+        run: uv run ruff check ../scripts/check_production_login_boundaries.py tests/test_production_login_boundary_eval_set.py
+        working-directory: backend
+      - name: Deployment resilience eval lint
+        run: uv run ruff check tests/test_production_deploy_resilience_eval_set.py
         working-directory: backend
 
   web-integration:

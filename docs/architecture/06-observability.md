@@ -35,15 +35,17 @@ otel-collector（memory_limiter → batch）
 ## 追踪口径
 
 - 每 run 一条 trace：`trace_id = sha256("video2md-"+run_id)`（确定性；evals 据此回挂分数。2026-09-22 前为 `serve-` 前缀，历史 233 条回放 trace 用旧前缀）。
-- trace 名常量 `video2md-serve-run`（低基数，=f"{service_name}-run"，SDK 现状命名 465b53c）；URL 进 root input；`langfuse.user.id`=uid（成本按用户归因）；tags=`video2md`,`mode:vault|deliver`；environment=`V2MD_ENV`。
-- LLM 调用渲染为 generation（gen_ai semconv：model/usage/TTFT + prompt/completion 全文经 `_otel` 旁路上云，不落 jsonl/SSE）。
+- trace 名常量 `video2md-serve-run`（低基数，=f"{service_name}-run"，SDK 现状命名 465b53c）；开发调试可把 URL 放入 root input，生产关闭内容采集后不上传 URL/签名参数；`langfuse.user.id`=uid（成本按用户归因）；tags=`video2md`,`mode:vault|deliver`；environment=`V2MD_ENV`。
+- LLM 调用渲染为 generation（gen_ai semconv：model/usage/TTFT）。生产必须设置
+  `V2MD_OTEL_INCLUDE_CONTENT=off`，只上报用量、耗时和长度元数据；prompt/completion
+  正文不进入 collector/Langfuse。开发环境可显式打开以便本地调试。
 - 图编排插桩：`GraphObsHandler` 挂 `run_graph` 的 callbacks（`graph:node/state/route/start|end` 零时长点事件；`test_graph_obs.py` 钉字段口径）。
 - **Langfuse 只收生产**：开发机不配 OTEL/LANGFUSE 端点，保持纯本地 jsonl；开发/生产分 Langfuse 项目。
 - **历史回放**：本机时代的 233 个 run（含 Dify 时代真实业务）已一次性回放进 Langfuse，root 属性 `replayed=true` 可过滤；按需再回放 `LANGFUSE_PK=… LANGFUSE_SK=… uv run --project backend python backend/scripts/otel_replay.py [--run-id …]`（重复跑产生重复 span；离线测试 `test_otel_replay.py`）。
 - 核验陷阱：2026-09-16 后建的 Langfuse 组织 legacy traces API 404、v2 observations 读路径不可靠——**核验以网页 UI 为准**（摄入本身正常；设计评审存档 `docs/research/2026-09-22-otel-critique-review.md`）。
 - **Grafana 访问**：仅绑回环——`ssh -L 3000:127.0.0.1:3000 <server>` 隧道（或反代+自行加访问控制）；已开匿名只读 Viewer（面板仅回环/隧道可达，写操作仍需 admin）。
 - **图调试**：`langgraph dev`（本地 Studio UI 看 checkpoint/单步）走 LangGraph Server 事件流，不经过 `run_graph`，与 api 形态互不干扰。
-- **观测栈起停**：`docker compose -f docker-compose.yml -f docker-compose.obs.yml up -d`（凭证 `secrets/obs.env`）；未起栈时 app 回退 LANGFUSE 直连，再退纯本地 jsonl。
+- **观测栈起停**：生产 API 使用 `docker compose -f deploy/docker-compose.prod.yml up -d`；collector、Prometheus、Grafana 由 `~/stack/platform-obs` 平台统一栈单独管理（凭证在该栈的 `secrets/obs.env`）。未起栈时 app 回退 LANGFUSE 直连，再退纯本地 jsonl。
 
 ## 告警链
 
@@ -79,8 +81,9 @@ P1-5 SLO 化告警（错误预算燃烧率）→ P2-5 采样 + 日志结构化�
 
 - **run 记录是成本真相源**：`usage`（llm_in_tok/llm_out_tok/gpu_s 原始凭据）+ `cost_usd`
   （结算时刻单价 × usage）随 run 落盘；预算闸（`V2MD_BUDGET_MONTH_USD`）与 GET /cost 读它。
-- **Langfuse 侧**：llm span 已带 usage/generation 全文（`_llm_observed` 收口）——Langfuse
-  的成本页可直接按 model 建价目表出报表，与 run 记录口径互为对照（Langfuse=调用量视角，
-  run 记录=账单视角）。GPU 成本不进 Langfuse（无 span 级单价），以 run 记录为准。
+- **Langfuse 侧**：生产 LLM span 只带 usage、耗时和长度等元数据，不上传 prompt/completion
+  正文；Langfuse 的成本页可按 model 建价目表出报表，与 run 记录口径互为对照
+  （Langfuse=调用量视角，run 记录=账单视角）。GPU 成本不进 Langfuse（无 span 级单价），
+  以 run 记录为准。开发环境只有显式设置 `V2MD_OTEL_INCLUDE_CONTENT=on` 才会发送正文。
 - 单价表在仓内 config（`V2MD_PRICE_*`），改价=改 env 重启；历史 run 不追溯重算
   （usage 凭据在，可离线重估价）。

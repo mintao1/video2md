@@ -1,0 +1,12 @@
+{
+  "kind": "production",
+  "environment": {"host_alias": "lcode-4c", "base_url": "https://ferosse.tech", "release_version": "0.2.0"},
+  "anonymous_surface": {"healthz": 200, "terms": 200, "privacy": 200, "me": 401, "runs": 401, "docs": 403, "openapi": 403, "redacted": true},
+  "preflight": {"http": 200, "ok": true, "ffmpeg": true, "disk": true, "vault": true, "colab_cli": true},
+  "gpu_router": {"running": 1, "ready": 1},
+  "model_channel": {"models_http": 200, "chat_http": 200, "model": "glm-5.3-flash"},
+  "authentication": {"logout_observed": true, "oauth_login_succeeded": true, "session_refresh_kept_login": true, "protocol_guard": true},
+  "colab": {"explicit_consent": true, "connected": true, "authorization_saved": true, "tenant_scoped": true},
+  "history": {"count_before": 17, "count_after": 18, "completed": 6, "failed": 11, "book_count_delta": 1, "new_book_visible": true, "run_id": "70f4a4d4"},
+  "evidence_refs": ["docs/testing/2026-10-26/production-live-integration-report.md", "docs/testing/2026-10-26/billing-evidence-c2e5d741.json", "docs/testing/2026-10-26/billing-evidence-70f4a4d4.json"]
+}

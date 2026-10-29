@@ -3995,6 +3995,7 @@ name = "video2md"
 version = "0.2.0"
 source = { virtual = "." }
 dependencies = [
+    { name = "cryptography" },
     { name = "fastapi" },
     { name = "google-auth" },
     { name = "google-colab-cli", marker = "sys_platform != 'win32'" },
@@ -4033,6 +4034,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "cryptography", specifier = ">=43.0" },
     { name = "deepeval", marker = "extra == 'evals'", specifier = ">=3.0" },
     { name = "fastapi", specifier = ">=0.115" },
     { name = "google-auth", specifier = ">=2.58.0" },

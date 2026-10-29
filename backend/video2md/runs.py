@@ -212,10 +212,14 @@ def create_run(url: str, part_items: str = "", force: bool = False,
     # 严格相等会让已完成的视频整链重跑（实测 44min 视频重复下载+转录）
     # isinstance 设防（P1-6 实证）：历史 state.json 混过裸 int 条目（{"k2": 49}），
     # 不设防会让整个 POST /runs 路径 500——脏数据降级为「跳过」而非炸管线
+    # Completed state is tenant-scoped. Legacy rows without an owner are only
+    # eligible for the owner-less CLI/development path; they must never cause
+    # an authenticated tenant to skip work produced by someone else.
     done_by_url: dict[str, dict] = {str(v.get("url", "")).rstrip("/"): v
                                     for v in state.values()
                                     if isinstance(v, dict) and not v.get("dry_run")
-                                    and v.get("url")}
+                                    and v.get("url")
+                                    and str(v.get("owner") or "") == str(owner or "")}
     # deliver 模式在架判定需要 runs 库比对来源 run 的 outbox 是否存在
     runs_db = _load_runs() if artsink.current_mode() == "deliver" else {}
 

@@ -8,7 +8,7 @@ import { useToastStore } from '../../stores/toast'
 
 const props = defineProps<{
   run: RunListItem
-  /** 缩略图色相（mock 占位封面用） */
+  /** 缩略图色相（CSS 占位封面用） */
   hue?: number
 }>()
 

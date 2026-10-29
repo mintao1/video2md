@@ -1,0 +1,1 @@
+{"ok":true,"checks":[{"name":"ffmpeg","ok":true,"detail":""},{"name":"disk","ok":true,"detail":""},{"name":"vault","ok":true,"detail":""},{"name":"colab_cli","ok":true,"detail":""}],"ts":"2026-10-26T09:32:47"}

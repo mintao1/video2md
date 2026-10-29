@@ -16,13 +16,13 @@
 ├─ nginx（仓内 deploy/nginx.conf）:80(/443 模板) ── 唯一公网入口（P0-4 ✅）
 │    └─→ 127.0.0.1:8790
 ├─ docker compose 栈（network_mode: host）
-│    ├─ video2md 容器      uvicorn 单进程，V2MD_HOST=127.0.0.1:8790
+│    ├─ api 服务（deploy/docker-compose.prod.yml）  uvicorn 单进程，V2MD_HOST=0.0.0.0:8790
 │    │    ├─ asyncio 信号量闸门（V2MD_MAX_CONCURRENT_RUNS，默认 1）
 │    │    ├─ 工作线程跑同步 graph（asyncio.to_thread）
 │    │    ├─ 常驻周期任务：watchdog 巡检 / outbox sweeper / uploads sweeper
 │    │    └─ events PG 泵线程（V2MD_EVENTS=pg 时，LISTEN v2md_events+v2md_cmds）
 │    ├─ gpu_router 容器    :9700（无认证面，安全组兜底——见已知限制）
-│    └─ postgres:17-alpine  profile=["pg"] 默认不起；127.0.0.1:5432
+│    └─ postgres 服务（deploy/docker-compose.prod.yml）  postgres:16-alpine；127.0.0.1:5432
 ├─ 平台统一观测栈（~/stack/platform-obs，2026-09-26 obs 双栈合并——平台 Phase 1.1/M1；
 │    本仓自有 docker-compose.obs.yml 退役为本地预览资产，服务器不再使用）
 │    ├─ otel-collector :4318 → traces 按 service.name 路由各自 Langfuse 项目 / prometheus exporter :8889
@@ -38,7 +38,7 @@
 |---|---|---|---|
 | 80/443 | 反代 | ✅ 唯一入口 | 仓内 nginx（P0-4 ✅）：SSE 关缓冲；`/docs`/`/openapi.json`/`/redoc` deny；匿名双层限流；body 上限 2g。TLS 证书部署期接 `deploy/certs/`（模板见 conf 尾） |
 | 8790 | 127.0.0.1 | ❌ | api；`ssh -L 8790:127.0.0.1:8790` 隧道调试 |
-| 9700 | 全接口 | ❌（安全组+iptables 不放行） | gpu_router **无认证**（`docker-compose.yml:25-26` 自述） |
+| 9700 | 全接口 | ❌（安全组+iptables 不放行） | gpu_router **无认证**（兼容 HTTP REMOTE 部署的独立服务） |
 | 3000/9090/4318/8889/9760 | 127.0.0.1 | ❌ | 平台统一观测栈（platform-obs） |
 | 5432 | 127.0.0.1 | ❌ | PG（compose 内置时）；外部托管 PG 走 DSN |
 
@@ -90,8 +90,8 @@ GOOGLE_CLIENT_ID=xxxxx.apps.googleusercontent.com
 
 ```bash
 cd ~/stack/video2md
-docker compose -f docker-compose.yml build
-docker compose -f docker-compose.yml up -d
+docker compose -f deploy/docker-compose.prod.yml build
+docker compose -f deploy/docker-compose.prod.yml up -d
 curl -s localhost:8790/healthz && curl -s localhost:8790/preflight && \
   curl -s "localhost:9700/status?refresh=true"
 # 观测面归平台统一栈（~/stack/platform-obs）：curl -s 127.0.0.1:9090/-/healthy · curl -s 127.0.0.1:13133/health
@@ -155,17 +155,17 @@ watchdog `V2MD_WATCHDOG_ACTION=exit`（compose 生产已配）：判定卡死 �
 | `V2MD_QUEUE_MAX` / `V2MD_USER_QUEUE_MAX` / `V2MD_USER_SUBMIT_PER_MIN` | 三道提交闸（0=不设限）；PG 档跨副本一致，json 档进程内 |
 | `V2MD_UPLOAD_*` | 上传面：单文件 2GB / 每用户 5GB / TTL 24h（`data/uploads/<uid>/`） |
 | `V2MD_RUNS/STATE/USERS_STORE` `V2MD_TASKS_STORE` `V2MD_EVENTS` | 存储分派与事件扇出档位（详见 [04 篇](04-data-and-consistency.md)）；切换前先 `backend/scripts/migrate_json_to_pg.py` 导存量 |
-| `V2MD_CHECKPOINTER=postgres` + `V2MD_PG_DSN` | 两行进 `secrets/video2md.env`；compose PG 挂 `profiles:["pg"]` 默认不起：`docker compose --profile pg up -d postgres`（PG 未就绪 api fail-fast，restart 自拉起）；checkpoint 易失无存量迁移 |
+| `V2MD_CHECKPOINTER=postgres` + `V2MD_PG_DSN` | 两行进 `secrets/video2md.env`；生产 Compose 固定提供 `postgres` 服务，`api` 依赖健康检查后启动（PG 未就绪时 fail-fast，restart 自拉起）；checkpoint 易失无存量迁移 |
 | `V2MD_ARTIFACT_MODE=deliver` + `V2MD_OUTBOX_DIR/TTL_H` | 产物不落 vault、bundle+ACK/TTL 即焚（03 篇） |
 
 存量 run 收编（迁移到多用户归属）：`python backend/scripts/migrate_run_owner.py --to <uid> [--status done] [--dry-run]`。
 
 ## 已知限制
 
-1. ~~反代配置不在仓~~（P0-4 ✅：deploy/nginx.conf + compose nginx 服务 + smoke_proxy.sh CI 验证 + deploy.sh 起栈后 /docs→403 断言）。「安全组只放 80/443」由仓内拓扑承载。
+1. ~~反代配置不在仓~~（P0-4 ✅：deploy/nginx.conf + smoke_proxy.sh CI 验证 + deploy.sh 起栈后 /docs→403 断言；nginx 由主机/平台反代托管）。「安全组只放 80/443」由仓内拓扑承载。
 2. gpu_router :9700 无认证，信任模型 = 网络位置；colab quick tunnel 是无鉴权公网 URL（批判② S8）。
 3. 单副本 + 单 PG，均为 SPOF；多副本读侧就绪、写路径与验证闭环见 ROADMAP P1-1/P1-4。
-4. compose PG 默认口令 `v2md-loopback-only` 仅回环兜底（`docker-compose.yml:98`）；DSN 指外部库时必须显式覆盖。
+4. 生产 Compose 的 PG 凭证必须通过 `.env`/`VIDEO2MD_ENV_FILE` 提供；DSN 指外部库时必须显式覆盖。
 
 ## 演进方向
 

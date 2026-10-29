@@ -13,7 +13,7 @@
 # namespace/username/runtimeClass 三种粒度，无 per-workload 豁免，故 ns 级降级。
 # warn/audit=restricted 零风险（官方定义二者 otherwise allowed，永不拒绝）。
 # 回收路径见 templates/k8s-base/namespace.yaml 头注（四步）。
-# 回滚：kubectl delete -k deploy/k8s/base && docker compose start video2md（原容器原地保留）
+# 回滚：kubectl delete -k deploy/k8s/base && docker compose -f deploy/docker-compose.prod.yml start api（原容器原地保留）
 apiVersion: v1
 kind: Namespace
 metadata:

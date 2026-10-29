@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+from urllib.parse import urlsplit
 
 PROJ = Path(__file__).resolve().parent.parent  # 包目录的上一级 = 项目根（state.json/runs.json/.env 都在根上）
 
@@ -87,12 +88,15 @@ _SPEC: dict[str, tuple] = {
     "V2MD_RUNS_FILE":       ("path", str(PROJ / "runs.json"), None),
     "V2MD_USERS_FILE":      ("path", str(PROJ / "users.json"), None),
     "V2MD_PG_DSN":          ("raw", "", None),
+    "V2MD_PG_MIGRATE_DSN":  ("raw", "", None),
     "V2MD_PG_TIMEOUT_S":    ("float", 10.0, ("min", 1.0)),
     "V2MD_RUNS_STORE":      ("enum", "json", ("json", "postgres")),
     "V2MD_STATE_STORE":     ("enum", "json", ("json", "postgres")),
     "V2MD_USERS_STORE":     ("enum", "json", ("json", "postgres")),
     "V2MD_EVENTS":          ("enum", "local", ("local", "pg")),
     "V2MD_CHECKPOINTER":    ("enum", "sqlite", ("sqlite", "postgres")),
+    "V2MD_CHECKPOINTER_SETUP": ("enum", "on", ("on", "off")),
+    "V2MD_OTEL_INCLUDE_CONTENT": ("enum", "on", ("on", "off")),
     "V2MD_LOG_DIR":         ("path", str(PROJ / "logs"), None),
     "V2MD_SECRETS_FILE":    ("path", str(SECRETS_FILE), None),
     "OBSIDIAN_VAULT":       ("path", str(Path.home() / "Documents/Obsidian Vault"), None),
@@ -121,6 +125,7 @@ _SPEC: dict[str, tuple] = {
     # 教材偏好存储（收藏/阅读进度，(uid,run_id) 维度；web 教材库页数据源）
     "V2MD_PREFS_FILE":      ("path", str(PROJ / "prefs.json"), None),
     "V2MD_LLM_SETTINGS_FILE": ("str", "", None),  # 可选路径；空=跟随 PREFS_FILE 同目录
+    "V2MD_LLM_SETTINGS_KEY": ("raw", "", None),  # 32-byte base64url/hex envelope key
     "V2MD_PREFS_STORE":     ("enum", "json", ("json", "postgres")),
     "V2MD_COLAB_SESSION":   ("str", "v2md-whisper", None),
     "V2MD_COLAB_BIN":       ("str", "", None),
@@ -192,10 +197,52 @@ def _parse_spec(env: dict[str, str]) -> tuple[dict, list[str]]:
 
 _PARSED, _ERRS = _parse_spec(ENV)
 
+if ENV.get("V2MD_ENV", "development").strip().lower() == "production" \
+        and not (ENV.get("V2MD_LLM_SETTINGS_KEY") or "").strip():
+    raise RuntimeError("生产环境必须配置 V2MD_LLM_SETTINGS_KEY（用户 LLM Key 加密密钥）")
+
+_PG_BACKED_KEYS = ("V2MD_RUNS_STORE", "V2MD_STATE_STORE", "V2MD_USERS_STORE",
+                   "V2MD_TASKS_STORE", "V2MD_PREFS_STORE", "V2MD_EVENTS",
+                   "V2MD_CHECKPOINTER")
+
+
+def _dsn_user(value: str) -> str:
+    try:
+        return (urlsplit(value).username or "").strip()
+    except ValueError:
+        return ""
+
+
+# A production API must never silently fall back to POSTGRES_USER. The
+# migration is the only component allowed to use video2md_migrate; API traffic
+# is pinned to the DML-only video2md_app role. JSON/SQLite development and unit
+# test configurations remain unaffected.
+if ENV.get("V2MD_ENV", "development").strip().lower() == "production" \
+        and any((ENV.get(key) or "").strip().lower() in ("postgres", "pg")
+                for key in _PG_BACKED_KEYS):
+    _app_dsn = (ENV.get("V2MD_PG_DSN") or "").strip()
+    _migrate_dsn = (ENV.get("V2MD_PG_MIGRATE_DSN") or "").strip()
+    if _dsn_user(_app_dsn) != "video2md_app":
+        raise RuntimeError("生产 PostgreSQL API DSN 必须使用 video2md_app（禁止 POSTGRES_USER/superuser 回退）")
+    if _dsn_user(_migrate_dsn) != "video2md_migrate":
+        raise RuntimeError("生产必须配置 V2MD_PG_MIGRATE_DSN=video2md_migrate 的迁移凭据")
+
 # Production deployments must provide a real authentication provider.
 if ENV.get("V2MD_ENV", "development").strip().lower() == "production" \
         and (ENV.get("V2MD_AUTH", "off") or "off").strip().lower() in ("", "off", "none"):
     raise RuntimeError("生产环境禁止 V2MD_AUTH=off；请配置 V2MD_AUTH=google 或其它真实 provider")
+
+# A shared vault has no tenant boundary for attachments, transcripts, or the
+# index. Production must use per-run deliver shelves, which are owner-checked
+# by the API and physically burned after TTL/ACK. Fail closed before serving
+# traffic rather than silently falling back to the development vault mode.
+if ENV.get("V2MD_ENV", "development").strip().lower() == "production" \
+        and _PARSED.get("V2MD_ARTIFACT_MODE") != "deliver":
+    raise RuntimeError("生产环境必须配置 V2MD_ARTIFACT_MODE=deliver；共享 vault 禁止用于多租户部署")
+
+if ENV.get("V2MD_ENV", "development").strip().lower() == "production" \
+        and _PARSED.get("V2MD_OTEL_INCLUDE_CONTENT") != "off":
+    raise RuntimeError("生产环境必须配置 V2MD_OTEL_INCLUDE_CONTENT=off；禁止把 prompt/completion 全文发送到观测端")
 
 # Google 网页登录的 redirect_uri 与回跳地址由这两个键拼出；生产缺省会回落到 localhost，
 # 登录必坏且只在真人点击时暴露，所以启动期就拒绝。
@@ -253,6 +300,7 @@ TRANSCRIPT_DIR = OUT_DIR / "transcripts"  # 转录本 SSOT（info callout wikili
 #   deliver      = 多用户「云端不储存」：产物进 per-run outbox，终态后搬到 OUTBOX_DIR，
 #                  只经 bundle/ACK HTTP 端点发送到用户端，TTL 到期/确认收完即焚（api.py）
 ARTIFACT_MODE: str = _PARSED["V2MD_ARTIFACT_MODE"]
+OTEL_INCLUDE_CONTENT: bool = _PARSED["V2MD_OTEL_INCLUDE_CONTENT"] == "on"
 
 # deliver 在架根（容器指 data 卷）与保留窗口（小时，到期自动烧）
 OUTBOX_DIR: Path = _PARSED["V2MD_OUTBOX_DIR"]

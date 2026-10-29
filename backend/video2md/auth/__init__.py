@@ -6,6 +6,8 @@
 """
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
+
 from fastapi import (
     Request,  # 接线层允许碰框架（acctkit 本体不碰）；勿用 TYPE_CHECKING 字符串注解——FastAPI 解析不到会把参数当 query 导致 422
 )
@@ -32,19 +34,32 @@ from . import ext_google  # noqa: F401, E402  自注册 google 多 audience 覆�
 engine: AuthEngine = build_from_env(ENV, "V2MD_", store=_build_store())
 
 
-async def current_identity(request: Request) -> Identity:
-    """FastAPI 依赖：请求 → 已落库 uid 的 Identity（未认证抛 AuthError→api 层转 401）。"""
-    return await engine.authenticate(request.headers)
+async def current_identity(request: Request) -> AsyncIterator[Identity]:
+    """FastAPI 依赖：认证并把 UID绑定到整个请求生命周期。
+
+    PostgreSQL RLS 读取 ``v2md.tenant_id``，因此仅在 Python 返回 Identity
+    不够；将 tenant_scope 保持到 endpoint 完成，所有池连接 checkout 都能
+    设置同一租户 GUC。身份解析本身发生在绑定前，因为它必须按外部身份查找
+    UID；该 lookup 只由认证存储适配器执行。
+    """
+    ident = await engine.authenticate(request.headers)
+    from ..pg import tenant_scope
+    with tenant_scope(ident.uid):
+        yield ident
 
 
-async def optional_identity(request: Request) -> Identity | None:
+async def optional_identity(request: Request) -> AsyncIterator[Identity | None]:
     """可选鉴权依赖：无/坏凭据返回 None 不 401——匿名可达端点（如 /preflight）的
     「带有效凭证则升级视图」判权用。注意 off 档 providers=[fake,dev] 恒过，
     是否算真实凭证由调用方按 V2MD_AUTH 档位另判（见 api._preflight_privileged）。"""
     try:
-        return await engine.authenticate(request.headers)
+        ident = await engine.authenticate(request.headers)
     except AuthError:
-        return None
+        yield None
+        return
+    from ..pg import tenant_scope
+    with tenant_scope(ident.uid):
+        yield ident
 
 
 # 测试/运维辅助：直落本引擎的身份表（预置映射 / Principal→Identity 解析）

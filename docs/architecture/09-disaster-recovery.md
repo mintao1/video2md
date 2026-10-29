@@ -17,8 +17,21 @@
 - 覆盖：`v2md-data` 卷（state/runs/users/checkpoints/logs）+ `vault` 卷（deliver 形态不用）+ PG 在跑时 `pg_dump`。
 - 保留：`backups/daily/` 留 7 份 + `backups/weekly/`（周一晋升）留 4 份 + sha256 manifest。
 - cron：`15 4 * * * …/scripts/backup.sh >> /var/log/v2md-backup.log 2>&1`。
-- 一致性口径：runs/state 原子 rename 恒完整；checkpoints 可丢弃接受瞬时不一致；严格一致 = `docker compose stop video2md` 后备。
+- 生产备份必须设置 `V2MD_BACKUP_AGE_RECIPIENT`、`V2MD_BACKUP_REMOTE` 和
+  `V2MD_BACKUP_RETENTION_DAYS`；归档先用 age 加密、目录/文件权限收紧，再用
+  `rclone sync` 推送密文并镜像本地保留集。恢复加密归档需要
+  `V2MD_BACKUP_AGE_IDENTITY`，缺少 manifest 或解密身份会拒绝恢复。
+- 一致性口径：runs/state 原子 rename 恒完整；checkpoints 可丢弃接受瞬时不一致；严格一致 = `docker compose -f deploy/docker-compose.prod.yml stop api` 后备。
 - 防重入锁 + manifest 校验（`test_backup_scripts.py` 离线钉住）。
+
+## 生产数据库角色与部署闸
+
+- `video2md_app` 是 API 的 `LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS` 角色，只获业务表 DML；
+  `video2md_migrate` 仅用于迁移/检查点初始化，拥有应用 schema 的 DDL 权限但同样不具备超级用户或 `BYPASSRLS`。
+- Compose 首次初始化和每次部署前都执行 `deploy/postgres/000-provision-roles.sh`；外部托管 PostgreSQL
+  需用同等管理员操作一次，并把两个角色 DSN 放入只读 secrets 文件。API 不再继承整份 env 文件。
+- `scripts/deploy.sh` 在目标机 checkout 后运行 `scripts/check_production_readiness.py --self-test`，再按
+  `postgres → role bootstrap → migrate → api` 顺序启动；迁移命令会加密历史明文 LLM Key、验证 schema 约束并初始化 Postgres checkpoint 表。
 
 ### ⚠ 备份的盲区（批判①数据安全层）
 
@@ -28,7 +41,7 @@
 | 反代配置/TLS 证书 | P0-4 入仓后由 git 承载；证书由 Caddy/lego 自动重签 |
 | 镜像 | GHCR 不可变 tag（`docker pull ghcr.io/…:<tag>` 手动顶上） |
 
-secrets 登记清单（密码管理器逐条）：`LLM_API_KEY`、`LLM_BASE_URL`/`LLM_MODEL`、`GOOGLE_CLIENT_ID`(+设备流 SECRET)、`WECHAT_APP_ID/SECRET`、`V2MD_PG_DSN`（含口令）、`V2MD_DEADMAN_PING_URL`、`FEISHU_WEBHOOK_URL`、`LANGFUSE_*`、`GF_SECURITY_ADMIN_PASSWORD`、colab `token.json`、kaggle `kaggle.json`。
+secrets 登记清单（密码管理器逐条）：`LLM_API_KEY`、`LLM_BASE_URL`/`LLM_MODEL`、`V2MD_LLM_SETTINGS_KEY`、`VIDEO2MD_APP_PASSWORD`、`VIDEO2MD_MIGRATE_PASSWORD`、`V2MD_PG_DSN`/`V2MD_PG_MIGRATE_DSN`（含口令）、`V2MD_BACKUP_AGE_RECIPIENT`/`V2MD_BACKUP_AGE_IDENTITY`、`GOOGLE_CLIENT_ID`(+设备流 SECRET)、`WECHAT_APP_ID/SECRET`、`V2MD_DEADMAN_PING_URL`、`FEISHU_WEBHOOK_URL`、`LANGFUSE_*`、`GF_SECURITY_ADMIN_PASSWORD`、colab `token.json`、kaggle `kaggle.json`。
 
 ## 恢复流程（`scripts/restore.sh`）
 

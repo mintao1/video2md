@@ -23,16 +23,32 @@ def main() -> None:
         # schema 迁移（P0-5）：应用待迁移版本后校验，幂等可重跑；api 建池即校验，
         # 落后拒起等本命令。json 档（无 DSN）exit 0——deploy.sh 对 json 部署照常走。
         from . import pg
+        from . import llm_settings
         from .pgmigrate import SCHEMA_LATEST, apply_migrations, validate_schema
         if not pg.pg_enabled():
-            print("· V2MD_PG_DSN 未配置（json 档）：无 schema 可迁移")
+            migrated_keys = llm_settings.migrate_plaintext()
+            print("· V2MD_PG_DSN 未配置（json 档）：无 schema 可迁移"
+                  + (f"；已加密迁移 {migrated_keys} 条历史 LLM 凭据" if migrated_keys else ""))
             return
-        pool = pg.make_pool(pg.pg_dsn())
+        # Migrations run with the owner/migrate credential, while API traffic
+        # uses the least-privilege app DSN.  Keep the app DSN as fallback for
+        # existing single-role installations during credential rotation.
+        migrate_dsn = (ENV.get("V2MD_PG_MIGRATE_DSN") or pg.pg_dsn()).strip()
+        pool = pg.make_pool(migrate_dsn)
         try:
             applied = apply_migrations(pool)
             print(f"✅ 迁移就绪：库版本 {SCHEMA_LATEST}"
                   + (f"（本次新应用：{applied}）" if applied else "（无待应用，幂等重跑）"))
             validate_schema(pool)
+            migrated_keys = llm_settings.migrate_plaintext(pool=pool)
+            if migrated_keys:
+                print(f"✅ 已加密迁移 {migrated_keys} 条历史 LLM 凭据")
+            with pool.connection() as conn:
+                conn.execute("ALTER TABLE v2md_llm_settings VALIDATE CONSTRAINT v2md_llm_settings_ciphertext_ck")
+            if (ENV.get("V2MD_CHECKPOINTER") or "sqlite").strip().lower() == "postgres":
+                from langgraph.checkpoint.postgres import PostgresSaver
+                PostgresSaver(pool).setup()
+                print("✅ Postgres checkpoint 表已由迁移角色初始化")
         finally:
             pool.close()
         return

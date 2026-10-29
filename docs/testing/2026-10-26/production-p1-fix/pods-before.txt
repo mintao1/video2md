@@ -1,0 +1,2 @@
+NAME                            READY   STATUS    RESTARTS   AGE   IP         NODE            NOMINATED NODE   READINESS GATES
+video2md-api-5c7f6b4cf8-j95v8   1/1     Running   0          58m   10.0.0.7   vm-0-7-ubuntu   <none>           <none>

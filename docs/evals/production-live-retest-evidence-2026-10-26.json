@@ -1,0 +1,31 @@
+{
+  "kind": "production",
+  "environment": {"host_alias": "lcode-4c", "base_url": "https://ferosse.tech", "release_version": "0.2.0"},
+  "authentication": {
+    "logout_observed": true,
+    "oauth_login_succeeded": true,
+    "session_refresh_kept_login": true,
+    "protocol_checkbox_checked": false,
+    "oauth_login_initiated_before_protocol_acceptance": true,
+    "protocol_guard_observed": false
+  },
+  "colab": {"connected": true, "authorization_saved": true, "tenant_scoped": true},
+  "task_history": {"count_before": 18, "count_after_failure": 19, "count_after_success": 20, "book_count_before": 7, "book_count_after_success": 8},
+  "runs": {
+    "d4797d57": {
+      "kind": "production",
+      "submission": {"run_id": "d4797d57", "task_count_before": 18, "task_count_after": 19, "url_entered_explicitly": true},
+      "execution": {"status": "error", "failure_stage": "note", "failure_reason_visible": true, "running_stage_observed": true, "model_called": false, "model_inference_succeeded": false, "run_id_visible": true},
+      "billing": {"usage": {"llm_in_tok": 0, "llm_out_tok": 0, "llm_cached_in_tok": 0, "gpu_s": 258.812}, "cost_usd": 0.0, "monthly_rollup_includes_run": true, "usage_visible": true, "cost_visible": true, "gpu_policy": "free", "gpu_free_reason": "生产明确采用免费 GPU 计价策略", "prices": {"llm_in_mtok": 0.15, "llm_out_mtok": 0.5, "llm_cached_in_mtok": 0.03, "gpu_min": 0}},
+      "artifact": {"book_visible": false, "markdown_nonempty": false, "book_count_delta": 0}
+    },
+    "cad0dc5a": {
+      "kind": "production",
+      "submission": {"run_id": "cad0dc5a", "task_count_before": 19, "task_count_after": 20, "url_entered_explicitly": true},
+      "execution": {"status": "done", "running_stage_observed": true, "model_called": true, "model_calls": 3, "model": "glm-5.3-flash", "model_inference_succeeded": true, "run_id_visible": true, "stage_events": ["download", "transcribe", "frames", "ocr", "select", "clips", "note"]},
+      "billing": {"usage": {"llm_in_tok": 6739, "llm_out_tok": 11162, "llm_cached_in_tok": 0, "gpu_s": 369.374}, "cost_usd": 0.006592, "monthly_rollup_includes_run": true, "usage_visible": true, "cost_visible": true, "gpu_policy": "free", "gpu_free_reason": "生产明确采用免费 GPU 计价策略", "prices": {"llm_in_mtok": 0.15, "llm_out_mtok": 0.5, "llm_cached_in_mtok": 0.03, "gpu_min": 0}, "monthly_rollup_after": {"runs_n": 20, "llm_in_tok": 340223, "llm_out_tok": 108287, "gpu_s": 11238.138, "spend_usd": 0.102933}},
+      "artifact": {"book_visible": true, "markdown_nonempty": true, "book_count_delta": 1, "title": "数据库索引与查询优化入门", "path": "/vault/资料库/视频笔记/数据库索引与查询优化入门.md", "markdown_chars": 3190, "frames_kept": 8, "frames_ocr": 80, "transcribe_conf": 0.98, "media_refs": 8, "reader_url": "https://ferosse.tech/read/cad0dc5a"}
+    }
+  },
+  "redacted": true
+}

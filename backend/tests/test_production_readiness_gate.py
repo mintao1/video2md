@@ -18,7 +18,24 @@ SPEC.loader.exec_module(gate)
 def production_evidence() -> dict:
     return {
         "postgres": {"status": "healthy"},
-        "schema": {"version": 4},
+        "schema": {"version": 6},
+        "database_roles": {
+            "api_role": "video2md_app", "migrate_role": "video2md_migrate",
+            "api_login": True, "migrate_login": True, "api_superuser": False,
+            "migrate_superuser": False,
+            "api_bypass_rls": False, "migrate_bypass_rls": False, "rls_enabled": True,
+            "app_dsn_tls": True, "migrate_dsn_tls": True,
+        },
+        "backup": {
+            "encrypted": True, "permissions_hardened": True,
+            "remote_configured": True, "remote_tls": True,
+            "retention_configured": True,
+        },
+        "observability": {
+            "provider": "langfuse", "project": "production", "tls": True,
+            "prompt_redaction": True, "acl_verified": True,
+            "retention_configured": True,
+        },
         "api": {"status": "healthy", "version": "0.2.0"},
         "release": {
             "branch": "main",
@@ -86,6 +103,30 @@ def test_wrong_commit_unstable_pod_or_open_me_regression_fails() -> None:
 
 def test_repository_deployment_contract_is_guarded() -> None:
     assert gate.evaluate_repository(ROOT) == []
+
+
+def test_google_proxy_contract_accepts_local_binding_only() -> None:
+    assert gate._google_httpx_proxy_transport(
+        """
+class _GoogleHttpxRequest:
+    def _fetch(self):
+        proxy_url = self.proxy_url
+        with httpx.Client(proxy=proxy_url or None):
+            pass
+class Other:
+    pass
+"""
+    )
+    assert not gate._google_httpx_proxy_transport(
+        """
+class _GoogleHttpxRequest:
+    def _fetch(self):
+        with httpx.Client():
+            pass
+class Other:
+    pass
+"""
+    )
 
 
 def test_eval_set_covers_every_remediated_production_behavior() -> None:

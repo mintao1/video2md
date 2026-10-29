@@ -1,0 +1,50 @@
+{
+  "kind": "production",
+  "authentication": {
+    "logout_observed": true,
+    "oauth_login_succeeded": true
+  },
+  "source_resolution": {
+    "resolved": true
+  },
+  "submission": {
+    "feedback_visible": true,
+    "run_id": "c2e5d741",
+    "submit_log_present": true,
+    "url_entered_explicitly": true,
+    "task_count_before": 16,
+    "task_count_after": 17
+  },
+  "execution": {
+    "status": "done",
+    "running_stage_observed": true,
+    "model_called": true,
+    "model_inference_succeeded": true,
+    "run_id_visible": true
+  },
+  "billing": {
+    "usage": {
+      "llm_in_tok": 6141,
+      "llm_out_tok": 1043,
+      "llm_cached_in_tok": 0,
+      "gpu_s": 368.514
+    },
+    "cost_usd": 0.001443,
+    "monthly_rollup_includes_run": true,
+    "usage_visible": true,
+    "cost_visible": true,
+    "gpu_policy": "free",
+    "gpu_free_reason": "生产明确采用免费 GPU 计价策略",
+    "prices": {
+      "llm_in_mtok": 0.15,
+      "llm_out_mtok": 0.5,
+      "llm_cached_in_mtok": 0.03,
+      "gpu_min": 0
+    }
+  },
+  "artifact": {
+    "book_visible": true,
+    "markdown_nonempty": true,
+    "book_count_delta": 1
+  }
+}

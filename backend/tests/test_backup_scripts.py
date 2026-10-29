@@ -56,7 +56,8 @@ assert "video2md_v2md-data:/src:ro" in out, "data 卷挂载缺失"
 assert "video2md_vault:/src:ro" in out, "vault 卷挂载缺失"
 assert f"[dry-run] docker run --rm -v video2md_v2md-data:/src:ro -v {dst}/daily:/dst" in out
 assert "tar czf /dst/data-" in out and "tar czf /dst/vault-" in out
-assert "postgres 容器未在跑" in out, "无 PG 容器应跳过并注明"
+assert "docker compose -f" in out and "ps --status running --services" in out, \
+    "dry-run 应打印 Compose postgres 探测命令"
 assert not (dst / "daily").exists() or not any((dst / "daily").iterdir()), \
     "dry-run 不得真写归档"
 # dry-run 允许的 docker 调用只有无害探测（docker ps）；tar/exec 必须走 run() 打印而非执行
@@ -157,7 +158,7 @@ r = run_backup_env(ENV_REMOTE, "--dst", str(dst8))
 assert r.returncode == 0, r.stderr
 assert "异地推送" in r.stdout, r.stdout
 c = RCLONE_CALLS.read_text()
-assert f"copy {dst8} b2:v2md-backup --transfers 4" in c, c
+assert f"sync {dst8} b2:v2md-backup --transfers 4" in c, c
 assert "--exclude .lock/**" in c, "锁目录不得推远端"
 assert (dst8 / "manifest.sha256").exists(), "本地 manifest 不受 remote 影响"
 

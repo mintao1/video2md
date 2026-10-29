@@ -1,0 +1,12 @@
+{
+  "kind": "production",
+  "authentication": {"logout_observed": true, "oauth_login_succeeded": true, "account": "redacted"},
+  "llm_settings": {"entered_in_frontend": true, "base_url": "https://opencode.ai/inference/go/openai/v1", "model": "glm-5.3-flash", "api_key_value": "redacted", "save_feedback_visible": true},
+  "colab": {"button_clicked": true, "status_before": "尚未连接我的 Colab", "oauth_flow_visible": false, "flow_id_visible": false, "result": "blocked"},
+  "kaggle": {"frontend_link_clicked": true, "login_url_opened": true, "google_login_succeeded": true, "account": "redacted"},
+  "submission": {"url_entered_explicitly": true, "url": "https://www.bilibili.com/video/BV1LV411r77C/", "feedback_visible": true, "feedback": "已加入转换队列，稍后可在教材库查看", "task_count_before": 13, "task_count_after": 13, "submit_log_present": true, "run_id": null},
+  "execution": {"status": "unknown", "running_stage_observed": false, "model_called": false, "model_inference_succeeded": null, "run_id_visible": false, "failure_reason_visible": false, "failure_stage_visible": false},
+  "billing": {"usage": {}, "cost_usd": null, "monthly_rollup_includes_run": false, "usage_visible": false, "cost_visible": false, "prices": {}, "gpu_policy": null},
+  "artifact": {"book_visible": false, "markdown_nonempty": false, "book_count_delta": 0},
+  "observed_at": "2026-10-23T02:46:15+08:00"
+}

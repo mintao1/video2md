@@ -1,0 +1,206 @@
+{
+  "kind": "example",
+  "release": {
+    "version": "0.2.0-example",
+    "commit": "0000000-example",
+    "image": "video2md:example",
+    "schema": "v2md_schema_version:example"
+  },
+  "environment": "production-redacted",
+  "cases": [
+    {
+      "id": "pq-001",
+      "status": "pass",
+      "run_id": "redacted-run-001",
+      "evidence_ref": "redacted://evidence/pq-001"
+    },
+    {
+      "id": "pq-002",
+      "status": "pass",
+      "run_id": "redacted-run-002",
+      "evidence_ref": "redacted://evidence/pq-002"
+    },
+    {
+      "id": "pq-003",
+      "status": "pass",
+      "run_id": "redacted-run-003",
+      "evidence_ref": "redacted://evidence/pq-003"
+    },
+    {
+      "id": "pq-004",
+      "status": "pass",
+      "run_id": "redacted-run-004",
+      "evidence_ref": "redacted://evidence/pq-004"
+    },
+    {
+      "id": "pq-005",
+      "status": "pass",
+      "run_id": "redacted-run-005",
+      "evidence_ref": "redacted://evidence/pq-005"
+    },
+    {
+      "id": "pq-006",
+      "status": "pass",
+      "run_id": "redacted-run-006",
+      "evidence_ref": "redacted://evidence/pq-006"
+    },
+    {
+      "id": "pq-007",
+      "status": "pass",
+      "run_id": "redacted-run-007",
+      "evidence_ref": "redacted://evidence/pq-007"
+    },
+    {
+      "id": "pq-008",
+      "status": "pass",
+      "run_id": "redacted-run-008",
+      "evidence_ref": "redacted://evidence/pq-008"
+    },
+    {
+      "id": "pq-009",
+      "status": "pass",
+      "run_id": "redacted-run-009",
+      "evidence_ref": "redacted://evidence/pq-009"
+    },
+    {
+      "id": "pq-010",
+      "status": "pass",
+      "run_id": "redacted-run-010",
+      "evidence_ref": "redacted://evidence/pq-010"
+    },
+    {
+      "id": "pq-011",
+      "status": "pass",
+      "run_id": "redacted-run-011",
+      "evidence_ref": "redacted://evidence/pq-011"
+    },
+    {
+      "id": "pq-012",
+      "status": "pass",
+      "run_id": "redacted-run-012",
+      "evidence_ref": "redacted://evidence/pq-012"
+    },
+    {
+      "id": "pq-013",
+      "status": "pass",
+      "run_id": "redacted-run-013",
+      "evidence_ref": "redacted://evidence/pq-013"
+    },
+    {
+      "id": "pq-014",
+      "status": "pass",
+      "run_id": "redacted-run-014",
+      "evidence_ref": "redacted://evidence/pq-014"
+    },
+    {
+      "id": "pq-015",
+      "status": "pass",
+      "run_id": "redacted-run-015",
+      "evidence_ref": "redacted://evidence/pq-015"
+    },
+    {
+      "id": "pq-016",
+      "status": "pass",
+      "run_id": "redacted-run-016",
+      "evidence_ref": "redacted://evidence/pq-016"
+    },
+    {
+      "id": "pq-017",
+      "status": "pass",
+      "run_id": "redacted-run-017",
+      "evidence_ref": "redacted://evidence/pq-017"
+    },
+    {
+      "id": "pq-018",
+      "status": "pass",
+      "run_id": "redacted-run-018",
+      "evidence_ref": "redacted://evidence/pq-018"
+    },
+    {
+      "id": "pq-019",
+      "status": "pass",
+      "run_id": "redacted-run-019",
+      "evidence_ref": "redacted://evidence/pq-019"
+    },
+    {
+      "id": "pq-020",
+      "status": "pass",
+      "run_id": "redacted-run-020",
+      "evidence_ref": "redacted://evidence/pq-020"
+    },
+    {
+      "id": "pq-021",
+      "status": "pass",
+      "run_id": "redacted-run-021",
+      "evidence_ref": "redacted://evidence/pq-021"
+    },
+    {
+      "id": "pq-022",
+      "status": "pass",
+      "run_id": "redacted-run-022",
+      "evidence_ref": "redacted://evidence/pq-022"
+    },
+    {
+      "id": "pq-023",
+      "status": "pass",
+      "run_id": "redacted-run-023",
+      "evidence_ref": "redacted://evidence/pq-023"
+    },
+    {
+      "id": "pq-024",
+      "status": "pass",
+      "run_id": "redacted-run-024",
+      "evidence_ref": "redacted://evidence/pq-024"
+    },
+    {
+      "id": "pq-025",
+      "status": "pass",
+      "run_id": "redacted-run-025",
+      "evidence_ref": "redacted://evidence/pq-025"
+    },
+    {
+      "id": "pq-026",
+      "status": "pass",
+      "run_id": "redacted-run-026",
+      "evidence_ref": "redacted://evidence/pq-026"
+    },
+    {
+      "id": "pq-027",
+      "status": "pass",
+      "run_id": "redacted-run-027",
+      "evidence_ref": "redacted://evidence/pq-027"
+    },
+    {
+      "id": "pq-028",
+      "status": "pass",
+      "run_id": "redacted-run-028",
+      "evidence_ref": "redacted://evidence/pq-028"
+    },
+    {
+      "id": "pq-029",
+      "status": "pass",
+      "run_id": "redacted-run-029",
+      "evidence_ref": "redacted://evidence/pq-029"
+    },
+    {
+      "id": "pq-030",
+      "status": "pass",
+      "run_id": "redacted-run-030",
+      "evidence_ref": "redacted://evidence/pq-030"
+    }
+  ],
+  "aggregate": {
+    "run_success_rate": 1.0,
+    "submission_acceptance_rate": 1.0,
+    "sse_first_event_p95_seconds": 1.2,
+    "bundle_delivery_rate": 1.0,
+    "faithfulness_mean": 0.95,
+    "coverage_mean": 0.9,
+    "security_high_risk_failures": 0,
+    "forbidden_claim_hits": 0,
+    "credential_leaks": 0,
+    "blocked_cases": 0
+  },
+  "decision": "pass",
+  "notice": "Redacted template only; replace all release, run and evidence references with one real production acceptance and run with --allow-example only for offline contract checks."
+}

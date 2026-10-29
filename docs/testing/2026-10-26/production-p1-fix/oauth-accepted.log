@@ -1,0 +1,3 @@
+[req] GET /auth/google/login → 400 user=(anon:redacted) error_type=terms_not_accepted
+[req] GET /auth/google/login → 400 user=(anon:redacted) error_type=terms_not_accepted
+[req] GET /auth/google/login → 302 user=(anon:redacted)

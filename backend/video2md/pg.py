@@ -12,6 +12,8 @@ autocommit + prepare_threshold=0（psycopg 单连接非线程安全，图跑在 
 """
 from __future__ import annotations
 
+import contextlib
+import contextvars
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -20,6 +22,41 @@ if TYPE_CHECKING:
 from .config import ENV
 
 _POOL: ConnectionPool | None = None
+_TENANT: contextvars.ContextVar[str | None] = contextvars.ContextVar(
+    "v2md_pg_tenant", default=None)
+
+
+def current_tenant() -> str | None:
+    """Return the tenant bound to the current graph/request context."""
+    return _TENANT.get()
+
+
+@contextlib.contextmanager
+def tenant_scope(owner: str | None):
+    """Bind a tenant for state reads/writes in the current execution context."""
+    token = _TENANT.set(owner if owner is not None else None)
+    try:
+        yield
+    finally:
+        _TENANT.reset(token)
+
+
+@contextlib.contextmanager
+def tenant_connection(pool: ConnectionPool):
+    """Checkout a connection with the current tenant bound in a DB GUC.
+
+    RLS policies cannot observe Python ContextVars.  Bind the value for the
+    whole checkout and always reset it before returning the pooled connection,
+    preventing one request's tenant from leaking into the next checkout.
+    """
+    with pool.connection() as conn:
+        tenant = current_tenant()
+        conn.execute("SELECT set_config('v2md.tenant_id', %s, false)",
+                     (tenant if tenant is not None else '*',))
+        try:
+            yield conn
+        finally:
+            conn.execute("RESET v2md.tenant_id")
 
 
 def pg_dsn() -> str:

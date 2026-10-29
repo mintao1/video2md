@@ -49,6 +49,8 @@ from .util import (
     load_state,
     redact,
     save_state,
+    state_key,
+    state_record,
     state_file_lock,
 )
 
@@ -285,9 +287,10 @@ def node_note_entry(state: RunState) -> dict:
     # 「load→改→save」整段持锁：并发 run 各落各的 fp 时不丢更新
     with state_file_lock():
         state_db = load_state()
-        # owner：deliver 模式的幂等跳过判「谁的产物、还在不在架」（见 runs.create_run）；
-        # vault 模式此字段闲置（旧全局去重语义不变）
-        state_db[art["fp"]] = {"note": art.get("note", ""), "transcript": art.get("transcript_path", ""),
+        # owner is part of the state key as well as the record. This keeps
+        # authenticated tenants from overwriting each other's idempotency row
+        # even when a legacy/development vault backend is selected.
+        state_db[state_key(art["fp"], run.get("owner", ""))] = {"note": art.get("note", ""), "transcript": art.get("transcript_path", ""),
                                "title": art.get("title", ""), "url": entry.get("url", ""),
                                "date": date.today().isoformat(), "run_id": run["run_id"],
                                "owner": run.get("owner", ""),
@@ -317,7 +320,7 @@ def node_eval_entry(state: RunState) -> dict:
         art = (run.get("artifacts") or {}).get(entry.get("url"), {})
         if not (art.get("note") and art.get("transcript_path")):
             return {"run": run}  # 幂等跳过/门禁拒答：本 pass 没写盘
-        rec = load_state().get(art.get("fp") or "", {})
+        rec = state_record(load_state(), art.get("fp") or "", run.get("owner", ""))
         if rec.get("run_id") != run["run_id"]:
             return {"run": run}  # note 是旧 run 写的（幂等复用），不重复评
         note_p, tr_p = Path(art["note"]), Path(art["transcript_path"])
@@ -510,7 +513,11 @@ def make_checkpointer_from_env(env: dict | None = None) -> tuple:
     pool = shared_pool()  # 与 P3 三存储/事件扇出共用进程级池（消双池）
     # dict 行工厂：langgraph PostgresSaver 官方口径（psycopg 默认 tuple 行不匹配其反序列化）
     saver = PostgresSaver(pool)  # type: ignore[arg-type]
-    saver.setup()  # 幂等建表（池共享，不在此关——生命周期归 pg 模块/api lifespan）
+    # Production API uses the DML-only app role. The migrate command creates
+    # checkpoint tables with the owner role before the API starts; setup stays
+    # opt-in for local/dev single-role deployments.
+    if (env.get("V2MD_CHECKPOINTER_SETUP", "on") or "on").strip().lower() != "off":
+        saver.setup()
     return saver, lambda: None
 
 
@@ -548,8 +555,9 @@ def run_graph(url: str, *, part_items: str = "", force: bool = False, review: bo
     deadman.ping("start", run_id=run_id, trace_name=url)
     try:
         from .colab import session_scope
+        from .pg import tenant_scope
         from .llm_settings import user_scope
-        with user_scope(owner), session_scope(owner=owner):
+        with tenant_scope(owner), user_scope(owner), session_scope(owner=owner):
             final = graph.invoke(initial, config=config)
     except Exception:
         deadman.ping("fail", run_id=run_id, trace_name=url)

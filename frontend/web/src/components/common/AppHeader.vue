@@ -10,9 +10,6 @@ const emit = defineEmits<{ (e: 'notifications'): void }>()
 
 const auth = useAuthStore()
 const canSignOut = Boolean(getToken())
-// Free users get no badge; paid plans show what /me actually reports.
-const planBadge = computed(() => ({ free: '', pro: 'Pro 会员', svip: 'SVIP 会员' })[auth.user?.plan ?? 'free'])
-
 onMounted(() => {
   auth.fetchUser().catch(() => {
     /* a 401 is already handled by the API client */
@@ -49,13 +46,6 @@ const avatarStyle = computed(() => {
         >
           <span class="material-symbols-outlined text-[22px]">notifications</span>
         </button>
-        <div
-          v-if="planBadge"
-          class="flex items-center gap-0.5 px-2 py-0.5 rounded-full bg-primary/10 text-primary font-label-sm text-[11px] leading-tight font-semibold shadow-sm mr-1"
-        >
-          <span class="material-symbols-outlined text-[13px] filled">workspace_premium</span>
-          <span>{{ planBadge }}</span>
-        </div>
         <RouterLink
           to="/profile"
           class="flex items-center justify-center w-9 h-9 rounded-full ring-2 ring-primary-fixed text-on-primary font-bold text-[14px] shadow-sm"

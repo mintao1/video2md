@@ -89,6 +89,39 @@ def load_state() -> dict:
     return {}
 
 
+def state_key(fp: str, owner: str = "") -> str:
+    """Return the tenant-scoped idempotency key for one completed artifact.
+
+    Legacy CLI/development records intentionally retain their historical bare
+    fingerprint key when ``owner`` is empty. Authenticated runs use a
+    namespaced key so two tenants completing the same source cannot overwrite
+    one another in either the JSON or PostgreSQL state store.
+    """
+    fp = str(fp or "")
+    owner = str(owner or "")
+    return f"{owner}::{fp}" if owner else fp
+
+
+def state_record(state: dict, fp: str, owner: str = "") -> dict:
+    """Read a tenant-scoped state row with a safe legacy fallback.
+
+    Old rows were keyed only by ``fp``. They may be reused only when their
+    embedded owner matches the requesting tenant; a missing owner is never
+    treated as a match for an authenticated tenant.
+    """
+    key = state_key(fp, owner)
+    row = state.get(key)
+    if isinstance(row, dict):
+        return row
+    if owner:
+        legacy = state.get(str(fp or ""))
+        if isinstance(legacy, dict) and str(legacy.get("owner") or "") == owner:
+            return legacy
+        return {}
+    legacy = state.get(str(fp or ""))
+    return legacy if isinstance(legacy, dict) else {}
+
+
 
 _STATE_LOCK = threading.RLock()  # json 档：state.json 读改写串行化（RLock：锁内可再调 save_state）
 

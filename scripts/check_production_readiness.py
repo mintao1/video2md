@@ -32,7 +32,50 @@ def evaluate(evidence: dict[str, Any], *, require_browser: bool) -> list[str]:
 
     expect("prod-db-health", nested(evidence, "postgres.status") == "healthy", "PostgreSQL must be healthy")
     schema_version = nested(evidence, "schema.version")
-    expect("prod-schema-version", isinstance(schema_version, int) and schema_version >= 4, "schema version must be >= 4")
+    expect("prod-schema-version", isinstance(schema_version, int) and schema_version >= 6, "schema version must be >= 6 (tenant RLS + encrypted LLM keys)")
+
+    roles = nested(evidence, "database_roles")
+    expect(
+        "prod-db-roles",
+        isinstance(roles, dict)
+        and roles.get("api_role") == "video2md_app"
+        and roles.get("migrate_role") == "video2md_migrate"
+        and roles.get("api_login") is True
+        and roles.get("migrate_login") is True
+        and roles.get("api_superuser") is False
+        and roles.get("migrate_superuser") is False
+        and roles.get("api_bypass_rls") is False
+        and roles.get("migrate_bypass_rls") is False
+        and roles.get("rls_enabled") is True
+        and roles.get("app_dsn_tls") is True
+        and roles.get("migrate_dsn_tls") is True,
+        "API/migrate roles, RLS flags and TLS-verified DSNs must be attested",
+    )
+
+    backup = nested(evidence, "backup")
+    expect(
+        "prod-backup-protection",
+        isinstance(backup, dict)
+        and backup.get("encrypted") is True
+        and backup.get("permissions_hardened") is True
+        and backup.get("remote_configured") is True
+        and backup.get("remote_tls") is True
+        and backup.get("retention_configured") is True,
+        "backups must be encrypted, permission-hardened, remote, TLS-protected and retained by policy",
+    )
+
+    observability = nested(evidence, "observability")
+    expect(
+        "prod-observability-protection",
+        isinstance(observability, dict)
+        and observability.get("provider") == "langfuse"
+        and observability.get("project") == "production"
+        and observability.get("tls") is True
+        and observability.get("prompt_redaction") is True
+        and observability.get("acl_verified") is True
+        and observability.get("retention_configured") is True,
+        "Langfuse production project must use TLS, redaction, ACL and retention controls",
+    )
     expect("prod-api-health", nested(evidence, "api.status") == "healthy", "API must be healthy")
     expect("prod-release-version", nested(evidence, "api.version") == "0.2.0", "/healthz version must equal 0.2.0")
 
@@ -141,6 +184,21 @@ def evaluate(evidence: dict[str, Any], *, require_browser: bool) -> list[str]:
     return failures
 
 
+def _google_httpx_proxy_transport(providers: str) -> bool:
+    """Accept equivalent local-variable formatting without weakening the proxy check."""
+    class_start = providers.find("class _GoogleHttpxRequest")
+    if class_start < 0:
+        return False
+    next_class = providers.find("\nclass ", class_start + 1)
+    request_class = providers[class_start:next_class if next_class >= 0 else None]
+    return re.search(
+        r"httpx\.Client\(\s*proxy\s*=\s*(?:self\.proxy_url|proxy_url)\s+or\s+None\s*\)",
+        request_class,
+    ) is not None and (
+        "proxy_url = self.proxy_url" in request_class or "proxy=self.proxy_url" in request_class
+    )
+
+
 def evaluate_repository(repo_root: Path) -> list[str]:
     """Check deployable repository contracts without network or secret access."""
     failures: list[str] = []
@@ -150,6 +208,19 @@ def evaluate_repository(repo_root: Path) -> list[str]:
             failures.append(f"{label}: {detail}")
 
     deployment = (repo_root / "deploy/k8s/base/deployment-api.yaml").read_text(encoding="utf-8")
+    compose = (repo_root / "deploy/docker-compose.prod.yml").read_text(encoding="utf-8")
+    api_start = compose.find("\n  api:")
+    api_end = compose.find("\nvolumes:", api_start)
+    api_compose = compose[api_start:api_end if api_end >= 0 else None]
+    role_bootstrap = (repo_root / "deploy/postgres/000-provision-roles.sh").read_text(encoding="utf-8")
+    role_init = (repo_root / "deploy/postgres/001-roles.sql").read_text(encoding="utf-8")
+    deploy_script = (repo_root / "scripts/deploy.sh").read_text(encoding="utf-8")
+    migration = (repo_root / "backend/video2md/migrations/0005_tenant_rls.sql").read_text(encoding="utf-8")
+    key_migration = (repo_root / "backend/video2md/migrations/0006_llm_key_ciphertext.sql").read_text(encoding="utf-8")
+    key_store = (repo_root / "backend/video2md/llm_settings.py").read_text(encoding="utf-8")
+    config_source = (repo_root / "backend/video2md/config.py").read_text(encoding="utf-8")
+    backup = (repo_root / "scripts/backup.sh").read_text(encoding="utf-8")
+    observability = (repo_root / "backend/video2md/observability.py").read_text(encoding="utf-8")
     nginx = (repo_root / "deploy/nginx.conf").read_text(encoding="utf-8")
     relay = (repo_root / "deploy/oauth-relay/oauth-relay.service").read_text(encoding="utf-8")
     tunnel = (repo_root / "deploy/oauth-relay/oauth-tunnel.service").read_text(encoding="utf-8")
@@ -161,7 +232,10 @@ def evaluate_repository(repo_root: Path) -> list[str]:
     require("repo-host-network", "hostNetwork: true" in deployment, "OAuth loopback tunnel requires hostNetwork")
     require(
         "repo-oauth-proxy-env",
-        deployment.count("value: http://127.0.0.1:18080") == 2,
+        deployment.count(
+            "- name: V2MD_GOOGLE_OAUTH_PROXY_URL\n"
+            "              value: http://127.0.0.1:18080"
+        ) == 2,
         "migrate and API containers must both use the local OAuth tunnel",
     )
     require(
@@ -194,7 +268,7 @@ def evaluate_repository(repo_root: Path) -> list[str]:
     )
     require(
         "repo-google-httpx-transport",
-        "class _GoogleHttpxRequest" in providers and "httpx.Client(proxy=self.proxy_url or None)" in providers,
+        _google_httpx_proxy_transport(providers),
         "Google certificate retrieval must use the proven HTTPX proxy path",
     )
     require(
@@ -207,13 +281,95 @@ def evaluate_repository(repo_root: Path) -> list[str]:
     require("repo-brand-home", "path: '/'" in router and "BrandView.vue" in router
             and "path: '/login'" not in router,
             "the brand home must own sign-in; legacy login route must remain removed")
+    require(
+        "repo-artifact-mode",
+        deployment.count("- name: V2MD_ARTIFACT_MODE") == 2
+        and "value: deliver" in deployment
+        and "V2MD_ARTIFACT_MODE: deliver" in compose,
+        "migrate/API manifests must pin deliver mode",
+    )
+    require(
+        "repo-database-roles",
+        all(text in migration for text in (
+            "ENABLE ROW LEVEL SECURITY", "REVOKE ALL ON ALL TABLES IN SCHEMA public FROM PUBLIC",
+            "REVOKE INSERT, UPDATE, DELETE ON v2md_schema_version FROM video2md_app",
+        ))
+        and all(text in (role_init + role_bootstrap) for text in ("video2md_app", "video2md_migrate"))
+        and "V2MD_PG_DSN:" not in compose,
+        "RLS/role migration must exist and compose must not inject a superuser DSN fallback",
+    )
+    require(
+        "repo-api-secret-scope",
+        api_start >= 0 and "env_file:" not in api_compose
+        and "V2MD_SECRETS_FILE: /run/video2md.env" in api_compose,
+        "API must read the mounted secret file without inheriting bootstrap/database passwords as environment variables",
+    )
+    require(
+        "repo-role-bootstrap",
+        all(text in role_bootstrap for text in (
+            "video2md_app", "video2md_migrate", "video2md_owner", "NOSUPERUSER", "NOBYPASSRLS",
+            "VIDEO2MD_APP_PASSWORD", "VIDEO2MD_MIGRATE_PASSWORD",
+            "REVOKE CREATE ON SCHEMA public FROM PUBLIC",
+            "GRANT USAGE, CREATE ON SCHEMA public TO video2md_migrate",
+        ))
+        and "/docker-entrypoint-initdb.d/000-provision-roles.sh" in deploy_script
+        and deploy_script.count("python3 scripts/check_production_readiness.py --self-test") >= 2,
+        "role bootstrap must be repeatable, secret-backed and invoked before migrate",
+    )
+    require(
+        "repo-credential-encryption",
+        "AESGCM" in key_store
+        and "V2MD_LLM_SETTINGS_KEY" in config_source
+        and "v1:aesgcm:" in key_store
+        and "v2md_llm_settings_ciphertext_ck" in key_migration,
+        "LLM credentials must use AES-GCM envelope encryption with a migration constraint",
+    )
+    require(
+        "repo-observability-redaction",
+        "OTEL_INCLUDE_CONTENT" in config_source
+        and "config.OTEL_INCLUDE_CONTENT" in (repo_root / "backend/video2md/llm.py").read_text(encoding="utf-8")
+        and "otel_attrs" in observability
+        and "trace_content" in observability
+        and deployment.count(
+            "- name: V2MD_OTEL_INCLUDE_CONTENT\n"
+            "              value: \"off\""
+        ) == 2
+        and "V2MD_OTEL_INCLUDE_CONTENT: off" in compose,
+        "production observability must gate prompt/completion content while retaining metrics",
+    )
+    require(
+        "repo-backup-protection",
+        "V2MD_BACKUP_AGE_RECIPIENT" in backup
+        and "age -r" in backup
+        and "V2MD_BACKUP_RETENTION_DAYS" in backup
+        and "-mtime +\"$BACKUP_RETENTION_DAYS\"" in backup
+        and "rclone sync" in backup,
+        "backups must be encrypted, retained and synchronized as ciphertext",
+    )
     return failures
 
 
 def self_test() -> None:
     good = {
         "postgres": {"status": "healthy"},
-        "schema": {"version": 4},
+        "schema": {"version": 6},
+        "database_roles": {
+            "api_role": "video2md_app", "migrate_role": "video2md_migrate",
+            "api_login": True, "migrate_login": True, "api_superuser": False,
+            "migrate_superuser": False,
+            "api_bypass_rls": False, "migrate_bypass_rls": False, "rls_enabled": True,
+            "app_dsn_tls": True, "migrate_dsn_tls": True,
+        },
+        "backup": {
+            "encrypted": True, "permissions_hardened": True,
+            "remote_configured": True, "remote_tls": True,
+            "retention_configured": True,
+        },
+        "observability": {
+            "provider": "langfuse", "project": "production", "tls": True,
+            "prompt_redaction": True, "acl_verified": True,
+            "retention_configured": True,
+        },
         "api": {"status": "healthy", "version": "0.2.0"},
         "release": {
             "branch": "main",

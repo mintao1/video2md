@@ -1,0 +1,51 @@
+name: Production quality evidence gate
+
+on:
+  workflow_dispatch:
+    inputs:
+      evidence_file:
+        description: Repository path to sanitized evidence for the tested release
+        required: true
+        type: string
+      expected_release:
+        description: Release/version label recorded in the evidence
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+          enable-cache: true
+      - run: uv sync --frozen
+        working-directory: backend
+      - name: Validate quality eval set and offline regressions
+        run: uv run pytest tests/test_production_quality_eval_set.py -q
+        working-directory: backend
+
+  evidence:
+    needs: contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate sanitized production evidence
+        env:
+          EVIDENCE_FILE: ${{ inputs.evidence_file }}
+          EXPECTED_RELEASE: ${{ inputs.expected_release }}
+        run: |
+          test -f "$EVIDENCE_FILE"
+          python3 scripts/check_production_quality_eval.py "$EVIDENCE_FILE"
+          python3 - "$EVIDENCE_FILE" "$EXPECTED_RELEASE" <<'PY'
+          import json, sys
+          evidence = json.load(open(sys.argv[1], encoding="utf-8"))
+          if evidence.get("release", {}).get("version") != sys.argv[2]:
+              raise SystemExit("release version in evidence does not match workflow input")
+          PY

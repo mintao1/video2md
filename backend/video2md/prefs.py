@@ -77,7 +77,8 @@ class PostgresPrefsStore:
         self.pool = pool  # 建表已上收 migrations/0003，构造只接线
 
     def list_uid(self, uid: str) -> dict[str, dict]:
-        with self.pool.connection() as conn:
+        from .pg import tenant_connection
+        with tenant_connection(self.pool) as conn:
             rows = conn.execute("""
                 SELECT run_id, fav, progress FROM v2md_prefs WHERE uid=%s
                 """, (uid,)).fetchall()
@@ -85,7 +86,8 @@ class PostgresPrefsStore:
 
     def upsert(self, uid: str, run_id: str, *, fav: bool | None = None,
                progress: int | None = None) -> dict:
-        with self.pool.connection() as conn:
+        from .pg import tenant_connection
+        with tenant_connection(self.pool) as conn:
             row = conn.execute("""
                 INSERT INTO v2md_prefs (uid, run_id, fav, progress)
                 VALUES (%s, %s, COALESCE(%s, false), COALESCE(%s, 0))

@@ -169,6 +169,16 @@ util.save_state({"j": {"url": "jj"}})
 assert json.loads(util.STATE_FILE.read_text())["j"]["url"] == "jj"
 print("✅ PostgresStateStore（upsert/分派/json 回归）")
 
+with pg.tenant_scope("u_a"):
+    st_state.save({"same-fp": {"url": "a", "owner": "u_a"}})
+    assert st_state.load()["same-fp"]["url"] == "a"
+with pg.tenant_scope("u_b"):
+    st_state.save({"same-fp": {"url": "b", "owner": "u_b"}})
+    assert st_state.load()["same-fp"]["url"] == "b"
+with pg.tenant_scope("u_a"):
+    assert st_state.load()["same-fp"]["url"] == "a"
+print("✅ PostgresStateStore（owner+fp tenant isolation）")
+
 # ---- 3. PostgresIdentityStore -------------------------------------------------------
 ids = PostgresIdentityStore(pool)  # 表由 §0 迁移建好（P0-5）
 _truncate("v2md_users", "v2md_identities")

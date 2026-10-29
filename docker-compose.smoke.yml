@@ -1,4 +1,4 @@
-# compose 冒烟栈（独立 project，不与生产栈冲突）：video2md + mockpool（假算力池）。
+# compose 冒烟栈（独立 project，不与生产栈冲突）：api + mockpool（假算力池）。
 # 用法：scripts/smoke_compose.sh（先 docker compose build 生产栈镜像，再跑本栈）。
 # 全程零 GPU 零 token：转写/OCR/剪辑走 mockpool 契约假实现，LLM 走 V2MD_FAKE_LLM。
 name: video2md-smoke
@@ -18,7 +18,7 @@ services:
     working_dir: /mock
     networks: [internal]
 
-  video2md:
+  api:
     image: video2md
     depends_on:
       mockpool:

@@ -164,6 +164,20 @@ assert m["v2md_llm_tokens"][(("kind", "output"), ("task", "organize"))] == 2000
 assert m["v2md_llm_seconds"][(("task", "organize"),)] == 30.0
 assert m["v2md_queue_queued"][()] == 2 and m["v2md_run_active"][()] == 1
 
+# Production content gate also removes URL/query data from the root span;
+# usage/metrics remain available through the normal instruments.
+from video2md import config
+observability._reset_for_tests()
+redacted_spans = InMemorySpanExporter()
+observability.init(span_exporter=redacted_spans, metric_reader=InMemoryMetricReader())
+with mock.patch.object(config, "OTEL_INCLUDE_CONTENT", False):
+    signed = RunLog("t", run_id="redacted", trace_name="https://signed.example/video?token=secret")
+    signed.info("graph:end", status="done")
+    observability.close_run("redacted")
+redacted_root = next(s for s in redacted_spans.get_finished_spans()
+                     if s.name == "video2md-serve-run")
+assert "langfuse.observation.input" not in redacted_root.attributes
+
 # 未 init 时指标全 no-op（纯本地模式不炸）
 observability._reset_for_tests()
 observability.metric_run("done")

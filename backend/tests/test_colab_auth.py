@@ -194,13 +194,28 @@ def test_colab_oauth_uses_the_configured_google_proxy(monkeypatch, tmp_path):
     assert flow.oauth2session.proxies == {"http": proxy, "https": proxy}
 
 
+def test_colab_token_exchange_forwards_the_configured_google_proxy(web, monkeypatch):
+    client, _, calls, _ = web
+    proxy = "http://127.0.0.1:18080"
+    monkeypatch.setitem(auth.ENV, "V2MD_GOOGLE_OAUTH_PROXY_URL", proxy)
+    started = client.post("/settings/colab/start").json()
+    assert client.post("/settings/colab/complete", json={"flow_id": started["flow_id"], "code": "code-secret"}).status_code == 200
+    assert calls[3] == {
+        "code": "code-secret",
+        "timeout": 30,
+        "proxies": {"http": proxy, "https": proxy},
+    }
+
+
 def test_colab_account_verification_uses_the_configured_google_proxy(monkeypatch):
     import google.auth.transport.requests
 
     proxy = "http://127.0.0.1:18080"
     monkeypatch.setitem(auth.ENV, "V2MD_GOOGLE_OAUTH_PROXY_URL", proxy)
-    session = SimpleNamespace(proxies={}, get=lambda url, **kwargs: SimpleNamespace(
-        raise_for_status=lambda: None, json=lambda: {"id": "google-subject"}))
+    requests = []
+    session = SimpleNamespace(proxies={}, get=lambda url, **kwargs: (
+        requests.append((url, kwargs)) or SimpleNamespace(
+            raise_for_status=lambda: None, json=lambda: {"id": "google-subject"})))
 
     class FakeSession:
         def __init__(self, credentials):
@@ -215,6 +230,7 @@ def test_colab_account_verification_uses_the_configured_google_proxy(monkeypatch
     monkeypatch.setattr(google.auth.transport.requests, "AuthorizedSession", FakeSession)
     assert auth._credential_subject(object()) == "google-subject"
     assert session.proxies == {"http": proxy, "https": proxy}
+    assert requests[0][1]["proxies"] == {"http": proxy, "https": proxy}
 
 
 def test_auth_disabled_allows_only_local_development(web, monkeypatch):

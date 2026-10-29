@@ -1,5 +1,28 @@
 # 全栈评测集
 
+## 502 部署韧性专项集
+
+`production-deploy-resilience-eval-set.jsonl` 固化本次单节点 k3s 线上 502 的因果链和发布护栏：
+渲染清单中的全部镜像（含 `initContainers`）导入 k3s containerd、节点磁盘压力门禁、
+`127.0.0.1:8790/healthz` 发布后冒烟、镜像缺失阻断，以及公开路由的 200/403 边界。
+对应的离线回归入口是：
+
+```bash
+python3 -m pytest backend/tests/test_production_deploy_resilience_eval_set.py -q
+```
+
+该集合只检查脱敏的部署契约和反例，不连接生产，也不能替代发布后的真实节点、上游端口和公网路由证据。
+
+## 生产质量全链路集
+
+`production-quality-eval-set.jsonl` 是统一发布流程的 30 条真实回放评测集契约，覆盖解析、转写、抽帧/OCR、LLM 整理、产物、可靠性、安全和成本。仓库中的 `production-quality-evidence.example.json` 只是脱敏结构模板，不能作为生产通过证据；真实验收必须替换 release、run 和证据引用后运行：
+
+```bash
+python3 scripts/check_production_quality_eval.py <sanitized-production-evidence.json>
+```
+
+离线契约测试为 `backend/tests/test_production_quality_eval_set.py`。它只检查评测定义、反例、阈值和敏感信息边界，不连接生产、不调用模型，也不产生费用。
+
 `bilibili-production-review-eval-set.jsonl` 为 B站联调的 **44 条用户批注逐项编号**
 `bbr-001` 至 `044`：每项都有输入场景、测量断言、证据文件、应用回归入口和至少
 3 个可执行失败反例，共 132 个基础反例。字段按
@@ -108,6 +131,33 @@ python3 scripts/check_production_pipeline_stages.py docs/testing/2026-10-21/bill
 
 `fullstack-regression.json` 是 video2md 的确定性回归集，覆盖认证、用户隔离、队列状态、阅读器媒体、教材库、个人中心、登出和同源 SPA 路由等跨前后端契约。
 
+`production-followup-eval-set-2026-10-26.jsonl` 固化本轮生产复测的 6 个开放结果：
+预检/额度阻塞、阅读器媒体未就绪、Markdown Callout 原文暴露、Markdown 导出未确认、
+受限 runner 的本地端口 `EPERM`，以及模型渠道 403 导致的零 usage/cost。正例表示“当前
+阻塞或未确认事实被正确保留”，不表示产品通过；每项至少 3 个反例，禁止用合成结果关闭
+生产问题。对应回归门禁为：
+
+```bash
+python3 scripts/check_production_followup_eval.py
+python3 -m pytest backend/tests/test_production_followup_eval_set.py -q
+```
+
+两条命令只检查评测定义、失败闭环和敏感信息边界，不访问生产、不提交任务、不产生费用。
+只有补齐 `metadata.production_evidence_required` 中的真实证据后，才能重新进行生产验收。
+
+`production-login-boundary-eval-set-2026-10-26.jsonl` 补充登录到首次提交之间的 5 个边界：
+服务端主体绑定、退出后的缓存清理、重新登录时的租户隔离、站内安全回跳，以及登录后显式输入
+并单次创建任务。正例是脱敏的离线控制，不能关闭生产问题；每项至少 3 个反例，禁止保存邮箱、
+授权码、Cookie、token 或模型密钥。对应回归入口为：
+
+```bash
+python3 scripts/check_production_login_boundaries.py
+python3 -m pytest backend/tests/test_production_login_boundary_eval_set.py -q
+```
+
+这组检查只验证评测定义和失败闭环，不访问生产、不提交任务、不产生费用。真实验收仍需保存同一
+浏览器会话的回调、受保护 API、归属、提交和账本时间序列等脱敏证据。
+
 `textbook-quality-set.jsonl` 是模型“转录 → 教材”质量集。每行一个样本，包含原始转录、金标准要点/顺序/安全不变量、禁止臆造项和权重。新增样本时保持字段稳定；`id` 不复用，原始转录不要包含用户凭据。
 
 `backend-hygiene-regression.json` 是后端卫生回归集，专门覆盖本次发现的
@@ -124,6 +174,13 @@ backend/.venv/bin/python -m pytest backend/tests/test_vendor_acctkit.py -q
 Colab 连接评测集，按本轮用户批注拆为 **12 项、29 个失败反例**。输入、通过标准与
 来源/回归入口分别放在 `input`、`expectedOutput`、`metadata`；每个反例都有拒绝理由和
 实际测试入口。仅使用离线身份与无效凭证，未上传或改写云端数据集。
+
+[`new-user-login-journey-eval-set.jsonl`](./new-user-login-journey-eval-set.jsonl) 记录
+2026-10-23 新用户现场旅程的 4 个门禁：Colab 必须进入真实 Google 授权页、Kaggle
+登录前说明页、Kaggle 第三方登录态清理，以及会员功能暂时隐藏。现场结果见
+[`new-user-login-journey-results-2026-10-23.md`](./new-user-login-journey-results-2026-10-23.md)。
+其中 Kaggle 会话清理和真实 OAuth 完成仍需人工在官方页面接管；JSONL 的
+`offline_can_close_production` 固定为 `false`。
 
 新集覆盖首次 Google 登录引导与原目标保留、已有连接复用、可跳过连接及状态故障、
 普通用户无需管理员名单、凭证/流程隔离、同 Google 账号核对、PKCE/时效/重放/权限边界、
@@ -232,7 +289,7 @@ python3 scripts/check_video_resolver_runtime.py --evidence evidence.json
 确定性防回退测试为 `backend/tests/test_video_resolver_runtime_eval_set.py`；生产证据不得包含
 OAuth token、邮箱、模型密钥或完整数据库连接串。
 
-`production-readiness-regression.json` 把 PostgreSQL/API 健康、schema 版本、发布版本、
+`production-readiness-regression.json` 把 PostgreSQL/API 健康、schema 版本、数据库最小权限角色、备份和 Langfuse 保护、发布版本、
 Git 提交/镜像溯源、Pod Ready/重启/近期错误、Google 出网、旧代理清退、公网路由、
 未登录 `/me=401`、配置权限和真实浏览器登录固化为发布防回退集。生产环境只需
 填写脱敏证据（参考 `production-readiness-evidence.example.json`），不得记录密钥值：
@@ -463,3 +520,34 @@ python3 scripts/check_production_ui_annotations.py --require-closed
 本轮回放结果见 `docs/testing/2026-10-22/production-ui-annotation-evals/`：离线回放通过；严格门禁按真实证据保留
 `pua-001/002` 的浏览器动作审计缺口，以及 `pua-005/006/007/008` 的媒体就绪/实播缺口。重复提交的用量和费用
 核对本身通过，只有实播条件未满足时整条 `pua-008` 才保持未关闭。
+
+2026-10-26 生产浏览器回归新增 [`production-browser-findings-2026-10-26.jsonl`](production-browser-findings-2026-10-26.jsonl)，
+将本轮真实浏览器发现固化为 `pb-001..008`：登录/刷新/退出、`preflight` 的 GPU 与额度门禁、任务历史
+`13 = 0 + 5 + 8`、阅读器媒体真实就绪与播放、Obsidian callout 渲染、个人 Colab 引导、最小真实转换闭环和匿名安全面。
+每条至少包含 3 个反例；当前 GPU、Colab、媒体播放和 callout 发现保持 `blocked`/`fail`，不能由离线回放改绿。
+
+```sh
+python3 scripts/check_production_browser_findings.py
+python3 scripts/check_production_browser_findings.py --require-closed
+cd backend && uv run pytest tests/test_production_browser_findings_eval_set.py -q
+```
+
+第一条命令只验证评测定义、正例控制和反例拒绝；`--require-closed` 在真实生产证据补齐前必须失败。
+评测集不保存邮箱、密码、OAuth code、state、token、Cookie 或 API Key；生产证据需另存脱敏快照。
+
+2026-10-26 4c 生产复测另有两组回放：
+
+- `production-live-regression-eval-set-2026-10-26.jsonl`：10 条登录、匿名面、4c 预检、GPU/模型、SSE、usage/cost、教材产物和历史一致性回归；检查器为 `scripts/check_production_live_regressions.py`。
+- `production-live-retest-regression-eval-set-2026-10-26.jsonl`：3 条本次新复测，覆盖协议复选框绕过、短转录质量截止和成功教材/账单闭环；脱敏证据为 `production-live-retest-evidence-2026-10-26.json`，检查器为 `scripts/check_production_live_retest.py`。
+- `production-followup-eval-set-2026-10-26.jsonl`：8 条后续回归，新增 B 站无法提供匿名完整 MP4 时的 download 阶段安全失败、下游阻断和零模型费用契约；真实脱敏证据为 `production-download-failure-evidence-2026-10-26.json`，检查器为 `scripts/check_production_followup_eval.py`。
+
+两组都要求 `metadata.offline_can_close_production=false`；离线检查只验证证据契约，不能把协议门禁回归标成通过。
+
+`production-login-protocol-fix-eval-set-2026-10-26.jsonl` 固化本次 P1 修复的 5 项生产门禁：OAuth state 创建前的后端协议校验、未勾选协议的原生按钮门禁、同意后的真实登录与会话刷新、4c image-only rollout 健康性，以及旧绕过事实到新 release 的证据链。旧的 `production-live-retest` 文件保留为历史发现，不改写为通过；修复后的脱敏证据写入 `production-login-protocol-fix-evidence-2026-10-26.json`，离线检查入口为：
+
+```bash
+python3 scripts/check_production_login_protocol_fix.py
+backend/.venv/bin/python -m pytest backend/tests/test_production_login_protocol_fix_eval_set.py -q
+```
+
+该回归集的 `offline_can_close_production` 固定为 `false`；离线 PASS 只说明证据结构和门禁逻辑完整，不能替代 4c 浏览器登录、回调和部署现场证据。

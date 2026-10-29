@@ -23,7 +23,7 @@ spec:
         app.kubernetes.io/name: video2md
         app.kubernetes.io/component: api
     spec:
-      hostNetwork: true   # 消费 obs(4318)/gpu-router(9700) 回环
+      hostNetwork: true   # 消费观测栈回环；GPU 阶段走按租户隔离的 Colab CLI
       dnsPolicy: ClusterFirstWithHostNet
       serviceAccountName: video2md
       enableServiceLinks: false
@@ -38,7 +38,7 @@ spec:
       # an older schema.
       initContainers:
         - name: fix-volume-permissions
-          image: video2md:0.2.0-hotfix-20261021j
+          image: video2md:0.2.0-hotfix-20261021l
           imagePullPolicy: IfNotPresent
           securityContext:
             runAsNonRoot: false
@@ -54,7 +54,7 @@ spec:
             - name: vault
               mountPath: /vault
         - name: migrate
-          image: video2md:0.2.0-hotfix-20261021g
+          image: video2md:0.2.0-colab-tenant-20261026d
           imagePullPolicy: IfNotPresent
           securityContext:
             allowPrivilegeEscalation: false
@@ -64,6 +64,18 @@ spec:
           env:
             - name: V2MD_ENV
               value: production
+            # The migration command imports the production config module too;
+            # keep its auth gate identical to the API container.
+            - name: V2MD_AUTH
+              value: google
+            - name: V2MD_AUTH_PROVIDERS
+              value: google
+            - name: V2MD_ARTIFACT_MODE
+              value: deliver
+            - name: V2MD_CHECKPOINTER_SETUP
+              value: "on"
+            - name: V2MD_OTEL_INCLUDE_CONTENT
+              value: "off"
             # config 启动期校验与 api 容器同口径（secret 可能设 V2MD_AUTH=google）
             - name: V2MD_PUBLIC_BASE_URL
               value: https://ferosse.tech
@@ -84,7 +96,7 @@ spec:
         - name: api
           # registry 全名（D2 预构建收官）：制品=CI tag 构建产物（GHCR 灾备副本同 ID）。
           # 服务器落地流：gh run download artifact → gunzip | ctr import（无 packages 凭证通道）。
-          image: video2md:0.2.0-failure-cost-20261021b
+          image: video2md:0.2.0-colab-tenant-20261026d
           imagePullPolicy: IfNotPresent
           securityContext:
             allowPrivilegeEscalation: false
@@ -115,6 +127,8 @@ spec:
               value: google
             - name: V2MD_AUTH_PROVIDERS
               value: google
+            - name: V2MD_ARTIFACT_MODE
+              value: deliver
             # 同源部署：API 与 Vite bundle 都在 ferosse.tech。Google 控制台登记的
             # redirect_uri 须逐字等于 https://ferosse.tech/auth/google/callback。
             - name: V2MD_PUBLIC_BASE_URL
@@ -133,6 +147,10 @@ spec:
             # is supplied by the mounted secret file and is never committed here.
             - name: V2MD_CHECKPOINTER
               value: postgres
+            - name: V2MD_CHECKPOINTER_SETUP
+              value: "off"
+            - name: V2MD_OTEL_INCLUDE_CONTENT
+              value: "off"
             - name: V2MD_RUNS_STORE
               value: postgres
             - name: V2MD_STATE_STORE
@@ -146,13 +164,18 @@ spec:
             - name: V2MD_EVENTS
               value: pg
             - name: V2MD_REMOTE
-              value: http://127.0.0.1:9700
+              value: colab-cli
             - name: V2MD_OCR_REMOTE
-              value: http://127.0.0.1:9700
+              value: colab-cli
             - name: V2MD_CLIPS_REMOTE
-              value: http://127.0.0.1:9700
+              value: colab-cli
             - name: V2MD_COLAB_USERS_DIR
               value: /app/data/colab-users
+            # The bundled google-colab-cli entry point lives in the image venv;
+            # keep the path explicit because Kubernetes may replace the image's
+            # PATH with its runtime default.
+            - name: V2MD_COLAB_BIN
+              value: /app/.venv/bin/colab
             - name: V2MD_CLIPS_SOURCE
               value: remote
             - name: OTEL_EXPORTER_OTLP_ENDPOINT
@@ -164,7 +187,17 @@ spec:
             - name: V2MD_DIRECT_HOSTS
               value: "ferosse.tech,.ferosse.tech"
             - name: NO_PROXY
-              value: "127.0.0.1,localhost,10.0.0.7,10.43.,.svc,ferosse.tech,.ferosse.tech,api2.niubi.win,opencode.ai"
+              value: "127.0.0.1,localhost,10.0.0.7,10.43.,.svc,ferosse.tech,.ferosse.tech,api2.niubi.win"
+            # OpenCode Go is reachable through the 4c CONNECT relay. Keep its
+            # host out of NO_PROXY so every rollout retains the verified model path.
+            - name: no_proxy
+              value: "127.0.0.1,localhost,10.0.0.7,10.43.,.svc,ferosse.tech,.ferosse.tech,api2.niubi.win"
+            - name: HTTP_PROXY
+              value: http://127.0.0.1:18080
+            - name: HTTPS_PROXY
+              value: http://127.0.0.1:18080
+            - name: ALL_PROXY
+              value: http://127.0.0.1:18080
             - name: V2MD_WATCHDOG_ACTION
               value: exit   # 标 error 后退出（码 70），重启自愈并恢复队列
             - name: OBSIDIAN_VAULT

@@ -23,7 +23,10 @@ DRY_RUN=0
 # 2026-09-26 obs 双栈合并（平台 Phase 1.1/M1）：观测归 ~/stack/platform-obs 统一栈，
 # 发版不再叠 docker-compose.obs.yml（叠了会与平台栈抢 4318/9090/9093/3000/9760 端口）；
 # OTEL 出口已入主 compose environment。
-COMPOSE="docker compose -f docker-compose.yml"
+# The production Compose file is kept under deploy/; invoke it from the
+# repository root so its relative build context and default ../.env resolve
+# consistently on the target host.
+COMPOSE="docker compose -f deploy/docker-compose.prod.yml"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -51,12 +54,17 @@ remote() { if [[ $DRY_RUN -eq 1 ]]; then echo "[dry-run] ssh $HOST -- $*"; else 
 REF="$TAG"
 [[ "$TAG" == "main" ]] && REF="origin/main"
 
+echo "── 发布前仓库门禁（角色/RLS/Key 加密/备份/Langfuse）"
+run python3 scripts/check_production_readiness.py --self-test
+
 echo "── 部署 $TAG → $HOST:$DIR"
-remote "cd $DIR && git fetch --tags --prune && git checkout -f $REF && $COMPOSE build"
-remote "cd $DIR && $COMPOSE up -d"
+remote "cd $DIR && git fetch --tags --prune && git checkout -f $REF && python3 scripts/check_production_readiness.py --self-test && $COMPOSE build"
+remote "cd $DIR && $COMPOSE up -d postgres"
 
 echo "── schema 迁移（幂等；json 档部署自动跳过）"
-remote "cd $DIR && $COMPOSE run --rm --no-deps video2md python -m video2md migrate"
+remote "cd $DIR && $COMPOSE exec -T postgres /docker-entrypoint-initdb.d/000-provision-roles.sh"
+remote "cd $DIR && $COMPOSE run --rm --no-deps api python -m video2md migrate"
+remote "cd $DIR && $COMPOSE up -d api"
 
 echo "── 反代面验证（P0-4：/docs 必须被网关拦下）"
 if [[ $DRY_RUN -eq 0 ]]; then
@@ -77,11 +85,21 @@ if [[ $DRY_RUN -eq 0 ]]; then
     echo "· 等待服务就绪（$i/6）…"; sleep 5
   done
   if [[ $HEALTH_OK -ne 1 ]]; then
-    echo "✗ healthz 不通：看日志 ssh $HOST 'cd $DIR && docker compose logs --tail 50 video2md'" >&2
+    echo "✗ healthz 不通：看日志 ssh $HOST 'cd $DIR && docker compose -f deploy/docker-compose.prod.yml logs --tail 50 api'" >&2
     echo "  回滚：scripts/deploy.sh <上一个可用 tag>" >&2
     exit 1
   fi
-  ssh "$HOST" 'curl -s localhost:8790/preflight' || true   # 体检项逐项看 detail，失败不挡部署
+  PREFLIGHT=$(ssh "$HOST" 'curl -fsS localhost:8790/preflight') || {
+    echo "✗ preflight 请求失败：无法确认生产依赖是否就绪" >&2
+    echo "  回滚：scripts/deploy.sh <上一个可用 tag>" >&2
+    exit 1
+  }
+  echo "$PREFLIGHT"
+  if ! printf '%s' "$PREFLIGHT" | python3 -c 'import json, sys; payload=json.load(sys.stdin); raise SystemExit(0 if payload.get("ok") is True else 1)'; then
+    echo "✗ preflight 未通过：禁止把未就绪的部署标记为成功" >&2
+    echo "  回滚：scripts/deploy.sh <上一个可用 tag>" >&2
+    exit 1
+  fi
   ssh "$HOST" "curl -s localhost:8790/healthz" && echo
 else
   echo "[dry-run] ssh $HOST 'curl -sf localhost:8790/healthz'  # 起栈后验证"

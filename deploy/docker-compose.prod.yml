@@ -1,13 +1,18 @@
+name: video2md
+
 services:
   postgres:
     image: postgres:16-alpine
     restart: unless-stopped
+    env_file:
+      - ${VIDEO2MD_ENV_FILE:-../.env}
     environment:
       POSTGRES_DB: ${POSTGRES_DB:?set POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
     volumes:
       - pg-data:/var/lib/postgresql/data
+      - ./postgres:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 10s
@@ -24,21 +29,27 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    env_file:
-      - ${VIDEO2MD_ENV_FILE:-.env}
     environment:
       V2MD_HOST: 0.0.0.0
       V2MD_ENV: production
       V2MD_AUTH: google
       V2MD_AUTH_PROVIDERS: google
+      V2MD_ARTIFACT_MODE: deliver
       V2MD_CHECKPOINTER: postgres
+      V2MD_CHECKPOINTER_SETUP: off
+      V2MD_OTEL_INCLUDE_CONTENT: off
       V2MD_RUNS_STORE: postgres
       V2MD_STATE_STORE: postgres
       V2MD_USERS_STORE: postgres
       V2MD_TASKS_STORE: postgres
       V2MD_PREFS_STORE: postgres
       V2MD_EVENTS: pg
-      V2MD_PG_DSN: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      # DSNs and provider credentials are loaded from the mounted secret/env
+      # file by config.py.  Do not inject the full env file into the process
+      # environment: it would expose POSTGRES_PASSWORD and role-bootstrap
+      # passwords as inherited variables.  The mounted file remains read-only.
+      # There is no superuser fallback: the API must use video2md_app and
+      # migrations must use video2md_migrate after role provisioning.
       V2MD_GOOGLE_OAUTH_PROXY_URL: ${V2MD_GOOGLE_OAUTH_PROXY_URL:?set a non-17898 relay URL}
       V2MD_SECRETS_FILE: /run/video2md.env
       V2MD_PUBLIC_BASE_URL: ${V2MD_PUBLIC_BASE_URL:?set public URL}
@@ -46,7 +57,7 @@ services:
     volumes:
       - app-data:/app/data
       - vault-data:/vault
-      - ${VIDEO2MD_ENV_FILE:-.env}:/run/video2md.env:ro
+      - ${VIDEO2MD_ENV_FILE:-../.env}:/run/video2md.env:ro
     ports:
       - "127.0.0.1:8790:8790"
     healthcheck:
@@ -58,5 +69,10 @@ services:
 
 volumes:
   pg-data:
+    name: video2md_pg-data
   app-data:
+    # Keep the historical volume name used by the k3s hostPath migration.
+    name: video2md_v2md-data
   vault-data:
+    # Keep the historical volume name used by the k3s hostPath migration.
+    name: video2md_vault

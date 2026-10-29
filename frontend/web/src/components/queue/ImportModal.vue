@@ -5,7 +5,7 @@ import BottomSheet from '../common/BottomSheet.vue'
 const props = defineProps<{ modelValue: boolean; error?: string; busy?: boolean }>()
 const emit = defineEmits<{
   (e: 'update:modelValue', v: boolean): void
-  (e: 'start', payload: { url: string; title?: string }): void
+  (e: 'start', payload: { url: string; title?: string; file?: File }): void
   (e: 'draft'): void
 }>()
 
@@ -15,36 +15,68 @@ const ocrEnabled = ref(true)
 const tocEnabled = ref(true)
 const template = ref<'academic' | 'notes'>('academic')
 const validationError = ref('')
+const file = ref<File | null>(null)
 
 watch(
   () => props.modelValue,
   (open) => {
     if (open) {
       validationError.value = ''
-      if (!url.value) url.value = 'https://www.bilibili.com/video/BV1WE411d7v4'
+      const saved = localStorage.getItem('v2md_import_draft')
+      if (saved) {
+        try {
+          const draft = JSON.parse(saved) as { source?: typeof source.value; url?: string; ocrEnabled?: boolean; tocEnabled?: boolean; template?: typeof template.value }
+          if (draft.source) source.value = draft.source
+          if (typeof draft.url === 'string') url.value = draft.url
+          if (typeof draft.ocrEnabled === 'boolean') ocrEnabled.value = draft.ocrEnabled
+          if (typeof draft.tocEnabled === 'boolean') tocEnabled.value = draft.tocEnabled
+          if (draft.template) template.value = draft.template
+        } catch {
+          localStorage.removeItem('v2md_import_draft')
+        }
+      }
     }
   },
 )
 
+// A browser File object cannot be persisted with the draft.  Never carry a
+// previously selected local file into a link/cloud submission after switching
+// the source tab.
+watch(source, (next) => {
+  if (next !== 'local') file.value = null
+})
+
 function start() {
   if (props.busy) return
   validationError.value = ''
-  if (source.value === 'link' && !url.value.trim()) {
-    validationError.value = '请输入视频或音频链接'
+  if (source.value !== 'local' && !url.value.trim()) {
+    validationError.value = source.value === 'cloud' ? '请输入网盘分享链接' : '请输入视频或音频链接'
+    return
+  }
+  if (source.value === 'local' && !file.value) {
+    validationError.value = '请选择要上传的视频或音频文件'
     return
   }
   emit('start', {
-    url: url.value.trim() || '本地上传视频.mp4',
+    url: url.value.trim(),
     title:
       source.value === 'local'
         ? '本地上传视频'
         : source.value === 'cloud'
           ? '网盘提取视频'
           : undefined,
+    file: source.value === 'local' ? file.value ?? undefined : undefined,
   })
 }
 
 function saveDraft() {
+  localStorage.setItem('v2md_import_draft', JSON.stringify({
+    source: source.value,
+    url: url.value,
+    ocrEnabled: ocrEnabled.value,
+    tocEnabled: tocEnabled.value,
+    template: template.value,
+  }))
   emit('draft')
   emit('update:modelValue', false)
 }
@@ -82,9 +114,9 @@ function saveDraft() {
         </button>
       </div>
 
-      <!-- 链接输入 / 本地上传说明 -->
+      <!-- 链接输入 / 本地上传 -->
       <div
-        v-if="source === 'link'"
+        v-if="source === 'link' || source === 'cloud'"
         class="bg-surface-container-low rounded-xl p-space-sm border border-outline-variant/30 flex items-center gap-space-sm shadow-sm"
       >
         <span class="material-symbols-outlined text-outline text-[20px]">link</span>
@@ -92,7 +124,7 @@ function saveDraft() {
           v-model="url"
           :disabled="busy"
           class="bg-transparent flex-1 text-on-surface font-body-md text-body-md focus:outline-none placeholder:text-outline min-w-0"
-          placeholder="粘贴 Bilibili / YouTube / 夸克 / 百度网盘链接..."
+          :placeholder="source === 'cloud' ? '粘贴夸克 / 百度网盘分享链接...' : '粘贴 Bilibili / YouTube / 夸克 / 百度网盘链接...'"
           type="text"
         />
         <button
@@ -103,18 +135,23 @@ function saveDraft() {
           清空
         </button>
       </div>
-      <p v-if="validationError || error" class="text-xs text-red-600 px-1" role="alert">{{ validationError || error }}</p>
-      <div
-        v-else
-        class="bg-surface-container-low rounded-xl p-space-md border border-outline-variant/30 flex flex-col items-center gap-space-xs shadow-sm"
+      <label
+        v-else-if="source === 'local'"
+        class="bg-surface-container-low rounded-xl p-space-md border border-outline-variant/30 flex flex-col items-center gap-space-xs shadow-sm cursor-pointer"
       >
-        <span class="material-symbols-outlined text-outline text-[32px]">
-          {{ source === 'local' ? 'upload_file' : 'cloud_download' }}
-        </span>
+        <span class="material-symbols-outlined text-outline text-[32px]">upload_file</span>
         <span class="font-body-sm text-body-sm text-on-surface-variant">
-          {{ source === 'local' ? '点击选择本地 MP4 文件（mock：直接开始）' : '粘贴夸克/百度网盘分享链接' }}
+          {{ file ? file.name : '选择本地 MP4、WebM、MP3 或 WAV 文件' }}
         </span>
-      </div>
+        <input
+          class="sr-only"
+          type="file"
+          accept="video/*,audio/*,.mp4,.webm,.mkv,.mp3,.wav,.m4a"
+          :disabled="busy"
+          @change="file = (($event.target as HTMLInputElement).files?.[0] ?? null)"
+        />
+      </label>
+      <p v-if="validationError || error" class="text-xs text-red-600 px-1" role="alert">{{ validationError || error }}</p>
       <p v-if="busy" role="status" aria-live="polite" class="text-sm text-on-surface-variant">
         正在读取视频与合集信息，请稍候。解析成功后会自动加入队列。
       </p>
