@@ -30,9 +30,10 @@ def _encryption_key() -> bytes:
     There is deliberately no generated/default key: losing the key must fail
     closed rather than silently making old credentials unrecoverable.
     """
-    raw = (config.ENV.get("V2MD_LLM_SETTINGS_KEY") or "").strip()
+    raw = (config.ENV.get("V2PDF_LLM_SETTINGS_KEY")
+           or config.ENV.get("V2MD_LLM_SETTINGS_KEY") or "").strip()
     if not raw:
-        raise CredentialEncryptionError("未配置 V2MD_LLM_SETTINGS_KEY，无法读取用户 LLM 凭据")
+        raise CredentialEncryptionError("未配置 V2PDF_LLM_SETTINGS_KEY，无法读取用户 LLM 凭据")
     try:
         if raw.startswith("hex:"):
             key = bytes.fromhex(raw[4:])
@@ -40,9 +41,9 @@ def _encryption_key() -> bytes:
             encoded = raw.removeprefix("base64:").encode("ascii")
             key = base64.urlsafe_b64decode(encoded + b"=" * (-len(encoded) % 4))
     except (ValueError, UnicodeEncodeError) as exc:
-        raise CredentialEncryptionError("V2MD_LLM_SETTINGS_KEY 格式无效") from exc
+        raise CredentialEncryptionError("V2PDF_LLM_SETTINGS_KEY 格式无效") from exc
     if len(key) != 32:
-        raise CredentialEncryptionError("V2MD_LLM_SETTINGS_KEY 必须解码为 32 字节")
+        raise CredentialEncryptionError("V2PDF_LLM_SETTINGS_KEY 必须解码为 32 字节")
     return key
 
 
@@ -97,13 +98,13 @@ def migrate_plaintext(*, pool=None) -> int:
     if pool is not None:
         changed = 0
         with pool.connection() as conn, conn.transaction():
-            rows = conn.execute("SELECT uid, api_key FROM v2md_llm_settings").fetchall()
+            rows = conn.execute("SELECT uid, api_key FROM v2pdf_llm_settings").fetchall()
             for uid, value in rows:
                 value = str(value or "")
                 if not value or value.startswith(_ENC_PREFIX):
                     continue
                 encrypted = _encrypt(uid, value)
-                conn.execute("UPDATE v2md_llm_settings SET api_key=%s, updated=now() WHERE uid=%s",
+                conn.execute("UPDATE v2pdf_llm_settings SET api_key=%s, updated=now() WHERE uid=%s",
                              (encrypted, uid))
                 changed += 1
         return changed
@@ -166,7 +167,7 @@ def load(uid: str) -> dict:
     if pool is not None:
         from .pg import tenant_connection
         with tenant_connection(pool) as conn:
-            row = conn.execute("SELECT base_url, api_key, model FROM v2md_llm_settings WHERE uid=%s",
+            row = conn.execute("SELECT base_url, api_key, model FROM v2pdf_llm_settings WHERE uid=%s",
                                (uid,)).fetchone()
         return _decrypt_row(uid, dict(zip(("base_url", "api_key", "model"), row))) if row else {}
     path = _path()
@@ -189,7 +190,7 @@ def update(uid: str, *, base_url: str = "", api_key: str | None = None,
             encrypted = _encrypt(uid, api_key) if api_key is not None else None
             if not clear and encrypted is None:
                 existing = conn.execute(
-                    "SELECT api_key FROM v2md_llm_settings WHERE uid=%s", (uid,)).fetchone()
+                    "SELECT api_key FROM v2pdf_llm_settings WHERE uid=%s", (uid,)).fetchone()
                 if existing and existing[0]:
                     # Decrypt before preserving to validate the current key and
                     # prevent carrying forward an unreadable legacy token.

@@ -51,7 +51,7 @@ class PostgresRunsStore:
 
     def load(self) -> dict:
         with tenant_connection(self.pool) as conn:
-            rows = conn.execute("SELECT record FROM v2md_runs").fetchall()
+            rows = conn.execute("SELECT record FROM v2pdf_runs").fetchall()
         out: dict = {}
         for (rec,) in rows:
             out[rec["run_id"]] = rec
@@ -110,9 +110,9 @@ class PostgresStateStore:
             # Keep the unscoped form for CLI/eval callers and migration tooling.
             owner = current_tenant()
             if owner is None:
-                rows = conn.execute("SELECT fp, record FROM v2md_state").fetchall()
+                rows = conn.execute("SELECT fp, record FROM v2pdf_state").fetchall()
             else:
-                rows = conn.execute("SELECT fp, record FROM v2md_state WHERE owner=%s",
+                rows = conn.execute("SELECT fp, record FROM v2pdf_state WHERE owner=%s",
                                     (owner,)).fetchall()
         return {fp: rec for fp, rec in rows}
 
@@ -123,7 +123,7 @@ class PostgresStateStore:
             tenant = current_tenant()
             with conn.cursor() as cur:
                 cur.executemany("""
-                    INSERT INTO v2md_state (owner, fp, record) VALUES (%s, %s, %s)
+                    INSERT INTO v2pdf_state (owner, fp, record) VALUES (%s, %s, %s)
                     ON CONFLICT (owner, fp) DO UPDATE SET record = EXCLUDED.record, updated = now()
                     """, [((tenant if tenant is not None else (rec.get("owner") or "")),
                            fp, Json(rec)) for fp, rec in s.items()])

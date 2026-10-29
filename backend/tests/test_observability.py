@@ -175,7 +175,7 @@ with mock.patch.object(config, "OTEL_INCLUDE_CONTENT", False):
     signed.info("graph:end", status="done")
     observability.close_run("redacted")
 redacted_root = next(s for s in redacted_spans.get_finished_spans()
-                     if s.name == "video2md-serve-run")
+                     if s.attributes.get("run_id") == "redacted")
 assert "langfuse.observation.input" not in redacted_root.attributes
 
 # 未 init 时指标全 no-op（纯本地模式不炸）

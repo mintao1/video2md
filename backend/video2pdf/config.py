@@ -54,13 +54,13 @@ def _read_env_file(p: Path) -> dict[str, str]:
     return out
 
 
-# 改名兼容（video2md → video2pdf）：旧前缀 V2MD_* 仍可用，新键未设时按旧键补齐。
+# 改名兼容（video2md → video2pdf）：旧前缀 V2PDF_* 仍可用，新键未设时按旧键补齐。
 # 真实环境变量同步写回 os.environ，直读 os.environ 的模块与子进程也看得到新键名。
 LEGACY_ENV_PREFIX, ENV_PREFIX = "V2MD_", "V2PDF_"
 
 
 def _alias_legacy(env: dict[str, str]) -> list[str]:
-    """把 V2MD_X 补成 V2PDF_X（新键已存在则新键优先），返回被补齐的旧键名。"""
+    """把 V2PDF_X 补成 V2PDF_X（新键已存在则新键优先），返回被补齐的旧键名。"""
     aliased = []
     for k in [k for k in env if k.startswith(LEGACY_ENV_PREFIX)]:
         nk = ENV_PREFIX + k[len(LEGACY_ENV_PREFIX):]
@@ -101,8 +101,9 @@ def load_env() -> dict[str, str]:
 ENV = load_env()
 if _LEGACY_ENV_KEYS:
     import sys
-    print(f"⚠️ 已弃用的 {LEGACY_ENV_PREFIX}* 配置仍在使用（{len(_LEGACY_ENV_KEYS)} 个，如 "
-          f"{sorted(_LEGACY_ENV_KEYS)[0]}），请改为 {ENV_PREFIX}*", file=sys.stderr)
+    sample = ", ".join(sorted(_LEGACY_ENV_KEYS)[:8])
+    print(f"⚠️ 已弃用的 {LEGACY_ENV_PREFIX}* 配置仍在使用（{len(_LEGACY_ENV_KEYS)} 个：{sample}），"
+          f"请改为 {ENV_PREFIX}*", file=sys.stderr)
 
 
 # ---------------------------------------------------------------- 配置契约表（P1-9）
@@ -114,21 +115,21 @@ _SPEC: dict[str, tuple] = {
     "V2PDF_ENV":             ("str", "development", None),
     "V2PDF_COLAB_USERS_DIR": ("path", str(PROJ / "data" / "colab-users"), None),
     # 持久化/身份/凭证（容器里指 data 卷；凭证文件只在此处定位）
-    "V2MD_STATE_FILE":      ("path", str(PROJ / "state.json"), None),
-    "V2MD_RUNS_FILE":       ("path", str(PROJ / "runs.json"), None),
-    "V2MD_USERS_FILE":      ("path", str(PROJ / "users.json"), None),
-    "V2MD_PG_DSN":          ("raw", "", None),
-    "V2MD_PG_MIGRATE_DSN":  ("raw", "", None),
-    "V2MD_PG_TIMEOUT_S":    ("float", 10.0, ("min", 1.0)),
-    "V2MD_RUNS_STORE":      ("enum", "json", ("json", "postgres")),
-    "V2MD_STATE_STORE":     ("enum", "json", ("json", "postgres")),
-    "V2MD_USERS_STORE":     ("enum", "json", ("json", "postgres")),
-    "V2MD_EVENTS":          ("enum", "local", ("local", "pg")),
-    "V2MD_CHECKPOINTER":    ("enum", "sqlite", ("sqlite", "postgres")),
-    "V2MD_CHECKPOINTER_SETUP": ("enum", "on", ("on", "off")),
-    "V2MD_OTEL_INCLUDE_CONTENT": ("enum", "on", ("on", "off")),
-    "V2MD_LOG_DIR":         ("path", str(PROJ / "logs"), None),
-    "V2MD_SECRETS_FILE":    ("path", str(SECRETS_FILE), None),
+    "V2PDF_STATE_FILE":      ("path", str(PROJ / "state.json"), None),
+    "V2PDF_RUNS_FILE":       ("path", str(PROJ / "runs.json"), None),
+    "V2PDF_USERS_FILE":      ("path", str(PROJ / "users.json"), None),
+    "V2PDF_PG_DSN":          ("raw", "", None),
+    "V2PDF_PG_MIGRATE_DSN":  ("raw", "", None),
+    "V2PDF_PG_TIMEOUT_S":    ("float", 10.0, ("min", 1.0)),
+    "V2PDF_RUNS_STORE":      ("enum", "json", ("json", "postgres")),
+    "V2PDF_STATE_STORE":     ("enum", "json", ("json", "postgres")),
+    "V2PDF_USERS_STORE":     ("enum", "json", ("json", "postgres")),
+    "V2PDF_EVENTS":          ("enum", "local", ("local", "pg")),
+    "V2PDF_CHECKPOINTER":    ("enum", "sqlite", ("sqlite", "postgres")),
+    "V2PDF_CHECKPOINTER_SETUP": ("enum", "on", ("on", "off")),
+    "V2PDF_OTEL_INCLUDE_CONTENT": ("enum", "on", ("on", "off")),
+    "V2PDF_LOG_DIR":         ("path", str(PROJ / "logs"), None),
+    "V2PDF_SECRETS_FILE":    ("path", str(SECRETS_FILE), None),
     "OBSIDIAN_VAULT":       ("path", str(Path.home() / "Documents/Obsidian Vault"), None),
     # 鉴权/CORS（V2PDF_AUTH 语义在 acctkit.build_from_env，此处不镜像——接线 auth/__init__.py）
     "V2PDF_CORS_ORIGINS":    ("csv", [], None),
@@ -153,15 +154,15 @@ _SPEC: dict[str, tuple] = {
     # 任务表真相源（P4b·多副本档）
     "V2PDF_TASKS_STORE":     ("enum", "json", ("json", "postgres")),
     # 教材偏好存储（收藏/阅读进度，(uid,run_id) 维度；web 教材库页数据源）
-    "V2MD_PREFS_FILE":      ("path", str(PROJ / "prefs.json"), None),
-    "V2MD_LLM_SETTINGS_FILE": ("str", "", None),  # 可选路径；空=跟随 PREFS_FILE 同目录
-    "V2MD_LLM_SETTINGS_KEY": ("raw", "", None),  # 32-byte base64url/hex envelope key
-    "V2MD_PREFS_STORE":     ("enum", "json", ("json", "postgres")),
-    "V2MD_COLAB_SESSION":   ("str", "v2md-whisper", None),
-    "V2MD_COLAB_BIN":       ("str", "", None),
-    "V2MD_COLAB_LOCK":      ("path", str(PROJ / "data" / "colab.lock"), None),
-    "V2MD_COLAB_MAX_WAIT_S": ("int", 2700, ("min", 30)),
-    "V2MD_COLAB_CPU_FALLBACK": ("enum", "off", ("on", "off")),
+    "V2PDF_PREFS_FILE":      ("path", str(PROJ / "prefs.json"), None),
+    "V2PDF_LLM_SETTINGS_FILE": ("str", "", None),  # 可选路径；空=跟随 PREFS_FILE 同目录
+    "V2PDF_LLM_SETTINGS_KEY": ("raw", "", None),  # 32-byte base64url/hex envelope key
+    "V2PDF_PREFS_STORE":     ("enum", "json", ("json", "postgres")),
+    "V2PDF_COLAB_SESSION":   ("str", "v2md-whisper", None),
+    "V2PDF_COLAB_BIN":       ("str", "", None),
+    "V2PDF_COLAB_LOCK":      ("path", str(PROJ / "data" / "colab.lock"), None),
+    "V2PDF_COLAB_MAX_WAIT_S": ("int", 2700, ("min", 30)),
+    "V2PDF_COLAB_CPU_FALLBACK": ("enum", "off", ("on", "off")),
     # 本地路径输入策略（auto/allow/deny 语义见 _validate_run_url）
     "V2PDF_LOCAL_PATHS":     ("enum", "auto", ("auto", "allow", "deny")),
     # 匿名面限流（P0-2）：设备流两端点按 IP 共享滑窗（0=不设限）。缺省 30/min 而非
@@ -227,13 +228,13 @@ def _parse_spec(env: dict[str, str]) -> tuple[dict, list[str]]:
 
 _PARSED, _ERRS = _parse_spec(ENV)
 
-if ENV.get("V2MD_ENV", "development").strip().lower() == "production" \
-        and not (ENV.get("V2MD_LLM_SETTINGS_KEY") or "").strip():
-    raise RuntimeError("生产环境必须配置 V2MD_LLM_SETTINGS_KEY（用户 LLM Key 加密密钥）")
+if ENV.get("V2PDF_ENV", "development").strip().lower() == "production" \
+        and not (ENV.get("V2PDF_LLM_SETTINGS_KEY") or "").strip():
+    raise RuntimeError("生产环境必须配置 V2PDF_LLM_SETTINGS_KEY（用户 LLM Key 加密密钥）")
 
-_PG_BACKED_KEYS = ("V2MD_RUNS_STORE", "V2MD_STATE_STORE", "V2MD_USERS_STORE",
-                   "V2MD_TASKS_STORE", "V2MD_PREFS_STORE", "V2MD_EVENTS",
-                   "V2MD_CHECKPOINTER")
+_PG_BACKED_KEYS = ("V2PDF_RUNS_STORE", "V2PDF_STATE_STORE", "V2PDF_USERS_STORE",
+                   "V2PDF_TASKS_STORE", "V2PDF_PREFS_STORE", "V2PDF_EVENTS",
+                   "V2PDF_CHECKPOINTER")
 
 
 def _dsn_user(value: str) -> str:
@@ -247,15 +248,15 @@ def _dsn_user(value: str) -> str:
 # migration is the only component allowed to use video2md_migrate; API traffic
 # is pinned to the DML-only video2md_app role. JSON/SQLite development and unit
 # test configurations remain unaffected.
-if ENV.get("V2MD_ENV", "development").strip().lower() == "production" \
+if ENV.get("V2PDF_ENV", "development").strip().lower() == "production" \
         and any((ENV.get(key) or "").strip().lower() in ("postgres", "pg")
                 for key in _PG_BACKED_KEYS):
-    _app_dsn = (ENV.get("V2MD_PG_DSN") or "").strip()
-    _migrate_dsn = (ENV.get("V2MD_PG_MIGRATE_DSN") or "").strip()
+    _app_dsn = (ENV.get("V2PDF_PG_DSN") or "").strip()
+    _migrate_dsn = (ENV.get("V2PDF_PG_MIGRATE_DSN") or "").strip()
     if _dsn_user(_app_dsn) != "video2md_app":
         raise RuntimeError("生产 PostgreSQL API DSN 必须使用 video2md_app（禁止 POSTGRES_USER/superuser 回退）")
     if _dsn_user(_migrate_dsn) != "video2md_migrate":
-        raise RuntimeError("生产必须配置 V2MD_PG_MIGRATE_DSN=video2md_migrate 的迁移凭据")
+        raise RuntimeError("生产必须配置 V2PDF_PG_MIGRATE_DSN=video2md_migrate 的迁移凭据")
 
 # Production deployments must provide a real authentication provider.
 if ENV.get("V2PDF_ENV", "development").strip().lower() == "production" \
@@ -266,13 +267,13 @@ if ENV.get("V2PDF_ENV", "development").strip().lower() == "production" \
 # index. Production must use per-run deliver shelves, which are owner-checked
 # by the API and physically burned after TTL/ACK. Fail closed before serving
 # traffic rather than silently falling back to the development vault mode.
-if ENV.get("V2MD_ENV", "development").strip().lower() == "production" \
-        and _PARSED.get("V2MD_ARTIFACT_MODE") != "deliver":
-    raise RuntimeError("生产环境必须配置 V2MD_ARTIFACT_MODE=deliver；共享 vault 禁止用于多租户部署")
+if ENV.get("V2PDF_ENV", "development").strip().lower() == "production" \
+        and _PARSED.get("V2PDF_ARTIFACT_MODE") != "deliver":
+    raise RuntimeError("生产环境必须配置 V2PDF_ARTIFACT_MODE=deliver；共享 vault 禁止用于多租户部署")
 
-if ENV.get("V2MD_ENV", "development").strip().lower() == "production" \
-        and _PARSED.get("V2MD_OTEL_INCLUDE_CONTENT") != "off":
-    raise RuntimeError("生产环境必须配置 V2MD_OTEL_INCLUDE_CONTENT=off；禁止把 prompt/completion 全文发送到观测端")
+if ENV.get("V2PDF_ENV", "development").strip().lower() == "production" \
+        and _PARSED.get("V2PDF_OTEL_INCLUDE_CONTENT") != "off":
+    raise RuntimeError("生产环境必须配置 V2PDF_OTEL_INCLUDE_CONTENT=off；禁止把 prompt/completion 全文发送到观测端")
 
 # Google 网页登录的 redirect_uri 与回跳地址由这两个键拼出；生产缺省会回落到 localhost，
 # 登录必坏且只在真人点击时暴露，所以启动期就拒绝。
@@ -329,8 +330,8 @@ TRANSCRIPT_DIR = OUT_DIR / "transcripts"  # 转录本 SSOT（info callout wikili
 #   vault（默认）= 直写 vault 卷 + Syncthing 同步（现状逐字节不变）
 #   deliver      = 多用户「云端不储存」：产物进 per-run outbox，终态后搬到 OUTBOX_DIR，
 #                  只经 bundle/ACK HTTP 端点发送到用户端，TTL 到期/确认收完即焚（api.py）
-ARTIFACT_MODE: str = _PARSED["V2MD_ARTIFACT_MODE"]
-OTEL_INCLUDE_CONTENT: bool = _PARSED["V2MD_OTEL_INCLUDE_CONTENT"] == "on"
+ARTIFACT_MODE: str = _PARSED["V2PDF_ARTIFACT_MODE"]
+OTEL_INCLUDE_CONTENT: bool = _PARSED["V2PDF_OTEL_INCLUDE_CONTENT"] == "on"
 
 # deliver 在架根（容器指 data 卷）与保留窗口（小时，到期自动烧）
 OUTBOX_DIR: Path = _PARSED["V2PDF_OUTBOX_DIR"]

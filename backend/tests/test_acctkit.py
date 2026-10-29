@@ -208,7 +208,7 @@ class _RaiseOpener:
 
 def test_build_from_env_google_device_wiring():
     eng = build_from_env({"V2PDF_AUTH": "on", "V2PDF_AUTH_PROVIDERS": "google_device",
-                          "GOOGLE_CLIENT_ID": "cid"}, store=MemoryStore())
+                          "GOOGLE_CLIENT_ID": "cid"}, prefix="V2PDF_", store=MemoryStore())
     assert [type(p).__name__ for p in eng.providers] == ["GoogleDeviceProvider"]
 
 

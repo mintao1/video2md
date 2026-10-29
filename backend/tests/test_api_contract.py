@@ -147,51 +147,51 @@ def _import_config_with_env(**overrides):
 
 
 def test_production_anonymous_auth_is_rejected():
-    assert _import_config_with_env(V2MD_ENV="production", V2MD_AUTH="off").returncode != 0
-    assert _import_config_with_env(V2MD_ENV="production", V2MD_AUTH="").returncode != 0
-    urls = {"V2MD_PUBLIC_BASE_URL": "https://v.test", "V2MD_WEB_BASE_URL": "https://v.test",
-            "V2MD_LLM_SETTINGS_KEY": "hex:" + "11" * 32}
-    assert _import_config_with_env(V2MD_ENV="production", V2MD_AUTH="google",
-                                   V2MD_ARTIFACT_MODE="deliver",
-                                   V2MD_OTEL_INCLUDE_CONTENT="off", **urls).returncode == 0
-    assert _import_config_with_env(V2MD_ENV="production", V2MD_AUTH="google",
-                                   V2MD_ARTIFACT_MODE="vault", **urls).returncode != 0
-    assert _import_config_with_env(V2MD_ENV="production", V2MD_AUTH="google",
-                                   V2MD_ARTIFACT_MODE="deliver",
-                                   V2MD_OTEL_INCLUDE_CONTENT="on", **urls).returncode != 0
+    assert _import_config_with_env(V2PDF_ENV="production", V2PDF_AUTH="off").returncode != 0
+    assert _import_config_with_env(V2PDF_ENV="production", V2PDF_AUTH="").returncode != 0
+    urls = {"V2PDF_PUBLIC_BASE_URL": "https://v.test", "V2PDF_WEB_BASE_URL": "https://v.test",
+            "V2PDF_LLM_SETTINGS_KEY": "hex:" + "11" * 32}
+    assert _import_config_with_env(V2PDF_ENV="production", V2PDF_AUTH="google",
+                                   V2PDF_ARTIFACT_MODE="deliver",
+                                   V2PDF_OTEL_INCLUDE_CONTENT="off", **urls).returncode == 0
+    assert _import_config_with_env(V2PDF_ENV="production", V2PDF_AUTH="google",
+                                   V2PDF_ARTIFACT_MODE="vault", **urls).returncode != 0
+    assert _import_config_with_env(V2PDF_ENV="production", V2PDF_AUTH="google",
+                                   V2PDF_ARTIFACT_MODE="deliver",
+                                   V2PDF_OTEL_INCLUDE_CONTENT="on", **urls).returncode != 0
 
 
 def test_production_google_requires_public_urls():
     # 缺省回落 localhost 会让生产 Google 登录跳回本机——启动期拒绝
-    ok = {"V2MD_PUBLIC_BASE_URL": "https://v.test", "V2MD_WEB_BASE_URL": "https://v.test",
-          "V2MD_LLM_SETTINGS_KEY": "hex:" + "11" * 32}
-    for key in ("V2MD_PUBLIC_BASE_URL", "V2MD_WEB_BASE_URL"):
+    ok = {"V2PDF_PUBLIC_BASE_URL": "https://v.test", "V2PDF_WEB_BASE_URL": "https://v.test",
+          "V2PDF_LLM_SETTINGS_KEY": "hex:" + "11" * 32}
+    for key in ("V2PDF_PUBLIC_BASE_URL", "V2PDF_WEB_BASE_URL"):
         for bad in ("", "http://localhost:5173"):
             env = {**ok, key: bad}
-            r = _import_config_with_env(V2MD_ENV="production", V2MD_AUTH="google",
-                                         V2MD_ARTIFACT_MODE="deliver",
-                                         V2MD_OTEL_INCLUDE_CONTENT="off", **env)
+            r = _import_config_with_env(V2PDF_ENV="production", V2PDF_AUTH="google",
+                                         V2PDF_ARTIFACT_MODE="deliver",
+                                         V2PDF_OTEL_INCLUDE_CONTENT="off", **env)
             assert r.returncode != 0 and key in r.stderr, (key, bad)
 
 
 def test_production_pg_requires_separate_app_and_migrate_roles():
-    urls = {"V2MD_PUBLIC_BASE_URL": "https://v.test", "V2MD_WEB_BASE_URL": "https://v.test",
-            "V2MD_LLM_SETTINGS_KEY": "hex:" + "11" * 32}
-    pg = {"V2MD_RUNS_STORE": "postgres", "V2MD_STATE_STORE": "postgres",
-          "V2MD_USERS_STORE": "postgres", "V2MD_TASKS_STORE": "postgres",
-          "V2MD_PREFS_STORE": "postgres", "V2MD_EVENTS": "pg",
-          "V2MD_CHECKPOINTER": "postgres"}
-    common = {**urls, **pg, "V2MD_ENV": "production", "V2MD_AUTH": "google",
-              "V2MD_ARTIFACT_MODE": "deliver", "V2MD_OTEL_INCLUDE_CONTENT": "off"}
+    urls = {"V2PDF_PUBLIC_BASE_URL": "https://v.test", "V2PDF_WEB_BASE_URL": "https://v.test",
+            "V2PDF_LLM_SETTINGS_KEY": "hex:" + "11" * 32}
+    pg = {"V2PDF_RUNS_STORE": "postgres", "V2PDF_STATE_STORE": "postgres",
+          "V2PDF_USERS_STORE": "postgres", "V2PDF_TASKS_STORE": "postgres",
+          "V2PDF_PREFS_STORE": "postgres", "V2PDF_EVENTS": "pg",
+          "V2PDF_CHECKPOINTER": "postgres"}
+    common = {**urls, **pg, "V2PDF_ENV": "production", "V2PDF_AUTH": "google",
+              "V2PDF_ARTIFACT_MODE": "deliver", "V2PDF_OTEL_INCLUDE_CONTENT": "off"}
     bad = _import_config_with_env(
         **common,
-        V2MD_PG_DSN="postgresql://postgres:secret@db/v2md",
-        V2MD_PG_MIGRATE_DSN="postgresql://video2md_migrate:secret@db/v2md")
+        V2PDF_PG_DSN="postgresql://postgres:secret@db/v2pdf",
+        V2PDF_PG_MIGRATE_DSN="postgresql://video2md_migrate:secret@db/v2pdf")
     assert bad.returncode != 0 and "video2md_app" in bad.stderr
     good = _import_config_with_env(
         **common,
-        V2MD_PG_DSN="postgresql://video2md_app:secret@db/v2md",
-        V2MD_PG_MIGRATE_DSN="postgresql://video2md_migrate:secret@db/v2md")
+        V2PDF_PG_DSN="postgresql://video2md_app:secret@db/v2pdf",
+        V2PDF_PG_MIGRATE_DSN="postgresql://video2md_migrate:secret@db/v2pdf")
     assert good.returncode == 0, good.stderr
 
 

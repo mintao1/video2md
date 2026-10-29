@@ -46,7 +46,7 @@ class AuthEngine:
         raise AuthError("未配置任何鉴权 provider", status=500)
 
 
-def build_from_env(env: Mapping[str, str], prefix: str = "V2PDF_",
+def build_from_env(env: Mapping[str, str], prefix: str = "V2MD_",
                    store: IdentityStore | None = None) -> AuthEngine:
     """按环境映射装配引擎（键：{prefix}AUTH / {prefix}AUTH_PROVIDERS /
     {prefix}USERS_FILE / GOOGLE_CLIENT_ID）；宿主项目换前缀即复用同一套配置策略。
