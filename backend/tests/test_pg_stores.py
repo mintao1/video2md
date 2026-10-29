@@ -30,6 +30,11 @@ if not DSN:
     import pytest
     pytest.skip("未配 V2PDF_TEST_PG_DSN（PG 真库测试只在有库的环境跑）", allow_module_level=True)
 
+# The CI fixture provisions a DML-only role so the RLS checks below exercise
+# the same path as production API traffic.  Local runs may omit this value;
+# the store regression suite remains useful with the historical superuser DSN.
+APP_DSN = os.environ.get("V2PDF_TEST_APP_DSN") or ""
+
 # 在 import video2pdf 之前定档：config.ENV 是 import 时快照
 os.environ.update({
     "V2PDF_PG_DSN": DSN,
@@ -78,6 +83,62 @@ except RuntimeError:
 pgmigrate.apply_migrations(pool)                       # 重跑迁移自愈（各版幂等 → 补记版本行）
 pgmigrate.validate_schema(pool)
 print("✅ 迁移纪律（裸库拒起/首应用/幂等重跑/落后拒起/自愈恢复）")
+
+
+# ---- 0.25 production role/RLS contract + two-tenant cross-read regression ----
+with pool.connection() as conn:
+    role_rows = conn.execute(
+        "SELECT rolname, rolcanlogin, rolsuper, rolbypassrls "
+        "FROM pg_roles WHERE rolname IN "
+        "('video2md_app','video2md_migrate','video2md_owner') "
+        "ORDER BY rolname").fetchall()
+assert [r[0] for r in role_rows] == ["video2md_app", "video2md_migrate", "video2md_owner"]
+assert all(not r[2] and not r[3] for r in role_rows), role_rows
+assert role_rows[0][1] is True and role_rows[1][1] is True
+assert role_rows[2][1] is False
+rls_rows = conn.execute(
+    "SELECT count(*) FROM pg_class "
+    "WHERE relname IN ('v2pdf_runs','v2pdf_state','v2pdf_submit_log',"
+    "'v2pdf_users','v2pdf_identities','v2pdf_membership','v2pdf_prefs',"
+    "'v2pdf_llm_settings') AND relrowsecurity AND relforcerowsecurity").fetchone()
+assert rls_rows[0] == 8, rls_rows
+print("✅ 生产角色/RLS 合约（无 superuser/BYPASSRLS；8 张租户表 FORCE RLS）")
+
+if APP_DSN:
+    app_pool = pg.make_pool(APP_DSN)
+    try:
+        with app_pool.connection() as conn:
+            with conn.transaction():
+                conn.execute("SELECT set_config('v2md.tenant_id', %s, true)",
+                             ("tenant-a-regression",))
+                conn.execute(
+                    "INSERT INTO v2pdf_runs(run_id, owner, status, created, record) "
+                    "VALUES (%s, %s, 'done', '', %s::jsonb)",
+                    ("rls-a-regression", "tenant-a-regression",
+                     '{"owner":"tenant-a-regression"}'))
+                conn.execute("SELECT set_config('v2md.tenant_id', %s, true)",
+                             ("tenant-b-regression",))
+                assert conn.execute(
+                    "SELECT count(*) FROM v2pdf_runs WHERE run_id=%s",
+                    ("rls-a-regression",)).fetchone()[0] == 0
+                conn.execute(
+                    "INSERT INTO v2pdf_runs(run_id, owner, status, created, record) "
+                    "VALUES (%s, %s, 'done', '', %s::jsonb)",
+                    ("rls-b-regression", "tenant-b-regression",
+                     '{"owner":"tenant-b-regression"}'))
+                assert conn.execute(
+                    "SELECT count(*) FROM v2pdf_runs WHERE run_id=%s",
+                    ("rls-b-regression",)).fetchone()[0] == 1
+                conn.execute("SELECT set_config('v2md.tenant_id', %s, true)",
+                             ("tenant-a-regression",))
+                assert conn.execute(
+                    "SELECT count(*) FROM v2pdf_runs WHERE run_id=%s",
+                    ("rls-b-regression",)).fetchone()[0] == 0
+        print("✅ 双租户 RLS 交叉访问（A 看不到 B，B 看不到 A，各自可读自身）")
+    finally:
+        app_pool.close()
+else:
+    print("⚠️ 未配置 V2PDF_TEST_APP_DSN，跳过 DML-only 双租户交叉访问")
 
 
 # ---- 0.5 PostgresMembershipStore（0002：web 个人页会员/配额展示档）------------------

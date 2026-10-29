@@ -29,6 +29,9 @@ jobs:
           --health-retries 12
     env:
       V2PDF_TEST_PG_DSN: postgresql://v2pdf:v2pdf@127.0.0.1:5432/v2pdf
+      # The app DSN is used only by the tenant-RLS regression below; it is
+      # deliberately separate from the superuser fixture used to apply DDL.
+      V2PDF_TEST_APP_DSN: postgresql://video2md_app:ci_app_password@127.0.0.1:5432/v2pdf
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
@@ -41,8 +44,36 @@ jobs:
       # 布局口径：pyproject 在 backend/，Python 侧 uv/pytest/脚本式测试一律在 backend/ 下跑
       - run: uv sync --frozen
         working-directory: backend
-      - name: pytest（API 契约 + acctkit）
-        run: uv run pytest tests/test_api_contract.py tests/test_acctkit.py tests/test_google_cert_cache.py tests/test_rename_compat.py -q
+      - name: Provision non-bypass test roles for PG migrations
+        run: |
+          uv run python - <<'PY'
+          import os
+          import psycopg
+
+          dsn = os.environ["V2PDF_TEST_PG_DSN"]
+          with psycopg.connect(dsn, autocommit=True) as conn:
+              conn.execute("""
+              DO $$
+              BEGIN
+                  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'video2md_app') THEN
+                      CREATE ROLE video2md_app;
+                  END IF;
+                  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'video2md_migrate') THEN
+                      CREATE ROLE video2md_migrate;
+                  END IF;
+                  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'video2md_owner') THEN
+                      CREATE ROLE video2md_owner;
+                  END IF;
+              END
+              $$;
+              """)
+              conn.execute("ALTER ROLE video2md_app LOGIN PASSWORD 'ci_app_password' NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS")
+              conn.execute("ALTER ROLE video2md_migrate LOGIN PASSWORD 'ci_migrate_password' NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS")
+              conn.execute("ALTER ROLE video2md_owner NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS")
+          PY
+        working-directory: backend
+      - name: pytest（API 契约 + migration role contract + acctkit）
+        run: uv run pytest tests/test_api_contract.py tests/test_migration_role_contract.py tests/test_acctkit.py tests/test_google_cert_cache.py tests/test_rename_compat.py -q
         working-directory: backend
       - name: 个人租户 Colab 评测（普通用户授权、同账号核对、凭证与执行隔离；离线）
         run: uv run pytest tests/test_colab_auth.py tests/test_colab_cli.py tests/test_tenant_colab_eval_set.py -q
