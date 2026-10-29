@@ -169,9 +169,10 @@ jobs:
           MIN_FREE_GIB: ${{ steps.limits.outputs.min_free_gib }}
         run: |
           set -euo pipefail
+          PRODUCT="${{ inputs.product || 'video2md' }}"
           set +e
           ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
-            "MIN_FREE_GIB=${MIN_FREE_GIB} bash -s" < scripts/node-build-guard.sh
+            "MIN_FREE_GIB=${MIN_FREE_GIB} bash -s" < "${PRODUCT}/scripts/node-build-guard.sh"
           STATUS=$?
           set -e
           if [[ "$STATUS" -ne 0 ]]; then
@@ -241,9 +242,10 @@ jobs:
           MIN_FREE_GIB: ${{ steps.limits.outputs.min_free_gib }}
         run: |
           set -euo pipefail
+          PRODUCT="${{ inputs.product || 'video2md' }}"
           set +e
           ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
-            "MIN_FREE_GIB=${MIN_FREE_GIB} bash -s" < scripts/node-build-guard.sh
+            "MIN_FREE_GIB=${MIN_FREE_GIB} bash -s" < "${PRODUCT}/scripts/node-build-guard.sh"
           STATUS=$?
           set -e
           if [[ "$STATUS" -ne 0 ]]; then
