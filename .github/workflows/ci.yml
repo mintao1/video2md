@@ -237,9 +237,14 @@ jobs:
         working-directory: frontend/web
       - name: Production platform entry bundle gate
         run: node scripts/check_frontend_bundle.mjs frontend/web/dist
+      - name: Install Chromium for PDF browser tests
+        run: npx playwright install --with-deps chromium
+        working-directory: frontend/web
       - run: npm run test:integration
         working-directory: frontend/web
       - run: npm run test:regression
+        working-directory: frontend/web
+      - run: npm run test:e2e
         working-directory: frontend/web
 
   # 生产镜像构建路径验证（此前只在服务器上验证过）

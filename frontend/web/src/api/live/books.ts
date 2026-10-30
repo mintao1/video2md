@@ -1,7 +1,7 @@
 // 教材库生产 API 实现。
 // 映射口径：一本「书」= 一条 done/partial 的 run；收藏/阅读进度来自 /prefs（后端入库）。
 // 页面/页码等展示字段使用真实可得数据（讲数、状态徽章），不造假。
-import { ApiRequestError, request, requestBlob, requestMediaBlob } from '../client'
+import { API_REQUEST_TIMEOUT_MS, ApiRequestError, request, requestBlob, requestMediaBlob } from '../client'
 import type { Book, RunStatus, TocChapter } from '../../types'
 
 /** GET /runs 列表项（后端 RunListOut；title 为服务端三路派生） */
@@ -34,6 +34,15 @@ interface RunDetailResp {
     note?: string | null
     title?: string | null
   }[]
+}
+
+export class ArtifactsExpiredError extends Error {
+  readonly code = 'ARTIFACT_EXPIRED'
+
+  constructor() {
+    super('笔记产物已过期或已被清理，请重新生成后再试')
+    this.name = 'ArtifactsExpiredError'
+  }
 }
 
 /** 模块级偏好缓存：toggleFav 只拿 run_id，当前值从这里读（getBooks 时重建） */
@@ -125,15 +134,15 @@ export async function toggleFav(id: string): Promise<void> {
   }
 }
 
-/** 全书笔记（含正文 md）：阅读器数据源。错误（deliver 已焚 410 等）→ []，由视图走诚实空态。 */
+/** 全书笔记（含正文 md）：阅读器数据源。deliver 产物已焚时保留可识别错误。 */
 export async function getNotes(bookId: string): Promise<{ title: string; md: string }[]> {
   try {
-    const resp = await request<RunNotesResp>(`/runs/${bookId}/note`)
+    const resp = await request<RunNotesResp>(`/runs/${bookId}/note`, {}, { timeoutMs: API_REQUEST_TIMEOUT_MS })
     return resp.notes
       .filter((n) => n.md.trim())
       .map((n) => ({ title: n.title, md: n.md }))
   } catch (error) {
-    if (error instanceof ApiRequestError && error.code === 410) return []
+    if (error instanceof ApiRequestError && error.code === 410) throw new ArtifactsExpiredError()
     throw error
   }
 }

@@ -27,3 +27,50 @@ it('keeps the PDF action wired separately from the Markdown download path', asyn
   assert.match(source, /format !== 'Markdown'/)
   assert.match(modal, /PDF（打印保存）/)
 })
+
+it('uses the bundled MathJax runtime instead of a remote CDN', () => {
+  const html = pdf.buildPdfHtml('离线公式', '<p>$$x^2$$</p>')
+  assert.match(html, /\/vendor\/mathjax\/tex-svg\.js/)
+  assert.doesNotMatch(html, /jsdelivr\.net\/npm\/mathjax/)
+})
+
+it('ships the self-contained MathJax asset with the frontend', async () => {
+  const { stat } = await import('node:fs/promises')
+  const asset = await stat(new URL('../public/vendor/mathjax/tex-svg.js', import.meta.url))
+  assert.ok(asset.size > 1_000_000)
+})
+
+it('classifies an expired deliver artifact so export can explain the 410', async () => {
+  const books = await vite.ssrLoadModule('/src/api/live/books.ts?expired-test')
+  const previousFetch = globalThis.fetch
+  const previousStorage = globalThis.localStorage
+  globalThis.localStorage = { getItem: () => null, setItem: () => {}, removeItem: () => {} }
+  globalThis.fetch = async () => new Response(JSON.stringify({ error: { code: 410, message: 'expired' } }), {
+    status: 410,
+    headers: { 'content-type': 'application/json' },
+  })
+  try {
+    await assert.rejects(books.getNotes('expired-run'), (error) =>
+      error?.name === 'ArtifactsExpiredError' && error?.code === 'ARTIFACT_EXPIRED')
+  } finally {
+    globalThis.fetch = previousFetch
+    globalThis.localStorage = previousStorage
+  }
+})
+
+it('aborts a media request after the configured timeout', async () => {
+  const client = await vite.ssrLoadModule('/src/api/client.ts?timeout-test')
+  const previousFetch = globalThis.fetch
+  const previousStorage = globalThis.localStorage
+  globalThis.localStorage = { getItem: () => null, setItem: () => {}, removeItem: () => {} }
+  globalThis.fetch = async (_input, init) => await new Promise((_resolve, reject) => {
+    init?.signal?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')), { once: true })
+  })
+  try {
+    await assert.rejects(client.requestBlob('/slow-media', { timeoutMs: 5 }), (error) =>
+      error?.name === 'ApiTimeoutError' && error?.code === 'REQUEST_TIMEOUT')
+  } finally {
+    globalThis.fetch = previousFetch
+    globalThis.localStorage = previousStorage
+  }
+})

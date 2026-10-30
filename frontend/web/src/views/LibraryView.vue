@@ -3,7 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useLibraryStore } from '../stores/library'
 import { useToastStore } from '../stores/toast'
-import { getMedia, getNotes, getToc } from '../api'
+import { ApiTimeoutError, ArtifactsExpiredError, getMedia, getNotes, getToc } from '../api'
 import type { Book, TocChapter } from '../types'
 import { printNotesAsPdf } from '../pdf'
 import AppHeader from '../components/common/AppHeader.vue'
@@ -68,6 +68,16 @@ function onShare(book: Book) {
   toast.show('已复制教材分享链接到剪贴板！')
 }
 
+function exportErrorMessage(error: unknown, format: string): string {
+  if (error instanceof ArtifactsExpiredError) {
+    return `${format} 导出失败：笔记产物已过期或已被清理，请重新生成后再试`
+  }
+  if (error instanceof ApiTimeoutError) {
+    return `${format} 导出超时，请检查网络后重试`
+  }
+  return error instanceof Error ? error.message : `${format} 导出失败，请稍后重试`
+}
+
 async function onExport(format: string) {
   const book = activeBook.value
   if (!book) return
@@ -87,7 +97,7 @@ async function onExport(format: string) {
       toast.show('PDF 打印窗口已打开，请选择“保存为 PDF”')
     } catch (error) {
       popup.close()
-      toast.show(error instanceof Error ? error.message : 'PDF 导出失败，请稍后重试')
+      toast.show(exportErrorMessage(error, 'PDF'))
     }
     return
   }
@@ -108,7 +118,7 @@ async function onExport(format: string) {
     URL.revokeObjectURL(href)
     toast.show('Markdown 已开始下载')
   } catch (error) {
-    toast.show(error instanceof Error ? error.message : 'Markdown 导出失败，请稍后重试')
+    toast.show(exportErrorMessage(error, 'Markdown'))
   }
 }
 

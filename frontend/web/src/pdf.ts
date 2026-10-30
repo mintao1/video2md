@@ -125,7 +125,7 @@ export function buildPdfHtml(title: string, chaptersHtml: string): string {
     <title>${safeTitle} · PDF</title>
     <style>${printStyles()}</style>
     <script>window.MathJax = { tex: { inlineMath: [['$','$'], ['\\(','\\)']], displayMath: [['$$','$$'], ['\\[','\\]']] }, svg: { fontCache: 'global' } }<\/script>
-    <script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"><\/script>
+    <script async src="/vendor/mathjax/tex-svg.js"><\/script>
   </head>
   <body>
     <div class="pdf-toolbar">打印对话框中选择“保存为 PDF”即可导出文件</div>

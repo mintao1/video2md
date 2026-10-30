@@ -12,6 +12,8 @@ npm install        # 安装依赖
 npm run dev        # 开发服务器（默认 http://localhost:5173，移动视口 390px 设计）
 npm run build      # vue-tsc 类型检查 + vite 生产构建 → dist/
 npm run test:integration # Pinia → 真实 HTTP → FastAPI 集成测试（需 backend/.venv）
+npx playwright install chromium # 首次运行真实浏览器测试时安装 Chromium
+npm run test:e2e          # Chromium 端到端导出测试（Vite 生产预览 + fixture API）
 npm run preview    # 预览构建产物
 ```
 
@@ -30,6 +32,11 @@ npm run preview    # 预览构建产物
 集成用例覆盖：按 owner 列任务、真实进度映射、无后端进展时状态不变、后端完成自动同步、
 取消持久化及状态一致性、终态/越权取消、缺失凭据、删除后刷新、恢复/插队失败反馈，
 以及收藏/进度部分更新持久化、跨用户隔离、笔记正文读取。
+
+PDF 端到端测试使用 Playwright 启动真实 Chromium 和 Vite，通过 fixture API 驱动教材库，
+覆盖弹窗打印、本地 MathJax、鉴权媒体 Blob、deliver 产物 410 提示和媒体超时提示。
+CI 会执行 `npx playwright install --with-deps chromium`；本地若使用系统浏览器，可设置
+`PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH`。
 
 队列从后端轮询真实状态；取消、重试、优先执行、删除均通过 HTTP 持久化。
 取消是协作式终止，长阶段结束前显示「取消中」；重试只支持 error/partial，保留已完成笔记。

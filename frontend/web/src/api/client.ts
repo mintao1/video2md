@@ -2,6 +2,11 @@
 import type { ApiError } from '../types'
 
 const configuredBaseUrl = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim()
+const configuredTimeout = Number((import.meta.env.VITE_API_TIMEOUT_MS as string | undefined)?.trim())
+/** Per-request deadline for notes and media reads; zero disables the guard. */
+export const API_REQUEST_TIMEOUT_MS = Number.isFinite(configuredTimeout) && configuredTimeout >= 0
+  ? configuredTimeout
+  : 20_000
 
 // Production is served behind the same TLS origin as the API. Local Vite
 // development uses a separate API port, so keep that default explicit while
@@ -74,48 +79,100 @@ export class ApiRequestError extends Error {
   }
 }
 
-async function response(path: string, init: RequestInit = {}): Promise<Response> {
+export class ApiTimeoutError extends Error {
+  readonly code = 'REQUEST_TIMEOUT'
+  readonly path: string
+  readonly timeoutMs: number
+
+  constructor(path: string, timeoutMs: number) {
+    super(`请求超时（${Math.ceil(timeoutMs / 1000)} 秒）：${path}`)
+    this.name = 'ApiTimeoutError'
+    this.path = path
+    this.timeoutMs = timeoutMs
+  }
+}
+
+export type RequestOptions = { timeoutMs?: number }
+
+async function response<T>(
+  path: string,
+  init: RequestInit = {},
+  options: RequestOptions = {},
+  read: (res: Response) => Promise<T>,
+): Promise<T> {
   const token = getToken()
   const isFormData = typeof FormData !== 'undefined' && init.body instanceof FormData
-  const res = await fetch(`${BASE_URL}${path}`, {
-    ...init,
-    headers: {
-      ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...init.headers,
-    },
-  })
-  if (!res.ok) {
-    if (res.status === 401) {
-      clearToken()
-      if (typeof window !== 'undefined' && window.location.pathname !== '/') {
-        const query = new URLSearchParams({ redirect: window.location.pathname + window.location.search })
-        if (token) query.set('reason', 'expired')
-        window.location.assign(`/?${query}`)
-      }
-    }
-    let envelope: ApiError['error'] = { code: 'HTTP_' + res.status, message: res.statusText }
-    try {
-      const body = (await res.json()) as ApiError
-      if (body.error) envelope = body.error
-    } catch {
-      /* keep default */
-    }
-    throw new ApiRequestError(envelope)
+  const controller = new AbortController()
+  const timeoutMs = options.timeoutMs ?? 0
+  let timedOut = false
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const onAbort = () => controller.abort(init.signal?.reason)
+  if (init.signal) {
+    if (init.signal.aborted) controller.abort(init.signal.reason)
+    else init.signal.addEventListener('abort', onAbort, { once: true })
   }
-  return res
+  if (timeoutMs > 0) timer = setTimeout(() => {
+    timedOut = true
+    controller.abort()
+  }, timeoutMs)
+  const release = () => {
+    if (timer) clearTimeout(timer)
+    init.signal?.removeEventListener('abort', onAbort)
+  }
+  let res: Response
+  try {
+    res = await fetch(`${BASE_URL}${path}`, {
+      ...init,
+      signal: controller.signal,
+      headers: {
+        ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...init.headers,
+      },
+    })
+  } catch (error) {
+    release()
+    if (timedOut) throw new ApiTimeoutError(path, timeoutMs)
+    throw error
+  }
+  try {
+    if (!res.ok) {
+      if (res.status === 401) {
+        clearToken()
+        if (typeof window !== 'undefined' && window.location.pathname !== '/') {
+          const query = new URLSearchParams({ redirect: window.location.pathname + window.location.search })
+          if (token) query.set('reason', 'expired')
+          window.location.assign(`/?${query}`)
+        }
+      }
+      let envelope: ApiError['error'] = { code: 'HTTP_' + res.status, message: res.statusText }
+      try {
+        const body = (await res.json()) as ApiError
+        if (body.error) envelope = body.error
+      } catch {
+        /* keep default */
+      }
+      throw new ApiRequestError(envelope)
+    }
+    return await read(res)
+  } catch (error) {
+    if (timedOut) throw new ApiTimeoutError(path, timeoutMs)
+    throw error
+  } finally {
+    release()
+  }
 }
 
-export async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
-  return (await (await response(path, init)).json()) as T
+export async function request<T>(path: string, init: RequestInit = {}, options?: RequestOptions): Promise<T> {
+  return response(path, init, options, async (res) => (await res.json()) as T)
 }
 
-export async function requestBlob(path: string): Promise<Blob> {
-  return (await response(path)).blob()
+export async function requestBlob(path: string, options: RequestOptions = { timeoutMs: API_REQUEST_TIMEOUT_MS }): Promise<Blob> {
+  return response(path, {}, options, (res) => res.blob())
 }
 
 /** Resume large clips in small authenticated ranges instead of restarting the whole file. */
-export async function requestMediaBlob(path: string): Promise<Blob> {
+export async function requestMediaBlob(path: string, options: RequestOptions = { timeoutMs: API_REQUEST_TIMEOUT_MS }): Promise<Blob> {
   const parts: Blob[] = []
   const chunkSize = 64 * 1024
   let offset = 0, total = 0, etag = '', type = ''
@@ -123,11 +180,12 @@ export async function requestMediaBlob(path: string): Promise<Blob> {
     let res: Response | undefined, blob: Blob | undefined
     for (let attempt = 0; attempt < 2; attempt++) {
       try {
-        res = await response(path, { headers: {
+        const result = await response(path, { headers: {
           Range: `bytes=${offset}-${offset + chunkSize - 1}`,
           ...(etag ? { 'If-Range': etag } : {}),
-        } })
-        blob = await res.blob()
+        } }, options, async (response) => ({ response, blob: await response.blob() }))
+        res = result.response
+        blob = result.blob
         const length = Number(res.headers.get('Content-Length'))
         if (length && blob.size !== length) throw new TypeError('Incomplete media response')
         break
