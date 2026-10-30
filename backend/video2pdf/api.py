@@ -1418,7 +1418,8 @@ def _public_run_diagnostic(run: dict) -> dict | None:
         return None
     error = str(errors[-1]).strip() or "框架异常（未提供错误消息）"
     lower_error = error.lower()
-    stage = next((name for name in ("note", "select_frames", "transcribe", "download", "frames", "ocr", "clips")
+    stage = next((name for name in ("resolve", "note", "select_frames", "select_frames_llm",
+                                   "transcribe", "download", "frames", "ocr", "clips", "finalize")
                   if name in lower_error), "unknown")
     if stage == "unknown":
         # Colab failures happen outside a named graph stage (session setup,
@@ -1449,6 +1450,9 @@ def _public_run_diagnostic(run: dict) -> dict | None:
         message = f"Colab 算力阶段失败：{_safe_diagnostic_reason(error)}"
     elif stage == "run":
         message = f"任务编排失败：{_safe_diagnostic_reason(error)}"
+    elif stage in ("resolve", "select_frames_llm", "finalize"):
+        labels = {"resolve": "链接解析", "select_frames_llm": "画面选择", "finalize": "任务收尾"}
+        message = f"{labels[stage]}阶段失败：{_safe_diagnostic_reason(error)}"
     elif '转录本过短' in error or '无转录本' in error:
         message = '转录内容过短或为空，未达到教材生成质量门槛；请使用内容更完整的视频。'
     elif "cancelled" in error or "用户取消" in error:
