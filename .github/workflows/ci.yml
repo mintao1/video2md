@@ -238,7 +238,7 @@ jobs:
       - name: Production platform entry bundle gate
         run: node scripts/check_frontend_bundle.mjs frontend/web/dist
       - name: Install Chromium for PDF browser tests
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install chromium
         working-directory: frontend/web
       - run: npm run test:integration
         working-directory: frontend/web

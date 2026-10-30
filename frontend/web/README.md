@@ -35,7 +35,7 @@ npm run preview    # 预览构建产物
 
 PDF 端到端测试使用 Playwright 启动真实 Chromium 和 Vite，通过 fixture API 驱动教材库，
 覆盖弹窗打印、本地 MathJax、鉴权媒体 Blob、deliver 产物 410 提示和媒体超时提示。
-CI 会执行 `npx playwright install --with-deps chromium`；本地若使用系统浏览器，可设置
+CI 会执行 `npx playwright install chromium`；本地若使用系统浏览器，可设置
 `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH`。
 
 队列从后端轮询真实状态；取消、重试、优先执行、删除均通过 HTTP 持久化。
