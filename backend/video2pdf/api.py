@@ -705,10 +705,15 @@ async def _drive(run_id: str, url: str, part_items: str, force: bool,
             _TASKS[run_id].update(status=final.get("status") or "done",
                                   finished=_now(), errors=(final.get("errors") or [])[-10:])
         except Exception as exc:  # graph 节点已全捕获，走到这是框架级异常
+            detail = redact(str(exc)).strip()
+            # Keep framework failures diagnosable after the task leaves memory.
+            # Empty exception strings (some subprocess/cancellation wrappers) used
+            # to become a bare error and were rendered as an unhelpful "unknown".
+            failure = f"{type(exc).__name__}: {detail}" if detail else type(exc).__name__
             _TASKS[run_id].update(status="error", finished=_now(),
-                                  errors=[redact(str(exc))[:300]])
+                                  errors=[failure[:300]])
             patch_owned_run(run_id, owner, ("created", "queued", "running", "done", "partial", "error"),
-                            {"status": "error", "errors": [redact(str(exc))[:300]]})
+                            {"status": "error", "errors": [failure[:300]]})
         finally:
             _RUNNING_DRIVES.discard(run_id)
             observability.metric_run(_TASKS[run_id].get("status", "error"))
@@ -1383,6 +1388,22 @@ def _run_title(r: dict) -> str:
     return urllib.parse.urlparse(r.get("url") or "").hostname or r.get("url") or ""
 
 
+_DIAGNOSTIC_URL_RE = re.compile(r"https?://\S+")
+_DIAGNOSTIC_SECRET_RE = re.compile(
+    r"(?i)\b(?:token|key|secret|password|authorization)=\S+"
+)
+_DIAGNOSTIC_PATH_RE = re.compile(r"(?<!\w)/(?:[A-Za-z0-9_.-]+/)+[A-Za-z0-9_.-]+")
+
+
+def _safe_diagnostic_reason(error: str) -> str:
+    """Return a short provider-safe reason for framework/Colab failures."""
+    reason = redact(str(error)).replace("\n", " ").strip()
+    reason = _DIAGNOSTIC_URL_RE.sub("<upstream>", reason)
+    reason = _DIAGNOSTIC_PATH_RE.sub("<path>", reason)
+    reason = _DIAGNOSTIC_SECRET_RE.sub(lambda m: m.group(0).split("=", 1)[0] + "=<redacted>", reason)
+    return reason[:180]
+
+
 def _public_run_diagnostic(run: dict) -> dict | None:
     """Never forward provider bodies, prompts, credentials or paths to the UI."""
     from .note import MIN_NOTE_TRANSCRIPT_CHARS
@@ -1395,9 +1416,19 @@ def _public_run_diagnostic(run: dict) -> dict | None:
                 if short else '部分条目未生成教材，请检查视频内容或重试。')}
     if not errors:
         return None
-    error = str(errors[-1])
+    error = str(errors[-1]).strip() or "框架异常（未提供错误消息）"
+    lower_error = error.lower()
     stage = next((name for name in ("note", "select_frames", "transcribe", "download", "frames", "ocr", "clips")
-                  if name in error), "unknown")
+                  if name in lower_error), "unknown")
+    if stage == "unknown":
+        # Colab failures happen outside a named graph stage (session setup,
+        # worker startup, or scope cleanup) and previously appeared as unknown.
+        if any(marker in lower_error for marker in
+               ("colab", "colab-cli", "session", "t4", "gpu", "worker")):
+            stage = "colab"
+        elif any(marker in lower_error for marker in
+                 ("framework", "langgraph", "checkpoint", "graph")):
+            stage = "run"
     if "依赖阶段" in error or "clips 阶段无节段产物" in error:
         failed = run.get("partial_failures") or {}
         dependency = next((name for name in ("clips", "ocr", "select", "frames", "transcribe", "download")
@@ -1414,6 +1445,10 @@ def _public_run_diagnostic(run: dict) -> dict | None:
                    "401": "模型身份验证失败，请检查服务配置。",
                    "429": "模型请求受限，请稍后重试。"}.get(code, "上游服务请求失败，请稍后重试。")
         message = f"{message}（HTTP {code}）"
+    elif stage == "colab":
+        message = f"Colab 算力阶段失败：{_safe_diagnostic_reason(error)}"
+    elif stage == "run":
+        message = f"任务编排失败：{_safe_diagnostic_reason(error)}"
     elif '转录本过短' in error or '无转录本' in error:
         message = '转录内容过短或为空，未达到教材生成质量门槛；请使用内容更完整的视频。'
     elif "cancelled" in error or "用户取消" in error:

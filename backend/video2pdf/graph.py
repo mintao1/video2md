@@ -557,7 +557,11 @@ def run_graph(url: str, *, part_items: str = "", force: bool = False, review: bo
         from .colab import session_scope
         from .llm_settings import user_scope
         from .pg import tenant_scope
-        with tenant_scope(owner), user_scope(owner), session_scope(owner=owner):
+        # Graph stages return terminal error states instead of raising.  Colab
+        # shutdown is therefore best-effort here; a stop/lock cleanup failure
+        # must not erase the stage error and surface as an ``unknown`` failure.
+        with tenant_scope(owner), user_scope(owner), session_scope(
+                owner=owner, suppress_cleanup_errors=True):
             final = graph.invoke(initial, config=config)
     except Exception:
         deadman.ping("fail", run_id=run_id, trace_name=url)

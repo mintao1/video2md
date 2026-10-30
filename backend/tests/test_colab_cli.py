@@ -275,6 +275,24 @@ def test_failed_shutdown_does_not_hide_original_error(cli, monkeypatch):
         raise ValueError("original error")
 
 
+def test_graph_terminal_error_survives_failed_colab_shutdown(cli, monkeypatch):
+    """A returned graph error must not become ``unknown`` during cleanup."""
+    from video2pdf import graph as pipeline
+
+    class ErrorGraph:
+        def invoke(self, _initial, config=None):
+            use = colab._USE.get()
+            assert use is not None
+            use.used = True
+            return {"status": "error", "errors": ["阶段 transcribe: remote worker failed"]}
+
+    monkeypatch.setattr(pipeline, "build_graph", lambda _checkpointer: ErrorGraph())
+    monkeypatch.setattr(colab.machinery, "_colab_stop_session", lambda _reason: False)
+    final = pipeline.run_graph("fixture://cleanup", run_id="cleanup-failure-regression")
+    assert final["status"] == "error"
+    assert final["errors"] == ["阶段 transcribe: remote worker failed"]
+
+
 def test_stop_command_retries_timeout(cli, monkeypatch):
     calls = []
 

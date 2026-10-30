@@ -93,8 +93,14 @@ def _configure():
     machinery.ALLOW_CPU_FALLBACK = (ENV.get("V2PDF_COLAB_CPU_FALLBACK") or "off") == "on"
 
 @contextlib.contextmanager
-def session_scope(owner: str | None = None):
-    """Reuse one session across a run's stages, releasing it even on failure."""
+def session_scope(owner: str | None = None, *, suppress_cleanup_errors: bool = False):
+    """Reuse one session across a run's stages, releasing it even on failure.
+
+    A graph can return a terminal ``error`` state without raising.  In that
+    case, cleanup is best-effort: a failed ``colab stop`` must not replace the
+    graph's stage error with a framework-level exception.  Standalone callers
+    keep the strict default so cleanup failures remain visible to them.
+    """
     if _USE.get() is not None:
         if owner is not None and owner != _OWNER.get():
             raise RuntimeError("Colab 任务执行期间不能切换租户")
@@ -106,8 +112,13 @@ def session_scope(owner: str | None = None):
     try:
         yield
     finally:
+        original_error = sys.exc_info()[1]
         try:
             release_session("run 结束")
+        except Exception as cleanup_error:
+            if not suppress_cleanup_errors and original_error is None:
+                raise
+            print(f"⚠ Colab 会话清理失败（不覆盖原始任务结果）：{cleanup_error}", flush=True)
         finally:
             _USE.reset(token)
             if owner_token is not None:

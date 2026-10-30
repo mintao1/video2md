@@ -2160,6 +2160,24 @@ def test_run_accounting_and_redacted_failure_reach_owned_list_and_detail(client)
     assert client.get('/runs/diagnostic-bill', headers={'X-Test-Auth': 'bob'}).status_code == 403
 
 
+def test_framework_colab_failure_is_visible_without_provider_secrets(client):
+    put_identity('test', 'alice', 'uid_alice')
+    rec = _seed_run('colab-framework-failure', 'uid_alice', status='error')
+    rec['errors'] = [
+        'RuntimeError: colab sessions 失败: /private/colab/token.json token=secret '
+        'https://upstream.test/?key=secret',
+    ]
+    with runs._runs_file_lock():
+        runs._runs_merge(rec)
+    diagnostic = client.get('/runs/colab-framework-failure',
+                            headers={'X-Test-Auth': 'alice'}).json()['diagnostic']
+    assert diagnostic['stage'] == 'colab'
+    assert 'Colab' in diagnostic['message'] and 'sessions' in diagnostic['message']
+    assert '/private' not in diagnostic['message']
+    assert 'token=secret' not in diagnostic['message']
+    assert 'key=secret' not in diagnostic['message']
+
+
 def test_monthly_cost_details_include_only_owner_and_keep_deleted_bills(client):
     put_identity('test', 'alice', 'uid_alice')
     rec = _seed_run('monthly-bill', 'uid_alice', status='done')
