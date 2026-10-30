@@ -702,10 +702,13 @@ async def _drive(run_id: str, url: str, part_items: str, force: bool,
                                             force=force, review=review,
                                             max_frames=max_frames, run_id=run_id,
                                             checkpointer=_CHECKPOINTER, owner=owner)
-            final_run = final.get("run") if isinstance(final.get("run"), dict) else {}
-            final_errors = ((final.get("errors") or [])
-                            or (final_run.get("errors") or [])
-                            or (_TASKS.get(run_id, {}).get("errors") or []))[-10:]
+            final_errors = list(final.get("errors") or [])
+            nested_run = final.get("run")
+            if not final_errors and isinstance(nested_run, dict):
+                final_errors = list(nested_run.get("errors") or [])
+            if not final_errors:
+                final_errors = list(_TASKS.get(run_id, {}).get("errors") or [])
+            final_errors = final_errors[-10:]
             _TASKS[run_id].update(status=final.get("status") or "done",
                                   finished=_now(), errors=final_errors)
         except Exception as exc:  # graph 节点已全捕获，走到这是框架级异常
