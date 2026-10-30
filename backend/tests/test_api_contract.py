@@ -7,11 +7,13 @@ X-Test-Auth 头注入不同身份断言多用户隔离）；POST 成功路径 mo
 """
 from __future__ import annotations
 
+import asyncio
 import os
 import tempfile
 import threading
 import time
 import urllib.parse
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 _TMP = tempfile.mkdtemp(prefix="v2pdf-contract-")
@@ -2176,6 +2178,29 @@ def test_framework_colab_failure_is_visible_without_provider_secrets(client):
     assert '/private' not in diagnostic['message']
     assert 'token=secret' not in diagnostic['message']
     assert 'key=secret' not in diagnostic['message']
+
+
+def test_drive_preserves_nested_graph_errors(monkeypatch):
+    """node_fail returns errors under ``run``; the task view must retain them."""
+    import video2pdf.api as _api
+
+    run_id = "nested-graph-error"
+    _api._TASKS[run_id] = {"status": "queued", "url": "fixture", "owner": ""}
+
+    @asynccontextmanager
+    async def slot(_run_id):
+        yield
+
+    monkeypatch.setattr(_api, "_execution_slot", slot)
+    monkeypatch.setattr(_api, "run_graph",
+                        lambda *args, **kwargs: {
+                            "status": "error",
+                            "run": {"errors": ["阶段 transcribe: remote worker failed"]},
+                        })
+    monkeypatch.setattr(_api, "settle_cost", lambda _run_id: None)
+    asyncio.run(_api._drive(run_id, "fixture", "", False, False, 60))
+    assert _api._TASKS[run_id]["errors"] == ["阶段 transcribe: remote worker failed"]
+    _api._TASKS.pop(run_id, None)
 
 
 def test_monthly_cost_details_include_only_owner_and_keep_deleted_bills(client):

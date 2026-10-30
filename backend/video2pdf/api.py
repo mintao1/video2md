@@ -702,8 +702,12 @@ async def _drive(run_id: str, url: str, part_items: str, force: bool,
                                             force=force, review=review,
                                             max_frames=max_frames, run_id=run_id,
                                             checkpointer=_CHECKPOINTER, owner=owner)
+            final_run = final.get("run") if isinstance(final.get("run"), dict) else {}
+            final_errors = ((final.get("errors") or [])
+                            or (final_run.get("errors") or [])
+                            or (_TASKS.get(run_id, {}).get("errors") or []))[-10:]
             _TASKS[run_id].update(status=final.get("status") or "done",
-                                  finished=_now(), errors=(final.get("errors") or [])[-10:])
+                                  finished=_now(), errors=final_errors)
         except Exception as exc:  # graph 节点已全捕获，走到这是框架级异常
             detail = redact(str(exc)).strip()
             # Keep framework failures diagnosable after the task leaves memory.
@@ -1460,7 +1464,10 @@ def _public_run_diagnostic(run: dict) -> dict | None:
     elif "timeout" in error.lower() or "超时" in error:
         message = "处理阶段超时，请稍后重试。"
     else:
-        message = "处理未完成，请重试或凭任务编号联系支持。"
+        # Keep unknown as an internal classification only; a non-empty error
+        # should always give the user a safe, actionable reason.
+        stage = "run" if stage == "unknown" else stage
+        message = f"任务编排失败：{_safe_diagnostic_reason(error)}"
     return {"stage": stage, "message": message}
 
 
