@@ -83,16 +83,27 @@ export async function listRuns(): Promise<RunListItem[]> {
   return resp.items.map((i) => toItem(i, resp.mode))
 }
 
-/** 验证档：只跑前 2 个条目（用户拍板「先跑 1-2 个验证」）；全量跑删掉这个字段即可 */
-// 验证档只跑前 2 条（全量跑删掉该字段）。含 0：单视频条目 playlist_index=None，
-// 后端 _part_selected 口径为 (index or 0)——spec 不含 0 会把单视频整条滤空（400）。
-const VERIFY_PART_ITEMS = '0,1,2'
+export interface CreateRunInput {
+  url: string
+  title?: string
+  /**
+   * Optional playlist selection, using the backend syntax (`1,3-5`).
+   * Leaving it empty means the whole resolved playlist, which is the
+   * production default.  The old hard-coded `0,1,2` value was a temporary
+   * verification switch and silently truncated every collection.
+   */
+  partItems?: string
+}
 
-export async function createRun(body: { url: string; title?: string }): Promise<RunListItem> {
-  // RunCreate 契约无 title 字段（展示名由服务端从 art/entry 派生），本地 title 仅兜底
+export async function createRun(body: CreateRunInput): Promise<RunListItem> {
+  // RunCreate 契约无 title 字段（展示名由服务端从 art/entry 派生），本地 title 仅兜底。
+  // Keep playlist selection explicit: omitted part_items means process all entries.
+  const requestBody: { url: string; part_items?: string } = { url: body.url }
+  const partItems = body.partItems?.trim()
+  if (partItems) requestBody.part_items = partItems
   const created = await request<RunCreatedResp>('/runs', {
     method: 'POST',
-    body: JSON.stringify({ url: body.url, part_items: VERIFY_PART_ITEMS }),
+    body: JSON.stringify(requestBody),
   })
   return {
     run_id: created.run_id,
@@ -127,4 +138,17 @@ export async function deleteRuns(ids: string[]): Promise<void> {
 
 export async function downloadBundle(id: string): Promise<Blob> {
   return requestBlob(`/runs/${encodeURIComponent(id)}/bundle`)
+}
+
+/**
+ * Confirm that the client has received the deliver bundle.
+ *
+ * The server deliberately keeps deliver artifacts only for a short TTL.  A
+ * successful blob fetch is the client-side confirmation point, so callers
+ * should ACK immediately after the browser download has been started.  The
+ * endpoint is intentionally separate from downloadBundle so a failed fetch
+ * cannot burn the only copy.
+ */
+export async function acknowledgeBundle(id: string): Promise<void> {
+  await request(`/runs/${encodeURIComponent(id)}/artifacts`, { method: 'DELETE' })
 }
