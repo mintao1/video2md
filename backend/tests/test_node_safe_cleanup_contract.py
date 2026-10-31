@@ -19,7 +19,9 @@ def test_node_cleanup_prunes_only_rebuildable_caches() -> None:
     assert "--filter \"until=${KEEP_HOURS}h\"" in text
     assert "docker system prune" not in text
     assert "docker volume prune" not in text
-    assert "k3s ctr images rm" not in text
+    assert "k3s ctr images rm" in text
+    assert "KEEP_ROLLOUTS" in text
+    assert "keep set unavailable" in text
 
 
 def test_node_cleanup_keeps_production_paths_out_of_delete_commands() -> None:
