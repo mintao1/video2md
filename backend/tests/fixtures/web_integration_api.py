@@ -132,10 +132,20 @@ async def reset():
         artifacts = {e["url"]: ({"note": str(root / f"{rid}-{i}.md"),
                                 "title": f"Lesson {i + 1}", "md": "# Integration lesson"}
                                if i < completed else {}) for i, e in enumerate(entries)}
-        records[rid] = {"run_id": rid, "url": f"https://example.test/{rid}", "part_items": "0,1,2",
+        # Keep the seeded records aligned with the production contract: an
+        # omitted selection means the whole collection.  The finished fixture
+        # also covers an explicit selection so request-serialization tests can
+        # deduplicate without reaching the real resolver/network.
+        seeded_part_items = "1,3-5" if rid == "finished" else ""
+        records[rid] = {"run_id": rid, "url": f"https://example.test/{rid}", "part_items": seeded_part_items,
                         "owner": owner, "status": status, "total": total,
                         "created": "2026-01-01T00:00:00", "entries": entries,
                         "artifacts": artifacts, "stages": {}}
+        if rid == "finished":
+            # A reusable completed run must have a real note path so the
+            # production deduplication branch can answer the explicit
+            # `part_items` request without touching the network resolver.
+            (root / "finished-0.md").write_text("# Integration lesson")
         if status in ("running", "queued"):
             api._TASKS[rid] = {"status": status, "url": records[rid]["url"], "owner": owner}
     records['finished'].update(created=__import__('datetime').datetime.now().isoformat(),
