@@ -10,17 +10,29 @@ before_kib="$(df -Pk "$ROOT_PATH" | awk 'NR == 2 { print $4; exit }')"
 echo "NODE_SAFE_CLEANUP=START root=$ROOT_PATH free_kib=${before_kib:-unknown} keep_days=$KEEP_DAYS"
 
 report_usage() {
+  local -a paths=(
+    "$ROOT_PATH"
+    "$ROOT_PATH/agent"
+    "$ROOT_PATH/agent/containerd"
+    /var/lib/docker
+    /var/lib/containerd
+    /home
+    /tmp
+  )
   command -v du >/dev/null 2>&1 || return 0
-  for path in "$ROOT_PATH" "$ROOT_PATH/agent" "$ROOT_PATH/agent/containerd"; do
+  for path in "${paths[@]}"; do
     [[ -d "$path" ]] || continue
-    du -x -k -d 1 "$path" 2>/dev/null \
+    if command -v sudo >/dev/null 2>&1; then
+      sudo du -x -k -d 1 "$path" 2>/dev/null
+    else
+      du -x -k -d 1 "$path" 2>/dev/null
+    fi \
       | sort -rn \
       | head -n 12 \
       | sed 's#^#NODE_SAFE_CLEANUP=USAGE #' \
       || true
   done
 }
-
 if command -v docker >/dev/null 2>&1; then
   docker builder prune -af --filter "until=${KEEP_HOURS}h" || true
   docker image prune -af --filter "until=${KEEP_HOURS}h" || true
