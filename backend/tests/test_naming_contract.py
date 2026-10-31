@@ -42,6 +42,21 @@ def test_migrate_renames_old_tables_and_keeps_rows():
 
     db = f"rename_{uuid.uuid4().hex[:8]}"
     with psycopg.connect(DSN, autocommit=True) as admin:
+        admin.execute("""
+        DO $$
+        BEGIN
+            IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'video2md_app') THEN
+                CREATE ROLE video2md_app;
+            END IF;
+            IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'video2md_migrate') THEN
+                CREATE ROLE video2md_migrate;
+            END IF;
+            IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'video2md_owner') THEN
+                CREATE ROLE video2md_owner;
+            END IF;
+        END
+        $$;
+        """)
         admin.execute(sql.SQL("CREATE DATABASE {}").format(sql.Identifier(db)))
     try:
         dsn = make_conninfo(DSN, dbname=db)
@@ -52,7 +67,13 @@ def test_migrate_renames_old_tables_and_keeps_rows():
                          "SELECT g, 'legacy' FROM generate_series(1, %s) g", (SCHEMA_LATEST,))
             conn.execute("CREATE TABLE v2pdf_runs (run_id text PRIMARY KEY, record jsonb NOT NULL)")
             conn.execute("CREATE INDEX v2pdf_runs_extra_idx ON v2pdf_runs (run_id)")
-            conn.execute("INSERT INTO v2pdf_runs VALUES ('r1', '{}')")
+            conn.execute("ALTER TABLE v2pdf_runs ADD COLUMN owner text NOT NULL DEFAULT ''")
+            conn.execute("CREATE FUNCTION v2pdf_tenant_visible(text) RETURNS boolean "
+                         "LANGUAGE sql IMMUTABLE AS 'SELECT true'")
+            conn.execute("ALTER TABLE v2pdf_runs ENABLE ROW LEVEL SECURITY")
+            conn.execute("CREATE POLICY v2pdf_runs_tenant ON v2pdf_runs "
+                         "USING (v2pdf_tenant_visible(owner))")
+            conn.execute("INSERT INTO v2pdf_runs (run_id, record) VALUES ('r1', '{}')")
         pool = pg.make_pool(dsn)
         try:
             assert apply_migrations(pool) == []
@@ -62,10 +83,15 @@ def test_migrate_renames_old_tables_and_keeps_rows():
                     "SELECT relname FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace "
                     "WHERE n.nspname = current_schema()").fetchall()}
                 rows = conn.execute("SELECT run_id FROM v2md_runs").fetchall()
+                policy = conn.execute("SELECT policyname FROM pg_policies "
+                                      "WHERE tablename = 'v2md_runs'").fetchall()
+                function = conn.execute("SELECT to_regprocedure('v2md_tenant_visible(text)')").fetchone()[0]
             assert not {n for n in names if n.startswith("v2pdf_")}
             assert {"v2md_runs", "v2md_runs_pkey", "v2md_runs_extra_idx",
                     "v2md_schema_version"} <= names
             assert rows == [("r1",)]
+            assert policy == [("v2md_runs_tenant",)]
+            assert function is not None
             assert apply_migrations(pool) == []
         finally:
             pool.close()

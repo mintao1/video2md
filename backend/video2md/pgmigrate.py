@@ -59,7 +59,7 @@ def _rename_legacy_relations(conn) -> list[str]:
     rels = conn.execute(
         "SELECT c.relname, c.relkind FROM pg_class c "
         "JOIN pg_namespace n ON n.oid = c.relnamespace "
-        "WHERE n.nspname = current_schema() AND c.relname LIKE 'v2md\\_%' "
+        "WHERE n.nspname = current_schema() AND c.relname LIKE 'v2pdf\\_%' "
         "AND c.relkind IN ('r', 'p', 'i', 'S') ORDER BY c.relkind DESC, c.relname").fetchall()
     with conn.transaction():
         for name, kind in rels:
