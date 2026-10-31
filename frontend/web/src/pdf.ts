@@ -6,7 +6,9 @@ export type PdfNote = { title: string; md: string }
 export type PdfMediaLoader = (name: string) => Promise<Blob>
 type PdfCallout = { type: 'info' | 'tip' | 'warning' | 'example'; title: string; body: string }
 
-const CALLOUT_START = /^>\s*\[!(info|tip|warning|example)\](?:-)?(?:\s+(.*))?\s*$/
+// Keep PDF export compatible with both canonical Obsidian blockquotes and
+// legacy notes where the leading `>` was lost by the stored markdown.
+const CALLOUT_START = /^(?:>\s*)?\[!(info|tip|warning|example)\](?:-)?(?:\s+(.*))?\s*$/
 
 function extractCallouts(md: string): { markdown: string; callouts: PdfCallout[] } {
   const lines = md.split(/\r?\n/)
