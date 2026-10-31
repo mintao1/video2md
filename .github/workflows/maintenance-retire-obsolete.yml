@@ -1,0 +1,61 @@
+name: Retire obsolete project namespaces
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "inspect or delete obsolete stateless namespaces"
+        required: true
+        type: choice
+        options: [inspect, delete]
+
+permissions:
+  contents: read
+
+jobs:
+  retire:
+    runs-on: ubuntu-latest
+    environment: prod
+    steps:
+      - name: Setup SSH
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H "${{ secrets.SSH_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Inspect or retire high-confidence obsolete namespaces
+        env:
+          MODE: ${{ inputs.mode }}
+        run: |
+          set -euo pipefail
+          ssh "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" "MODE=${MODE} bash -s" <<'REMOTE'
+          set -euo pipefail
+          NAMESPACES=(bookserve sing-train vquote)
+          echo "=== target namespaces ==="
+          sudo k3s kubectl get ns "${NAMESPACES[@]}" --ignore-not-found
+          echo "=== target workloads ==="
+          for ns in "${NAMESPACES[@]}"; do
+            echo "--- $ns ---"
+            sudo k3s kubectl get all,pvc,ingress,configmap,secret -n "$ns" --ignore-not-found || true
+          done
+          if [[ "$MODE" == "inspect" ]]; then
+            exit 0
+          fi
+          for ns in "${NAMESPACES[@]}"; do
+            if sudo k3s kubectl get pvc -n "$ns" --no-headers 2>/dev/null | grep -q .; then
+              echo "refusing to delete $ns: PVC exists" >&2
+              exit 20
+            fi
+          done
+          for ns in "${NAMESPACES[@]}"; do
+            sudo k3s kubectl delete namespace "$ns" --ignore-not-found --wait=true --timeout=120s
+          done
+          echo "=== reclaim unused runtime cache ==="
+          docker builder prune --all --force || true
+          docker system prune --all --force || true
+          sudo k3s crictl rmi --prune || true
+          echo "=== filesystem after retirement ==="
+          df -h /
+          REMOTE
