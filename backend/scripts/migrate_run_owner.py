@@ -24,7 +24,7 @@ from video2md import runs  # noqa: E402
 
 if (runs.ENV.get("V2MD_RUNS_STORE") or "").strip().lower() == "postgres":
     sys.exit("本工具面向 JSON 文件档（runs.json）；V2MD_RUNS_STORE=postgres 下数据在 PG——"
-             "owner 收编用 SQL（UPDATE v2pdf_runs SET record = jsonb_set(...)）处理")
+             "owner 收编用 SQL（UPDATE v2md_runs SET record = jsonb_set(...)）处理")
 
 
 def main() -> int:

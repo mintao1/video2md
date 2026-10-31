@@ -236,7 +236,7 @@ def _tasks_backend_safe():
 
 def check_cluster(*, timeout_s: float | None = None,
                   now_wall: float | None = None) -> list[str]:
-    """PG 档大盘巡检：扫 v2pdf_runs 全盘 running 中 DB 侧超龄的行，逐个复核处置。
+    """PG 档大盘巡检：扫 v2md_runs 全盘 running 中 DB 侧超龄的行，逐个复核处置。
 
     三层信号取最小龄（_LOCAL_HB 跨进程缓存 / started / GREATEST(阶段 ts, updated)），
     与 check_run 同口径：宁可放过不误杀。本进程有活条目 → 既有 trip 语义；

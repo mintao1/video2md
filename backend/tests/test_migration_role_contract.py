@@ -20,8 +20,8 @@ def _run(code: str) -> subprocess.CompletedProcess[str]:
         **os.environ,
         "PYTHONPATH": str(ROOT),
         "V2MD_ENV": "development",
-        "V2MD_PG_DSN": "postgresql://video2md_app:app@db/v2pdf",
-        "V2MD_PG_MIGRATE_DSN": "postgresql://video2md_migrate:migrate@db/v2pdf",
+        "V2MD_PG_DSN": "postgresql://video2md_app:app@db/v2md",
+        "V2MD_PG_MIGRATE_DSN": "postgresql://video2md_migrate:migrate@db/v2md",
     }
     return subprocess.run([sys.executable, "-c", code], env=env,
                           capture_output=True, text=True, timeout=30)
@@ -31,7 +31,7 @@ def test_migrate_dsn_prefers_dedicated_role() -> None:
     result = _run(
         "from video2md import pg; "
         "assert pg.pg_migrate_dsn() == "
-        "'postgresql://video2md_migrate:migrate@db/v2pdf'"
+        "'postgresql://video2md_migrate:migrate@db/v2md'"
     )
     assert result.returncode == 0, result.stderr
 
@@ -47,7 +47,7 @@ def test_migrate_entrypoint_passes_dedicated_dsn_to_pool() -> None:
         "pgmigrate.apply_migrations=lambda pool: []; "
         "pgmigrate.validate_schema=lambda pool: None; "
         "sys.argv=['video2md','migrate']; __main__.main(); "
-        "assert seen == ['postgresql://video2md_migrate:migrate@db/v2pdf']"
+        "assert seen == ['postgresql://video2md_migrate:migrate@db/v2md']"
     )
     assert result.returncode == 0, result.stderr
 

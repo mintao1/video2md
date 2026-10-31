@@ -19,19 +19,10 @@ export const BASE_URL = configuredBaseUrl ||
     (typeof window !== 'undefined' ? window.location.origin : 'http://127.0.0.1:8790'))
 
 // Google ID token is carried as a Bearer credential for every API request.
-// Keep the previous video2pdf key as a one-time migration so existing users stay signed in.
 const TOKEN_KEY = 'v2md_token'
-const LEGACY_TOKEN_KEY = 'v2pdf_token'
 
 export function getToken(): string | null {
-  const token = localStorage.getItem(TOKEN_KEY)
-  if (token) return token
-  const legacy = localStorage.getItem(LEGACY_TOKEN_KEY)
-  if (legacy) {
-    localStorage.setItem(TOKEN_KEY, legacy)
-    localStorage.removeItem(LEGACY_TOKEN_KEY)
-  }
-  return legacy
+  return localStorage.getItem(TOKEN_KEY)
 }
 
 export function setToken(token: string): void {
@@ -40,7 +31,6 @@ export function setToken(token: string): void {
 
 export function clearToken(): void {
   localStorage.removeItem(TOKEN_KEY)
-  localStorage.removeItem(LEGACY_TOKEN_KEY)
 }
 
 /** Only same-site absolute paths are accepted as post-login targets. */

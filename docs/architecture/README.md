@@ -50,7 +50,7 @@
 |---|---|---|
 | P1/P2（e320ee5） | 并发闸门 `V2MD_MAX_CONCURRENT_RUNS`、配额限流三闸（429 统一信封）、`POST /uploads` 上传面 + 路径白名单、GHCR 发布流水线（tag 驱动 + `deploy.sh`）、`backup.sh` rclone 异地钩子 | ✅ |
 | P3 | 存储分派 `json｜postgres`：`V2MD_RUNS/STATE/USERS_STORE` 三存储 + checkpointer 同池、`V2MD_EVENTS=pg`（LISTEN/NOTIFY 跨进程 SSE 扇出）、存量导入 `backend/scripts/migrate_json_to_pg.py` | ✅ |
-| P4b（3f7bb1a） | 任务表 **PG 读侧真相源**（`V2MD_TASKS_STORE=postgres`）：`/queue`·配额·dedup·watchdog 大盘巡检·启动认领恢复走 `v2pdf_runs`；events `v2md_cmds` 心跳广播；多副本 tmp 保护 | ✅（读侧；写路径仍进程内，见 [04 篇](04-data-and-consistency.md#任务表两档口径)） |
+| P4b（3f7bb1a） | 任务表 **PG 读侧真相源**（`V2MD_TASKS_STORE=postgres`）：`/queue`·配额·dedup·watchdog 大盘巡检·启动认领恢复走 `v2md_runs`；events `v2md_cmds` 心跳广播；多副本 tmp 保护 | ✅（读侧；写路径仍进程内，见 [04 篇](04-data-and-consistency.md#任务表两档口径)） |
 
 **距「完整多副本生产」尚差四件**（原 README 出界项，全部已入 ROADMAP）：
 

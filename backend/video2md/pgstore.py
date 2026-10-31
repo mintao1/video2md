@@ -7,7 +7,7 @@
 - PostgresStateStore.save() 把「全量替换」降为逐 fp upsert——state 键集只增不删
   （重跑覆盖同 fp），语义等价。
 
-表名带 v2pdf_ 前缀（与 langgraph checkpointer 的 checkpoints* 表同库不撞）；
+表名带 v2md_ 前缀（与 langgraph checkpointer 的 checkpoints* 表同库不撞）；
 owner/status/created 提取列供 PostgresTaskStore 的队列查询（P4b）与运维 SQL 用，
 真相仍是 record jsonb——merge() 整行覆盖 record+status，两态天然一致。
 """
@@ -51,7 +51,7 @@ class PostgresRunsStore:
 
     def load(self) -> dict:
         with tenant_connection(self.pool) as conn:
-            rows = conn.execute("SELECT record FROM v2pdf_runs").fetchall()
+            rows = conn.execute("SELECT record FROM v2md_runs").fetchall()
         out: dict = {}
         for (rec,) in rows:
             out[rec["run_id"]] = rec
@@ -60,7 +60,7 @@ class PostgresRunsStore:
     def delete_terminal(self, run_id: str, owner: str) -> bool:
         with tenant_connection(self.pool) as conn:
             row = conn.execute("""
-                UPDATE v2pdf_runs SET record=record || '{"deleted":true}'::jsonb, updated=now()
+                UPDATE v2md_runs SET record=record || '{"deleted":true}'::jsonb, updated=now()
                 WHERE run_id=%s AND owner=%s AND record->>'deleted' IS DISTINCT FROM 'true'
                 AND status IN ('done', 'partial', 'error') RETURNING run_id
                 """, (run_id, owner)).fetchone()
@@ -69,7 +69,7 @@ class PostgresRunsStore:
     def patch_owned(self, run_id: str, owner: str, statuses: tuple[str, ...], patch: dict) -> dict | None:
         with tenant_connection(self.pool) as conn:
             row = conn.execute("""
-                UPDATE v2pdf_runs SET record = record || %s::jsonb, status = COALESCE(%s, status), updated = now()
+                UPDATE v2md_runs SET record = record || %s::jsonb, status = COALESCE(%s, status), updated = now()
                 WHERE run_id=%s AND owner=%s AND record->>'deleted' IS DISTINCT FROM 'true'
                 AND status = ANY(%s) RETURNING record
                 """, (Json(patch), patch.get("status"), run_id, owner, list(statuses))).fetchone()
@@ -79,13 +79,13 @@ class PostgresRunsStore:
         """行级 upsert（原子）。调用方无需持锁——文件档的锁纪律在此内化为行锁。"""
         with tenant_connection(self.pool) as conn:
             conn.execute("""
-                INSERT INTO v2pdf_runs (run_id, owner, status, created, record)
+                INSERT INTO v2md_runs (run_id, owner, status, created, record)
                 VALUES (%(run_id)s, %(owner)s, %(status)s, %(created)s, %(rec)s)
                 ON CONFLICT (run_id) DO UPDATE SET
                     owner = EXCLUDED.owner,
                     status = EXCLUDED.status,
                     created = EXCLUDED.created,
-                    record = CASE WHEN v2pdf_runs.record->>'deleted'='true'
+                    record = CASE WHEN v2md_runs.record->>'deleted'='true'
                         THEN EXCLUDED.record || '{"deleted":true}'::jsonb ELSE EXCLUDED.record END,
                     updated = now()""",
                 {"run_id": run.get("run_id", ""),
@@ -110,9 +110,9 @@ class PostgresStateStore:
             # Keep the unscoped form for CLI/eval callers and migration tooling.
             owner = current_tenant()
             if owner is None:
-                rows = conn.execute("SELECT fp, record FROM v2pdf_state").fetchall()
+                rows = conn.execute("SELECT fp, record FROM v2md_state").fetchall()
             else:
-                rows = conn.execute("SELECT fp, record FROM v2pdf_state WHERE owner=%s",
+                rows = conn.execute("SELECT fp, record FROM v2md_state WHERE owner=%s",
                                     (owner,)).fetchall()
         return {fp: rec for fp, rec in rows}
 
@@ -123,7 +123,7 @@ class PostgresStateStore:
             tenant = current_tenant()
             with conn.cursor() as cur:
                 cur.executemany("""
-                    INSERT INTO v2pdf_state (owner, fp, record) VALUES (%s, %s, %s)
+                    INSERT INTO v2md_state (owner, fp, record) VALUES (%s, %s, %s)
                     ON CONFLICT (owner, fp) DO UPDATE SET record = EXCLUDED.record, updated = now()
                     """, [((tenant if tenant is not None else (rec.get("owner") or "")),
                            fp, Json(rec)) for fp, rec in s.items()])
@@ -132,17 +132,17 @@ class PostgresStateStore:
 class PostgresTaskStore:
     """任务表 PG 真相源（P4b·多副本档）——只管「读侧 + 认领」，不碰状态写入。
 
-    口径：record jsonb 是状态唯一真相，v2pdf_runs.status 提取列是其可查镜像
+    口径：record jsonb 是状态唯一真相，v2md_runs.status 提取列是其可查镜像
     （merge 整行覆盖两态天然一致）。本类方法全是纯 SQL 查询/单语句原子迁移：
     - counts/active_for/total_active/is_alive → /queue、配额闸、dedup 判活
     - recover_candidates → 启动恢复认领：FOR UPDATE SKIP LOCKED，claim=行锁本身，
       双起竞争败者跳过、胜者重投后由 _drive 的 merge 自然刷 claimed_by
     - stale_running/steal_if_unclaimed/heartbeat → watchdog DB 巡检与崩溃残档接管
-    - submit_window_allowed → 跨进程滑窗限流（v2pdf_submit_log 单语句清旧+计数+判定）
+    - submit_window_allowed → 跨进程滑窗限流（v2md_submit_log 单语句清旧+计数+判定）
     """
 
     def __init__(self, pool: ConnectionPool):
-        self.pool = pool  # v2pdf_runs·claimed_by·v2pdf_submit_log 建表已上收 migrations/0001（P0-5）
+        self.pool = pool  # v2md_runs·claimed_by·v2md_submit_log 建表已上收 migrations/0001（P0-5）
 
     # ---------------------------------------------------------------- 队列视图
 
@@ -150,7 +150,7 @@ class PostgresTaskStore:
         """{queued, running} 全盘计数（status 索引扫描，仅两态）。"""
         with tenant_connection(self.pool) as conn:
             rows = conn.execute(
-                "SELECT status, count(*) FROM v2pdf_runs "
+                "SELECT status, count(*) FROM v2md_runs "
                 "WHERE status IN ('queued','running') GROUP BY status").fetchall()
         c = {"queued": 0, "running": 0}
         for st, n in rows:
@@ -160,13 +160,13 @@ class PostgresTaskStore:
     def total_active(self) -> int:
         with tenant_connection(self.pool) as conn:
             row = conn.execute(
-                "SELECT count(*) FROM v2pdf_runs WHERE status IN ('queued','running')").fetchone()
+                "SELECT count(*) FROM v2md_runs WHERE status IN ('queued','running')").fetchone()
         return int(row[0]) if row else 0
 
     def active_for(self, uid: str) -> int:
         with tenant_connection(self.pool) as conn:
             row = conn.execute(
-                "SELECT count(*) FROM v2pdf_runs "
+                "SELECT count(*) FROM v2md_runs "
                 "WHERE status IN ('queued','running') AND owner=%s", (uid,)).fetchone()
         return int(row[0]) if row else 0
 
@@ -174,7 +174,7 @@ class PostgresTaskStore:
         """dedup 判活：DB 视角该 run 是否仍 queued/running（他进程驱动也算活）。"""
         with tenant_connection(self.pool) as conn:
             row = conn.execute(
-                "SELECT 1 FROM v2pdf_runs WHERE run_id=%s "
+                "SELECT 1 FROM v2md_runs WHERE run_id=%s "
                 "AND status IN ('queued','running')", (run_id,)).fetchone()
         return row is not None
 
@@ -182,7 +182,7 @@ class PostgresTaskStore:
         """SSE 收尾判定的 DB 兜底：两行内存皆 miss 时现读 (status, url)。"""
         with tenant_connection(self.pool) as conn:
             row = conn.execute(
-                "SELECT status, record->>'url' FROM v2pdf_runs WHERE run_id=%s",
+                "SELECT status, record->>'url' FROM v2md_runs WHERE run_id=%s",
                 (run_id,)).fetchone()
         return (row[0], row[1]) if row else (None, None)
 
@@ -196,7 +196,7 @@ class PostgresTaskStore:
         """
         with tenant_connection(self.pool) as conn:
             row = conn.execute(
-                "UPDATE v2pdf_runs SET updated=now() WHERE run_id=%s "
+                "UPDATE v2md_runs SET updated=now() WHERE run_id=%s "
                 "AND status IN ('queued','running') RETURNING 1", (run_id,)).fetchone()
         return row is not None
 
@@ -208,7 +208,7 @@ class PostgresTaskStore:
         """
         with tenant_connection(self.pool) as conn:
             row = conn.execute("""
-                UPDATE v2pdf_runs
+                UPDATE v2md_runs
                    SET status='queued', updated=now(),
                        claimed_by = CASE WHEN claimed_by='' THEN %(proc)s ELSE claimed_by END
                  WHERE run_id=%(rid)s AND status IN ('created','queued')
@@ -220,7 +220,7 @@ class PostgresTaskStore:
         watchdog 划给别人（或已终态）则 False，调用方静默让位不驱动。"""
         with tenant_connection(self.pool) as conn:
             row = conn.execute(
-                "SELECT 1 FROM v2pdf_runs WHERE run_id=%s AND claimed_by=%s "
+                "SELECT 1 FROM v2md_runs WHERE run_id=%s AND claimed_by=%s "
                 "AND status IN ('queued','running')", (run_id, proc)).fetchone()
         return row is not None
 
@@ -229,7 +229,7 @@ class PostgresTaskStore:
         try:
             with tenant_connection(self.pool) as conn:
                 conn.execute(
-                    "UPDATE v2pdf_runs SET claimed_by=%s WHERE run_id=%s AND claimed_by=''",
+                    "UPDATE v2md_runs SET claimed_by=%s WHERE run_id=%s AND claimed_by=''",
                     (proc, run_id))
         except Exception:
             pass
@@ -238,7 +238,7 @@ class PostgresTaskStore:
         """Clear a terminal run's dead process lease before it is enqueued again."""
         with tenant_connection(self.pool) as conn:
             row = conn.execute(
-                "UPDATE v2pdf_runs SET claimed_by='', updated=now() "
+                "UPDATE v2md_runs SET claimed_by='', updated=now() "
                 "WHERE run_id=%s AND status='created' RETURNING 1", (run_id,)
             ).fetchone()
         return row is not None
@@ -251,7 +251,7 @@ class PostgresTaskStore:
         """
         with tenant_connection(self.pool) as conn:
             row = conn.execute("""
-                UPDATE v2pdf_runs
+                UPDATE v2md_runs
                    SET claimed_by=%(proc)s, updated=now()
                  WHERE run_id=%(rid)s AND status IN ('queued','running')
                    AND (claimed_by='' OR EXTRACT(EPOCH FROM (now()-updated)) > %(lease)s)
@@ -269,7 +269,7 @@ class PostgresTaskStore:
         """
         with tenant_connection(self.pool) as conn:
             rows = conn.execute(
-                "SELECT run_id, record, claimed_by FROM v2pdf_runs "
+                "SELECT run_id, record, claimed_by FROM v2md_runs "
                 "WHERE status='running'").fetchall()
         cols = ("run_id", "record", "claimed_by")
         return [dict(zip(cols, r)) for r in rows]
@@ -283,7 +283,7 @@ class PostgresTaskStore:
         """
         with tenant_connection(self.pool) as conn:
             row = conn.execute("""
-                UPDATE v2pdf_runs
+                UPDATE v2md_runs
                    SET claimed_by=%(new)s, updated=now()
                  WHERE run_id=%(rid)s AND status='running' AND claimed_by=%(old)s
                 RETURNING record""",
@@ -304,7 +304,7 @@ class PostgresTaskStore:
                 SELECT run_id, record, claimed_by,
                        record->>'started' AS started,
                        EXTRACT(EPOCH FROM updated) AS updated_epoch
-                  FROM v2pdf_runs
+                  FROM v2md_runs
                  WHERE status='running'
                    AND EXTRACT(EPOCH FROM (now() - updated)) > %(cut)s""",
                 {"cut": timeout_s}).fetchall()
@@ -325,7 +325,7 @@ class PostgresTaskStore:
         with tenant_connection(self.pool) as conn:
             rows = conn.execute("""
                 SELECT run_id, record, claimed_by
-                  FROM v2pdf_runs
+                  FROM v2md_runs
                  WHERE status='queued'
                    AND EXTRACT(EPOCH FROM (now()-updated)) > %(lease)s""",
                 {"lease": lease_s}).fetchall()
@@ -341,7 +341,7 @@ class PostgresTaskStore:
         """
         with tenant_connection(self.pool) as conn:
             row = conn.execute(
-                "SELECT record FROM v2pdf_runs WHERE run_id=%s", (run_id,)).fetchone()
+                "SELECT record FROM v2md_runs WHERE run_id=%s", (run_id,)).fetchone()
         return _stage_ts_epoch(row[0] or {}) if row else 0.0
 
     def mark_stuck_error(self, run_id: str, msg: str) -> bool:
@@ -349,7 +349,7 @@ class PostgresTaskStore:
         with tenant_connection(self.pool) as conn:
             with conn.transaction():
                 row = conn.execute(
-                    "SELECT record FROM v2pdf_runs WHERE run_id=%s AND status='running' "
+                    "SELECT record FROM v2md_runs WHERE run_id=%s AND status='running' "
                     "FOR UPDATE", (run_id,)).fetchone()
                 if not row:
                     return False
@@ -357,7 +357,7 @@ class PostgresTaskStore:
                 rec["status"] = "error"
                 rec["errors"] = [*(rec.get("errors") or []), msg][-20:]
                 conn.execute("""
-                    UPDATE v2pdf_runs SET record=%(rec)s, status='error',
+                    UPDATE v2md_runs SET record=%(rec)s, status='error',
                                           claimed_by='', updated=now()
                      WHERE run_id=%(rid)s""", {"rec": Json(rec), "rid": run_id})
         return True
@@ -369,7 +369,7 @@ class PostgresTaskStore:
         同格式字典序=时间序）。"""
         with tenant_connection(self.pool) as conn:
             row = conn.execute(
-                "SELECT COALESCE(SUM((record->>'cost_usd')::numeric), 0) FROM v2pdf_runs "
+                "SELECT COALESCE(SUM((record->>'cost_usd')::numeric), 0) FROM v2md_runs "
                 "WHERE owner=%s AND created >= %s AND record ? 'cost_usd'",
                 (uid, since_iso)).fetchone()
         return float(row[0]) if row else 0.0
@@ -383,7 +383,7 @@ class PostgresTaskStore:
                        COALESCE(SUM((record->'usage'->>'llm_out_tok')::bigint), 0),
                        COALESCE(SUM((record->'usage'->>'gpu_s')::numeric), 0),
                        count(*)
-                  FROM v2pdf_runs
+                  FROM v2md_runs
                  WHERE owner=%s AND created >= %s""", (uid, since_iso)).fetchone()
         row = row or (0, 0, 0, 0, 0)
         return {"spend_usd": round(float(row[0]), 6), "llm_in_tok": int(row[1]),
@@ -400,11 +400,11 @@ class PostgresTaskStore:
         """
         with tenant_connection(self.pool) as conn:
             row = conn.execute("""
-                INSERT INTO v2pdf_submit_log (uid, ts, count) VALUES (%(uid)s, now(), 1)
+                INSERT INTO v2md_submit_log (uid, ts, count) VALUES (%(uid)s, now(), 1)
                 ON CONFLICT (uid) DO UPDATE SET
                     ts    = now(),
-                    count = CASE WHEN EXTRACT(EPOCH FROM (now() - v2pdf_submit_log.ts)) > 60
-                                 THEN 1 ELSE v2pdf_submit_log.count + 1 END
+                    count = CASE WHEN EXTRACT(EPOCH FROM (now() - v2md_submit_log.ts)) > 60
+                                 THEN 1 ELSE v2md_submit_log.count + 1 END
                 RETURNING count""", {"uid": uid}).fetchone()
         return int(row[0]) if row else 0
 
@@ -416,7 +416,7 @@ class PostgresMembershipStore:
     不参与提交强制（_admit_submission 不读它——后续工作）。"""
 
     def __init__(self, pool: ConnectionPool):
-        self.pool = pool  # v2pdf_membership 建表已上收 migrations/0002（P0-5），构造只接线
+        self.pool = pool  # v2md_membership 建表已上收 migrations/0002（P0-5），构造只接线
 
     def get(self, uid: str) -> dict | None:
         """单行读；无行回 None（端点据此给 free/全 0 默认视图）。"""
@@ -426,7 +426,7 @@ class PostgresMembershipStore:
                        ai_hours_used, ai_hours_total,
                        storage_gb_used, storage_gb_total,
                        stats_books, stats_knowledge_points, stats_accuracy
-                  FROM v2pdf_membership WHERE uid=%s""", (uid,)).fetchone()
+                  FROM v2md_membership WHERE uid=%s""", (uid,)).fetchone()
         if not row:
             return None
         cols = ("uid", "plan", "display_name", "avatar_hue",
@@ -438,7 +438,7 @@ class PostgresMembershipStore:
         """全列 upsert（幂等可重跑）；record 预留扩展位（签名/备注等不进列的字段）。"""
         with tenant_connection(self.pool) as conn:
             conn.execute("""
-                INSERT INTO v2pdf_membership
+                INSERT INTO v2md_membership
                     (uid, plan, display_name, avatar_hue,
                      ai_hours_used, ai_hours_total, storage_gb_used, storage_gb_total,
                      stats_books, stats_knowledge_points, stats_accuracy, record)

@@ -227,7 +227,7 @@ class QuotaStats(BaseModel):
 
 
 class QuotaOut(BaseModel):
-    """GET /quota：本人会员配额与统计（展示档，来自 v2pdf_membership；不参与提交强制）。
+    """GET /quota：本人会员配额与统计（展示档，来自 v2md_membership；不参与提交强制）。
     PG 关（无 DSN）或无 membership 行 → 全 0 默认值。"""
     ai_hours_used: float
     ai_hours_total: float

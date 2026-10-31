@@ -7,9 +7,9 @@
 
 | 数据 | 缺省落点 | 生产落点 | 真相/性质 |
 |---|---|---|---|
-| runs（run 记录） | `runs.json`（项目根） | PG `v2pdf_runs` 或 data 卷 json | 状态真相源 |
-| state（幂等记录） | `state.json` | PG `v2pdf_state` 或 data 卷 | 幂等 SSOT（键只增不删） |
-| users/identities | `users.json` | PG `v2pdf_users`/`v2pdf_identities` | 账目 |
+| runs（run 记录） | `runs.json`（项目根） | PG `v2md_runs` 或 data 卷 json | 状态真相源 |
+| state（幂等记录） | `state.json` | PG `v2md_state` 或 data 卷 | 幂等 SSOT（键只增不删） |
+| users/identities | `users.json` | PG `v2md_users`/`v2md_identities` | 账目 |
 | checkpoints（图断点） | `data/checkpoints.sqlite` | PG `checkpoints*`（langgraph 自建） | **易失**：done 即删，可丢弃 |
 | logs（run 遥测） | `logs/run-YYYY-MM-DD.jsonl` | 同（data 卷） | 本地真相，append-only |
 | 产物 | vault 直写 | outbox 在架（TTL/ACK 即焚） | 多用户形态不留存 |
@@ -35,14 +35,14 @@ json 档并发纪律：线程锁 + `fcntl` flock + per-pid tmp rename 原子写�
 
 | 表 | 定义处 | 要点 |
 |---|---|---|
-| `v2pdf_runs` | `migrations/0001_init.sql` | run_id PK + owner/status/created 提取列 + `record jsonb`（**唯一真相**，提取列是其可查镜像）+ claimed_by（P4b 租约） |
-| `v2pdf_state` | `migrations/0001_init.sql` | fp PK + record jsonb |
-| `v2pdf_users` / `v2pdf_identities` | `migrations/0001_init.sql` | uid PK；(provider, external_id) PK → uid |
+| `v2md_runs` | `migrations/0001_init.sql` | run_id PK + owner/status/created 提取列 + `record jsonb`（**唯一真相**，提取列是其可查镜像）+ claimed_by（P4b 租约） |
+| `v2md_state` | `migrations/0001_init.sql` | fp PK + record jsonb |
+| `v2md_users` / `v2md_identities` | `migrations/0001_init.sql` | uid PK；(provider, external_id) PK → uid |
 | `v2md_submit_log` | `migrations/0001_init.sql` | 60s 滑窗限流计数（单语句 upsert 原子判定） |
-| `v2pdf_schema_version` | `pgmigrate.py` 建表 | 迁移记账（version PK + 文件名 + 应用时间） |
+| `v2md_schema_version` | `pgmigrate.py` 建表 | 迁移记账（version PK + 文件名 + 应用时间） |
 
 **schema 迁移纪律（P0-5 ✅）**：`video2md/migrations/`（包内目录，随镜像走）是 DDL 唯一真相，
-store 构造函数只接线不建表；`v2pdf_schema_version` 逐迁移记账；`pg.shared_pool()` 建池即校验，
+store 构造函数只接线不建表；`v2md_schema_version` 逐迁移记账；`pg.shared_pool()` 建池即校验，
 落后/超前一律拒起并提示 `python -m video2md migrate`（deploy.sh 在 up -d 后自动跑该步，
 json 档跳过）。全部迁移幂等（IF NOT EXISTS）——存量库重跑 no-op 直接补记版本行（基线盖戳）。
 边界：langgraph `PostgresSaver.setup()` 自管的 `checkpoints*` 表族同库共存，不收编。
@@ -55,7 +55,7 @@ json 档跳过）。全部迁移幂等（IF NOT EXISTS）——存量库重跑 n
 | | json 档（缺省） | postgres 档（`V2MD_TASKS_STORE=postgres`） |
 |---|---|---|
 | 写路径 | `_TASKS` 进程内 dict | **进程内实时视图 + 关键态落库**（P1-1）：`_enqueue` 即 `mark_queued` 翻 queued+钉名 claimed_by；`_drive` 起跑 `still_mine` 复核，被划走静默让位 |
-| 读侧 | 进程内视图 | **PG 真相源**：`/queue` 计数、配额三闸、dedup 判活、watchdog 大盘巡检（running 卡死 2h 判定标 error + queued 短租约 3×period 接管重投）、启动恢复（属主甄别：`recovery_scan`+`claim_dead`+phb 进程心跳——B 重启不抢 A 活 run，死属主窗后认领）全走 `v2pdf_runs` |
+| 读侧 | 进程内视图 | **PG 真相源**：`/queue` 计数、配额三闸、dedup 判活、watchdog 大盘巡检（running 卡死 2h 判定标 error + queued 短租约 3×period 接管重投）、启动恢复（属主甄别：`recovery_scan`+`claim_dead`+phb 进程心跳——B 重启不抢 A 活 run，死属主窗后认领）全走 `v2md_runs` |
 | 跨副本 | 各自为战 | 各副本看到同一队列（读侧含排队项）；`GET /runs/{id}` 的 `task` 段仍只读本进程（`api.py:852-856`） |
 | 滑窗限流 | 进程内 deque | `v2md_submit_log` 单语句 upsert，跨进程一致 |
 
@@ -89,7 +89,7 @@ json 档跳过）。全部迁移幂等（IF NOT EXISTS）——存量库重跑 n
 
 ## 已知限制
 
-1. ~~无 schema 版本化迁移~~（P0-5 ✅ 已闭环：migrations/ + v2pdf_schema_version + 建池校验拒起）。
+1. ~~无 schema 版本化迁移~~（P0-5 ✅ 已闭环：migrations/ + v2md_schema_version + 建池校验拒起）。
 2. **PG 池无超时参数化**（P1-8）：PG 挂起时池获取无限阻塞，故障放大为 API 全挂。
 3. ~~rescue/migrate 工具只认 json 档~~（P1-3 ✅：env 自动分派双档同缝，E2E 见 test_rescue_pg.py）。
 4. `runs.json` 无界增长（完成 run 永不删记录，只有 tmp 清理）——长期膨胀未治理（随 P1-6 容量实测定价）。

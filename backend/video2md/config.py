@@ -54,31 +54,10 @@ def _read_env_file(p: Path) -> dict[str, str]:
     return out
 
 
-# 改名兼容（video2pdf → video2md）：旧前缀 V2PDF_* 仍可用，新键未设时按旧键补齐。
-# 真实环境变量同步写回 os.environ，直读 os.environ 的模块与子进程也看得到新键名。
-LEGACY_ENV_PREFIX, ENV_PREFIX = "V2PDF_", "V2MD_"
-
-
-def _alias_legacy(env: dict[str, str]) -> list[str]:
-    """把 V2PDF_X 补成 V2MD_X（新键已存在则新键优先），返回被补齐的旧键名。"""
-    aliased = []
-    for k in [k for k in env if k.startswith(LEGACY_ENV_PREFIX)]:
-        nk = ENV_PREFIX + k[len(LEGACY_ENV_PREFIX):]
-        if nk not in env:
-            env[nk] = env[k]
-            aliased.append(k)
-    return aliased
-
-
-_LEGACY_ENV_KEYS = _alias_legacy(os.environ)  # type: ignore[arg-type]
-
-
-# 机密凭证 SSOT：~/.config/video2md.env（0600；LLM_API_KEY 等）；旧文件名
-# ~/.config/video2pdf.env 在新文件不存在时兜底。
+# 机密凭证 SSOT：~/.config/video2md.env（0600；LLM_API_KEY 等）。
 # Dify 抽离（2026-09-21）后不再经 dify_kit 注入 dify-zcode.env。
 def _default_secrets_file() -> Path:
-    new, old = Path.home() / ".config" / "video2md.env", Path.home() / ".config" / "video2pdf.env"
-    return old if not new.exists() and old.exists() else new
+    return Path.home() / ".config" / "video2md.env"
 
 
 SECRETS_FILE = Path(ENV_SECRETS_OVERRIDE) if (ENV_SECRETS_OVERRIDE := os.environ.get("V2MD_SECRETS_FILE")) \
@@ -93,17 +72,11 @@ def load_env() -> dict[str, str]:
     """
     files = _read_env_file(PROJ / ".env")
     files.update(_read_env_file(SECRETS_FILE))
-    _LEGACY_ENV_KEYS.extend(_alias_legacy(files))
     files.update(dict(os.environ))
     return files
 
 
 ENV = load_env()
-if _LEGACY_ENV_KEYS:
-    import sys
-    sample = ", ".join(sorted(_LEGACY_ENV_KEYS)[:8])
-    print(f"⚠️ 已弃用的 {LEGACY_ENV_PREFIX}* 配置仍在使用（{len(_LEGACY_ENV_KEYS)} 个：{sample}），"
-          f"请改为 {ENV_PREFIX}*", file=sys.stderr)
 
 
 # ---------------------------------------------------------------- 配置契约表（P1-9）
@@ -360,12 +333,12 @@ UPLOAD_QUOTA_GB: float = _PARSED["V2MD_UPLOAD_QUOTA_GB"]
 UPLOADS_TTL_H: float = _PARSED["V2MD_UPLOADS_TTL_H"]
 
 # 任务表真相源（P4b·多副本档）：json 缺省 = _TASKS 进程内视图即现状零变化；
-# postgres = /queue、配额闸、dedup 判活、watchdog 巡检、启动恢复认领读 v2pdf_runs
+# postgres = /queue、配额闸、dedup 判活、watchdog 巡检、启动恢复认领读 v2md_runs
 # 提取列（record jsonb 仍是状态唯一真相，status 列是其可查镜像）。需先切 RUNS_STORE。
 TASKS_STORE: str = _PARSED["V2MD_TASKS_STORE"]
 
 # 教材偏好（收藏/阅读进度）：json 缺省指 PROJ/prefs.json（容器指 data 卷）；
-# postgres = v2pdf_prefs 表（migrations/0003，共用 V2MD_PG_DSN）——云上多副本切此档
+# postgres = v2md_prefs 表（migrations/0003，共用 V2MD_PG_DSN）——云上多副本切此档
 PREFS_FILE: Path = _PARSED["V2MD_PREFS_FILE"]
 PREFS_STORE: str = _PARSED["V2MD_PREFS_STORE"]
 

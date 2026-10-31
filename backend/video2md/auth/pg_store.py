@@ -1,9 +1,9 @@
 """IdentityStore 的 Postgres 适配器（宿主侧实现——acctkit 保持零依赖，只继承其协议）。
 
 表：
-- v2pdf_users(uid PK, created, record jsonb)——record 与 JsonFileStore 的用户记录同形
+- v2md_users(uid PK, created, record jsonb)——record 与 JsonFileStore 的用户记录同形
   （uid/email/name/identities[]/created），迁移/导出零转换。
-- v2pdf_identities(provider, external_id) PK → uid——映射的规范化形态（文件档是
+- v2md_identities(provider, external_id) PK → uid——映射的规范化形态（文件档是
   记录体内 identities 列表 + O(n) 扫描，这里下沉成索引查询）。
 
 resolve 语义逐条对齐 acctkit.store._provision：命中回填 email/name；miss 自动开户
@@ -32,20 +32,20 @@ class PostgresIdentityStore(IdentityStore):
     # ---- 内部：用户记录读写（行锁串行化，防并发回填/追加丢更新）
 
     def _get_user(self, conn, uid: str) -> dict | None:
-        row = conn.execute("SELECT record FROM v2pdf_users WHERE uid = %s", (uid,)).fetchone()
+        row = conn.execute("SELECT record FROM v2md_users WHERE uid = %s", (uid,)).fetchone()
         return row[0] if row else None
 
     def _put_user(self, conn, rec: dict) -> None:
         conn.execute("""
-            INSERT INTO v2pdf_users (uid, created, record) VALUES (%(uid)s, %(created)s, %(rec)s)
+            INSERT INTO v2md_users (uid, created, record) VALUES (%(uid)s, %(created)s, %(rec)s)
             ON CONFLICT (uid) DO UPDATE SET record = EXCLUDED.record""",
             {"uid": rec["uid"], "created": rec.get("created", ""),
              "rec": Json(rec)})
 
     def _find(self, conn, provider: str, external_id: str) -> tuple[str, dict] | None:
         row = conn.execute("""
-            SELECT u.uid, u.record FROM v2pdf_identities i
-            JOIN v2pdf_users u ON u.uid = i.uid
+            SELECT u.uid, u.record FROM v2md_identities i
+            JOIN v2md_users u ON u.uid = i.uid
             WHERE i.provider = %s AND i.external_id = %s""",
             (provider, external_id)).fetchone()
         return (row[0], row[1]) if row else None
@@ -77,12 +77,12 @@ class PostgresIdentityStore(IdentityStore):
                        "created": datetime.now().isoformat(timespec="seconds")}
                 self._put_user(conn, rec)
                 n = conn.execute("""
-                    INSERT INTO v2pdf_identities (provider, external_id, uid) VALUES (%s, %s, %s)
+                    INSERT INTO v2md_identities (provider, external_id, uid) VALUES (%s, %s, %s)
                     ON CONFLICT DO NOTHING""", (p.provider, p.external_id, uid)).rowcount
                 if not n:  # 并发首登：以先落库者为准
                     hit = self._find(conn, p.provider, p.external_id)
                     if hit and hit[0] != uid:
-                        conn.execute("DELETE FROM v2pdf_users WHERE uid = %s", (uid,))
+                        conn.execute("DELETE FROM v2md_users WHERE uid = %s", (uid,))
                         uid, rec = hit
                 return Identity(uid=uid, provider=p.provider, external_id=p.external_id,
                                 email=rec.get("email") or p.email,
@@ -101,7 +101,7 @@ class PostgresIdentityStore(IdentityStore):
                         {"provider": provider, "external_id": external_id})
                     self._put_user(conn, rec)  # record 内 identities 与映射表保持同形
                 conn.execute("""
-                    INSERT INTO v2pdf_identities (provider, external_id, uid) VALUES (%s, %s, %s)
+                    INSERT INTO v2md_identities (provider, external_id, uid) VALUES (%s, %s, %s)
                     ON CONFLICT (provider, external_id) DO UPDATE SET uid = EXCLUDED.uid""",
                     (provider, external_id, uid))
 
@@ -115,13 +115,13 @@ def bulk_load(pool: ConnectionPool, users: dict) -> tuple[int, int]:
                 row = dict(rec)
                 row["uid"] = uid
                 conn.execute("""
-                    INSERT INTO v2pdf_users (uid, created, record) VALUES (%(uid)s, %(created)s, %(rec)s)
+                    INSERT INTO v2md_users (uid, created, record) VALUES (%(uid)s, %(created)s, %(rec)s)
                     ON CONFLICT (uid) DO UPDATE SET record = EXCLUDED.record""",
                     {"uid": uid, "created": rec.get("created", ""), "rec": Json(row)})
                 n_users += 1
                 for ident in rec.get("identities", []):
                     conn.execute("""
-                        INSERT INTO v2pdf_identities (provider, external_id, uid) VALUES (%s, %s, %s)
+                        INSERT INTO v2md_identities (provider, external_id, uid) VALUES (%s, %s, %s)
                         ON CONFLICT (provider, external_id) DO UPDATE SET uid = EXCLUDED.uid""",
                         (ident.get("provider", ""), ident.get("external_id", ""), uid))
                     n_idents += 1

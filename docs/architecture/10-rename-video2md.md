@@ -1,28 +1,19 @@
-# 10 · 项目命名与兼容策略（video2md）
+# 10 · video2md 命名收口
 
-当前项目的规范名称是 **video2md**。源码包、命令入口、容器镜像、环境变量和前端存储键均以 video2md 为主；旧的 video2pdf 标识只作为平滑升级兼容层保留。
+项目规范名称是 **video2md**。源码包、命令入口、环境变量、容器、数据库对象、前端存储键和监控指标全部使用这一命名。
 
-## 当前规范
+本次收口包含一次数据库对象迁移：生产库中旧前缀的表、索引、序列、约束、RLS policy、tenant helper 函数和 schema ledger 会在迁移命令持有 advisory lock 时原子改为 `v2md_*`。迁移不改数据内容；API 必须在迁移完成后再启动。LangGraph 自管的 `checkpoint*` 对象不属于项目命名空间，不改名。
 
-| 项目 | 规范名称 | 兼容保留 |
-| --- | --- | --- |
-| Python 包 / 入口 | `video2md`、`python -m video2md` | `video2pdf` import 与 CLI 垫片 |
-| 环境变量 | `V2MD_*` | `V2PDF_*` 仅在对应 `V2MD_*` 未设置时补齐 |
-| 凭证文件 | `~/.config/video2md.env` | `~/.config/video2pdf.env` 旧文件兜底 |
-| 前端 localStorage | `v2md_*` | 读取一次并迁移旧 `v2pdf_*` 键 |
-| 容器与部署 | `video2md` | 旧镜像/脚本可通过兼容入口回滚 |
-| PostgreSQL 现有表 | `v2pdf_*` | 生产数据表暂不改名，避免破坏已有数据与回滚能力 |
+迁移路径：
 
-`video2pdf` 兼容层不得成为新代码的 import、命令、用户可见文案或部署默认值。新功能只使用规范名称。
+1. 备份 PostgreSQL，并在独立数据库执行 `python -m video2md migrate`。
+2. 核对 `v2md_schema_version`、`v2md_runs`、RLS policy 和约束名称。
+3. 再切换 API 与 worker；旧前缀对象不再由运行时代码读取。
+4. 保留数据库备份作为回滚点；回滚必须恢复与旧镜像匹配的代码和对象名，不能只回滚镜像。
 
-## 数据与迁移边界
+收口后的检查要求：
 
-生产库已经使用 `v2pdf_*` 表名。此次命名恢复不执行在线表重命名；应用层继续通过内部表名访问现有数据。若未来确需把表名改为 `v2md_*`，必须单独设计可回滚的双读/双写迁移，并完成备份、演练和生产验收后再切换。
-
-历史测试证据、trace 前缀和 gpu_plugins 外部资源名称可保留原值，因为它们承担跨版本关联或外部协议身份；新生成的数据和文档使用 video2md。
-
-## 收尾检查
-
-- `rg -n 'video2pdf|V2PDF|v2pdf'` 的命中只能出现在兼容垫片、兼容测试、生产表名边界或历史证据中。
-- `python -m video2md --help` 与 `python -m video2pdf --help` 都能启动，后者输出弃用兼容提示。
-- 生产部署使用 `V2MD_*` 和 `python -m video2md`，旧变量只用于回滚。
+- `python -m video2md --help` 是唯一 CLI 入口。
+- 配置只读取 `V2MD_*` 和 `~/.config/video2md.env`。
+- 前端只使用 `v2md_*` localStorage 键。
+- 新代码、部署清单、测试和文档不再包含旧项目包、旧环境前缀或旧数据库前缀；历史生产证据可保留原始事实。

@@ -295,7 +295,7 @@ def evaluate_repository(repo_root: Path) -> list[str]:
         "repo-database-roles",
         all(text in migration for text in (
             "ENABLE ROW LEVEL SECURITY", "REVOKE ALL ON TABLE",
-            "REVOKE INSERT, UPDATE, DELETE ON v2pdf_schema_version FROM video2md_app",
+            "REVOKE INSERT, UPDATE, DELETE ON v2md_schema_version FROM video2md_app",
         ))
         and all(text in (role_init + role_bootstrap) for text in ("video2md_app", "video2md_migrate"))
         and "V2MD_PG_DSN:" not in compose,
@@ -324,7 +324,7 @@ def evaluate_repository(repo_root: Path) -> list[str]:
         "AESGCM" in key_store
         and "V2MD_LLM_SETTINGS_KEY" in config_source
         and "v1:aesgcm:" in key_store
-        and "v2pdf_llm_settings_ciphertext_ck" in key_migration,
+        and "v2md_llm_settings_ciphertext_ck" in key_migration,
         "LLM credentials must use AES-GCM envelope encryption with a migration constraint",
     )
     require(

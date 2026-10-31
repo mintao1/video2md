@@ -186,13 +186,13 @@ def test_production_pg_requires_separate_app_and_migrate_roles():
               "V2MD_ARTIFACT_MODE": "deliver", "V2MD_OTEL_INCLUDE_CONTENT": "off"}
     bad = _import_config_with_env(
         **common,
-        V2MD_PG_DSN="postgresql://postgres:secret@db/v2pdf",
-        V2MD_PG_MIGRATE_DSN="postgresql://video2md_migrate:secret@db/v2pdf")
+        V2MD_PG_DSN="postgresql://postgres:secret@db/v2md",
+        V2MD_PG_MIGRATE_DSN="postgresql://video2md_migrate:secret@db/v2md")
     assert bad.returncode != 0 and "video2md_app" in bad.stderr
     good = _import_config_with_env(
         **common,
-        V2MD_PG_DSN="postgresql://video2md_app:secret@db/v2pdf",
-        V2MD_PG_MIGRATE_DSN="postgresql://video2md_migrate:secret@db/v2pdf")
+        V2MD_PG_DSN="postgresql://video2md_app:secret@db/v2md",
+        V2MD_PG_MIGRATE_DSN="postgresql://video2md_migrate:secret@db/v2md")
     assert good.returncode == 0, good.stderr
 
 

@@ -259,7 +259,7 @@ async def _main_scenarios(a, dsn: str, fixture: Path) -> None:
             pool = pgmod.make_pool(dsn)
             pgmigrate.apply_migrations(pool)
             with pool.connection() as conn:
-                conn.execute("TRUNCATE v2pdf_runs, v2pdf_submit_log, v2pdf_state, v2pdf_users, v2pdf_identities")
+                conn.execute("TRUNCATE v2md_runs, v2md_submit_log, v2md_state, v2md_users, v2md_identities")
             pool.close()
             _PROCS[PORT_PG] = _boot(PORT_PG, {
                 "V2MD_QUEUE_MAX": "0", "V2MD_USER_QUEUE_MAX": "0", "V2MD_USER_SUBMIT_PER_MIN": "0",
@@ -274,10 +274,10 @@ async def _main_scenarios(a, dsn: str, fixture: Path) -> None:
             pool = pgmod.make_pool(dsn)
             with pool.connection() as conn:
                 sz = int(conn.execute(
-                    "SELECT pg_total_relation_size('v2pdf_runs')").fetchone()[0] or 0)
-                n = int(conn.execute("SELECT count(*) FROM v2pdf_runs").fetchone()[0] or 0)
+                    "SELECT pg_total_relation_size('v2md_runs')").fetchone()[0] or 0)
+                n = int(conn.execute("SELECT count(*) FROM v2md_runs").fetchone()[0] or 0)
             pool.close()
-            MEAS["jsonb 膨胀"] = f"v2pdf_runs 表 {sz // 1024} KB / {n} 行 ≈ **{max(sz, 1) // max(n, 1)} B/run**（含索引）"
+            MEAS["jsonb 膨胀"] = f"v2md_runs 表 {sz // 1024} KB / {n} 行 ≈ **{max(sz, 1) // max(n, 1)} B/run**（含索引）"
             MEAS["PG 池压力"] = (f"并发闸=1 + PG 档全链（runs/tasks/state/users/events=pg）"
                                  f"{a.runs} run 零 PoolTimeout（P1-8 预算 10s 内）；每 run 开销"
                                  "约 0.8s vs json 档 0.1–0.3s——多副本真相源的落库代价（如实计价）")

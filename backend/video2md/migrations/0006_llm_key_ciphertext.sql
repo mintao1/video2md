@@ -4,10 +4,10 @@
 DO $$
 BEGIN
     IF NOT EXISTS (
-        SELECT 1 FROM pg_constraint WHERE conname = 'v2pdf_llm_settings_ciphertext_ck'
+        SELECT 1 FROM pg_constraint WHERE conname = 'v2md_llm_settings_ciphertext_ck'
     ) THEN
-        ALTER TABLE v2pdf_llm_settings
-            ADD CONSTRAINT v2pdf_llm_settings_ciphertext_ck
+        ALTER TABLE v2md_llm_settings
+            ADD CONSTRAINT v2md_llm_settings_ciphertext_ck
             CHECK (api_key = '' OR api_key LIKE 'v1:aesgcm:%') NOT VALID;
     END IF;
 END

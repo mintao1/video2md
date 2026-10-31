@@ -1,12 +1,12 @@
 """用户偏好存储（教材库：收藏/阅读进度）：(uid, run_id) → {fav, progress}。
 
 json 缺省档（V2MD_PREFS_FILE，仿 runs.json：fcntl 跨进程锁 + 原子 rename 落盘）；
-V2MD_PREFS_STORE=postgres 且 V2MD_PG_DSN 在 → PostgresPrefsStore（v2pdf_prefs 表，
+V2MD_PREFS_STORE=postgres 且 V2MD_PG_DSN 在 → PostgresPrefsStore（v2md_prefs 表，
 行级原子，建表上收 migrations/0003——构造函数不建表，P0-5 纪律）。
 
 分派惰性解析仿 runs._runs_backend（ENV 调用时读，测试可直改 _STORE 切档）。
 run 归属校验在端点层（_require_run_access）：表只按 (uid, run_id) 存偏好，不 FK
-v2pdf_runs——json 档无处挂 FK，跨存储一致性由端点纪律保证。
+v2md_runs——json 档无处挂 FK，跨存储一致性由端点纪律保证。
 """
 from __future__ import annotations
 
@@ -71,7 +71,7 @@ class JsonPrefsStore:
 
 
 class PostgresPrefsStore:
-    """v2pdf_prefs 表（migrations/0003）：行级原子 upsert，多副本并发安全。"""
+    """v2md_prefs 表（migrations/0003）：行级原子 upsert，多副本并发安全。"""
 
     def __init__(self, pool):
         self.pool = pool  # 建表已上收 migrations/0003，构造只接线
@@ -80,7 +80,7 @@ class PostgresPrefsStore:
         from .pg import tenant_connection
         with tenant_connection(self.pool) as conn:
             rows = conn.execute("""
-                SELECT run_id, fav, progress FROM v2pdf_prefs WHERE uid=%s
+                SELECT run_id, fav, progress FROM v2md_prefs WHERE uid=%s
                 """, (uid,)).fetchall()
         return {r[0]: {"fav": bool(r[1]), "progress": int(r[2])} for r in rows}
 
@@ -89,11 +89,11 @@ class PostgresPrefsStore:
         from .pg import tenant_connection
         with tenant_connection(self.pool) as conn:
             row = conn.execute("""
-                INSERT INTO v2pdf_prefs (uid, run_id, fav, progress)
+                INSERT INTO v2md_prefs (uid, run_id, fav, progress)
                 VALUES (%s, %s, COALESCE(%s, false), COALESCE(%s, 0))
                 ON CONFLICT (uid, run_id) DO UPDATE SET
-                    fav = COALESCE(%s, v2pdf_prefs.fav),
-                    progress = COALESCE(%s, v2pdf_prefs.progress),
+                    fav = COALESCE(%s, v2md_prefs.fav),
+                    progress = COALESCE(%s, v2md_prefs.progress),
                     updated = now()
                 RETURNING fav, progress
                 """, (uid, run_id, fav, progress, fav, progress)).fetchone()

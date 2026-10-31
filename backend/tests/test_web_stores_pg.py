@@ -27,8 +27,8 @@ def stores():
         yield PostgresRunsStore(pool), PostgresPrefsStore(pool), uid
     finally:
         with pool.connection() as conn:
-            conn.execute("DELETE FROM v2pdf_runs WHERE owner=%s", (uid,))
-            conn.execute("DELETE FROM v2pdf_prefs WHERE uid=%s", (uid,))
+            conn.execute("DELETE FROM v2md_runs WHERE owner=%s", (uid,))
+            conn.execute("DELETE FROM v2md_prefs WHERE uid=%s", (uid,))
         pool.close()
 
 

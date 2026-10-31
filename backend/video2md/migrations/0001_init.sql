@@ -5,7 +5,7 @@
 -- 全部幂等（IF NOT EXISTS）：存量库（基线前建的表）重跑本脚本是 no-op，直接补记版本行。
 -- 边界声明：langgraph PostgresSaver.setup() 自管的 checkpoints* 表族同库共存，
 -- 属三方边界不收编（video2md/graph.py）。
-CREATE TABLE IF NOT EXISTS v2pdf_runs (
+CREATE TABLE IF NOT EXISTS v2md_runs (
     run_id     text PRIMARY KEY,
     owner      text NOT NULL DEFAULT '',
     status     text NOT NULL DEFAULT '',
@@ -14,24 +14,24 @@ CREATE TABLE IF NOT EXISTS v2pdf_runs (
     record     jsonb NOT NULL,
     claimed_by text NOT NULL DEFAULT ''      -- P4b 租约认领（原 ALTER 补丁收编，列序对齐存量库）
 );
-CREATE INDEX IF NOT EXISTS v2pdf_runs_status_idx ON v2pdf_runs (status);
-CREATE INDEX IF NOT EXISTS v2pdf_runs_owner_idx ON v2pdf_runs (owner);
-CREATE TABLE IF NOT EXISTS v2pdf_state (
+CREATE INDEX IF NOT EXISTS v2md_runs_status_idx ON v2md_runs (status);
+CREATE INDEX IF NOT EXISTS v2md_runs_owner_idx ON v2md_runs (owner);
+CREATE TABLE IF NOT EXISTS v2md_state (
     fp      text PRIMARY KEY,
     updated timestamptz NOT NULL DEFAULT now(),
     record  jsonb NOT NULL
 );
-CREATE TABLE IF NOT EXISTS v2pdf_submit_log (
+CREATE TABLE IF NOT EXISTS v2md_submit_log (
     uid   text PRIMARY KEY,
     ts    timestamptz NOT NULL DEFAULT now(),
     count integer NOT NULL DEFAULT 1
 );
-CREATE TABLE IF NOT EXISTS v2pdf_users (
+CREATE TABLE IF NOT EXISTS v2md_users (
     uid     text PRIMARY KEY,
     created text NOT NULL DEFAULT '',
     record  jsonb NOT NULL
 );
-CREATE TABLE IF NOT EXISTS v2pdf_identities (
+CREATE TABLE IF NOT EXISTS v2md_identities (
     provider    text NOT NULL,
     external_id text NOT NULL,
     uid         text NOT NULL,

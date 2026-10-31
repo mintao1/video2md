@@ -417,12 +417,12 @@ def settle_cost(run_id: str) -> dict | None:
     if be is not None:
         from psycopg.types.json import Json
         with be.pool.connection() as conn, conn.transaction():
-            row = conn.execute("SELECT record FROM v2pdf_runs WHERE run_id=%s FOR UPDATE",
+            row = conn.execute("SELECT record FROM v2md_runs WHERE run_id=%s FOR UPDATE",
                                (run_id,)).fetchone()
             if row is None:
                 return None
             run = _add_usage_settlement(row[0], u)
-            conn.execute("UPDATE v2pdf_runs SET record=%s::jsonb, updated=now() WHERE run_id=%s",
+            conn.execute("UPDATE v2md_runs SET record=%s::jsonb, updated=now() WHERE run_id=%s",
                          (Json(run), run_id))
             return run
     with _runs_file_lock():

@@ -13,7 +13,7 @@
   recover_candidates 认领互斥+tmp 缺失直接 error、steal_if_unclaimed 租约拒抢/过期抢到、
   heartbeat 终态不续、submit_window_count 滑窗限频
 
-运行：V2MD_TEST_PG_DSN=postgresql://v2pdf:v2pdf@127.0.0.1:5432/v2pdf python3 test_pg_stores.py
+运行：V2MD_TEST_PG_DSN=postgresql://v2md:v2md@127.0.0.1:5432/v2md python3 test_pg_stores.py
 （CI 由 services: postgres 提供；本地 docker run 临时库即可——测试自带 TRUNCATE，别指生产库）
 """
 import asyncio
@@ -60,11 +60,11 @@ def _truncate(*tables: str) -> None:
             conn.execute(f"TRUNCATE {t}")
 
 
-# ---- 0. 迁移纪律（P0-5：migrations/ 基线 + v2pdf_schema_version + 落后/超前拒起）-------
+# ---- 0. 迁移纪律（P0-5：migrations/ 基线 + v2md_schema_version + 落后/超前拒起）-------
 from video2md import pgmigrate  # noqa: E402
 
 with pool.connection() as conn:  # 重置版本表：重跑本测试时也走「存量表盖戳」路径
-    conn.execute("DROP TABLE IF EXISTS v2pdf_schema_version")
+    conn.execute("DROP TABLE IF EXISTS v2md_schema_version")
 try:
     pgmigrate.validate_schema(pool)
     raise AssertionError("裸库（无版本表）校验必须拒起并提示 migrate")
@@ -74,7 +74,7 @@ assert pgmigrate.apply_migrations(pool) == list(range(1, pgmigrate.SCHEMA_LATEST
 assert pgmigrate.apply_migrations(pool) == []          # 连跑两次幂等：已应用跳过、不重复记行
 pgmigrate.validate_schema(pool)
 with pool.connection() as conn:                        # 验收口径：手工把版本整体改低 → 拒起
-    conn.execute("UPDATE v2pdf_schema_version SET version = version - 100")  # 保 PK 唯一整体降
+    conn.execute("UPDATE v2md_schema_version SET version = version - 100")  # 保 PK 唯一整体降
 try:
     pgmigrate.validate_schema(pool)
     raise AssertionError("版本落后必须拒起")
@@ -98,8 +98,8 @@ assert role_rows[0][1] is True and role_rows[1][1] is True
 assert role_rows[2][1] is False
 rls_rows = conn.execute(
     "SELECT count(*) FROM pg_class "
-    "WHERE relname IN ('v2pdf_runs','v2pdf_state','v2pdf_submit_log',"
-    "'v2pdf_users','v2pdf_identities','v2pdf_membership','v2pdf_prefs',"
+    "WHERE relname IN ('v2md_runs','v2md_state','v2md_submit_log',"
+    "'v2md_users','v2md_identities','v2md_membership','v2md_prefs',"
     "'v2md_llm_settings') AND relrowsecurity AND relforcerowsecurity").fetchone()
 assert rls_rows[0] == 8, rls_rows
 print("✅ 生产角色/RLS 合约（无 superuser/BYPASSRLS；8 张租户表 FORCE RLS）")
@@ -112,27 +112,27 @@ if APP_DSN:
                 conn.execute("SELECT set_config('v2md.tenant_id', %s, true)",
                              ("tenant-a-regression",))
                 conn.execute(
-                    "INSERT INTO v2pdf_runs(run_id, owner, status, created, record) "
+                    "INSERT INTO v2md_runs(run_id, owner, status, created, record) "
                     "VALUES (%s, %s, 'done', '', %s::jsonb)",
                     ("rls-a-regression", "tenant-a-regression",
                      '{"owner":"tenant-a-regression"}'))
                 conn.execute("SELECT set_config('v2md.tenant_id', %s, true)",
                              ("tenant-b-regression",))
                 assert conn.execute(
-                    "SELECT count(*) FROM v2pdf_runs WHERE run_id=%s",
+                    "SELECT count(*) FROM v2md_runs WHERE run_id=%s",
                     ("rls-a-regression",)).fetchone()[0] == 0
                 conn.execute(
-                    "INSERT INTO v2pdf_runs(run_id, owner, status, created, record) "
+                    "INSERT INTO v2md_runs(run_id, owner, status, created, record) "
                     "VALUES (%s, %s, 'done', '', %s::jsonb)",
                     ("rls-b-regression", "tenant-b-regression",
                      '{"owner":"tenant-b-regression"}'))
                 assert conn.execute(
-                    "SELECT count(*) FROM v2pdf_runs WHERE run_id=%s",
+                    "SELECT count(*) FROM v2md_runs WHERE run_id=%s",
                     ("rls-b-regression",)).fetchone()[0] == 1
                 conn.execute("SELECT set_config('v2md.tenant_id', %s, true)",
                              ("tenant-a-regression",))
                 assert conn.execute(
-                    "SELECT count(*) FROM v2pdf_runs WHERE run_id=%s",
+                    "SELECT count(*) FROM v2md_runs WHERE run_id=%s",
                     ("rls-b-regression",)).fetchone()[0] == 0
         print("✅ 双租户 RLS 交叉访问（A 看不到 B，B 看不到 A，各自可读自身）")
     finally:
@@ -143,7 +143,7 @@ else:
 
 # ---- 0.5 PostgresMembershipStore（0002：web 个人页会员/配额展示档）------------------
 st_mem = pgstore.PostgresMembershipStore(pool)  # 表由 §0 迁移建好，构造只接线（P0-5）
-_truncate("v2pdf_membership")
+_truncate("v2md_membership")
 assert st_mem.get("u_nobody") is None              # miss 回 None（端点据此给 free/全 0 默认）
 st_mem.upsert({"uid": "u_mem1", "plan": "pro", "display_name": "林思齐 (Siyi Lin)",
                "avatar_hue": 258, "ai_hours_used": 38, "ai_hours_total": 50,
@@ -162,7 +162,7 @@ print("✅ PostgresMembershipStore（miss→None / upsert 往返 / 重复 upsert
 
 # ---- 1. PostgresRunsStore -----------------------------------------------------------
 st_runs = pgstore.PostgresRunsStore(pool)  # 表由 §0 迁移建好，构造只接线（P0-5）
-_truncate("v2pdf_runs")
+_truncate("v2md_runs")
 st_runs.merge({"run_id": "r1", "owner": "u_a", "status": "created",
                "created": "2026-01-01T00:00:00", "entries": [1, 2]})
 st_runs.merge({"run_id": "r2", "owner": "u_b", "status": "done", "created": "2026-01-02"})
@@ -210,7 +210,7 @@ print("✅ PostgresRunsStore（往返/并发/分派/json 回归）")
 
 # ---- 2. PostgresStateStore ----------------------------------------------------------
 st_state = pgstore.PostgresStateStore(pool)
-_truncate("v2pdf_state")
+_truncate("v2md_state")
 st_state.save({"a": {"url": "u1"}, "b": {"url": "u2"}})
 assert st_state.load() == {"a": {"url": "u1"}, "b": {"url": "u2"}}
 st_state.save({"b": {"url": "u2x"}, "c": {"url": "u3"}})  # 键只增不删 → 等价全量替换
@@ -242,7 +242,7 @@ print("✅ PostgresStateStore（owner+fp tenant isolation）")
 
 # ---- 3. PostgresIdentityStore -------------------------------------------------------
 ids = PostgresIdentityStore(pool)  # 表由 §0 迁移建好（P0-5）
-_truncate("v2pdf_users", "v2pdf_identities")
+_truncate("v2md_users", "v2md_identities")
 i1 = ids.resolve(Principal(provider="google", external_id="g1", email="a@x.com", name="A"))
 assert i1.is_new and i1.uid.startswith("u_")
 i2 = ids.resolve(Principal(provider="google", external_id="g1"))
@@ -266,8 +266,8 @@ for t in ts:
     t.join()
 with pool.connection() as conn:
     uids = [r[0] for r in conn.execute(
-        "SELECT uid FROM v2pdf_identities WHERE provider='test' AND external_id='race1'").fetchall()]
-    n_users = conn.execute("SELECT count(*) FROM v2pdf_users").fetchone()[0]
+        "SELECT uid FROM v2md_identities WHERE provider='test' AND external_id='race1'").fetchall()]
+    n_users = conn.execute("SELECT count(*) FROM v2md_users").fetchone()[0]
 assert len(uids) == 1, f"并发首登必须收敛到同一 uid：{uids}"
 assert n_users == 2, f"并发首登不得留孤儿账号行（期望 2：g1+race1）：{n_users}"
 print("✅ PostgresIdentityStore（开户/回填/归并/并发首登收敛）")
@@ -328,7 +328,7 @@ print("✅ events PG 扇出（跨进程互通/回声去重）+ cmd 心跳通道"
 
 # ---- 5. PostgresTaskStore（P4b 多副本真相源）----------------------------------------
 tasks = pgstore.PostgresTaskStore(pool)  # 表由 §0 迁移建好（含 claimed_by 列）
-_truncate("v2pdf_runs", "v2pdf_submit_log")
+_truncate("v2md_runs", "v2md_submit_log")
 
 st_runs.merge({"run_id": "t_q", "owner": "u_a", "status": "queued", "created": "2026-01-01"})
 st_runs.merge({"run_id": "t_r", "owner": "u_a", "status": "running", "created": "2026-01-01",
@@ -348,12 +348,12 @@ assert tasks.heartbeat("t_d") is False
 # 启动恢复（P1-4 属主甄别版）：recovery_scan 无锁全查 + mark_stuck_error 翻 tmp 缺失 +
 # claim_dead 原子认领（expect 匹配才翻——替代旧 SKIP LOCKED 全量抢占，批判补遗②）
 missing = {"run_id": "rec_miss", "owner": "u", "status": "running", "created": "",
-           "url": "http://x/m", "tmp": "/nonexistent-v2pdf-tmp", "tmp_cleaned": False}
+           "url": "http://x/m", "tmp": "/nonexistent-v2md-tmp", "tmp_cleaned": False}
 alive_run = {"run_id": "rec_ok", "owner": "u", "status": "running", "created": "",
              "url": "http://x/ok", "tmp": ""}
 for rid in ("t_q", "t_r", "t_d"):  # 清场：只留 rec_* 两行 running，断言精确
     with pool.connection() as conn:
-        conn.execute("DELETE FROM v2pdf_runs WHERE run_id=%s", (rid,))
+        conn.execute("DELETE FROM v2md_runs WHERE run_id=%s", (rid,))
 st_runs.merge(missing)
 st_runs.merge(alive_run)
 rows = tasks.recovery_scan()
@@ -362,14 +362,14 @@ assert all(r["claimed_by"] == "" for r in rows)  # merge 新行无主（merge �
 assert tasks.mark_stuck_error("rec_miss", "临时目录已被清理，无法续跑（重发同 URL 新建 run）")
 assert st_runs.load()["rec_miss"]["status"] == "error"
 with pool.connection() as conn:
-    col = conn.execute("SELECT status, claimed_by FROM v2pdf_runs WHERE run_id='rec_miss'").fetchone()
+    col = conn.execute("SELECT status, claimed_by FROM v2md_runs WHERE run_id='rec_miss'").fetchone()
 assert col[0] == "error" and col[1] == ""  # 提取列同步翻转
 
 # claim_dead：无主认领 / expect 不匹配拒（并发互斥）/ 匹配即翻（死属主路径）/ 终态不可领
 got = tasks.claim_dead("rec_ok", "", "procB")
 assert got and got["run_id"] == "rec_ok"
 with pool.connection() as conn:
-    cb = conn.execute("SELECT claimed_by FROM v2pdf_runs WHERE run_id='rec_ok'").fetchone()[0]
+    cb = conn.execute("SELECT claimed_by FROM v2md_runs WHERE run_id='rec_ok'").fetchone()[0]
 assert cb == "procB"
 assert tasks.claim_dead("rec_ok", "", "procC") is None      # 已非无主：第二个恢复方让位
 assert tasks.claim_dead("rec_ok", "other", "procC") is None  # 属主不是预期值：让位
@@ -382,14 +382,14 @@ assert tasks.claim_dead("rec_done", "", "procX") is None    # 终态不可认领
 st_runs.merge({"run_id": "st1", "owner": "u", "status": "running", "created": "",
                "url": "http://x/s"})
 with pool.connection() as conn:
-    conn.execute("UPDATE v2pdf_runs SET claimed_by='other-proc' WHERE run_id='st1'")
+    conn.execute("UPDATE v2md_runs SET claimed_by='other-proc' WHERE run_id='st1'")
 assert tasks.steal_if_unclaimed("st1", 3600, "me") is None  # 他进程持有且租约未过期
 with pool.connection() as conn:  # 把 updated 拨回 2h 前 → 租约过期可接管
-    conn.execute("UPDATE v2pdf_runs SET updated=now()-interval '7200 seconds' WHERE run_id='st1'")
+    conn.execute("UPDATE v2md_runs SET updated=now()-interval '7200 seconds' WHERE run_id='st1'")
 rec = tasks.steal_if_unclaimed("st1", 3600, "me")
 assert rec and rec["run_id"] == "st1"
 with pool.connection() as conn:
-    cb = conn.execute("SELECT claimed_by FROM v2pdf_runs WHERE run_id='st1'").fetchone()[0]
+    cb = conn.execute("SELECT claimed_by FROM v2md_runs WHERE run_id='st1'").fetchone()[0]
 assert cb == "me"
 
 # mark_stuck_error / recheck_age：仍 running 才动；翻后 recheck 有值
@@ -402,7 +402,7 @@ assert tasks.mark_stuck_error("st1", "二次不应生效") is False
 st_runs.merge({"run_id": "old1", "owner": "u", "status": "running", "created": "",
                "url": "http://x/o"})
 with pool.connection() as conn:
-    conn.execute("UPDATE v2pdf_runs SET updated=now()-interval '7200 seconds' WHERE run_id='old1'")
+    conn.execute("UPDATE v2md_runs SET updated=now()-interval '7200 seconds' WHERE run_id='old1'")
 rows = tasks.stale_running(3600)
 ids = {r["run_id"] for r in rows}
 assert "old1" in ids and "t_r" not in ids, ids  # t_r 刚 heartbeat 过，不入
@@ -420,16 +420,16 @@ print("✅ PostgresTaskStore（队列视图/心跳/认领恢复/steal 租约/sta
 # 背景：queued 此前只在内存 _TASKS（DB 停在 created）——配额闸/判活/gauge 看不见排队项，
 # 跨副本双投、重启丢排队 run。本节钉住：入队落库+钉名、heartbeat 续 queued、
 # stale_queued 短租约、steal 扩 queued、still_mine 让位、大盘接管走查（不标 error）。
-_truncate("v2pdf_runs", "v2pdf_submit_log")
+_truncate("v2md_runs", "v2md_submit_log")
 st_runs.merge({"run_id": "p1", "owner": "u", "status": "created", "created": "",
                "url": "http://x/p1"})
 assert tasks.mark_queued("p1", "procA") is True
 with pool.connection() as conn:
-    st, cb = conn.execute("SELECT status, claimed_by FROM v2pdf_runs WHERE run_id='p1'").fetchone()
+    st, cb = conn.execute("SELECT status, claimed_by FROM v2md_runs WHERE run_id='p1'").fetchone()
 assert (st, cb) == ("queued", "procA"), (st, cb)        # created→queued + 钉名
 assert tasks.mark_queued("p1", "procB") is True          # 幂等重入队：已有主不动
 with pool.connection() as conn:
-    cb = conn.execute("SELECT claimed_by FROM v2pdf_runs WHERE run_id='p1'").fetchone()[0]
+    cb = conn.execute("SELECT claimed_by FROM v2md_runs WHERE run_id='p1'").fetchone()[0]
 assert cb == "procA", "钉名后他人 mark_queued 不得抢注"
 assert tasks.counts()["queued"] == 1                     # 配额闸/gauge 从此看得见排队项
 assert tasks.heartbeat("p1") is True                     # 排队期心跳续 updated（P1-1 放宽）
@@ -442,7 +442,7 @@ st_runs.merge({"run_id": "p2", "owner": "u", "status": "created", "created": "",
                "url": "http://x/p2"})
 tasks.mark_queued("p2", "procA")
 with pool.connection() as conn:
-    conn.execute("UPDATE v2pdf_runs SET updated=now()-interval '600 seconds' WHERE run_id='p2'")
+    conn.execute("UPDATE v2md_runs SET updated=now()-interval '600 seconds' WHERE run_id='p2'")
 assert {r["run_id"] for r in tasks.stale_queued(180)} == {"p2"}
 
 # steal_if_unclaimed 扩 queued：他主租约内拒抢、过期抢到（排队项同款语义）
@@ -450,7 +450,7 @@ assert tasks.steal_if_unclaimed("p2", 3600, "procB") is None
 rec = tasks.steal_if_unclaimed("p2", 180, "procB")
 assert rec and rec["run_id"] == "p2"
 with pool.connection() as conn:
-    st, cb = conn.execute("SELECT status, claimed_by FROM v2pdf_runs WHERE run_id='p2'").fetchone()
+    st, cb = conn.execute("SELECT status, claimed_by FROM v2md_runs WHERE run_id='p2'").fetchone()
 assert (st, cb) == ("queued", "procB"), "排队项接管后态仍 queued，属主换人"
 
 # still_mine：_drive 让位判据（「不重」半边）
@@ -472,21 +472,21 @@ st_runs.merge({"run_id": "p3", "owner": "u", "status": "created", "created": "",
                "url": "http://x/p3"})
 tasks.mark_queued("p3", "dead-proc")
 with pool.connection() as conn:   # 属主死：updated 停滞 > 短租约
-    conn.execute("UPDATE v2pdf_runs SET updated=now()-interval '600 seconds' WHERE run_id='p3'")
+    conn.execute("UPDATE v2md_runs SET updated=now()-interval '600 seconds' WHERE run_id='p3'")
 # 本进程自己持有的排队项（updated 也停滞）必须跳过——等信号量是健康态
 st_runs.merge({"run_id": "p4", "owner": "u", "status": "created", "created": "",
                "url": "http://x/p4"})
 tasks.mark_queued("p4", vapi._PROC_ID)
 with pool.connection() as conn:
-    conn.execute("UPDATE v2pdf_runs SET updated=now()-interval '600 seconds' WHERE run_id='p4'")
+    conn.execute("UPDATE v2md_runs SET updated=now()-interval '600 seconds' WHERE run_id='p4'")
 vapi._TASKS["p4"] = {"status": "queued", "url": "http://x/p4"}
 
 assert vwd.check_cluster() == []                  # 排队接管不计 tripped（不是卡死）
 assert [r["run_id"] for r in adopted] == ["p3"], adopted   # 只接管无主项，自己的不动
 with pool.connection() as conn:
     st3, cb3 = conn.execute(
-        "SELECT status, claimed_by FROM v2pdf_runs WHERE run_id='p3'").fetchone()
-    cb4 = conn.execute("SELECT claimed_by FROM v2pdf_runs WHERE run_id='p4'").fetchone()[0]
+        "SELECT status, claimed_by FROM v2md_runs WHERE run_id='p3'").fetchone()
+    cb4 = conn.execute("SELECT claimed_by FROM v2md_runs WHERE run_id='p4'").fetchone()[0]
 assert (st3, cb3) == ("queued", vapi._PROC_ID), "接管重投：态仍 queued、属主换接管者"
 assert cb4 == vapi._PROC_ID, "本进程排队项不得被自己大盘误接管"
 vwd._reset_for_tests()
@@ -561,7 +561,7 @@ async def _recover_once() -> int:
 
 
 # 场景 1：活属主（phb 闻声）→ 不抢、不驱动，行属主不变
-_truncate("v2pdf_runs", "v2pdf_submit_log")
+_truncate("v2md_runs", "v2md_submit_log")
 st_runs.merge({"run_id": "rc_a", "owner": "u", "status": "running", "created": "",
                "url": "http://x/a", "tmp": ""})
 assert tasks.claim_dead("rc_a", "", "procA")
@@ -569,23 +569,23 @@ vwd.note_proc_alive("procA")
 assert asyncio.run(_recover_once()) == 0
 assert "rc_a" not in driven
 with pool.connection() as conn:
-    cb = conn.execute("SELECT claimed_by FROM v2pdf_runs WHERE run_id='rc_a'").fetchone()[0]
+    cb = conn.execute("SELECT claimed_by FROM v2md_runs WHERE run_id='rc_a'").fetchone()[0]
 assert cb == "procA", "活属主的行不得被抢（批判补遗②验收）"
 
 # 场景 2：死属主（甄别窗内无声）→ 窗后认领重投（单副本重启自愈路径）
 vwd._LOCAL_PROCS.clear()
-_truncate("v2pdf_runs", "v2pdf_submit_log")
+_truncate("v2md_runs", "v2md_submit_log")
 st_runs.merge({"run_id": "rc_d", "owner": "u", "status": "running", "created": "",
                "url": "http://x/d", "tmp": ""})
 assert tasks.claim_dead("rc_d", "", "procOld")
 assert asyncio.run(_recover_once()) == 1
 assert "rc_d" in driven
 with pool.connection() as conn:
-    cb = conn.execute("SELECT claimed_by FROM v2pdf_runs WHERE run_id='rc_d'").fetchone()[0]
+    cb = conn.execute("SELECT claimed_by FROM v2md_runs WHERE run_id='rc_d'").fetchone()[0]
 assert cb == vapi._PROC_ID
 
 # 场景 3：无主即领（不经甄别窗）
-_truncate("v2pdf_runs", "v2pdf_submit_log")
+_truncate("v2md_runs", "v2md_submit_log")
 st_runs.merge({"run_id": "rc_u", "owner": "u", "status": "running", "created": "",
                "url": "http://x/u", "tmp": ""})
 assert asyncio.run(_recover_once()) == 1
@@ -609,7 +609,7 @@ vapi._TASKS_PG = tasks
 vapi._tasks_pg_resolved = True
 taken: list[dict] = []
 vwd.set_stealer(lambda r: taken.append(r))
-_truncate("v2pdf_runs", "v2pdf_submit_log")
+_truncate("v2md_runs", "v2md_submit_log")
 # 死属主残档：running、属主 dead-proc、updated 停滞 2h、阶段戳为 2h 前的本地 naive 串——
 # 时钟域回归钉（P1-4 实证 bug）：旧 SQL 把该串 cast 成 timestamptz 落在未来 → GREATEST
 # 判超龄恒假 → 残档永不入候选。新口径：DB 只滤 updated（超龄 ✓），阶段龄应用侧解析（旧 ✓）。
@@ -619,7 +619,7 @@ st_runs.merge({"run_id": "rk_dead", "owner": "u", "status": "running", "created"
                "stages": {"download": {"ts": _O}, "transcribe": {"ts": _O}}})
 assert tasks.claim_dead("rk_dead", "", "dead-proc")
 with pool.connection() as conn:
-    conn.execute("UPDATE v2pdf_runs SET updated=now()-interval '7200 seconds' WHERE run_id='rk_dead'")
+    conn.execute("UPDATE v2md_runs SET updated=now()-interval '7200 seconds' WHERE run_id='rk_dead'")
 tripped = vwd.check_cluster(timeout_s=3600)
 assert "rk_dead" in tripped, tripped                     # 卡死判定生效（不再被自刷 updated 空转）
 assert [r["run_id"] for r in taken] == ["rk_dead"], taken  # 抢到即重投（STEALER）
@@ -669,7 +669,7 @@ holder.execute("SELECT pg_advisory_unlock(9201)")
 ENV["V2MD_PG_TIMEOUT_S"] = "2"
 _bh = None
 try:
-    _bh = pg.make_pool("postgresql://v2pdf:v2pdf@10.255.255.1:5432/x")
+    _bh = pg.make_pool("postgresql://v2md:v2md@10.255.255.1:5432/x")
     t0 = time.time()
     try:
         with _bh.connection() as c:
@@ -688,7 +688,7 @@ print("✅ P1-8 PG 超时预算（statement_timeout 生效/挂起打断/连接�
 # ---- 10. P2-2 成本归因（PG 档月度查询/预算闸读数）------------------------------------
 from datetime import datetime as _dt  # noqa: E402
 
-_truncate("v2pdf_runs", "v2pdf_submit_log")
+_truncate("v2md_runs", "v2md_submit_log")
 now = _dt.now()
 since = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0).isoformat(timespec="seconds")
 last_mo = (now.replace(day=1) - __import__("datetime").timedelta(days=1)).strftime("%Y-%m")

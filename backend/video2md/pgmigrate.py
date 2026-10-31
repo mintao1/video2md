@@ -3,7 +3,7 @@
 机制（对齐 ROADMAP P0-5 验收口径）：
 - migrations/NNNN_name.sql 按号递增；本模块持有注册表 MIGRATIONS（号→文件名），
   加新迁移 = 落一个 SQL 文件 + 注册表加一行，别处零改动。
-- v2pdf_schema_version 表逐迁移记账（version PK + 文件名 + 应用时间，审计可查）。
+- v2md_schema_version 表逐迁移记账（version PK + 文件名 + 应用时间，审计可查）。
 - apply_migrations：advisory lock 串行化（并发副本/并发跑只一份生效）+ 每迁移
   单事务（SQL 与版本行同进同退）。全部幂等——存量库（基线前建的表）重跑 no-op
   直接补记版本行，即 Flyway「基线盖戳」语义，无需特殊探测分支。
@@ -41,14 +41,15 @@ _MIG_DIR = Path(__file__).parent / "migrations"
 _ADVISORY_KEY = 0x76326D64  # 'v2md' 四字节（改名前的键值，沿用）——本库迁移互斥锁键，勿改
 
 
-_LEGACY_PREFIX, _PREFIX = "v2md_", "v2pdf_"
+_LEGACY_PREFIX, _PREFIX = "v2pdf_", "v2md_"
 
 
 def _rename_legacy_relations(conn) -> list[str]:
-    """历史兼容：存量库 v2md_* 表/索引/序列整体改名为 v2pdf_*。
+    """将旧 v2pdf_* 数据库对象原子改名为规范 v2md_*。
 
-    只在「有旧版本表、无新版本表」时执行一次，单事务进退；之后版本表已是新名，
-    后续迁移照常按号补齐。返回改名前的关系名列表（空 = 无需改名）。
+    只在「有旧版本表、无新版本表」时执行一次，单事务进退。除表、索引和序列外，
+    同步改名约束、RLS policy 和 tenant helper 函数；LangGraph 自管的 checkpoint
+    对象不匹配 v2pdf_*，因此不会被触碰。
     """
     row = conn.execute("SELECT to_regclass(%s), to_regclass(%s)",
                        (f"{_LEGACY_PREFIX}schema_version", f"{_PREFIX}schema_version")).fetchone()
@@ -65,6 +66,26 @@ def _rename_legacy_relations(conn) -> list[str]:
             conn.execute(sql.SQL("ALTER {} {} RENAME TO {}").format(
                 sql.SQL(kinds[kind]), sql.Identifier(name),
                 sql.Identifier(_PREFIX + name[len(_LEGACY_PREFIX):])))
+        constraints = conn.execute(
+            "SELECT k.conname, c.relname FROM pg_constraint k "
+            "JOIN pg_class c ON c.oid = k.conrelid "
+            "JOIN pg_namespace n ON n.oid = c.relnamespace "
+            "WHERE n.nspname = current_schema() AND k.conname LIKE 'v2pdf\\_%'"
+        ).fetchall()
+        for name, table in constraints:
+            conn.execute(sql.SQL("ALTER TABLE {} RENAME CONSTRAINT {} TO {}").format(
+                sql.Identifier(table), sql.Identifier(name),
+                sql.Identifier(_PREFIX + name[len(_LEGACY_PREFIX):])))
+        policies = conn.execute(
+            "SELECT policyname, tablename FROM pg_policies "
+            "WHERE schemaname = current_schema() AND policyname LIKE 'v2pdf\\_%'"
+        ).fetchall()
+        for name, table in policies:
+            conn.execute(sql.SQL("ALTER POLICY {} ON {} RENAME TO {}").format(
+                sql.Identifier(name), sql.Identifier(table),
+                sql.Identifier(_PREFIX + name[len(_LEGACY_PREFIX):])))
+        if conn.execute("SELECT to_regprocedure('v2pdf_tenant_visible(text)')").fetchone()[0]:
+            conn.execute("ALTER FUNCTION v2pdf_tenant_visible(text) RENAME TO v2md_tenant_visible")
     return [name for name, _ in rels]
 
 
@@ -76,13 +97,13 @@ def apply_migrations(pool: ConnectionPool) -> list[int]:
         try:
             _rename_legacy_relations(conn)
             conn.execute("""
-                CREATE TABLE IF NOT EXISTS v2pdf_schema_version (
+                CREATE TABLE IF NOT EXISTS v2md_schema_version (
                     version    integer PRIMARY KEY,
                     name       text NOT NULL,
                     applied_at timestamptz NOT NULL DEFAULT now()
                 )""")
             applied = {int(r[0]) for r in
-                       conn.execute("SELECT version FROM v2pdf_schema_version").fetchall()}
+                       conn.execute("SELECT version FROM v2md_schema_version").fetchall()}
             for ver, name in MIGRATIONS:
                 if ver in applied:
                     continue
@@ -98,7 +119,7 @@ def apply_migrations(pool: ConnectionPool) -> list[int]:
                     finally:
                         conn.cursor_factory = orig_factory
                     conn.execute(
-                        "INSERT INTO v2pdf_schema_version (version, name) VALUES (%s, %s)",
+                        "INSERT INTO v2md_schema_version (version, name) VALUES (%s, %s)",
                         (ver, name))
                 done.append(ver)
         finally:
@@ -110,7 +131,7 @@ def validate_schema(pool: ConnectionPool) -> None:
     """版本不符抛 RuntimeError（拒起并给修法）；供 shared_pool 建池即校验。"""
     try:
         with pool.connection() as conn:
-            row = conn.execute("SELECT max(version) FROM v2pdf_schema_version").fetchone()
+            row = conn.execute("SELECT max(version) FROM v2md_schema_version").fetchone()
         v = int(row[0]) if row and row[0] is not None else 0
     except psycopg.errors.UndefinedTable:
         v = 0

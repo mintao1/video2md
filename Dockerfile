@@ -58,9 +58,8 @@ RUN if [ -n "${PIP_INDEX_URL}" ]; then \
  && uv sync --frozen --no-dev
 # 无 mac extra：pyobjc 是 macOS 专属，Linux 镜像天然不含
 
-# 主包使用项目名；video2md 兼容垫片保留旧镜像/脚本可回滚。
+# 主包使用项目名。
 COPY backend/video2md/ ./video2md/
-COPY backend/video2pdf/ ./video2pdf/
 COPY backend/acctkit/ ./acctkit/
 COPY backend/gpu_plugins/ ./gpu_plugins/
 COPY --from=web-build /web/dist/ ./web-dist/

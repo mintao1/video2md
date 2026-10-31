@@ -45,6 +45,6 @@ def test_tenant_migration_enables_rls_and_separate_roles() -> None:
     assert "CREATE ROLE video2md_app NOLOGIN NOBYPASSRLS" in roles
     assert "CREATE ROLE video2md_migrate NOLOGIN NOBYPASSRLS" in roles
     assert "ENABLE ROW LEVEL SECURITY" in sql
-    assert "CREATE POLICY v2pdf_runs_tenant" in sql
+    assert "CREATE POLICY v2md_runs_tenant" in sql
     assert "REVOKE ALL ON TABLE" in sql
     assert "PRIMARY KEY (owner, fp)" in sql

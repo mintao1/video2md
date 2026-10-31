@@ -5,7 +5,7 @@
 断言：rescue 子进程在 PG 档捞出 partial run → **复用旧 tmp 视频**（不重新下载）→
 新 run 驱动到 done 并出笔记（vault 产物）→ 旧视频文件原位保留（copy 非搬移）。
 
-运行：V2MD_TEST_PG_DSN=postgresql://v2pdf:v2pdf@127.0.0.1:5432/v2pdf python3 test_rescue_pg.py
+运行：V2MD_TEST_PG_DSN=postgresql://v2md:v2md@127.0.0.1:5432/v2md python3 test_rescue_pg.py
 （CI 由 test job 的 PG service 提供；本地 8790 有服务在跑时 rescue 的 healthz 防护
 会按设计拒跑——先停本地 api 再跑本测试。）
 """
@@ -41,7 +41,7 @@ from video2md import pg, pgmigrate, pgstore  # noqa: E402
 pool = pg.make_pool(DSN)
 pgmigrate.apply_migrations(pool)  # 基线幂等（CI 库可能已被 test_pg_stores 用过）
 with pool.connection() as conn:
-    conn.execute("TRUNCATE v2pdf_runs, v2pdf_submit_log")
+    conn.execute("TRUNCATE v2md_runs, v2md_submit_log")
 runs_store = pgstore.PostgresRunsStore(pool)
 
 # ---- 1. 夹具视频 + 熔断残局种子（视频已在旧 tmp、无笔记、run error）--------------------
@@ -100,7 +100,7 @@ try:
     assert "复用已下载视频" in out, f"未走视频复用路径\n{out[-800:]}"
     with pool.connection() as conn:
         rows = conn.execute(
-            "SELECT run_id, status FROM v2pdf_runs WHERE run_id != 'resc1'").fetchall()
+            "SELECT run_id, status FROM v2md_runs WHERE run_id != 'resc1'").fetchall()
     assert rows and all(st == "done" for _rid, st in rows), f"补跑 run 未 done：{rows}"
     notes = list((VAULT / "资料库" / "视频笔记").glob("测试笔记*.md"))
     assert notes, "vault 无笔记（rescue 未产出）"

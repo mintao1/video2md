@@ -233,14 +233,14 @@ def _cleanup_stale_runs(max_age_days: int = 30, idle_hours: float = 24.0) -> Non
 
 def _prune_orphan_tmps(min_age_h: float = 6.0) -> None:
     """清没人认领的 run 临时目录：runs.json 记录丢失或进程被 SIGKILL 时，tmp 目录永久残留，
-    30 天兜底等于不清。只动 `video2md-run-*` 与改名前遗留的 `video2pdf-run-*`（CLI 的 `video2md-*` 由 finally 自清）。
+    30 天兜底等于不清。只动 `video2md-run-*` 与改名前遗留的 `video2md-run-*`（CLI 的 `video2md-*` 由 finally 自清）。
 
     6 小时内动过的目录视为可能在跑（目录 mtime 随文件增删刷新），不清。
     """
     tdir = Path(tempfile.gettempdir())
     claimed = {r.get("tmp") for r in _load_runs().values() if not r.get("deleted")}
     n = 0
-    for d in [*tdir.glob("video2md-run-*"), *tdir.glob("video2pdf-run-*")]:
+    for d in [*tdir.glob("video2md-run-*"), *tdir.glob("video2md-run-*")]:
         if str(d) in claimed:
             continue
         try:
@@ -295,7 +295,7 @@ _PROC_ID = uuid.uuid4().hex[:8]       # 副本身份：claimed_by 钉名 / watch
 
 # P4b 多副本档（V2MD_TASKS_STORE=postgres）：_TASKS 写路径保留不动（本进程实时视图），
 # 读侧换 PG 真相源——/queue、配额两闸+滑窗、dedup 判活、watchdog 大盘巡检、启动恢复
-# 认领全部走 v2pdf_runs（record jsonb 是状态唯一真相，status 提取列是其可查镜像）。
+# 认领全部走 v2md_runs（record jsonb 是状态唯一真相，status 提取列是其可查镜像）。
 # 缺省 json 档 _tasks_backend() 恒 None，下列新代码路径整体不激活。
 _TASKS_PG = None            # PostgresTaskStore | None（测试可直改本属性切档）
 _tasks_pg_resolved = False
@@ -1290,7 +1290,7 @@ def _google_finish(resp: RedirectResponse) -> RedirectResponse:
     """所有出口统一清 CSRF state cookie（一次性，用完即焚）。"""
     resp.delete_cookie("v2md_oauth_state", path="/auth/google/callback")
     # 清理改名前 cookie，避免旧浏览器残留继续影响回调。
-    resp.delete_cookie("v2pdf_oauth_state", path="/auth/google/callback")
+    resp.delete_cookie("v2md_oauth_state", path="/auth/google/callback")
     return resp
 
 
@@ -1346,7 +1346,7 @@ async def auth_google_callback(request: Request, code: str = "", state: str = ""
     exp = _GOOGLE_OAUTH_STATES.pop(state, None) if state else None
     back = _GOOGLE_OAUTH_REDIRECTS.pop(state, "") if state else ""
     cookie_state = (request.cookies.get("v2md_oauth_state")
-                    or request.cookies.get("v2pdf_oauth_state") or "")
+                    or request.cookies.get("v2md_oauth_state") or "")
     if exp is None or exp <= time.monotonic() or cookie_state != state:
         _req_log("GET", "/auth/google/callback", 400, user=f"(anon:{ip})")
         return _google_finish(_google_error_redirect("登录状态已过期或校验失败，请重新登录", back))
@@ -1983,7 +1983,7 @@ _membership_resolved = False
 
 
 def _membership_row(uid: str) -> dict | None:
-    """v2pdf_membership 单行读（惰性分派仿 _tasks_backend）：PG 关（无 DSN）→ None，
+    """v2md_membership 单行读（惰性分派仿 _tasks_backend）：PG 关（无 DSN）→ None，
     端点据此回 free/全 0 默认视图；运行期 PG 异常由既有 503 处理器兜住。"""
     global _MEMBERSHIP_STORE, _membership_resolved
     if not _membership_resolved:
@@ -2011,7 +2011,7 @@ def get_me(ident: Identity = Depends(current_identity)) -> dict:
 
 
 @app.get("/quota", response_model=QuotaOut,
-          summary="本人会员配额与统计（展示档，来自 v2pdf_membership；不参与提交强制）")
+          summary="本人会员配额与统计（展示档，来自 v2md_membership；不参与提交强制）")
 def get_quota(ident: Identity = Depends(current_identity)) -> dict:
     row = _membership_row(ident.uid) or {}
     # 已生成教材数取 runs 真相源（与教材库同口径：本人、未删、done/partial），

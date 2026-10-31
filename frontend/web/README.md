@@ -54,7 +54,7 @@ CI 会执行 `npx playwright install chromium`；本地若使用系统浏览器�
 
 接口为鉴权的 `GET/PUT/DELETE /settings/llm`。JSON 档写入 `V2MD_PREFS_FILE` 同目录的
 `llm-settings.json`（0600，可用 `V2MD_LLM_SETTINGS_FILE` 覆盖）；`V2MD_PREFS_STORE=postgres`
-时写入独立的 `v2pdf_llm_settings` 兼容表。升级 PG 部署前运行
+时写入独立的 `v2md_llm_settings` 兼容表。升级 PG 部署前运行
 `uv run --project backend python -m video2md migrate`，然后重启后端。
 凭据为服务端可读取的配置数据，应按服务端机密文件/数据库管理，不包含在 run 记录与图 checkpoint 中。
 

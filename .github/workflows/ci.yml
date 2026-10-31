@@ -73,7 +73,7 @@ jobs:
           PY
         working-directory: backend
       - name: pytest（API 契约 + migration role contract + acctkit）
-        run: uv run pytest tests/test_api_contract.py tests/test_migration_role_contract.py tests/test_acctkit.py tests/test_google_cert_cache.py tests/test_rename_compat.py -q
+        run: uv run pytest tests/test_api_contract.py tests/test_migration_role_contract.py tests/test_acctkit.py tests/test_google_cert_cache.py tests/test_naming_contract.py -q
         working-directory: backend
       - name: 个人租户 Colab 评测（普通用户授权、同账号核对、凭证与执行隔离；离线）
         run: uv run pytest tests/test_colab_auth.py tests/test_colab_cli.py tests/test_tenant_colab_eval_set.py -q
@@ -189,9 +189,9 @@ jobs:
           enable-cache: true
       - run: uv sync --frozen
         working-directory: backend
-      - run: uv run ruff check video2md video2pdf acctkit scripts
+      - run: uv run ruff check video2md acctkit scripts
         working-directory: backend
-      - run: uv run mypy video2md video2pdf acctkit
+      - run: uv run mypy video2md acctkit
         working-directory: backend
       - name: Follow-up evidence gate lint
         run: uv run ruff check ../scripts/check_kaggle_followup.py ../scripts/check_production_failure_cost.py ../scripts/check_reader_readiness.py ../scripts/backfill_opencode_usage.py ../scripts/check_resolution_annotations.py tests/test_kaggle_followup_eval_set.py tests/test_usage_backfill.py tests/test_google_cert_cache.py tests/test_note_embed_regressions.py tests/test_reader_readiness_eval.py tests/test_resolution_annotations.py tests/test_resolution_operations.py

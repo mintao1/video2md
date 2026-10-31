@@ -6,7 +6,7 @@
   林思齐 (Siyi Lin) · pro · AI 38/50 小时 · 存储 4.2/20 GB · 统计 47/182/94.8
 
 用法（backend 目录或项目根均可）：
-  V2MD_PG_DSN=postgresql://localhost:5432/v2pdf uv run --project backend python backend/scripts/seed_membership.py
+  V2MD_PG_DSN=postgresql://localhost:5432/v2md uv run --project backend python backend/scripts/seed_membership.py
   python backend/scripts/seed_membership.py --uid u_xxx          # 指定别的 uid
 
 默认 uid 是本地 dev 档（V2MD_AUTH=off + dev provider）的账号 u_9db31e487173——

@@ -44,7 +44,7 @@ RunFailed/RunPartial 事件告警仍是主力，燃烧告警是 SLO 问责口径
 | 单 worker 吞吐 | `backend/scripts/loadtest.py --runs N`（mockpool+假LLM，串行闸=1，8s 夹具） | json 档 **0.1–0.3 s/run**（两轮方差=冷热缓存）≈ 1.2万–2.5万 run/h 上限；PG 档全链 **0.8 s/run** ≈ 4800 run/h |
 | 单 run 资源画像 | RSS 增量 + tmp 构成（转录/OCR 在远端不驻留本地） | api RSS 增量 ≈ **1 MB/run 量级**（10 run +12MB）；tmp 以视频轨主导：8s 夹具 2.8MB → 1h 外推 **≈1.2 GB**（×450 线性）+ 帧上限 60 + 节段 20s×N；阶段耗时 mock 口径无意义不填 |
 | 队列积压拐点 | 同用户并发斜坡 1→50（默认限流档） | 429 首现 **c=10（RATE_LIMITED 30/min）**；c=6 并发无 USER_QUEUE_FULL——**admit TOCTOU 窗口**（补遗②）；50 并发无 5xx |
-| 磁盘增长 | runs.json 字节/N；`pg_total_relation_size('v2pdf_runs')`/N | runs.json **≈1 KB/run**；PG v2pdf_runs **≈32 KB/run**（含索引；10 行小样本——表/索引固定页未摊薄，大样本会显著低于此值）；uploads 稳态=单文件≤2GB×TTL 24h 内活跃数，outbox 同式 |
+| 磁盘增长 | runs.json 字节/N；`pg_total_relation_size('v2md_runs')`/N | runs.json **≈1 KB/run**；PG v2md_runs **≈32 KB/run**（含索引；10 行小样本——表/索引固定页未摊薄，大样本会显著低于此值）；uploads 稳态=单文件≤2GB×TTL 24h 内活跃数，outbox 同式 |
 | PG 池压力 | PG 档全链 N run 观测 PoolTimeout | 10 run **零 PoolTimeout**（P1-8 预算 10s）；代价=每 run ~0.7s 落库开销（0.8 vs 0.1–0.3s，如实计价）；并发>1 的饱和观测待真实多副本形态 |
 | SSE 扇出上限 | 单 run N 并发 SSE 订阅收终态 | **N=20：20/20 无丢失**；队列上限 500 事件/订阅=理论界（短 run ~60 事件未触及），慢消费者超 500 积压才开始丢新事件 |
 
