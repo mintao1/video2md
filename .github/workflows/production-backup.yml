@@ -1,0 +1,41 @@
+name: Production database backup
+
+on:
+  workflow_dispatch:
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    environment: prod
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup SSH
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H "${{ secrets.SSH_HOST }}" >> ~/.ssh/known_hosts
+      - name: Run production backup and verify PostgreSQL archive
+        run: |
+          set -euo pipefail
+          ssh "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" 'bash -s' <<'REMOTE'
+          set -euo pipefail
+          REPO="$HOME/stack/video2md-git"
+          test -d "$REPO/.git"
+          cd "$REPO"
+          TS="$(date +%Y%m%d-%H%M%S)"
+          DST="/var/lib/video2md/backups/manual-$TS"
+          sudo mkdir -p "$DST"
+          sudo chown "$(id -u):$(id -g)" "$DST"
+          set -a
+          . "$REPO/.env"
+          set +a
+          V2MD_ENV=production ./scripts/backup.sh --dst "$DST"
+          PG_FILE="$(find "$DST" -type f -name 'pg-*.sql.gz' -print -quit)"
+          test -n "$PG_FILE"
+          gzip -t "$PG_FILE"
+          sha256sum "$PG_FILE"
+          stat -c 'backup=%n bytes=%s' "$PG_FILE"
+          printf 'BACKUP_DIR=%s\nPG_FILE=%s\n' "$DST" "$PG_FILE"
+          REMOTE
