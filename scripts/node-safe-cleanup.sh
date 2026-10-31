@@ -16,7 +16,11 @@ report_usage() {
     "$ROOT_PATH/agent/containerd"
     /var/lib/docker
     /var/lib/containerd
+    /var/lib/containerd/io.containerd.snapshotter.v1.overlayfs
+    /var/lib/containerd/io.containerd.content.v1.content
     /home
+    "$HOME"
+    "$HOME/.cache"
     /tmp
   )
   command -v du >/dev/null 2>&1 || return 0
