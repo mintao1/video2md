@@ -38,7 +38,7 @@ if command -v sudo >/dev/null 2>&1 && command -v k3s >/dev/null 2>&1; then
   fi
   if ! rs_names="$(sudo k3s kubectl -n "$NAMESPACE" get rs -l "app.kubernetes.io/name=$PRODUCT" \
       --sort-by=.metadata.creationTimestamp \
-      -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null)"; then
+      -o name 2>/dev/null)"; then
     keep_set_failed=1
   else
     selected_rs="$(printf '%s\n' "$rs_names" | sed '/^$/d' | tail -n "$KEEP_ROLLOUTS")"
