@@ -27,7 +27,6 @@ from __future__ import annotations
 import os
 import shutil
 import sqlite3
-import uuid
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
@@ -532,7 +531,9 @@ def run_graph(url: str, *, part_items: str = "", force: bool = False, review: bo
     """
     from . import deadman
 
-    run_id = run_id or uuid.uuid4().hex[:8]
+    if not run_id:
+        from .runs import new_run_id
+        run_id = new_run_id()
     bind_current_run(run_id)  # 并发多 run 时 current_log() 按 ContextVar 取本 run 的 log
     initial: RunState = {"run_id": run_id, "url": url, "part_items": part_items,
                          "force": force, "review": review, "max_frames": max_frames,

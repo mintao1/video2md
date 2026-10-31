@@ -249,7 +249,7 @@ def create_run(url: str, part_items: str = "", force: bool = False,
                                        "title": v.get("title", "")}
         artifacts[e["url"]] = art
     run = {
-        "run_id": uuid.uuid4().hex[:8],
+        "run_id": str(uuid.uuid4()),
         "url": url, "part_items": part_items,
         "owner": owner,
         "created": datetime.now().isoformat(timespec="seconds"),
@@ -357,6 +357,11 @@ from .config import (  # noqa: E402
 )
 
 _USAGE: dict[str, dict] = {}
+
+
+def new_run_id() -> str:
+    """Return a canonical UUID accepted by legacy and current PG schemas."""
+    return str(uuid.uuid4())
 
 
 def bump_usage(*, llm_in_tok: int = 0, llm_out_tok: int = 0, gpu_s: float = 0.0,
