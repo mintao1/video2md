@@ -30,30 +30,30 @@ fi
 if command -v sudo >/dev/null 2>&1 && command -v k3s >/dev/null 2>&1; then
   keep_images=""
   keep_set_failed=0
-  if ! deploy_images="$(sudo k3s kubectl -n "$NAMESPACE" get deploy "$DEPLOYMENT" \
+  if deploy_images="$(sudo k3s kubectl -n "$NAMESPACE" get deploy "$DEPLOYMENT" \
       -o jsonpath='{range .spec.template.spec.initContainers[*]}{.image}{"\n"}{end}{range .spec.template.spec.containers[*]}{.image}{"\n"}{end}' 2>/dev/null)"; then
+    keep_images+=$'\n'"$deploy_images"
+  else
+    echo "NODE_SAFE_CLEANUP=INFO deployment image lookup unavailable; using ReplicaSets"
+  fi
+  if ! rs_names="$(sudo k3s kubectl -n "$NAMESPACE" get rs -l "app.kubernetes.io/name=$PRODUCT" \
+      --sort-by=.metadata.creationTimestamp \
+      -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null)"; then
     keep_set_failed=1
   else
-    keep_images+=$'\n'"$deploy_images"
-    if ! rs_names="$(sudo k3s kubectl -n "$NAMESPACE" get rs -l "app.kubernetes.io/name=$PRODUCT" \
-        --sort-by=.metadata.creationTimestamp \
-        -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null)"; then
+    selected_rs="$(printf '%s\n' "$rs_names" | sed '/^$/d' | tail -n "$KEEP_ROLLOUTS")"
+    if [[ -z "$selected_rs" ]]; then
       keep_set_failed=1
     else
-      selected_rs="$(printf '%s\n' "$rs_names" | sed '/^$/d' | tail -n "$KEEP_ROLLOUTS")"
-      if [[ -z "$selected_rs" ]]; then
-        keep_set_failed=1
-      else
-        while IFS= read -r rs_name; do
-          [[ -n "$rs_name" ]] || continue
-          if ! rs_images="$(sudo k3s kubectl -n "$NAMESPACE" get "$rs_name" \
-              -o jsonpath='{range .spec.template.spec.initContainers[*]}{.image}{"\n"}{end}{range .spec.template.spec.containers[*]}{.image}{"\n"}{end}' 2>/dev/null)"; then
-            keep_set_failed=1
-            break
-          fi
-          keep_images+=$'\n'"$rs_images"
-        done <<< "$selected_rs"
-      fi
+      while IFS= read -r rs_name; do
+        [[ -n "$rs_name" ]] || continue
+        if ! rs_images="$(sudo k3s kubectl -n "$NAMESPACE" get "$rs_name" \
+            -o jsonpath='{range .spec.template.spec.initContainers[*]}{.image}{"\n"}{end}{range .spec.template.spec.containers[*]}{.image}{"\n"}{end}' 2>/dev/null)"; then
+          keep_set_failed=1
+          break
+        fi
+        keep_images+=$'\n'"$rs_images"
+      done <<< "$selected_rs"
     fi
   fi
   keep_images="$(printf '%s\n' "$keep_images" | sed '/^$/d; s#^docker.io/library/##' | sort -u)"
