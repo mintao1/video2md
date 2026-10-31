@@ -361,8 +361,8 @@ it('reuses a queued submission without duplicating the frontend row', async () =
   const store = useQueueStore()
   await store.load()
   const before = store.runs.length
-  await store.createRun('https://example.test/queued')
-  await store.createRun('https://example.test/queued')
+  await store.createRun('https://example.test/queued', undefined, '0,1,2')
+  await store.createRun('https://example.test/queued', undefined, '0,1,2')
   assert.equal(store.runs.length, before)
   assert.equal(store.runs.filter((r) => r.run_id === 'queued').length, 1)
 })
