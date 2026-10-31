@@ -72,7 +72,7 @@ if command -v sudo >/dev/null 2>&1 && command -v k3s >/dev/null 2>&1; then
     done < <(sudo k3s ctr images list -q 2>/dev/null || true)
     # Removing a tag leaves unreferenced blobs until containerd content GC.
     # This command only prunes content with no remaining image reference.
-    sudo k3s ctr content prune >/dev/null 2>&1 || true
+    sudo k3s ctr content prune references --async >/dev/null 2>&1 || true
   else
     echo "NODE_SAFE_CLEANUP=SKIP containerd image pruning (keep set unavailable)"
   fi
