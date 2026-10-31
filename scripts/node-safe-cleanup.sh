@@ -8,47 +8,10 @@ esac
 KEEP_HOURS=$((KEEP_DAYS * 24))
 before_kib="$(df -Pk "$ROOT_PATH" | awk 'NR == 2 { print $4; exit }')"
 echo "NODE_SAFE_CLEANUP=START root=$ROOT_PATH free_kib=${before_kib:-unknown} keep_days=$KEEP_DAYS"
-
-report_usage() {
-  local -a paths=(
-    "$ROOT_PATH"
-    "$ROOT_PATH/agent"
-    "$ROOT_PATH/agent/containerd"
-    /var/lib/docker
-    /var/lib/containerd
-    /var/lib/containerd/io.containerd.snapshotter.v1.overlayfs
-    /var/lib/containerd/io.containerd.content.v1.content
-    /home
-    "$HOME"
-    "$HOME/.cache"
-    /tmp
-  )
-  command -v du >/dev/null 2>&1 || return 0
-  for path in "${paths[@]}"; do
-    [[ -d "$path" ]] || continue
-    if command -v sudo >/dev/null 2>&1; then
-      sudo du -x -k -d 1 "$path" 2>/dev/null
-    else
-      du -x -k -d 1 "$path" 2>/dev/null
-    fi \
-      | sort -rn \
-      | head -n 12 \
-      | sed 's#^#NODE_SAFE_CLEANUP=USAGE #' \
-      || true
-  done
-}
 if command -v docker >/dev/null 2>&1; then
   docker builder prune -af --filter "until=${KEEP_HOURS}h" || true
   docker image prune -af --filter "until=${KEEP_HOURS}h" || true
 fi
-
-prune_rebuildable_home_cache() {
-  local cache_path="$HOME/.cache/pip"
-  [[ -d "$cache_path" ]] || return 0
-  find "$cache_path" -type f -mtime +"$KEEP_DAYS" -delete 2>/dev/null || true
-  find "$cache_path" -depth -type d -empty -delete 2>/dev/null || true
-}
-prune_rebuildable_home_cache
 
 # K3s keeps imported product images after each deployment. Remove only stale
 # product tags absent from the current Deployment and the two newest ReplicaSets.
@@ -115,6 +78,5 @@ if command -v sudo >/dev/null 2>&1 && command -v k3s >/dev/null 2>&1; then
   fi
 fi
 find /tmp -maxdepth 1 -type f -name "${PRODUCT}-images-*" -mtime +"$KEEP_DAYS" -delete 2>/dev/null || true
-report_usage
 after_kib="$(df -Pk "$ROOT_PATH" | awk 'NR == 2 { print $4; exit }')"
 echo "NODE_SAFE_CLEANUP=PASS root=$ROOT_PATH free_kib=${after_kib:-unknown}"

@@ -133,7 +133,8 @@ jobs:
           uv run pytest
           tests/test_production_artifact_completeness_eval_set.py
           tests/test_export_delivery_eval_set.py
-          tests/test_bilibili_open_items_eval_set.py -q
+          tests/test_bilibili_open_items_eval_set.py
+          tests/test_production_acceptance_matrix_2026_10_31.py -q
         working-directory: backend
       - name: 生产产物完整性回归（完成状态不得掩盖缺少可读教材）
         run: uv run pytest tests/test_production_artifact_completeness_eval_set.py -q
