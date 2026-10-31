@@ -70,8 +70,12 @@ def _fake_note(run, entry, art, tmp, args):
     idx = run["entries"].index(entry) + 1
     CALLS.append(f"note:{idx}")
     assert args.get("body"), "note args 缺 body"
-    art.update(note=f"/vault/笔记{idx}.md", title=f"标题{idx}",
-               fp=art.get("fp") or f"fp-{idx}", transcript_path="/vault/t.md")
+    note = Path(tmp) / f"笔记{idx}.md"
+    transcript = Path(tmp) / f"t{idx}.md"
+    note.write_text(f"# 标题{idx}\n正文", encoding="utf-8")
+    transcript.write_text(art.get("transcript", "转录本"), encoding="utf-8")
+    art.update(note=str(note), title=f"标题{idx}",
+               fp=art.get("fp") or f"fp-{idx}", transcript_path=str(transcript))
 
 
 def _install_fakes():
@@ -109,8 +113,14 @@ print("✅ 1. 单条目 happy path（节点序 / state.json 落盘 / tmp 清理�
 
 # ---- 2. 多条目 + 幂等短路 ----------------------------------------------------
 _fresh()
+old_note = _TMP / "old-note.md"
+old_note.write_text("# 已有教材\n正文", encoding="utf-8")
+old_transcript = _TMP / "old-transcript.txt"
+old_transcript.write_text("旧转录本", encoding="utf-8")
 (_TMP / "state.json").write_text(json.dumps({
-    "x": {"url": "https://bilibili.com/video/BV1aaa/", "status": "completed"}}))
+    "x": {"url": "https://bilibili.com/video/BV1aaa/", "status": "completed",
+          "note": str(old_note), "transcript": str(old_transcript),
+          "title": "已有教材", "run_id": "old-run"}}))
 runs.resolve_url = lambda url: [  # 假合集展开（剥网络）
     {"url": "https://bilibili.com/video/BV1aaa", "id": "1", "playlist_index": 1},
     {"url": "https://bilibili.com/video/BV2bbb", "id": "2", "playlist_index": 2}]
@@ -150,10 +160,10 @@ def _refuse(run, entry, art, tmp, args):
     raise SystemExit("正文疑似 LLM 拒答/空壳，拒绝写盘")
 runs._STAGE_FNS["note"] = _refuse
 final = graph.run_graph("/tmp/fake.mp4", checkpointer=None)
-assert final["status"] == "partial", final
+assert final["status"] == "error", final
 assert final["run"]["partial_failures"]["note"] == ["1"]
 assert not (_TMP / "state.json").exists() or "fp-1" not in json.loads((_TMP / "state.json").read_text())
-print("✅ 5. 拒答门禁 → partial（state.json 不落该条目，run 不炸）")
+print("✅ 5. 拒答门禁 → error（无可读教材时不伪装完成，state.json 不落该条目）")
 
 
 # ---- 6. 选帧 LLM 失败 → 启发式兜底，run 继续 ---------------------------------
