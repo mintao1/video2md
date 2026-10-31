@@ -135,6 +135,12 @@ jobs:
       - name: 生产产物完整性回归（完成状态不得掩盖缺少可读教材）
         run: uv run pytest tests/test_production_artifact_completeness_eval_set.py -q
         working-directory: backend
+      - name: 生产浏览器证据完整性契约（媒体、导出、PDF边界；离线）
+        run: uv run pytest tests/test_production_evidence_integrity_eval_set.py -q
+        working-directory: backend
+      - name: 生产部署后联调回归契约（短ID、产物、去重、发布与PDF边界；离线）
+        run: uv run pytest tests/test_production_postdeploy_regression_eval_set.py -q
+        working-directory: backend
       - name: 生产续修43条批注评测与发布预检防回退（历史回放，不替代生产验收）
         run: >-
           uv run pytest tests/test_resolution_annotations.py
