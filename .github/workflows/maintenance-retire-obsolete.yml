@@ -1,6 +1,9 @@
 name: Retire obsolete project namespaces
 
 on:
+  push:
+    branches:
+      - cleanup-execute-20261031
   workflow_dispatch:
     inputs:
       mode:
@@ -27,7 +30,7 @@ jobs:
 
       - name: Inspect or retire high-confidence obsolete namespaces
         env:
-          MODE: ${{ inputs.mode }}
+          MODE: ${{ inputs.mode || 'delete' }}
         run: |
           set -euo pipefail
           ssh "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" "MODE=${MODE} bash -s" <<'REMOTE'
