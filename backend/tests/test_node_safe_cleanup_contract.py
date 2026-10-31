@@ -15,7 +15,8 @@ def test_node_cleanup_prunes_only_rebuildable_caches() -> None:
     text = SCRIPT.read_text(encoding="utf-8")
     assert "docker builder prune" in text
     assert "docker image prune" in text
-    assert "--filter \"until=${KEEP_DAYS}d\"" in text
+    assert "KEEP_HOURS=$((KEEP_DAYS * 24))" in text
+    assert "--filter \"until=${KEEP_HOURS}h\"" in text
     assert "docker system prune" not in text
     assert "docker volume prune" not in text
     assert "k3s ctr images rm" not in text
