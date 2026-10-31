@@ -74,6 +74,24 @@ def _persist(run: dict) -> None:
         _runs_merge(run)
 
 
+def _missing_note_entries(run: dict) -> list[str]:
+    """Return selected entry indexes whose readable note is absent."""
+    entries = run.get("entries") or []
+    artifacts = run.get("artifacts") or {}
+    missing: list[str] = []
+    for idx, entry in enumerate(entries, 1):
+        art = artifacts.get(entry.get("url"), {}) or {}
+        note = str(art.get("note") or "")
+        try:
+            readable = bool(note) and Path(note).is_file() and Path(note).stat().st_size > 0
+        except OSError:
+            readable = False
+        # A skipped entry is valid only when the deduplicated source still has
+        # a readable note. Provenance alone must not make a book appear ready.
+        if not readable:
+            missing.append(str(idx))
+    return missing
+
 
 # ---------------------------------------------------------------- 节点
 
@@ -381,7 +399,19 @@ def node_finalize(state: RunState) -> dict:
     errors = state.get("errors") or []
     if errors:
         run['errors'] = list(dict.fromkeys([*(run.get('errors') or []), *errors]))[-20:]
-    run["status"] = "partial" if run.get("partial_failures") else "done"
+    missing_notes = _missing_note_entries(run)
+    if missing_notes:
+        failed = run.setdefault("partial_failures", {}).setdefault("note", [])
+        run["partial_failures"]["note"] = sorted(
+            {*(str(i) for i in failed), *missing_notes},
+            key=lambda value: int(value) if value.isdigit() else value,
+        )
+        reason = f"教材产物缺失：条目 {','.join(missing_notes)} 未生成可读正文"
+        run["errors"] = list(dict.fromkeys([*(run.get("errors") or []), reason]))[-20:]
+        readable_count = len(run.get("entries") or []) - len(missing_notes)
+        run["status"] = "partial" if readable_count > 0 else "error"
+    else:
+        run["status"] = "partial" if run.get("partial_failures") else "done"
     if artsink.current_mode() == "deliver":
         _relocate_outbox(run)
     if run.get("tmp") and not run.get("tmp_cleaned"):

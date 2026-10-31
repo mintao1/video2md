@@ -247,6 +247,16 @@ def create_run(url: str, part_items: str = "", force: bool = False,
                 art["skipped"] = True
                 art["skipped_from"] = {"run_id": v.get("run_id", ""),  # 客户端凭它拉旧 bundle
                                        "title": v.get("title", "")}
+            if art.get("skipped"):
+                source = runs_db.get(v.get("run_id", "")) or {}
+                source_art = (source.get("artifacts") or {}).get(e["url"], {}) or {}
+                for dest, candidates in {
+                    "note": (source_art.get("note"), v.get("note")),
+                    "transcript_path": (source_art.get("transcript_path"), v.get("transcript")),
+                    "title": (source_art.get("title"), v.get("title"), e.get("title")),
+                }.items():
+                    if (value := next((item for item in candidates if item), None)):
+                        art[dest] = value
         artifacts[e["url"]] = art
     run = {
         "run_id": str(uuid.uuid4()),

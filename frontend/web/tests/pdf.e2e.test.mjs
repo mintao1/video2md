@@ -98,6 +98,34 @@ test('prints a book in a real browser with local MathJax and embedded media', as
   expect(externalMathRequests).toEqual([])
 })
 
+test('writes a non-empty PDF artifact from the rendered print surface', async ({ page }, testInfo) => {
+  // `window.print()` itself is intentionally stubbed in these tests because
+  // Chromium's native print dialog cannot be driven in CI.  Chromium's PDF
+  // renderer uses the exact same popup DOM and print CSS, so writing that
+  // surface to a test artifact proves the bytes are non-empty and current
+  // while keeping the native Save-as-PDF boundary explicit.
+  await installApiFixture(page)
+  await page.goto('/library')
+
+  const popup = await openPdfPopup(page)
+  await popup.waitForLoadState('domcontentloaded')
+  await expect(popup.locator('.pdf-document')).toBeVisible()
+  await expect.poll(() => popup.evaluate(() => Number(window.__v2mdPrintCalls || 0)), { timeout: 15_000 }).toBe(1)
+  // The product closes the popup after native printing. Keep it open while
+  // Chromium serializes the same DOM to a deterministic test PDF.
+  await popup.evaluate(() => { window.onafterprint = null })
+
+  const startedAt = Date.now()
+  const outputPath = testInfo.outputPath('browser-save-proof.pdf')
+  await popup.pdf({ path: outputPath, format: 'A4', printBackground: true })
+
+  const { stat, readFile } = await import('node:fs/promises')
+  const file = await stat(outputPath)
+  expect(file.size).toBeGreaterThan(1_000)
+  expect(file.mtimeMs).toBeGreaterThanOrEqual(startedAt - 1_000)
+  expect((await readFile(outputPath)).subarray(0, 5).toString()).toBe('%PDF-')
+})
+
 test('explains that deliver artifacts expired when notes return 410', async ({ page }) => {
   await installApiFixture(page, { notes: 'expired' })
   await page.goto('/library')
