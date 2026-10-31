@@ -1871,13 +1871,31 @@ async def _discard_waiting_drive(run_id: str) -> None:
 @app.post("/runs/{run_id}/resume", response_model=CancelOut, summary="重试失败或部分完成的任务")
 async def resume_run(run_id: str, ident: Identity = Depends(current_identity)) -> dict:
     run = _require_run_access(run_id, ident)
-    if not run or run.get("status") not in ("error", "partial"):
-        raise HTTPException(409, "只有失败或部分完成的任务可以重试")
+    # GET /runs fail-closes a fresh `done` record when no readable textbook
+    # exists, but the persisted status remains `done` so an already ACKed/
+    # expired deliver artifact is not misclassified.  Such a fresh missing-
+    # artifact run must still be retryable; otherwise the UI shows an
+    # actionable finalize error with no way to recover.
+    mode = artsink.current_mode()
+    readable = sum(
+        1 for artifact in ((run or {}).get("artifacts") or {}).values()
+        if _readable_note_artifact(artifact, mode=mode)
+    )
+    missing_artifact_done = (
+        bool(run)
+        and run.get("status") == "done"
+        and readable == 0
+        and not run.get("artifacts_burned")
+        and bool(run.get("entries"))
+    )
+    retry_statuses = ("error", "partial", "done") if missing_artifact_done else ("error", "partial")
+    if not run or run.get("status") not in retry_statuses:
+        raise HTTPException(409, "只有失败、部分完成或缺少教材的完成任务可以重试")
     task = _TASKS.get(run_id) or {}
     if run_id in _RUNNING_DRIVES or task.get("status") in ("running", "cancelling"):
         raise HTTPException(409, "原任务仍在结束中，请稍后重试")
     _admit_submission(ident.uid)
-    run = patch_owned_run(run_id, ident.uid, ("error", "partial"),
+    run = patch_owned_run(run_id, ident.uid, retry_statuses,
                           {"status": "created", "cancel_requested": False})
     if run is None:
         raise HTTPException(409, "任务已被其他请求重试或删除")

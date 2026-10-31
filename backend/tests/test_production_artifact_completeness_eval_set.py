@@ -7,6 +7,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 DATASET = ROOT / "docs/evals/production-artifact-completeness-eval-set.jsonl"
+API_SOURCE = ROOT / "backend/video2md/api.py"
 
 
 def rows() -> list[dict]:
@@ -77,6 +78,13 @@ def test_health_and_usage_cannot_mask_business_artifact_gap() -> None:
     for case_id in ("rac-008", "rac-009", "rac-012"):
         row = next(item for item in rows() if item["id"] == case_id)
         assert not artifact_contract(row["input"])
+
+
+def test_missing_artifact_done_run_remains_retryable() -> None:
+    source = API_SOURCE.read_text(encoding="utf-8")
+    assert "missing_artifact_done" in source
+    assert 'retry_statuses = ("error", "partial", "done") if missing_artifact_done' in source
+    assert "not run.get(\"artifacts_burned\")" in source
 
 
 def test_eval_rows_contain_no_credentials_or_signed_urls() -> None:
