@@ -21,6 +21,9 @@ def test_node_cleanup_prunes_only_rebuildable_caches() -> None:
     assert "docker volume prune" not in text
     assert "k3s ctr images rm" in text
     assert "ctr images rm --sync" in text
+    assert '"$HOME/.cache/pip"' in text
+    for protected in ("huggingface", "datasets", "weights"):
+        assert protected not in text
     assert "k3s ctr content prune references --async" in text
     assert "KEEP_ROLLOUTS" in text
     assert "invalid KEEP_ROLLOUTS" in text
