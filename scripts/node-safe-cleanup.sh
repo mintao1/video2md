@@ -42,6 +42,14 @@ if command -v docker >/dev/null 2>&1; then
   docker image prune -af --filter "until=${KEEP_HOURS}h" || true
 fi
 
+prune_rebuildable_home_cache() {
+  local cache_path="$HOME/.cache/pip"
+  [[ -d "$cache_path" ]] || return 0
+  find "$cache_path" -type f -mtime +"$KEEP_DAYS" -delete 2>/dev/null || true
+  find "$cache_path" -depth -type d -empty -delete 2>/dev/null || true
+}
+prune_rebuildable_home_cache
+
 # K3s keeps imported product images after each deployment. Remove only stale
 # product tags absent from the current Deployment and the two newest ReplicaSets.
 # If the keep set cannot be resolved, skip image deletion.
