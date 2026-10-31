@@ -8,6 +8,19 @@ esac
 KEEP_HOURS=$((KEEP_DAYS * 24))
 before_kib="$(df -Pk "$ROOT_PATH" | awk 'NR == 2 { print $4; exit }')"
 echo "NODE_SAFE_CLEANUP=START root=$ROOT_PATH free_kib=${before_kib:-unknown} keep_days=$KEEP_DAYS"
+
+report_usage() {
+  command -v du >/dev/null 2>&1 || return 0
+  for path in "$ROOT_PATH" "$ROOT_PATH/agent" "$ROOT_PATH/agent/containerd"; do
+    [[ -d "$path" ]] || continue
+    du -x -k -d 1 "$path" 2>/dev/null \
+      | sort -rn \
+      | head -n 12 \
+      | sed 's#^#NODE_SAFE_CLEANUP=USAGE #' \
+      || true
+  done
+}
+
 if command -v docker >/dev/null 2>&1; then
   docker builder prune -af --filter "until=${KEEP_HOURS}h" || true
   docker image prune -af --filter "until=${KEEP_HOURS}h" || true
@@ -78,5 +91,6 @@ if command -v sudo >/dev/null 2>&1 && command -v k3s >/dev/null 2>&1; then
   fi
 fi
 find /tmp -maxdepth 1 -type f -name "${PRODUCT}-images-*" -mtime +"$KEEP_DAYS" -delete 2>/dev/null || true
+report_usage
 after_kib="$(df -Pk "$ROOT_PATH" | awk 'NR == 2 { print $4; exit }')"
 echo "NODE_SAFE_CLEANUP=PASS root=$ROOT_PATH free_kib=${after_kib:-unknown}"
