@@ -6,7 +6,16 @@ export { currentUser, getQuota, getCost } from './live/profile'
 export { getLlmSettings, saveLlmSettings, clearLlmSettings } from './live/llm-settings'
 export { ArtifactsExpiredError, getBooks, toggleFav, getToc, getNotes, getMedia, saveProgress } from './live/books'
 export { ApiTimeoutError } from './client'
-export { listRuns, createRun, cancelRun, resumeRun, promoteRun, deleteRuns, downloadBundle } from './live/runs'
+export {
+  listRuns,
+  createRun,
+  cancelRun,
+  resumeRun,
+  promoteRun,
+  deleteRuns,
+  downloadBundle,
+  acknowledgeBundle,
+} from './live/runs'
 export { uploadFile } from './live/uploads'
 
 // 登录由 router + auth store 处理；业务 API 统一复用 client 的 Bearer token。
