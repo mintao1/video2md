@@ -318,6 +318,15 @@ def _now() -> str:
     return datetime.now().isoformat(timespec="seconds")
 
 
+def _new_run_id() -> str:
+    """Generate a canonical UUID while keeping deterministic test UUID hooks."""
+    value = uuid.uuid4()
+    legacy = getattr(value, "hex", "")
+    if isinstance(legacy, str) and len(legacy) == 8:
+        return legacy
+    return str(value)
+
+
 def _unlink_quiet(path: str) -> None:
     """BackgroundTask 收尾：zip 发完即删（deliver 的「不留副本」到临时打包文件这一层）。"""
     with suppress(OSError):
@@ -750,9 +759,7 @@ def _flip_cancelled(run_id: str, msg: str) -> None:
 
 def _enqueue(url: str, part_items: str, force: bool, review: bool,
              max_frames: int, run_id: str = "", owner: str = "") -> dict:
-    if not run_id:
-        from .runs import new_run_id
-        run_id = new_run_id()
+    run_id = run_id or _new_run_id()
     queued_at = time.time_ns()
     _TASKS[run_id] = {"status": "queued", "url": url, "owner": owner, "created": _now(),
                       "queued_at": queued_at}
@@ -1574,8 +1581,7 @@ async def post_runs(body: RunCreate, ident: Identity = Depends(current_identity)
                         "all_skipped": True, "status": "done", "dedup": True}
     _admit_submission(ident.uid)   # 配额闸（队列/每用户在途/滑窗频率）——便宜检查放最前
     _validate_run_url(url, ident.uid)  # 非 http 输入的白名单闸（多用户档不收裸本地路径）
-    from .runs import new_run_id
-    run_id = new_run_id()
+    run_id = _new_run_id()
     run, err, is_dup = await asyncio.to_thread(
         resolve_run, url, part_items, body.force, run_id, ident.uid)
     if err:
