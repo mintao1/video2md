@@ -111,6 +111,9 @@ test('writes a non-empty PDF artifact from the rendered print surface', async ({
   await popup.waitForLoadState('domcontentloaded')
   await expect(popup.locator('.pdf-document')).toBeVisible()
   await expect.poll(() => popup.evaluate(() => Number(window.__v2mdPrintCalls || 0)), { timeout: 15_000 }).toBe(1)
+  // The product closes the popup after native printing. Keep it open while
+  // Chromium serializes the same DOM to a deterministic test PDF.
+  await popup.evaluate(() => { window.onafterprint = null })
 
   const startedAt = Date.now()
   const outputPath = testInfo.outputPath('browser-save-proof.pdf')
