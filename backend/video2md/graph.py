@@ -81,7 +81,7 @@ def _missing_note_entries(run: dict) -> list[str]:
     missing: list[str] = []
     for idx, entry in enumerate(entries, 1):
         art = artifacts.get(entry.get("url"), {}) or {}
-        note = art.get("note")
+        note = str(art.get("note") or "")
         try:
             readable = bool(note) and Path(note).is_file() and Path(note).stat().st_size > 0
         except OSError:
