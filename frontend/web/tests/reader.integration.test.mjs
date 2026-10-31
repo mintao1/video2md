@@ -41,6 +41,17 @@ it('extracts Obsidian callouts into stable typed blocks without losing body mark
   assert.doesNotMatch(result.markdown, /\[!info\]|\[!tip\]/)
 })
 
+it('normalizes legacy callouts whose blockquote marker was stripped', () => {
+  const result = reader.extractCallouts('[!info] 视频信息\n\n[!tip]- 章节导航\n\n[!warning] 注意版本要求\n\n[!example] 思考题')
+  assert.deepEqual(result.callouts.map(c => [c.type, c.fold, c.title]), [
+    ['info', false, '视频信息'],
+    ['tip', true, '章节导航'],
+    ['warning', false, '注意版本要求'],
+    ['example', false, '思考题'],
+  ])
+  assert.doesNotMatch(result.markdown, /\[!(info|tip|warning|example)\]/)
+})
+
 it('escapes unavailable media names and refuses arbitrary external URLs', () => {
   const html = marked.parse(reader.mediaMarkdown('![[attachments/a" onerror="evil.jpg]]', {
     'a" onerror="evil.jpg': 'https://attacker.test/tracker.jpg',
