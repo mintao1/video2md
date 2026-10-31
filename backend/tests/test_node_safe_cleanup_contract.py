@@ -20,6 +20,7 @@ def test_node_cleanup_prunes_only_rebuildable_caches() -> None:
     assert "docker system prune" not in text
     assert "docker volume prune" not in text
     assert "k3s ctr images rm" in text
+    assert "ctr images rm --sync" in text
     assert "k3s ctr content prune" in text
     assert "KEEP_ROLLOUTS" in text
     assert "invalid KEEP_ROLLOUTS" in text
