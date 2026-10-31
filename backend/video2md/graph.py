@@ -81,18 +81,14 @@ def _missing_note_entries(run: dict) -> list[str]:
     missing: list[str] = []
     for idx, entry in enumerate(entries, 1):
         art = artifacts.get(entry.get("url"), {}) or {}
-        if art.get("skipped"):
-            if not (art.get("skipped_from") or {}).get("run_id"):
-                missing.append(str(idx))
-            continue
         note = art.get("note")
-        if not note:
-            missing.append(str(idx))
-            continue
         try:
-            if not Path(note).is_file() or Path(note).stat().st_size <= 0:
-                missing.append(str(idx))
+            readable = bool(note) and Path(note).is_file() and Path(note).stat().st_size > 0
         except OSError:
+            readable = False
+        # A skipped entry is valid only when the deduplicated source still has
+        # a readable note. Provenance alone must not make a book appear ready.
+        if not readable:
             missing.append(str(idx))
     return missing
 
