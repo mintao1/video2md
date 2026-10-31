@@ -52,8 +52,8 @@ export const useQueueStore = defineStore('queue', () => {
     }
   }
 
-  async function createRun(url: string, title?: string) {
-    const run = await api.createRun({ url, title })
+  async function createRun(url: string, title?: string, partItems?: string) {
+    const run = await api.createRun({ url, title, partItems })
     revision++
     if (runs.value.some((existing) => existing.run_id === run.run_id)) {
       await load() // Reused runs retain their authoritative usage and artifact state.
