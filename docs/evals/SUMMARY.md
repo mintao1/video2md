@@ -6,8 +6,8 @@
 
 | 指标 | 数值 |
 | --- | --- |
-| 评测集 | 26 个 JSONL |
-| 用例 | 355 条 |
+| 评测集 | 29 个 JSONL |
+| 用例 | 376 条 |
 | 显式反例 | 243 个（B站 132、逐阶段生产 78、GLM 审阅 33） |
 | 运行方式 | GitHub Actions `test` job，每次 push / PR |
 
@@ -26,6 +26,9 @@
 | `multilingual-edge-eval-set.jsonl` | 20 | 多语种、RTL、OCR、公式和低置信输入 |
 | `adversarial-safety-eval-set.jsonl` | 20 | Prompt 注入、租户隔离、路径和成本安全 |
 | `select-frames-eval-set.jsonl` | 30 | OCR/语音双信号、清晰度、去重、兜底和幂等 |
+| `production-artifact-completeness-eval-set.jsonl` | 12 | 完成状态与可读教材产物一致性 |
+| `export-delivery-regression-eval-set.jsonl` | 6 | Markdown、教材包、PDF、ACK 清理 |
+| `bilibili-open-items-eval-set.jsonl` | 3 | B站未关闭项的生产证据边界 |
 
 ## 这些评测拦住的典型线上问题
 
