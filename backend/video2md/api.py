@@ -1871,6 +1871,8 @@ async def _discard_waiting_drive(run_id: str) -> None:
 @app.post("/runs/{run_id}/resume", response_model=CancelOut, summary="重试失败或部分完成的任务")
 async def resume_run(run_id: str, ident: Identity = Depends(current_identity)) -> dict:
     run = _require_run_access(run_id, ident)
+    if run is None:
+        raise HTTPException(404, "任务不存在")
     # GET /runs fail-closes a fresh `done` record when no readable textbook
     # exists, but the persisted status remains `done` so an already ACKed/
     # expired deliver artifact is not misclassified.  Such a fresh missing-
@@ -1878,12 +1880,11 @@ async def resume_run(run_id: str, ident: Identity = Depends(current_identity)) -
     # actionable finalize error with no way to recover.
     mode = artsink.current_mode()
     readable = sum(
-        1 for artifact in ((run or {}).get("artifacts") or {}).values()
+        1 for artifact in (run.get("artifacts") or {}).values()
         if _readable_note_artifact(artifact, mode=mode)
     )
     missing_artifact_done = (
-        bool(run)
-        and run.get("status") == "done"
+        run.get("status") == "done"
         and readable == 0
         and not run.get("artifacts_burned")
         and bool(run.get("entries"))
