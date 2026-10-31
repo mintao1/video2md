@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { downloadBundle } from '../../api'
+import { acknowledgeBundle, downloadBundle } from '../../api'
 import type { RunListItem } from '../../types'
 import ProgressBar from '../common/ProgressBar.vue'
 import { useQueueStore } from '../../stores/queue'
@@ -34,6 +34,13 @@ async function action(kind: 'cancel' | 'resume' | 'promote' | 'download') {
       anchor.click()
       anchor.remove()
       setTimeout(() => URL.revokeObjectURL(url), 60_000)
+      // The blob is fully received before this branch continues.  ACK now so
+      // deliver mode can physically burn the server-side copy immediately;
+      // a failed download never reaches this point and remains recoverable.
+      await acknowledgeBundle(props.run.run_id)
+      // Refresh the card so the expired/burned artifact cannot be offered a
+      // second time from stale client state.
+      try { await queue.load() } catch { /* the download and ACK already succeeded */ }
     }
     toast.show({ cancel: '已提交取消请求', resume: '任务已重新排队', promote: '已设为优先', download: '下载已开始' }[kind])
   } catch (error) {
