@@ -61,16 +61,25 @@ api.app.dependency_overrides[current_identity] = identity
 
 # Only this isolated fixture app exposes these endpoints. Capture no credentials.
 _range_audit = []
+_run_requests = []
 
 
 @api.app.middleware("http")
 async def range_media_audit(request, call_next):
+    request_body = None
+    if request.method == "POST" and request.url.path == "/runs":
+        request_body = await request.body()
+        # Starlette caches Request.body(); restoring the cache keeps the real
+        # endpoint handler able to parse the same payload.
+        request._body = request_body
     response = await call_next(request)
     if request.url.path.endswith("/media/range-demo.mp4"):
         _range_audit.append({"range": request.headers.get("range"),
                              "if_range": request.headers.get("if-range"),
                              "authenticated": bool(request.headers.get("authorization")),
                              "status": response.status_code})
+    if request_body is not None:
+        _run_requests.append(json.loads(request_body))
     return response
 
 
@@ -91,9 +100,15 @@ def range_audit():
     return {"requests": _range_audit}
 
 
+@api.app.post("/__tests/run-requests")
+def run_requests():
+    return {"requests": _run_requests}
+
+
 @api.app.post("/__tests/reset")
 async def reset():
     _range_audit.clear()
+    _run_requests.clear()
     api.BUDGET_MONTH_USD = 0.0
     for task in list(api._DRIVES.values()):
         task.cancel()
