@@ -63,3 +63,4 @@ jobs:
           echo "=== filesystem after retirement ==="
           df -h /
           REMOTE
+# Triggered once on the dedicated cleanup branch.
