@@ -8,7 +8,11 @@ export function chapterIndex(chapter: unknown, total: number, progress = 0): num
 }
 
 const EMBED = /!\[\[attachments\/([^\]\n\\/|]+)(?:\|[^\]]*)?\]\]/g
-const CALLOUT_START = /^>\s*\[!(info|tip|warning|example)\](-)?(?:\s+(.*))?\s*$/
+// Notes produced by the pipeline use Obsidian's blockquote form, but older
+// notes and the first production renderer occasionally dropped the leading
+// `>`. Accept both forms so a stored note cannot regress to literal
+// `[!info]`/`[!tip]` text in the reader.
+const CALLOUT_START = /^(?:>\s*)?\[!(info|tip|warning|example)\](-)?(?:\s+(.*))?\s*$/
 
 export type Callout = { type: 'info' | 'tip' | 'warning' | 'example'; fold: boolean; title: string; body: string }
 
