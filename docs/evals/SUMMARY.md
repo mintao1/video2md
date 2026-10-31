@@ -6,8 +6,8 @@
 
 | 指标 | 数值 |
 | --- | --- |
-| 评测集 | 29 个 JSONL |
-| 用例 | 376 条 |
+| 评测集 | 32 个 JSONL |
+| 用例 | 378 条 |
 | 显式反例 | 243 个（B站 132、逐阶段生产 78、GLM 审阅 33） |
 | 运行方式 | GitHub Actions `test` job，每次 push / PR |
 
@@ -29,6 +29,8 @@
 | `production-artifact-completeness-eval-set.jsonl` | 12 | 完成状态与可读教材产物一致性 |
 | `export-delivery-regression-eval-set.jsonl` | 6 | Markdown、教材包、PDF、ACK 清理 |
 | `bilibili-open-items-eval-set.jsonl` | 3 | B站未关闭项的生产证据边界 |
+| `production-evidence-integrity-eval-set.jsonl` | 8 | 阅读器媒体、下载新鲜度、ACK 清理与 PDF 证据边界 |
+| `production-postdeploy-regression-eval-set.jsonl` | 10 | 部署后短ID、读写面、去重、产物状态、发布与PDF边界 |
 
 ## 这些评测拦住的典型线上问题
 
