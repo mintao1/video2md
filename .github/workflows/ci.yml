@@ -125,6 +125,16 @@ jobs:
       - name: 多语种与对抗安全质量子集契约（离线、零 token）
         run: uv run pytest tests/test_quality_subsets_eval_set.py -q
         working-directory: backend
+      - name: 任务产物完整性、导出交付与 B 站开放项契约（离线）
+        run: >-
+          uv run pytest
+          tests/test_production_artifact_completeness_eval_set.py
+          tests/test_export_delivery_eval_set.py
+          tests/test_bilibili_open_items_eval_set.py -q
+        working-directory: backend
+      - name: 生产产物完整性回归（完成状态不得掩盖缺少可读教材）
+        run: uv run pytest tests/test_production_artifact_completeness_eval_set.py -q
+        working-directory: backend
       - name: 生产续修43条批注评测与发布预检防回退（历史回放，不替代生产验收）
         run: >-
           uv run pytest tests/test_resolution_annotations.py
