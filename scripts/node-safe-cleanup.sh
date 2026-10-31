@@ -68,7 +68,7 @@ if command -v sudo >/dev/null 2>&1 && command -v k3s >/dev/null 2>&1; then
         continue
       fi
       echo "  removing stale containerd image $image"
-      sudo k3s ctr images rm "$image" >/dev/null 2>&1 || true
+      sudo k3s ctr images rm --sync "$image" >/dev/null 2>&1 || true
     done < <(sudo k3s ctr images list -q 2>/dev/null || true)
     # Removing a tag leaves unreferenced blobs until containerd content GC.
     # This command only prunes content with no remaining image reference.
