@@ -37,6 +37,19 @@ def main() -> None:
             validate_schema(pool)
         finally:
             pool.close()
+        # LangGraph owns the checkpoint schema and its migrations separately
+        # from the application tables.  Production keeps CHECKPOINTER_SETUP off
+        # in the API container, so the migration init container must run the
+        # package setup against the DDL-capable migration role as well.
+        if (ENV.get("V2PDF_CHECKPOINTER") or "sqlite").strip().lower() == "postgres" \
+                and (ENV.get("V2PDF_CHECKPOINTER_SETUP", "on") or "on").strip().lower() != "off":
+            from langgraph.checkpoint.postgres import PostgresSaver
+            checkpoint_pool = pg.make_pool(pg.pg_migrate_dsn())
+            try:
+                PostgresSaver(checkpoint_pool).setup()  # type: ignore[arg-type]
+                print("✅ LangGraph checkpoint schema ready")
+            finally:
+                checkpoint_pool.close()
         return
     if len(sys.argv) > 1 and sys.argv[1] == "graph-run":
         # LangGraph 单次直跑（调试/对拍用；生产入口是 api 服务的 POST /runs）
