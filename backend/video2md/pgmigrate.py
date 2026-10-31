@@ -34,6 +34,7 @@ MIGRATIONS: list[tuple[int, str]] = [
     (4, "0004_llm_settings.sql"),
     (5, "0005_tenant_rls.sql"),
     (6, "0006_llm_key_ciphertext.sql"),
+    (7, "0007_run_id_text_compat.sql"),
 ]
 SCHEMA_LATEST = MIGRATIONS[-1][0]
 
