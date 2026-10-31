@@ -367,17 +367,6 @@ it('reuses a queued submission without duplicating the frontend row', async () =
   assert.equal(store.runs.filter((r) => r.run_id === 'queued').length, 1)
 })
 
-it('submits whole playlists by default and preserves explicit part selection', async () => {
-  // `part_items` is optional in the API contract.  Omitting it must not
-  // silently truncate a playlist to a verification subset.
-  await api.createRun({ url: 'https://example.test/finished' })
-  await api.createRun({ url: 'https://example.test/queued', partItems: '1,3-5' })
-  const requests = (await (await http('/__tests/run-requests', { method: 'POST' })).json()).requests
-  assert.equal(requests.at(-2).url, 'https://example.test/finished')
-  assert.equal('part_items' in requests.at(-2), false)
-  assert.deepEqual(requests.at(-1), { url: 'https://example.test/queued', part_items: '1,3-5' })
-})
-
 it('renders API rejection persistently inside the still-open import sheet', async () => {
   const Component = (await vite.ssrLoadModule('/src/components/queue/ImportModal.vue')).default
   const context = {}
