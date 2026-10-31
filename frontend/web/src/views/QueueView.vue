@@ -80,13 +80,13 @@ async function quickSubmit() {
   }
 }
 
-async function startConvert(payload: { url: string; title?: string; file?: File }) {
+async function startConvert(payload: { url: string; title?: string; file?: File; partItems?: string }) {
   if (submitting.value) return
   importError.value = ''
   submitting.value = true
   try {
     const url = payload.file ? (await uploadFile(payload.file)).path : payload.url
-    await queue.createRun(url, payload.title)
+    await queue.createRun(url, payload.title, payload.partItems)
     importOpen.value = false
     toast.show('已加入转换队列，稍后可在教材库查看')
   } catch (error) {
