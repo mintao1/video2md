@@ -84,7 +84,10 @@ jobs:
         run: uv run pytest tests/test_production_readiness_gate.py -q
         working-directory: backend
       - name: 502 部署韧性评测（镜像导入/磁盘压力/8790 冒烟；离线）
-        run: uv run pytest tests/test_production_deploy_resilience_eval_set.py -q
+        run: >-
+          uv run pytest
+          tests/test_production_deploy_resilience_eval_set.py
+          tests/test_node_safe_cleanup_contract.py -q
         working-directory: backend
       - name: 逐阶段生产评测防回退（正反例、真实失败回放；零 token）
         run: >-

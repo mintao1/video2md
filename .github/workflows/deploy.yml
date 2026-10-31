@@ -164,6 +164,13 @@ jobs:
           chmod 600 ~/.ssh/id_ed25519
           ssh-keyscan -H "${{ secrets.SSH_HOST }}" >> ~/.ssh/known_hosts
 
+      - name: Release rebuildable node caches before build
+        run: |
+          set -euo pipefail
+          PRODUCT="${{ inputs.product || 'video2md' }}"
+          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
+            "bash -s" < "${PRODUCT}/scripts/node-safe-cleanup.sh"
+
       - name: Guard node disk pressure before build
         env:
           MIN_FREE_GIB: ${{ steps.limits.outputs.min_free_gib }}
