@@ -6,8 +6,8 @@
 
 | 指标 | 数值 |
 | --- | --- |
-| 评测集 | 23 个 JSONL |
-| 用例 | 285 条 |
+| 评测集 | 33 个 JSONL |
+| 用例 | 389 条 |
 | 显式反例 | 243 个（B站 132、逐阶段生产 78、GLM 审阅 33） |
 | 运行方式 | GitHub Actions `test` job，每次 push / PR |
 
@@ -23,6 +23,15 @@
 | `tenant-colab-login-eval-set.jsonl` | 13 | 个人 Colab 授权与凭证隔离 |
 | `kaggle-billing-followup-eval-set.jsonl` | 12 | GPU 供应商计费对账 |
 | `glm-production-review-eval-set.jsonl` | 11 | GLM 模型接入审阅批注 |
+| `multilingual-edge-eval-set.jsonl` | 20 | 多语种、RTL、OCR、公式和低置信输入 |
+| `adversarial-safety-eval-set.jsonl` | 20 | Prompt 注入、租户隔离、路径和成本安全 |
+| `select-frames-eval-set.jsonl` | 30 | OCR/语音双信号、清晰度、去重、兜底和幂等 |
+| `production-artifact-completeness-eval-set.jsonl` | 12 | 完成状态与可读教材产物一致性 |
+| `export-delivery-regression-eval-set.jsonl` | 6 | Markdown、教材包、PDF、ACK 清理 |
+| `bilibili-open-items-eval-set.jsonl` | 3 | B站未关闭项的生产证据边界 |
+| `production-evidence-integrity-eval-set.jsonl` | 8 | 阅读器媒体、下载新鲜度、ACK 清理与 PDF 证据边界 |
+| `production-postdeploy-regression-eval-set.jsonl` | 10 | 部署后短ID、读写面、去重、产物状态、发布与PDF边界 |
+| `production-acceptance-matrix-2026-10-31.jsonl` | 11 | 本轮生产复测结果、导出证据边界与 B 站未关闭项 |
 
 ## 这些评测拦住的典型线上问题
 

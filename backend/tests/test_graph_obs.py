@@ -71,8 +71,12 @@ def _happy(stage):
 
 def _fake_note(run, entry, art, tmp, args):
     idx = run["entries"].index(entry) + 1
-    art.update(note=f"/vault/笔记{idx}.md", title=f"标题{idx}",
-               fp=art.get("fp") or f"fp-{idx}", transcript_path="/vault/t.md")
+    note = Path(tmp) / f"笔记{idx}.md"
+    transcript = Path(tmp) / f"t{idx}.md"
+    note.write_text(f"# 标题{idx}\n正文", encoding="utf-8")
+    transcript.write_text(art.get("transcript", "转录本"), encoding="utf-8")
+    art.update(note=str(note), title=f"标题{idx}",
+               fp=art.get("fp") or f"fp-{idx}", transcript_path=str(transcript))
 
 
 def _fake_select(tr, cand, total):

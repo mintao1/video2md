@@ -1407,6 +1407,32 @@ def _run_title(r: dict) -> str:
     return urllib.parse.urlparse(r.get("url") or "").hostname or r.get("url") or ""
 
 
+def _readable_note_artifact(artifact: dict, *, mode: str) -> bool:
+    """Whether an artifact has a note that the reader can actually open.
+
+    ``GET /runs`` is the source for the queue's ``readable`` flag.  Counting
+    only a persisted ``note`` path is unsafe: deliver mode deliberately strips
+    ``md`` from ``runs.json`` and a burned/expired shelf leaves that path as a
+    stale string.  In vault mode the inline ``md`` field is the authoritative
+    body, while deliver mode must prove the shelf file still exists and is
+    non-empty.  Keep this predicate aligned with the finalization quality gate.
+    """
+    if not isinstance(artifact, dict) or artifact.get("skipped"):
+        return False
+    if mode != "deliver":
+        md = str(artifact.get("md") or "").strip()
+        if md:
+            return True
+    note = str(artifact.get("note") or "").strip()
+    if not note:
+        return False
+    try:
+        path = Path(note)
+        return path.is_file() and path.stat().st_size > 0
+    except OSError:
+        return False
+
+
 _DIAGNOSTIC_URL_RE = re.compile(r"https?://\S+")
 _DIAGNOSTIC_SECRET_RE = re.compile(
     r"(?i)\b(?:token|key|secret|password|authorization)=\S+"
@@ -1511,20 +1537,35 @@ def get_runs(status: str = "", limit: int = 50,
             continue
         if status and r.get("status") != status:
             continue
+        # ``done_entries`` feeds the frontend ``readable`` flag.  A stale
+        # path after deliver ACK/TTL must not make a run look like a readable
+        # book merely because the note key remains in runs.json.
         done_n = sum(1 for a in (r.get("artifacts") or {}).values()
-                     if a.get("note") and not a.get("skipped"))
+                     if _readable_note_artifact(a, mode=mode))
         arts = None
         if mode == "deliver":
             path, exp = _outbox_live(r)
             arts = {"mode": "deliver", "present": path is not None, "expires": exp}
         visible_status = ("cancelling" if r.get("cancel_requested") and r.get("status") in ("running", "queued")
                           else r.get("status"))
+        diagnostic = _public_run_diagnostic(r)
+        # A fresh terminal run with zero readable notes is a failed delivery,
+        # not a successful conversion.  Preserve ``done`` after an explicit
+        # ACK/TTL burn (the user already received or allowed expiry of the
+        # artifact), but fail closed for a run that never produced a note.
+        if (r.get("status") == "done" and done_n == 0
+                and not r.get("artifacts_burned")):
+            visible_status = "error"
+            diagnostic = diagnostic or {
+                "stage": "finalize",
+                "message": "转换完成但未生成可读教材，请重试。",
+            }
         rows.append({"run_id": r.get("run_id"), "url": r.get("url"),
                      "title": _run_title(r),
                      "status": visible_status, "created": r.get("created"),
                      "queue_pos": positions.get(r["run_id"]),
                      "total": r.get("total"), "done_entries": done_n, "artifacts": arts,
-                     **_run_accounting(r), "diagnostic": _public_run_diagnostic(r)})
+                     **_run_accounting(r), "diagnostic": diagnostic})
         if len(rows) >= limit:
             break
     return {"items": rows, "mode": mode}
