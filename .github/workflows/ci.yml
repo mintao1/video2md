@@ -122,6 +122,9 @@ jobs:
       - name: 内容质量提前拦截（零模型调用 / partial 原因落盘）
         run: uv run pytest tests/test_transcript_quality_admission.py -q
         working-directory: backend
+      - name: 多语种与对抗安全质量子集契约（离线、零 token）
+        run: uv run pytest tests/test_quality_subsets_eval_set.py -q
+        working-directory: backend
       - name: 生产续修43条批注评测与发布预检防回退（历史回放，不替代生产验收）
         run: >-
           uv run pytest tests/test_resolution_annotations.py
