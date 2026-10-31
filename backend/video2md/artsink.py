@@ -22,7 +22,7 @@ from pathlib import Path
 
 from . import config
 
-_SINK: contextvars.ContextVar[dict | None] = contextvars.ContextVar("v2pdf_art_sink", default=None)
+_SINK: contextvars.ContextVar[dict | None] = contextvars.ContextVar("v2md_art_sink", default=None)
 
 
 def current_mode() -> str:

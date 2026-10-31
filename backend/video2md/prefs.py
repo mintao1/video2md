@@ -1,7 +1,7 @@
 """用户偏好存储（教材库：收藏/阅读进度）：(uid, run_id) → {fav, progress}。
 
-json 缺省档（V2PDF_PREFS_FILE，仿 runs.json：fcntl 跨进程锁 + 原子 rename 落盘）；
-V2PDF_PREFS_STORE=postgres 且 V2PDF_PG_DSN 在 → PostgresPrefsStore（v2pdf_prefs 表，
+json 缺省档（V2MD_PREFS_FILE，仿 runs.json：fcntl 跨进程锁 + 原子 rename 落盘）；
+V2MD_PREFS_STORE=postgres 且 V2MD_PG_DSN 在 → PostgresPrefsStore（v2pdf_prefs 表，
 行级原子，建表上收 migrations/0003——构造函数不建表，P0-5 纪律）。
 
 分派惰性解析仿 runs._runs_backend（ENV 调用时读，测试可直改 _STORE 切档）。
@@ -109,7 +109,7 @@ def prefs_store() -> JsonPrefsStore | PostgresPrefsStore:
     if not _store_resolved:
         _store_resolved = True
         from .config import ENV
-        if (ENV.get("V2PDF_PREFS_STORE") or "").strip().lower() == "postgres":
+        if (ENV.get("V2MD_PREFS_STORE") or "").strip().lower() == "postgres":
             from . import pg
             _STORE = PostgresPrefsStore(pg.shared_pool())
         else:

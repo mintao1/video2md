@@ -104,16 +104,16 @@ def run_regressions() -> int:
         root = Path(directory)
         env = os.environ.copy()
         for key in env:
-            if key.startswith(("V2PDF_", "LLM_", "LANGFUSE_", "OTEL_", "OPENAI_", "GOOGLE_")):
+            if key.startswith(("V2MD_", "LLM_", "LANGFUSE_", "OTEL_", "OPENAI_", "GOOGLE_")):
                 env[key] = ""
-        env.update(V2PDF_SECRETS_FILE=str(root / "no-secrets"), V2PDF_ENV="development", V2PDF_AUTH="off",
-                   V2PDF_CHECKPOINTER="sqlite", V2PDF_FAKE_LLM="1", OBSIDIAN_VAULT=str(root / "vault"))
+        env.update(V2MD_SECRETS_FILE=str(root / "no-secrets"), V2MD_ENV="development", V2MD_AUTH="off",
+                   V2MD_CHECKPOINTER="sqlite", V2MD_FAKE_LLM="1", OBSIDIAN_VAULT=str(root / "vault"))
         for name in ("RUNS", "STATE", "USERS", "PREFS", "LLM_SETTINGS"):
-            env[f"V2PDF_{name}_FILE"] = str(root / f"{name.lower()}.json")
+            env[f"V2MD_{name}_FILE"] = str(root / f"{name.lower()}.json")
         for name in ("LOG", "UPLOADS", "OUTBOX", "COLAB_USERS"):
-            env[f"V2PDF_{name}_DIR"] = str(root / name.lower())
+            env[f"V2MD_{name}_DIR"] = str(root / name.lower())
         for name in ("RUNS", "STATE", "USERS", "PREFS", "TASKS"):
-            env[f"V2PDF_{name}_STORE"] = "json"
+            env[f"V2MD_{name}_STORE"] = "json"
         python = ROOT / "backend/.venv/bin/python"
         commands = [
             ([str(python) if python.is_file() else sys.executable, "-m", "pytest",

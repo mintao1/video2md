@@ -71,7 +71,7 @@ def remote_cut_clips(published: list, video: Path, dur: float,
     todo = [(k, v) for k, v in tasks.items() if not isinstance(v, str)]
     if not todo:
         return result
-    prefer_remote = bool(direct_url) and (ENV.get("V2PDF_CLIPS_SOURCE") or "").lower() == "remote"
+    prefer_remote = bool(direct_url) and (ENV.get("V2MD_CLIPS_SOURCE") or "").lower() == "remote"
     specs = [{"out": v[0], "s0": v[2], "s1": v[3]} for _k, v in todo]
     if base.lower() in ("colab", "colab-cli"):
         from .colab import cut_specs

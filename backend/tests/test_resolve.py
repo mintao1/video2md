@@ -11,7 +11,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # backend/（包根）
-from video2pdf import resolve as m
+from video2md import resolve as m
 
 # m.subprocess / m.time 是全局模块：pytest 收集本文件时同进程的其它用例也会受影响，
 # 跑完必须还原（见文末）。

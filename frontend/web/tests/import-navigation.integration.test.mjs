@@ -30,7 +30,7 @@ function renderer() {
 }
 
 test('consuming the import query preserves task state while reader query changes still remount', async () => {
-  const source = await readFile(process.env.V2PDF_TEST_APP_TEMPLATE_FILE || new URL('../src/App.vue', import.meta.url), 'utf8')
+  const source = await readFile(process.env.V2MD_TEST_APP_TEMPLATE_FILE || new URL('../src/App.vue', import.meta.url), 'utf8')
   const template = parse(source).descriptor.template.content
   const render = new Function('Vue', compile(template, { mode: 'function', prefixIdentifiers: true }).code)(Vue)
   let mounts = 0, readerMounts = 0, opened

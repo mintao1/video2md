@@ -11,7 +11,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-FORBIDDEN_ENV = {"17898", "HTTP_PROXY", "HTTPS_PROXY", "V2PDF_PROXY"}
+FORBIDDEN_ENV = {"17898", "HTTP_PROXY", "HTTPS_PROXY", "V2MD_PROXY"}
 
 
 def nested(data: dict[str, Any], path: str) -> Any:
@@ -209,7 +209,7 @@ def evaluate_repository(repo_root: Path) -> list[str]:
 
     deployment = (repo_root / "deploy/k8s/base/deployment-api.yaml").read_text(encoding="utf-8")
     compose = (repo_root / "deploy/docker-compose.prod.yml").read_text(encoding="utf-8")
-    package_root = repo_root / "backend/video2pdf"
+    package_root = repo_root / "backend/video2md"
     if not package_root.exists():
         package_root = repo_root / "backend/video2md"
     api_start = compose.find("\n  api:")
@@ -227,7 +227,7 @@ def evaluate_repository(repo_root: Path) -> list[str]:
     nginx = (repo_root / "deploy/nginx.conf").read_text(encoding="utf-8")
     relay = (repo_root / "deploy/oauth-relay/oauth-relay.service").read_text(encoding="utf-8")
     tunnel = (repo_root / "deploy/oauth-relay/oauth-tunnel.service").read_text(encoding="utf-8")
-    api = (repo_root / "backend/video2pdf/api.py").read_text(encoding="utf-8")
+    api = (repo_root / "backend/video2md/api.py").read_text(encoding="utf-8")
     providers = (repo_root / "backend/acctkit/providers.py").read_text(encoding="utf-8")
     router = (repo_root / "frontend/web/src/router/index.ts").read_text(encoding="utf-8")
     login = (repo_root / "frontend/web/src/views/BrandView.vue").read_text(encoding="utf-8")
@@ -243,8 +243,8 @@ def evaluate_repository(repo_root: Path) -> list[str]:
     )
     require(
         "repo-relay-loopback",
-        "V2PDF_OAUTH_RELAY_HOST=127.0.0.1" in relay
-        and "V2PDF_OAUTH_RELAY_ALLOWED_IPS=127.0.0.1" in relay,
+        "V2MD_OAUTH_RELAY_HOST=127.0.0.1" in relay
+        and "V2MD_OAUTH_RELAY_ALLOWED_IPS=127.0.0.1" in relay,
         "relay must only accept loopback clients",
     )
     require(
@@ -322,7 +322,7 @@ def evaluate_repository(repo_root: Path) -> list[str]:
     require(
         "repo-credential-encryption",
         "AESGCM" in key_store
-        and ("V2MD_LLM_SETTINGS_KEY" in config_source or "V2PDF_LLM_SETTINGS_KEY" in config_source)
+        and "V2MD_LLM_SETTINGS_KEY" in config_source
         and "v1:aesgcm:" in key_store
         and "v2pdf_llm_settings_ciphertext_ck" in key_migration,
         "LLM credentials must use AES-GCM envelope encryption with a migration constraint",
@@ -378,8 +378,8 @@ def self_test() -> None:
             "branch": "main",
             "expected_commit": "a83147d5be0d75253804e74663fefccbe70a904b",
             "source_commit": "a83147d5be0d75253804e74663fefccbe70a904b",
-            "expected_image": "video2pdf:0.2.0-hotfix-20261021g",
-            "deployed_image": "video2pdf:0.2.0-hotfix-20261021g",
+            "expected_image": "video2md:0.2.0-hotfix-20261021g",
+            "deployed_image": "video2md:0.2.0-hotfix-20261021g",
         },
         "runtime": {"pod_phase": "Running", "pod_ready": True, "restart_count": 0, "recent_error_count": 0},
         "google_token_probe": {"network_ok": True, "http_status": 404},

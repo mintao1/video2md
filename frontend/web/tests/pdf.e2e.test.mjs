@@ -7,9 +7,9 @@ const PNG_1X1 = Buffer.from(
 
 async function installApiFixture(page, { notes = 'ok', media = 'ok' } = {}) {
   await page.context().addInitScript(() => {
-    window.localStorage.setItem('v2pdf_token', 'pdf-e2e-token')
-    const calls = () => Number(window.__v2pdfPrintCalls || 0)
-    window.print = () => { window.__v2pdfPrintCalls = calls() + 1 }
+    window.localStorage.setItem('v2md_token', 'pdf-e2e-token')
+    const calls = () => Number(window.__v2mdPrintCalls || 0)
+    window.print = () => { window.__v2mdPrintCalls = calls() + 1 }
   })
 
   await page.route('**/*', async (route) => {
@@ -94,7 +94,7 @@ test('prints a book in a real browser with local MathJax and embedded media', as
   await expect(popup.locator('script[src^="/vendor/mathjax/"]')).toHaveCount(1)
   await expect(popup.locator('script[src^="/vendor/mathjax/"]')).toHaveAttribute('src', '/vendor/mathjax/tex-svg.js')
   await expect(popup.locator('script[src*="jsdelivr"]')).toHaveCount(0)
-  await expect.poll(() => popup.evaluate(() => Number(window.__v2pdfPrintCalls || 0)), { timeout: 15_000 }).toBe(1)
+  await expect.poll(() => popup.evaluate(() => Number(window.__v2mdPrintCalls || 0)), { timeout: 15_000 }).toBe(1)
   expect(externalMathRequests).toEqual([])
 })
 

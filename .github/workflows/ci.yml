@@ -17,21 +17,21 @@ jobs:
       postgres:
         image: postgres:17-alpine
         env:
-          POSTGRES_USER: v2pdf
-          POSTGRES_PASSWORD: v2pdf
-          POSTGRES_DB: v2pdf
+          POSTGRES_USER: v2md
+          POSTGRES_PASSWORD: v2md
+          POSTGRES_DB: v2md
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U v2pdf"
+          --health-cmd "pg_isready -U v2md"
           --health-interval 5s
           --health-timeout 3s
           --health-retries 12
     env:
-      V2PDF_TEST_PG_DSN: postgresql://v2pdf:v2pdf@127.0.0.1:5432/v2pdf
+      V2MD_TEST_PG_DSN: postgresql://v2md:v2md@127.0.0.1:5432/v2md
       # The app DSN is used only by the tenant-RLS regression below; it is
       # deliberately separate from the superuser fixture used to apply DDL.
-      V2PDF_TEST_APP_DSN: postgresql://video2md_app:ci_app_password@127.0.0.1:5432/v2pdf
+      V2MD_TEST_APP_DSN: postgresql://video2md_app:ci_app_password@127.0.0.1:5432/v2md
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
@@ -50,7 +50,7 @@ jobs:
           import os
           import psycopg
 
-          dsn = os.environ["V2PDF_TEST_PG_DSN"]
+          dsn = os.environ["V2MD_TEST_PG_DSN"]
           with psycopg.connect(dsn, autocommit=True) as conn:
               conn.execute("""
               DO $$
@@ -189,9 +189,9 @@ jobs:
           enable-cache: true
       - run: uv sync --frozen
         working-directory: backend
-      - run: uv run ruff check video2pdf acctkit scripts
+      - run: uv run ruff check video2md video2pdf acctkit scripts
         working-directory: backend
-      - run: uv run mypy video2pdf acctkit
+      - run: uv run mypy video2md video2pdf acctkit
         working-directory: backend
       - name: Follow-up evidence gate lint
         run: uv run ruff check ../scripts/check_kaggle_followup.py ../scripts/check_production_failure_cost.py ../scripts/check_reader_readiness.py ../scripts/backfill_opencode_usage.py ../scripts/check_resolution_annotations.py tests/test_kaggle_followup_eval_set.py tests/test_usage_backfill.py tests/test_google_cert_cache.py tests/test_note_embed_regressions.py tests/test_reader_readiness_eval.py tests/test_resolution_annotations.py tests/test_resolution_operations.py
@@ -254,4 +254,4 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: docker build -t video2pdf:ci .
+      - run: docker build -t video2md:ci .

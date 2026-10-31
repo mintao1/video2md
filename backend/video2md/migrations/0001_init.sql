@@ -4,7 +4,7 @@
 -- schema 唯一真相，构造函数只接线不再建表。
 -- 全部幂等（IF NOT EXISTS）：存量库（基线前建的表）重跑本脚本是 no-op，直接补记版本行。
 -- 边界声明：langgraph PostgresSaver.setup() 自管的 checkpoints* 表族同库共存，
--- 属三方边界不收编（video2pdf/graph.py）。
+-- 属三方边界不收编（video2md/graph.py）。
 CREATE TABLE IF NOT EXISTS v2pdf_runs (
     run_id     text PRIMARY KEY,
     owner      text NOT NULL DEFAULT '',

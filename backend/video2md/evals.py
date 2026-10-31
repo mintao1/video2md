@@ -1,7 +1,7 @@
 """评测旁路：DeepEval/RAGAS 给视频笔记打分，分数回写 Langfuse（scores）。
 
 定位（2026-09-22 定稿）：离线批量为主（backend/scripts/eval_notes.py），在线节点已接线
-（V2PDF_EVAL=1 时 graph 在 note_entry 后插 eval_entry，旁路不致命）。
+（V2MD_EVAL=1 时 graph 在 note_entry 后插 eval_entry，旁路不致命）。
 不引入 Braintrust/Confident AI 平台——它们的能力 = 本地开源库打分 + 看板，看板由
 Langfuse scores 承担；judge 模型走自有 openai-compatible 端点（LLM_BASE_URL），
 token 成本与管线同源可见。本模块的 judge 适配层可整体拷给其它项目复用。
@@ -17,7 +17,7 @@ judge 健壮性（2026-09-22，实测中转回包 JSON 不规范曾致 Faithfuln
 _Judge.generate(prompt, schema) 接管 deepeval 的 schema 解析——括号配平强提取 +
 尾逗号修复 + 一次「只输出 JSON」重问，仍烂才抛错走跳过兜底。指标间线程级并发
 （单篇耗时 ≈ 最慢的 Faithfulness，不再是全链总和）。judge 模型可用
-V2PDF_JUDGE_MODEL 单独换（缺省 LLM_MODEL）。
+V2MD_JUDGE_MODEL 单独换（缺省 LLM_MODEL）。
 
 scores 上报：Langfuse SDK（trace_id = sha256("video2md-"+run_id)[:32] 确定性回挂原 trace；
 2026-09-22 前为 serve- 前缀，历史 trace 在 Langfuse 仍用旧前缀）。
@@ -69,9 +69,9 @@ _JUDGE_SYSTEM = ("你是严谨的评测员。所有回答必须是且仅是合�
 
 
 def _judge_model() -> str:
-    """judge 专用模型（V2PDF_JUDGE_MODEL），缺省回退主管线模型。"""
+    """judge 专用模型（V2MD_JUDGE_MODEL），缺省回退主管线模型。"""
     from .llm import LLM_MODEL
-    return _env("V2PDF_JUDGE_MODEL") or LLM_MODEL
+    return _env("V2MD_JUDGE_MODEL") or LLM_MODEL
 
 
 def _scan_json_obj(text: str, pos: int = 0) -> tuple[int, int]:
@@ -164,7 +164,7 @@ def _judge_deepeval():
             return self.generate(prompt, schema=schema)
 
         def get_model_name(self) -> str:
-            return f"{_judge_model()} (video2pdf judge)"
+            return f"{_judge_model()} (video2md judge)"
 
     return _Judge()
 
@@ -384,7 +384,7 @@ def verify_pending(pending: dict[str, tuple[dict, str]]) -> str:
     return "otlp"
 
 
-# ---------------------------------------------------------------- 离线批量 CLI（python -m video2pdf.evals）
+# ---------------------------------------------------------------- 离线批量 CLI（python -m video2md.evals）
 # 放包内而非 scripts/：.dockerignore 排除 scripts/，容器内评测只能靠模块入口。
 
 _REGRESSION_DELTA = 0.05
@@ -424,7 +424,7 @@ def main(argv: list[str] | None = None) -> int:
     from .util import load_state
 
     ap = argparse.ArgumentParser(
-        description="video2pdf 笔记质量离线评测（DeepEval/RAGAS → Langfuse scores）")
+        description="video2md 笔记质量离线评测（DeepEval/RAGAS → Langfuse scores）")
     ap.add_argument("--run-id", default="")
     ap.add_argument("--date", default="", help="只评某天完成的条目（YYYY-MM-DD）")
     ap.add_argument("--limit", type=int, default=0)

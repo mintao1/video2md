@@ -4,7 +4,7 @@
 服务端主循环（SSE 协程里建）。故跨线程投递用 loop.call_soon_threadsafe(q.put_nowait)。
 主循环在 lifespan 起时 bind_loop 钉住。
 
-双实现（V2PDF_EVENTS，缺省 local）：
+双实现（V2MD_EVENTS，缺省 local）：
 - local：单进程 dict[run_id → list[Queue]]（Phase 1 现状，逐字节不变）。
 - pg：PG LISTEN/NOTIFY pub/sub 跨进程扇出——publish 在进程内扇出之外补一条 NOTIFY；
   模块起一条专用 LISTEN 连接的后台泵线程，把**其它进程**的通知按同一套
@@ -33,8 +33,8 @@ _SUBS: dict[str, list[asyncio.Queue]] = defaultdict(list)
 _QUEUE_MAX = 500  # 慢/断客户端兜底：队列满丢最旧之外的新事件，不反压主管线
 _TERMINAL_EVENTS = {"graph:end"}  # 见到即视为 run 收尾，端点据此可关流
 
-_CHANNEL = "v2pdf_events"
-_CMD_CHANNEL = "v2pdf_cmds"  # P4b 指令通道（hb 等小 payload，无截断问题）
+_CHANNEL = "v2md_events"
+_CMD_CHANNEL = "v2md_cmds"  # P4b 指令通道（hb 等小 payload，无截断问题）
 _NOTIFY_MAX = 7900  # PG NOTIFY payload 上限 8000B，留余量
 _PROC_ID = uuid.uuid4().hex[:8]  # 扇出回声去重：泵跳过自己进程发的通知
 
@@ -45,7 +45,7 @@ _PUMP_READY = threading.Event()  # LISTEN 注册完成；注册前提交的 NOTI
 
 def _pg_mode() -> bool:
     """每调用现读 env（dict 查找，够便宜）——测试可随时切档。"""
-    return (ENV.get("V2PDF_EVENTS") or "local").strip().lower() == "pg"
+    return (ENV.get("V2MD_EVENTS") or "local").strip().lower() == "pg"
 
 
 def bind_loop(loop: asyncio.AbstractEventLoop) -> None:
@@ -147,7 +147,7 @@ def _ensure_pump() -> None:
     if _PUMP is not None and _PUMP.is_alive():
         return
     _PUMP_STOP.clear()
-    _PUMP = threading.Thread(target=_pump_loop, daemon=True, name="v2pdf-events-pg")
+    _PUMP = threading.Thread(target=_pump_loop, daemon=True, name="v2md-events-pg")
     _PUMP.start()
 
 

@@ -9,7 +9,7 @@
 #   KEEP_UP=1 …                      # 保留现场排障
 set -euo pipefail
 cd "$(dirname "$0")/.."
-export PYTHONPATH="$PWD/backend"   # package=false：python -m video2pdf 靠包根上 path
+export PYTHONPATH="$PWD/backend"   # package=false：python -m video2md 靠包根上 path
 
 API_PORT=8797; PROXY_PORT=8843
 API="http://127.0.0.1:$API_PORT"; PROXY="http://127.0.0.1:$PROXY_PORT"
@@ -20,12 +20,12 @@ fail() {
   echo "── api.log（tail 20；空=进程秒死零输出——多半 OOM/解释器级）──"
   tail -20 "$TMP/api.log" 2>/dev/null
   echo "── api.log 大小：$(wc -c < "$TMP/api.log" 2>/dev/null || echo 0) 字节；进程表：──"
-  pgrep -af "video2pdf api" || echo "（无 api 进程）"
+  pgrep -af "video2md api" || echo "（无 api 进程）"
   docker logs "$NGX_CID" 2>&1 | tail -10 || true
   exit 1
 }
 cleanup() {
-  pkill -9 -f "video2pdf api --port $API_PORT" 2>/dev/null || true
+  pkill -9 -f "video2md api --port $API_PORT" 2>/dev/null || true
   [ -n "${API_PID}" ] && wait "${API_PID}" 2>/dev/null || true
   if [ -z "${KEEP_UP:-}" ]; then
     [ -n "${NGX_CID}" ] && docker rm -f "$NGX_CID" >/dev/null 2>&1 || true
@@ -36,17 +36,17 @@ trap cleanup EXIT
 command -v docker >/dev/null || fail "缺 docker（本冒烟需要 nginx 容器）"
 
 # —— 1. 进程级 api（TRUST_XFF 保持 off——socket 直连冒烟，伪造 XFF 无效口径）——
-# V2PDF_HOST=0.0.0.0（2026-09-27 CI 四连败根修）：nginx 容器经 host-gateway 打宿主
+# V2MD_HOST=0.0.0.0（2026-09-27 CI 四连败根修）：nginx 容器经 host-gateway 打宿主
 # docker0 地址（Linux=172.17.0.1），127.0.0.1 绑定的 socket 够不到——connection
 # refused → healthz 502。Mac Docker Desktop 的 host.docker.internal 有回环转发
 # 所以本地绿、Linux CI 从未绿（本步入库 09-25 16:31 晚于最后绿 CI 09-24 13:46，
 # 首跑即挂）。0.0.0.0 仅限冒烟环境：runner 端口随机短命 + api.py 注释本就注明
 # 「容器内设 0.0.0.0」语义。被测面（deny/SSE/限流）与 bind 地址无关。
-env V2PDF_HOST=0.0.0.0 V2PDF_AUTH=off V2PDF_USERS_FILE="$TMP/users.json" V2PDF_RUNS_FILE="$TMP/runs.json" \
-  V2PDF_STATE_FILE="$TMP/state.json" V2PDF_LOG_DIR="$TMP/logs" V2PDF_REMOTE="" \
-  V2PDF_CORS_ORIGINS="" LANGFUSE_PK="" LANGFUSE_SK="" OTEL_EXPORTER_OTLP_ENDPOINT="" \
+env V2MD_HOST=0.0.0.0 V2MD_AUTH=off V2MD_USERS_FILE="$TMP/users.json" V2MD_RUNS_FILE="$TMP/runs.json" \
+  V2MD_STATE_FILE="$TMP/state.json" V2MD_LOG_DIR="$TMP/logs" V2MD_REMOTE="" \
+  V2MD_CORS_ORIGINS="" LANGFUSE_PK="" LANGFUSE_SK="" OTEL_EXPORTER_OTLP_ENDPOINT="" \
   PYTHONUNBUFFERED=1 \
-  uv run --project backend python -m video2pdf api --port "$API_PORT" > "$TMP/api.log" 2>&1 &
+  uv run --project backend python -m video2md api --port "$API_PORT" > "$TMP/api.log" 2>&1 &
 API_PID=$!
 for _ in $(seq 1 30); do curl -s -m 2 "$API/healthz" >/dev/null 2>&1 && break; sleep 1; done
 curl -s -m 2 "$API/healthz" >/dev/null || fail "api 未起"
@@ -57,7 +57,7 @@ sed -e "s|proxy_pass http://127.0.0.1:8790|proxy_pass http://host.docker.interna
 NGINX_IMG="${SMOKE_NGINX_IMAGE:-nginx:1.27-alpine}"
 docker image inspect "$NGINX_IMG" >/dev/null 2>&1 || docker pull -q "$NGINX_IMG" >/dev/null 2>&1 \
   || NGINX_IMG=nginx:latest   # 拉取被墙时回退本地缓存（被验指令均为 nginx 基础特性）
-NGX_CID=$(docker run -d --name v2pdf-proxy-smoke-$$ -p "127.0.0.1:$PROXY_PORT:80" \
+NGX_CID=$(docker run -d --name v2md-proxy-smoke-$$ -p "127.0.0.1:$PROXY_PORT:80" \
   --add-host=host.docker.internal:host-gateway \
   -v "$TMP/nginx-smoke.conf:/etc/nginx/conf.d/default.conf:ro" "$NGINX_IMG")
 for _ in $(seq 1 20); do curl -s -m 2 -o /dev/null "$PROXY/healthz" && break; sleep 0.5; done

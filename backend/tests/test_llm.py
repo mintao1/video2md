@@ -12,12 +12,12 @@ def test_llm(monkeypatch):
     # Import after collection so the API suite can install isolated paths and
     # credentials first. The SDK is a declared dependency; a global fake breaks
     # API startup when this file is collected before the contract suite.
-    from video2pdf import llm
+    from video2md import llm
 
     for name in ('_TRANSPORT', 'LLM_BASE', 'LLM_KEY', '_FAKE_LLM'):
         monkeypatch.setattr(llm, name, getattr(llm, name))
     monkeypatch.setattr(llm, '_sleep', lambda _: None)
-    # Other contract tests intentionally set V2PDF_FAKE_LLM=1 for safety. This
+    # Other contract tests intentionally set V2MD_FAKE_LLM=1 for safety. This
     # test exercises the real HTTP/mock transport path, so isolate that module
     # switch from process-wide test ordering.
     llm._FAKE_LLM = False
@@ -55,7 +55,7 @@ def test_llm(monkeypatch):
     assert body["model"] == llm.LLM_MODEL and body["temperature"] == 0.1 and body["max_tokens"] == 100
     assert [m["role"] for m in body["messages"]] == ["system", "user"]
     
-    # model 参数覆盖：judge 单独换模型（V2PDF_JUDGE_MODEL 由 evals 传入），缺省仍 LLM_MODEL
+    # model 参数覆盖：judge 单独换模型（V2MD_JUDGE_MODEL 由 evals 传入），缺省仍 LLM_MODEL
     calls.clear()
     run_chat(ok_handler, model="Fast-Judge")
     assert json.loads(calls[0].content)["model"] == "Fast-Judge"

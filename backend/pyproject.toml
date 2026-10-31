@@ -1,5 +1,5 @@
 [project]
-name = "video2pdf"
+name = "video2md"
 version = "0.2.0"  # 库版本（/healthz 经 config.py 读它）；发版 SSOT=git tag（CI→GHCR），k8s deployment image 行随发版对拍（平面对齐轮 2026-09-29 声明）
 description = "视频 → Obsidian 笔记（LangGraph 编排：本地转写/抽帧 OCR + LLM 整理；Dify 已抽离）"
 requires-python = ">=3.12"
@@ -24,7 +24,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# macOS 本地开发：Vision 框架 OCR（Linux/云服务器不装，OCR 走 V2PDF_OCR_REMOTE 远程池）
+# macOS 本地开发：Vision 框架 OCR（Linux/云服务器不装，OCR 走 V2MD_OCR_REMOTE 远程池）
 mac = [
     "pyobjc-framework-Vision>=10.3",
     "pyobjc-framework-Cocoa>=10.3",

@@ -102,7 +102,7 @@ def test_unrelated_run_cannot_supply_billing_or_retry_evidence(source):
 def test_handwritten_release_match_flag_cannot_hide_bad_hash():
     data = gate.load_evidence()
     data["release"]["all_release_file_hashes_match"] = True
-    data["manifest"]["files"]["backend/video2pdf/bilibili.py"] = "0" * 64
+    data["manifest"]["files"]["backend/video2md/bilibili.py"] = "0" * 64
     assert not gate.check_case(CASES[20], data)
 
 

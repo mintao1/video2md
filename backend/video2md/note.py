@@ -17,7 +17,7 @@ _REFUSAL_RE = re.compile(r"抱歉[，,][^。！？\n]{0,16}(无法|不能)|无�
                          re.I)
 
 
-MIN_NOTE_TRANSCRIPT_CHARS = int(ENV.get("V2PDF_MIN_TRANSCRIPT_CHARS", "200"))  # 低于此视为片头/片尾噪音
+MIN_NOTE_TRANSCRIPT_CHARS = int(ENV.get("V2MD_MIN_TRANSCRIPT_CHARS", "200"))  # 低于此视为片头/片尾噪音
 
 
 
@@ -116,7 +116,7 @@ def render_note(body: str, meta: dict, ctx: dict, toc: list[tuple[str, str]]) ->
         "ocr_engine": ctx["ocr_engine"],
         "frames_kept": ctx["n_frames"],
         "frames_ocr": ctx["n_ocr"],
-        "processor": "video2pdf",
+        "processor": "video2md",
         "reviewed": "false",
     }
     if is_img:

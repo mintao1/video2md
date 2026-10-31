@@ -1,4 +1,4 @@
-// 与后端契约对齐的共享类型（参照 backend/video2pdf/models.py 与 docs/architecture/03-api-contract.md）
+// 与后端契约对齐的共享类型（参照 backend/video2md/models.py 与 docs/architecture/03-api-contract.md）
 
 /** 后端 run 状态词表（多出的 paused 是前端本地态） */
 export type RunStatus =

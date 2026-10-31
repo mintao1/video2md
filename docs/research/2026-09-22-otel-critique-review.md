@@ -1,7 +1,7 @@
 # 设计评审回应：OTel 批判逐条核对（为什么 traceId 用 sha256 约定而非 SDK 派生）
 
 > 评审日期：2026-09-22 · 对象：一份外部架构批判（「拥抱 OTel SDK 而非绕开它」五点修正案）
-> 背景：2026-09-22 观测栈定稿（`video2pdf/observability.py` + `docker-compose.obs.yml`）后的复核
+> 背景：2026-09-22 观测栈定稿（`video2md/observability.py` + `docker-compose.obs.yml`）后的复核
 > 上篇：[[2026-09-21-script-observability]]（观测设计的调研依据）
 
 ## TL;DR

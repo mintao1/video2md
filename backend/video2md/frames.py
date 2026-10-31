@@ -32,8 +32,8 @@ def _sharpness(im) -> float:
 
 def frame_pool_size(max_frames: int, ocr: str) -> int:
     """候选帧池大小：Vision 本地免费 / 远端 GPU 批量 → max_frames×3（上限 120）；
-    付费按次引擎 → max_frames；V2PDF_FRAME_POOL 显式覆盖。池越大选帧信息越多。"""
-    env = int(ENV.get("V2PDF_FRAME_POOL", "0") or "0")
+    付费按次引擎 → max_frames；V2MD_FRAME_POOL 显式覆盖。池越大选帧信息越多。"""
+    env = int(ENV.get("V2MD_FRAME_POOL", "0") or "0")
     if env > 0:
         return min(200, env)
     return min(120, max_frames * (3 if ocr in ("vision", "remote") else 1))
@@ -323,20 +323,20 @@ def ocr_candidates(frames: list[tuple[float, Path]], ocr: str,
     """候选帧 OCR：返回 (ocr_items 达标项, ocr_raw 全量含失败/空)。
 
     ocr_raw 喂给内容选帧（需要知道哪些候选没文字），ocr_items 进时间线/清单。
-    ocr="remote" 走 GPU 路由批量接口（V2PDF_OCR_REMOTE 或显式 base）；其余值固定本地
+    ocr="remote" 走 GPU 路由批量接口（V2MD_OCR_REMOTE 或显式 base）；其余值固定本地
     Vision（gemini 路径已摘除，入参保留兼容）。"""
     raw: list[list]
     if ocr == "remote":
         from .colab import remote_for_user
 
-        base = remote_for_user(base or ENV.get("V2PDF_OCR_REMOTE", ""))
+        base = remote_for_user(base or ENV.get("V2MD_OCR_REMOTE", ""))
         if not base:
-            raise SystemExit("ocr=remote 但 V2PDF_OCR_REMOTE 未配置")
+            raise SystemExit("ocr=remote 但 V2MD_OCR_REMOTE 未配置")
         if base.lower() in ("colab", "colab-cli"):
             import tempfile
 
             from .colab import ocr_images
-            with tempfile.TemporaryDirectory(prefix="v2pdf-colab-ocr-") as directory:
+            with tempfile.TemporaryDirectory(prefix="v2md-colab-ocr-") as directory:
                 rows = ocr_images([p for _t, p in frames], Path(directory))
             by_name = {row["name"]: row for row in rows}
             raw = [[t, str(by_name.get(p.name, {}).get("text") or ""),

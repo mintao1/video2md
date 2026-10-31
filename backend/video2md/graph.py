@@ -5,7 +5,7 @@
     resolve → download → transcribe → frames → ocr
       → select_frames_llm（LLM 内容选帧；失败/空选 → 空 payload，select 阶段启发式兜底）
       → select → clips → note_entry（逐条目回环：整理→校对?→元数据→写盘）
-        → [V2PDF_EVAL=1 时插入 eval_entry：刚写盘条目在线评测 → Langfuse scores，失败不致命]
+        → [V2MD_EVAL=1 时插入 eval_entry：刚写盘条目在线评测 → Langfuse scores，失败不致命]
       → finalize（状态落盘/清 tmp）→ END
     每个阶段节点失败 → fail（显式终止，对齐 DSL「失败即终止」闸门）
 
@@ -224,7 +224,7 @@ def node_note_entry(state: RunState) -> dict:
         return nxt
     blocked = _failed_dependencies(run, idx, ("download", "transcribe", "frames", "ocr", "select", "clips"))
     if (not art.get("images") and art.get("published") and art.get("clips") is None
-            and (ENV.get("V2PDF_CLIPS_REMOTE") or "").strip() and "clips" not in blocked):
+            and (ENV.get("V2MD_CLIPS_REMOTE") or "").strip() and "clips" not in blocked):
         blocked.append("clips")
     if blocked:
         msg = f"note 条目 {idx}: 依赖阶段 {', '.join(blocked)} 未成功，停止模型生成，请先补跑失败阶段"
@@ -303,7 +303,7 @@ def node_note_entry(state: RunState) -> dict:
 
 
 def node_eval_entry(state: RunState) -> dict:
-    """在线逐条目评测（仅 V2PDF_EVAL=1 时接线）：刚写盘的 note+transcript → evals 打分
+    """在线逐条目评测（仅 V2MD_EVAL=1 时接线）：刚写盘的 note+transcript → evals 打分
     → Langfuse scores + 分数写回 artifacts[url].eval。
 
     旁路纪律：任何失败只记 errors 继续（评测是旁路不是门禁，不继承 note 的 3-strikes
@@ -424,8 +424,8 @@ def _route_note(state: RunState) -> str:
 # ---------------------------------------------------------------- 建图
 
 def _eval_enabled() -> bool:
-    """在线逐条评测开关（V2PDF_EVAL=1）。建图时读取——是否插 eval_entry 是拓扑级决策。"""
-    v = os.environ["V2PDF_EVAL"] if "V2PDF_EVAL" in os.environ else ENV.get("V2PDF_EVAL", "")
+    """在线逐条评测开关（V2MD_EVAL=1）。建图时读取——是否插 eval_entry 是拓扑级决策。"""
+    v = os.environ["V2MD_EVAL"] if "V2MD_EVAL" in os.environ else ENV.get("V2MD_EVAL", "")
     return (v or "").strip().lower() in ("1", "true", "on")
 
 
@@ -492,20 +492,20 @@ def make_checkpointer(path: Path = CHECKPOINT_DB):
 def make_checkpointer_from_env(env: dict | None = None) -> tuple:
     """按 env 装配 checkpointer：``(saver, closer)``，closer 在进程/服务退出时调用。
 
-    V2PDF_CHECKPOINTER=sqlite（默认，零外部服务，本地/e2e/契约测试都走它）| postgres。
-    postgres 分支：V2PDF_PG_DSN 必填；图跑在 asyncio.to_thread 工作线程里、多家并发共享
+    V2MD_CHECKPOINTER=sqlite（默认，零外部服务，本地/e2e/契约测试都走它）| postgres。
+    postgres 分支：V2MD_PG_DSN 必填；图跑在 asyncio.to_thread 工作线程里、多家并发共享
     连接，psycopg 单连接非线程安全 → 用连接池（autocommit + prepare_threshold=0 是
     langgraph PostgresSaver 官方口径）。delete_thread 裁剪语义两家通用，run_graph 不改。
     """
     env = env if env is not None else ENV
-    kind = (env.get("V2PDF_CHECKPOINTER") or "sqlite").strip().lower()
+    kind = (env.get("V2MD_CHECKPOINTER") or "sqlite").strip().lower()
     if kind in ("", "sqlite"):
         return make_checkpointer(), lambda: None
     if kind != "postgres":
-        raise RuntimeError(f"未知 V2PDF_CHECKPOINTER：{kind}（支持 sqlite|postgres）")
-    dsn = (env.get("V2PDF_PG_DSN") or "").strip()
+        raise RuntimeError(f"未知 V2MD_CHECKPOINTER：{kind}（支持 sqlite|postgres）")
+    dsn = (env.get("V2MD_PG_DSN") or "").strip()
     if not dsn:
-        raise RuntimeError("V2PDF_CHECKPOINTER=postgres 需要配 V2PDF_PG_DSN")
+        raise RuntimeError("V2MD_CHECKPOINTER=postgres 需要配 V2MD_PG_DSN")
     from langgraph.checkpoint.postgres import PostgresSaver
 
     from .pg import shared_pool
@@ -544,7 +544,7 @@ def run_graph(url: str, *, part_items: str = "", force: bool = False, review: bo
             and existing.get("status") in ("created", "queued", "running")):
         initial["run"] = existing
     graph = build_graph(checkpointer)
-    # note 回环每条目 1 个 superstep（8 + total + 2；V2PDF_EVAL 接线时每条目 2 个），
+    # note 回环每条目 1 个 superstep（8 + total + 2；V2MD_EVAL 接线时每条目 2 个），
     # LangGraph 默认 recursion_limit=25 会杀掉 >15 条目的合集——放宽到 1000
     # （superstep 是真干活，不是空转，不存在烧轮次）
     # 图编排层自动插桩：节点/state 增量/路由决策 → RunLog 事件流（graph:* 前缀），

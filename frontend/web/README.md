@@ -1,6 +1,6 @@
 # 视书 · Web（frontend/web）
 
-video2pdf 的移动端 Web 前端：Vue 3.5.43 + Vite 8.3.4 + TypeScript 6.0.3 + Tailwind CSS 3.4.19 + Pinia 2.3.1 + vue-router 4.6.4。
+video2md 的移动端 Web 前端：Vue 3.5.43 + Vite 8.3.4 + TypeScript 6.0.3 + Tailwind CSS 3.4.19 + Pinia 2.3.1 + vue-router 4.6.4。
 
 依赖版本以 `package.json` 与 `package-lock.json` 的精确版本为准；安装使用 `npm ci`，不要使用会重新解析版本范围的 `npm install`。
 队列、教材库、阅读器、资料与配额使用 FastAPI；登录只提供 Google 授权码流（短信/密码/微信原型已移除）。
@@ -21,7 +21,7 @@ npm run preview    # 预览构建产物
 
 前置：Node 24+，仓根下 `cd backend && uv sync --frozen` 安装后端依赖，
 再到 `frontend/web` 执行 `npm ci && npm run test:integration`。
-自定义 Python 环境可设 `V2PDF_TEST_PYTHON=/absolute/path/to/python`。
+自定义 Python 环境可设 `V2MD_TEST_PYTHON=/absolute/path/to/python`。
 
 测试使用 Node 内置测试运行器，通过 Vite 加载真实 TypeScript 模块，不新增测试依赖。
 每次启动独立 FastAPI 子进程，监听随机回环端口；runs、prefs、日志及其他数据全部在
@@ -52,10 +52,10 @@ CI 会执行 `npx playwright install chromium`；本地若使用系统浏览器�
 已有配置时 Key 留空可保留原值；“恢复服务默认”删除个人配置并回落后端 `LLM_*`。
 保存只校验格式，不代表上游余额或连通性已验证。
 
-接口为鉴权的 `GET/PUT/DELETE /settings/llm`。JSON 档写入 `V2PDF_PREFS_FILE` 同目录的
-`llm-settings.json`（0600，可用 `V2PDF_LLM_SETTINGS_FILE` 覆盖）；`V2PDF_PREFS_STORE=postgres`
-时写入独立的 `v2pdf_llm_settings` 表。升级 PG 部署前运行
-`uv run --project backend python -m video2pdf migrate`，然后重启后端。
+接口为鉴权的 `GET/PUT/DELETE /settings/llm`。JSON 档写入 `V2MD_PREFS_FILE` 同目录的
+`llm-settings.json`（0600，可用 `V2MD_LLM_SETTINGS_FILE` 覆盖）；`V2MD_PREFS_STORE=postgres`
+时写入独立的 `v2pdf_llm_settings` 兼容表。升级 PG 部署前运行
+`uv run --project backend python -m video2md migrate`，然后重启后端。
 凭据为服务端可读取的配置数据，应按服务端机密文件/数据库管理，不包含在 run 记录与图 checkpoint 中。
 
 | 路由 | 页面 | 说明 |
@@ -65,14 +65,14 @@ CI 会执行 `npx playwright install chromium`；本地若使用系统浏览器�
 | `/tasks` | 转换队列 | 快速链接导入、导入面板（来源 tab/开关/模板）、任务状态卡、批量管理、3s 后端状态轮询 |
 | `/profile` | 个人中心 | 资料卡、配额仪表、SVIP 推广、设置行、会员套餐底部弹层 |
 
-未登录访问受保护路由会跳 `/?redirect=…`；token 存 `localStorage['v2pdf_token']`，任一 API 返回 401 即清除并跳回品牌首页。
-后端 `V2PDF_AUTH=off`（仅开发）时无凭据 `GET /me` 返回 200，前端据此进入匿名模式、不要求登录。
+未登录访问受保护路由会跳 `/?redirect=…`；token 存 `localStorage['v2md_token']`，任一 API 返回 401 即清除并跳回品牌首页。
+后端 `V2MD_AUTH=off`（仅开发）时无凭据 `GET /me` 返回 200，前端据此进入匿名模式、不要求登录。
 生产由 FastAPI 同源托管本 bundle，前端路由不得与 API 路由重名（`GET /queue` 是 gpu_router 回读口，故队列页用 `/tasks`）；
 `backend/tests/test_api_contract.py::test_spa_routes_serve_index_not_api` 读取 `src/router/index.ts` 校验这一点。
 
 ## Mock → 真实 API 的切换路径
 
-- `src/types/` 类型镜像后端契约（`docs/architecture/03-api-contract.md`、`backend/video2pdf/models.py`）：
+- `src/types/` 类型镜像后端契约（`docs/architecture/03-api-contract.md`、`backend/video2md/models.py`）：
   run 状态词表、错误信封 `{error:{code,message,details}}`、list 形状。
 - `src/api/index.ts` 是唯一出口（签名层）；第一版解构自 `src/api/mock/impl.ts`。
 - 换真实 API：新建 `src/api/live/*.ts`，用 `src/api/client.ts`（`fetch` + `Authorization: Bearer <token>`，
@@ -80,7 +80,7 @@ CI 会执行 `npx playwright install chromium`；本地若使用系统浏览器�
   的来源切到 live 实现——view/store 零改动。
 - mock 专用函数 `_setProgress` / `_snapshotRuns`（`stores/queue.ts` 的 3s 进度 tick 用）没有真实
   对应物；切真实 API 时用后端 SSE `GET /runs/{id}/events` 替代并删除 tick。
-- 后端 CORS：本地联调需设置 `V2PDF_CORS_ORIGINS=http://localhost:5173`。
+- 后端 CORS：本地联调需设置 `V2MD_CORS_ORIGINS=http://localhost:5173`。
 
 ## 目录
 

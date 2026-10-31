@@ -7,7 +7,7 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
 MANIFEST = ROOT / "deploy/k8s/base/deployment-api.yaml"
-RLS_MIGRATION = ROOT / "backend/video2pdf/migrations/0005_tenant_rls.sql"
+RLS_MIGRATION = ROOT / "backend/video2md/migrations/0005_tenant_rls.sql"
 ROLE_INIT = ROOT / "deploy/postgres/001-roles.sql"
 
 
@@ -46,5 +46,5 @@ def test_tenant_migration_enables_rls_and_separate_roles() -> None:
     assert "CREATE ROLE video2md_migrate NOLOGIN NOBYPASSRLS" in roles
     assert "ENABLE ROW LEVEL SECURITY" in sql
     assert "CREATE POLICY v2pdf_runs_tenant" in sql
-    assert "REVOKE ALL ON ALL TABLES IN SCHEMA public FROM PUBLIC" in sql
+    assert "REVOKE ALL ON TABLE" in sql
     assert "PRIMARY KEY (owner, fp)" in sql

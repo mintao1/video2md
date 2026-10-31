@@ -19,7 +19,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))  # 后�
 # 隔离：日志进临时目录；显式空串关掉任何真实端点（防开发机 secrets 文件串台）
 import os
 
-os.environ["V2PDF_LOG_DIR"] = tempfile.mkdtemp(prefix="v2pdf-replay-test-logs-")
+os.environ["V2MD_LOG_DIR"] = tempfile.mkdtemp(prefix="v2md-replay-test-logs-")
 for k in ("OTEL_EXPORTER_OTLP_ENDPOINT", "LANGFUSE_PK", "LANGFUSE_SK", "LANGFUSE_HOST"):
     os.environ[k] = ""
 
@@ -34,7 +34,7 @@ def _provider():
     spans = InMemorySpanExporter()
     tp = TracerProvider()
     tp.add_span_processor(SimpleSpanProcessor(spans))
-    return tp, tp.get_tracer("video2pdf"), spans
+    return tp, tp.get_tracer("video2md"), spans
 
 
 # ---- 合成一个 run 的事件流（含 info 点 / llm usage / 悬空 started 崩溃点）----

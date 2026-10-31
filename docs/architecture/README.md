@@ -1,6 +1,6 @@
-# video2pdf 架构文档
+# video2md 架构文档
 
-本目录是 video2pdf 架构的**单一真相源（SSOT）**。README.md 只留产品定位与快速上手，架构/运维口径全部在这里。
+本目录是 video2md 架构的**单一真相源（SSOT）**。README.md 只留产品定位与快速上手，架构/运维口径全部在这里。
 
 ## 阅读地图
 
@@ -15,6 +15,7 @@
 | [07-gpu-pool-contract.md](07-gpu-pool-contract.md) | 算力池契约：gpu_plugins 协议、四种 provider、异步 job | 算力侧开发 |
 | [08-capacity-and-slo.md](08-capacity-and-slo.md) | 容量规划与 SLO（含待实测占位） | SRE/容量规划 |
 | [09-disaster-recovery.md](09-disaster-recovery.md) | 灾备 runbook：RTO/RPO、备份恢复、演练制度 | 运维/on-call |
+| [10-rename-video2md.md](10-rename-video2md.md) | 项目命名与兼容策略 | 所有人 |
 | [critique/](critique/) | 批判存档（有日期的快照，不更新）：十层对照 + 质量属性 | 评审/参考 |
 
 ## 文档纪律
@@ -47,9 +48,9 @@
 
 | 阶段 | 落地内容 | 状态 |
 |---|---|---|
-| P1/P2（e320ee5） | 并发闸门 `V2PDF_MAX_CONCURRENT_RUNS`、配额限流三闸（429 统一信封）、`POST /uploads` 上传面 + 路径白名单、GHCR 发布流水线（tag 驱动 + `deploy.sh`）、`backup.sh` rclone 异地钩子 | ✅ |
-| P3 | 存储分派 `json｜postgres`：`V2PDF_RUNS/STATE/USERS_STORE` 三存储 + checkpointer 同池、`V2PDF_EVENTS=pg`（LISTEN/NOTIFY 跨进程 SSE 扇出）、存量导入 `backend/scripts/migrate_json_to_pg.py` | ✅ |
-| P4b（3f7bb1a） | 任务表 **PG 读侧真相源**（`V2PDF_TASKS_STORE=postgres`）：`/queue`·配额·dedup·watchdog 大盘巡检·启动认领恢复走 `v2pdf_runs`；events `v2pdf_cmds` 心跳广播；多副本 tmp 保护 | ✅（读侧；写路径仍进程内，见 [04 篇](04-data-and-consistency.md#任务表两档口径)） |
+| P1/P2（e320ee5） | 并发闸门 `V2MD_MAX_CONCURRENT_RUNS`、配额限流三闸（429 统一信封）、`POST /uploads` 上传面 + 路径白名单、GHCR 发布流水线（tag 驱动 + `deploy.sh`）、`backup.sh` rclone 异地钩子 | ✅ |
+| P3 | 存储分派 `json｜postgres`：`V2MD_RUNS/STATE/USERS_STORE` 三存储 + checkpointer 同池、`V2MD_EVENTS=pg`（LISTEN/NOTIFY 跨进程 SSE 扇出）、存量导入 `backend/scripts/migrate_json_to_pg.py` | ✅ |
+| P4b（3f7bb1a） | 任务表 **PG 读侧真相源**（`V2MD_TASKS_STORE=postgres`）：`/queue`·配额·dedup·watchdog 大盘巡检·启动认领恢复走 `v2pdf_runs`；events `v2md_cmds` 心跳广播；多副本 tmp 保护 | ✅（读侧；写路径仍进程内，见 [04 篇](04-data-and-consistency.md#任务表两档口径)） |
 
 **距「完整多副本生产」尚差四件**（原 README 出界项，全部已入 ROADMAP）：
 

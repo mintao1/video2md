@@ -165,7 +165,7 @@ def test_successful_delivery_does_not_close_failure_or_performance_gaps():
 
 
 def test_collection_has_no_project_configuration_side_effects():
-    code = 'import runpy,sys; runpy.run_path(sys.argv[1]); assert "video2pdf.config" not in sys.modules'
+    code = 'import runpy,sys; runpy.run_path(sys.argv[1]); assert "video2md.config" not in sys.modules'
     for filename in ("test_resolution_annotations.py", "test_resolution_operations.py"):
         result = subprocess.run([sys.executable, "-c", code, str(Path(__file__).with_name(filename))],
                                 capture_output=True, text=True, timeout=10)

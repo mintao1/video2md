@@ -15,13 +15,13 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # backend/（包根）
 
-os.environ["V2PDF_LOG_DIR"] = tempfile.mkdtemp(prefix="v2pdf-test-logs-")
+os.environ["V2MD_LOG_DIR"] = tempfile.mkdtemp(prefix="v2md-test-logs-")
 for k in ("OTEL_EXPORTER_OTLP_ENDPOINT", "LANGFUSE_PK", "LANGFUSE_SK", "LANGFUSE_HOST"):
     os.environ[k] = ""
 
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
-from video2pdf import evals, observability
+from video2md import evals, observability
 
 
 # ---- 假 deepeval / ragas / langfuse（sys.modules 注入，先于被测调用）----------
@@ -179,7 +179,7 @@ print("✅ _load_json_lenient：围栏/前言后语/假对象/尾逗号/串内�
 
 
 # ---- _Judge.generate(prompt, schema)：强解析 + 重问修复 + 模型透传 -------------
-from video2pdf import llm as _llm_mod
+from video2md import llm as _llm_mod
 
 _real_chat = _llm_mod.chat
 
@@ -212,19 +212,19 @@ _llm_mod.chat = lambda *a, **kw: "随便什么文本"
 judge = _real_judge_deepeval()
 assert judge.generate("x") == "随便什么文本"
 
-# V2PDF_JUDGE_MODEL 透传到 llm.chat；缺省回退 LLM_MODEL
+# V2MD_JUDGE_MODEL 透传到 llm.chat；缺省回退 LLM_MODEL
 _seen = {}
 _llm_mod.chat = lambda system, user, **kw: _seen.update(kw) or '{"verdict": "yes"}'
 judge = _real_judge_deepeval()
-envmap["V2PDF_JUDGE_MODEL"] = "Fast-Judge"
+envmap["V2MD_JUDGE_MODEL"] = "Fast-Judge"
 judge.generate("x", schema=_FakeSchema)
 assert _seen.get("model") == "Fast-Judge", _seen
-envmap.pop("V2PDF_JUDGE_MODEL")
+envmap.pop("V2MD_JUDGE_MODEL")
 _seen.clear()
 judge.generate("x", schema=_FakeSchema)
 assert _seen.get("model") == _llm_mod.LLM_MODEL, _seen
 _llm_mod.chat = _real_chat
-print("✅ _Judge：schema 强解析/重问修复/双烂抛出/schema=None 原文/V2PDF_JUDGE_MODEL 透传")
+print("✅ _Judge：schema 强解析/重问修复/双烂抛出/schema=None 原文/V2MD_JUDGE_MODEL 透传")
 
 
 # ---- _RagasJudge：老式 generate → LLMResult，走 llm.chat ------------------------

@@ -17,7 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # backend/（�
 
 # 隔离：日志进临时目录；显式空串关掉任何真实端点（防开发机 secrets 文件串台——
 # os.environ 显式设置优先于 config.ENV，见 observability._env）
-os.environ["V2PDF_LOG_DIR"] = tempfile.mkdtemp(prefix="v2pdf-test-logs-")
+os.environ["V2MD_LOG_DIR"] = tempfile.mkdtemp(prefix="v2md-test-logs-")
 for k in ("OTEL_EXPORTER_OTLP_ENDPOINT", "LANGFUSE_PK", "LANGFUSE_SK", "LANGFUSE_HOST"):
     os.environ[k] = ""
 
@@ -25,8 +25,8 @@ from opentelemetry.sdk.metrics.export import InMemoryMetricReader
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 from platform_otel_sdk import _otel as _sdk  # _TRACER_PROVIDER 随 otel 迁移入 SDK（033ae72）
 
-from video2pdf import deadman, observability
-from video2pdf.util import RunLog
+from video2md import deadman, observability
+from video2md.util import RunLog
 
 
 def _metrics_map(reader: InMemoryMetricReader) -> dict:
@@ -82,17 +82,17 @@ except RuntimeError:
 observability.close_run("r1")
 
 tree = {s.name: s for s in spans.get_finished_spans()}
-root, stage, entry = tree["video2pdf-serve-run"], tree["stage:download"], tree["entry 1/2 download"]
+root, stage, entry = tree["video2md-serve-run"], tree["stage:download"], tree["entry 1/2 download"]
 # trace 名常量化（低基数原则：名字是 API，URL 是数据进 input）
 # 现状命名=f"{service_name}-run"（otel 迁移后 SDK 生成；465b53c 兼容锚）
-assert root.attributes["langfuse.trace.name"] == "video2pdf-serve-run"
+assert root.attributes["langfuse.trace.name"] == "video2md-serve-run"
 assert root.attributes["run_id"] == "r1"
 # Langfuse OTel 映射：metadata 带 langfuse.trace.metadata.* 前缀才可过滤
 assert root.attributes["langfuse.trace.metadata.stage"] == "download"
 # userId 映射 + 全 span 传播（官方：过滤/聚合的前提）；tags 给 dashboard 分维度
 assert root.attributes["langfuse.user.id"] == "uid_alice"
 assert stage.attributes["langfuse.user.id"] == "uid_alice"
-assert "video2pdf" in root.attributes["langfuse.trace.tags"]
+assert "video2md" in root.attributes["langfuse.trace.tags"]
 assert any(t.startswith("mode:") for t in root.attributes["langfuse.trace.tags"])
 # trace 输入/输出（root 观察体语义等价物：v4 废弃 trace 级 input/output）
 assert root.attributes["langfuse.observation.input"] == "http://video"
@@ -150,23 +150,24 @@ observability.register_runtime_gauges(lambda: {"queued": 2, "active": 1})
 reader.collect()
 
 m = _metrics_map(reader)
-assert m["v2pdf_runs"][(("status", "done"),)] == 1
-assert m["v2pdf_runs"][(("status", "partial"),)] == 1
-st = m["v2pdf_stage_seconds"]
+assert m["v2md_runs"][(("status", "done"),)] == 1
+assert m["v2md_runs"][(("status", "partial"),)] == 1
+st = m["v2md_stage_seconds"]
 assert st[(("stage", "download"), ("status", "completed"))] == 12.5
 assert st["__bounds__"] == tuple(observability._HISTOGRAM_BOUNDS_S)  # 显式桶生效
-assert m["v2pdf_stage_entries"][(("stage", "download"), ("status", "ok"))] == 3
-assert m["v2pdf_stage_entries"][(("stage", "download"), ("status", "failed"))] == 1
-assert m["v2pdf_circuit_breaker_trips"][(("stage", "transcribe"),)] == 1
-assert m["v2pdf_llm_requests"][(("status", "ok"), ("task", "organize"))] == 1
-assert m["v2pdf_llm_tokens"][(("kind", "input"), ("task", "organize"))] == 100
-assert m["v2pdf_llm_tokens"][(("kind", "output"), ("task", "organize"))] == 2000
-assert m["v2pdf_llm_seconds"][(("task", "organize"),)] == 30.0
-assert m["v2pdf_queue_queued"][()] == 2 and m["v2pdf_run_active"][()] == 1
+assert m["v2md_stage_entries"][(("stage", "download"), ("status", "ok"))] == 3
+assert m["v2md_stage_entries"][(("stage", "download"), ("status", "failed"))] == 1
+assert m["v2md_circuit_breaker_trips"][(("stage", "transcribe"),)] == 1
+assert m["v2md_llm_requests"][(("status", "ok"), ("task", "organize"))] == 1
+assert m["v2md_llm_tokens"][(("kind", "input"), ("task", "organize"))] == 100
+assert m["v2md_llm_tokens"][(("kind", "output"), ("task", "organize"))] == 2000
+assert m["v2md_llm_seconds"][(("task", "organize"),)] == 30.0
+assert m["v2md_queue_queued"][()] == 2 and m["v2md_run_active"][()] == 1
 
 # Production content gate also removes URL/query data from the root span;
 # usage/metrics remain available through the normal instruments.
 from video2md import config
+
 observability._reset_for_tests()
 redacted_spans = InMemorySpanExporter()
 observability.init(span_exporter=redacted_spans, metric_reader=InMemoryMetricReader())
@@ -185,7 +186,7 @@ observability.metric_llm("t", "failed", 1.0)
 
 
 # ---- deadman ping 三态 --------------------------------------------------------
-os.environ["V2PDF_DEADMAN_PING_URL"] = "https://hc.test/abcd"
+os.environ["V2MD_DEADMAN_PING_URL"] = "https://hc.test/abcd"
 hits = []
 
 def fake_get(url, timeout=0, **_kw):
@@ -208,7 +209,7 @@ dm = [s for s in spans2.get_finished_spans() if s.name == "deadman"]
 assert len(dm) == 2 and dm[0].attributes["state"] == "start" and dm[1].attributes["state"] == "ok"
 
 # 未配 URL = 完全 no-op
-os.environ["V2PDF_DEADMAN_PING_URL"] = ""
+os.environ["V2MD_DEADMAN_PING_URL"] = ""
 hits.clear()
 with mock.patch.object(deadman.httpx, "get", fake_get):
     deadman.ping("ok", run_id="r9")
@@ -217,8 +218,8 @@ assert hits == []
 # ping 异常静默（监控通道不许炸主管线）
 with mock.patch.object(deadman.httpx, "get",
                        mock.Mock(side_effect=deadman.httpx.ConnectError("down"))):
-    os.environ["V2PDF_DEADMAN_PING_URL"] = "https://hc.test/x"
+    os.environ["V2MD_DEADMAN_PING_URL"] = "https://hc.test/x"
     deadman.ping("ok")
-os.environ.pop("V2PDF_DEADMAN_PING_URL", None)
+os.environ.pop("V2MD_DEADMAN_PING_URL", None)
 
 print("✅ test_observability.py 全部通过")

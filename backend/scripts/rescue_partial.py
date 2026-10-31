@@ -19,7 +19,7 @@ PG 档「重发同 URL 幂等续跑」只能跳过 state 已完成的条目，**
 本脚本逐条跑完 → docker start api。产物按服务器当前 artifact_mode 正常落
 vault/outbox。state 幂等：已出笔记的条目 resolve 时自动标 skipped。
 
-用法（容器内跑，环境变量沿用 compose：V2PDF_RUNS_STORE/V2PDF_PG_DSN/V2PDF_STATE_FILE/OBSIDIAN_VAULT）:
+用法（容器内跑，环境变量沿用 compose：V2MD_RUNS_STORE/V2MD_PG_DSN/V2MD_STATE_FILE/OBSIDIAN_VAULT）:
   docker stop video2md-video2md-1
   docker exec video2md-video2md-1 python backend/scripts/rescue_partial.py <run_id> [--dry-run] [--max-entries N]
   docker start video2md-video2md-1
@@ -41,16 +41,16 @@ from pathlib import Path
 # 项目根进 path：脚本可能放在项目外（容器里挂 /work/rp.py），此时以镜像代码所在目录
 # （-w /app）兜底。'' in sys.path 时它已指向脚本目录，补上包根（backend/）即可。
 _root = Path(__file__).resolve().parent.parent
-if not (_root / "video2pdf").is_dir():
+if not (_root / "video2md").is_dir():
     _root = Path.cwd()
 for p in (str(_root), str(_root / ".venv" / "lib" / "python3.12" / "site-packages")):
     if p not in sys.path and Path(p).exists():
         sys.path.insert(0, p)
 
-from video2pdf import runs  # noqa: E402
-from video2pdf.graph import resolve_run  # noqa: E402
-from video2pdf.resolve import normalize_url  # noqa: E402
-from video2pdf.util import load_state  # noqa: E402
+from video2md import runs  # noqa: E402
+from video2md.graph import resolve_run  # noqa: E402
+from video2md.resolve import normalize_url  # noqa: E402
+from video2md.util import load_state  # noqa: E402
 
 _CP_CLOSER = None  # checkpointer 关闭句柄（drive_and_wait 首次建时写入）
 
@@ -69,11 +69,11 @@ def main() -> int:
 
     # 前置：API 必须已停——worker 串行信号量只活在 API 进程里，双进程并发写同一
     # vault 笔记文件会互相覆盖。healthz 可达即拒绝开跑（--force-running 可跳过）。
-    # 探测端口取 V2PDF_PORT（与 api 实际监听同源；缺省 8790）。
+    # 探测端口取 V2MD_PORT（与 api 实际监听同源；缺省 8790）。
     if not a.force_running:
         import urllib.error
         import urllib.request
-        _port = os.environ.get("V2PDF_PORT", "8790")
+        _port = os.environ.get("V2MD_PORT", "8790")
         try:
             with urllib.request.urlopen(f"http://127.0.0.1:{_port}/healthz", timeout=3):
                 print(f"❌ API 还在服务 healthz（:{_port}）——先 docker stop video2md-video2md-1 再跑"
@@ -189,7 +189,7 @@ def drive_and_wait(url: str, rid: str, entry_url: str, owner: str,
     """
     import asyncio
 
-    from video2pdf import api as v2api
+    from video2md import api as v2api
 
     def _entry_done(d: dict) -> bool:
         return bool((d.get("artifacts") or {}).get(entry_url, {}).get("note"))
@@ -223,8 +223,8 @@ def drive_and_wait(url: str, rid: str, entry_url: str, owner: str,
         # owner dedup 命中我们预建并搬好视频的 created run。
         v2api._SEMA = asyncio.Semaphore(1)
         if v2api._CHECKPOINTER is None:
-            from video2pdf.config import ENV as _ENV
-            from video2pdf.graph import make_checkpointer_from_env
+            from video2md.config import ENV as _ENV
+            from video2md.graph import make_checkpointer_from_env
             cp, closer = make_checkpointer_from_env(_ENV)
             global _CP_CLOSER
             _CP_CLOSER = closer

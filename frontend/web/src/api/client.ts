@@ -19,9 +19,9 @@ export const BASE_URL = configuredBaseUrl ||
     (typeof window !== 'undefined' ? window.location.origin : 'http://127.0.0.1:8790'))
 
 // Google ID token is carried as a Bearer credential for every API request.
-// The pre-rename key (v2md_token) is moved over on first read so signed-in users stay signed in.
-const TOKEN_KEY = 'v2pdf_token'
-const LEGACY_TOKEN_KEY = 'v2md_token'
+// Keep the previous video2pdf key as a one-time migration so existing users stay signed in.
+const TOKEN_KEY = 'v2md_token'
+const LEGACY_TOKEN_KEY = 'v2pdf_token'
 
 export function getToken(): string | null {
   const token = localStorage.getItem(TOKEN_KEY)
@@ -51,7 +51,7 @@ export function safeRedirect(value: unknown, fallback = '/library'): string {
   return value
 }
 
-// With V2PDF_AUTH=off (development only; production config rejects it) the API
+// With V2MD_AUTH=off (development only; production config rejects it) the API
 // answers credential-less requests with a fixed dev identity. Ask the backend
 // instead of mirroring its auth mode in a build flag. Cached per page load;
 // a network failure is not cached so a late-starting API is picked up.

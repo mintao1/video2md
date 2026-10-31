@@ -1,7 +1,7 @@
 """OTel SDK 桥：RunLog 事件流 → traces+metrics → 本机 collector（或直连 Langfuse 回退）。
 
 拓扑（2026-09-22 定稿）：
-    video2pdf ──OTLP/HTTP──► otel-collector(:4318) ─┬─ traces → Langfuse Cloud
+    video2md ──OTLP/HTTP──► otel-collector(:4318) ─┬─ traces → Langfuse Cloud
                                                    └─ metrics → prometheus exporter :8889
 出口优先级：OTEL_EXPORTER_OTLP_ENDPOINT（投 collector，无认证）
            > LANGFUSE_PK/SK/HOST 直连（回退，仅 traces——Langfuse 不收 metrics）
@@ -74,19 +74,19 @@ def init(*, endpoint: str = "", headers: dict | None = None,
     测试注入：span_exporter=InMemorySpanExporter() + metric_reader=InMemoryMetricReader()，
     不经网络（SimpleSpanProcessor 同步导出，断言即所得）。
     """
-    views = [View(instrument_name="v2pdf_stage_seconds",
+    views = [View(instrument_name="v2md_stage_seconds",
                   aggregation=ExplicitBucketHistogramAggregation(_HISTOGRAM_BOUNDS_S)),
-             View(instrument_name="v2pdf_llm_seconds",
+             View(instrument_name="v2md_llm_seconds",
                   aggregation=ExplicitBucketHistogramAggregation(_HISTOGRAM_BOUNDS_S)),
-             View(instrument_name="v2pdf_sse_first_event_seconds",
+             View(instrument_name="v2md_sse_first_event_seconds",
                   aggregation=ExplicitBucketHistogramAggregation(_SSE_FIRST_EVENT_BOUNDS_S))]
     return sdk.init_otel(
-        service_name="video2pdf-serve",
-        service_namespace="video2pdf",
+        service_name="video2md-serve",
+        service_namespace="video2md",
         # 沿用改名前的前缀：历史 run 的 trace 与 evals 回挂靠它关联，勿改
         hash_prefix="video2md-",
-        trace_tags=["video2pdf", f"mode:{_artifact_mode()}"],  # mode tag 迁移漏带，回补（06 篇口径）
-        deployment_env=_env("V2PDF_ENV", "development"),
+        trace_tags=["video2md", f"mode:{_artifact_mode()}"],  # mode tag 迁移漏带，回补（06 篇口径）
+        deployment_env=_env("V2MD_ENV", "development"),
         endpoint=endpoint,
         headers=headers,
         span_exporter=span_exporter,
@@ -97,18 +97,18 @@ def init(*, endpoint: str = "", headers: dict | None = None,
 
 
 def _make_instruments(meter) -> None:
-    _M["runs"] = meter.create_counter("v2pdf_runs", description="完成的 run（按终态）")
-    _M["cb"] = meter.create_counter("v2pdf_circuit_breaker_trips", description="熔断次数（按阶段）")
-    _M["watchdog"] = meter.create_counter("v2pdf_watchdog_trips", description="看门狗卡死判定次数")
-    _M["stage_entries"] = meter.create_counter("v2pdf_stage_entries",
+    _M["runs"] = meter.create_counter("v2md_runs", description="完成的 run（按终态）")
+    _M["cb"] = meter.create_counter("v2md_circuit_breaker_trips", description="熔断次数（按阶段）")
+    _M["watchdog"] = meter.create_counter("v2md_watchdog_trips", description="看门狗卡死判定次数")
+    _M["stage_entries"] = meter.create_counter("v2md_stage_entries",
                                                description="阶段条目结果（ok/failed/skipped）")
-    _M["llm_requests"] = meter.create_counter("v2pdf_llm_requests", description="LLM 调用（按任务/终态）")
-    _M["llm_tokens"] = meter.create_counter("v2pdf_llm_tokens", description="LLM token（按任务/in|out）")
-    _M["stage_seconds"] = meter.create_histogram("v2pdf_stage_seconds", description="阶段耗时（秒）")
+    _M["llm_requests"] = meter.create_counter("v2md_llm_requests", description="LLM 调用（按任务/终态）")
+    _M["llm_tokens"] = meter.create_counter("v2md_llm_tokens", description="LLM token（按任务/in|out）")
+    _M["stage_seconds"] = meter.create_histogram("v2md_stage_seconds", description="阶段耗时（秒）")
     _M["sse_first"] = meter.create_histogram(
-        "v2pdf_sse_first_event_seconds",
+        "v2md_sse_first_event_seconds",
         description="SSE connected→首个业务事件延迟（秒；SLO p95<3s，P1-5）")
-    _M["llm_seconds"] = meter.create_histogram("v2pdf_llm_seconds", description="LLM 调用耗时（秒）")
+    _M["llm_seconds"] = meter.create_histogram("v2md_llm_seconds", description="LLM 调用耗时（秒）")
 
     def _queued(_options):
         from platform_otel_sdk._otel import _get_runtime_gauge_fn
@@ -120,9 +120,9 @@ def _make_instruments(meter) -> None:
         fn = _get_runtime_gauge_fn()
         yield Observation((fn() or {}).get("active", 0) if fn else 0)
 
-    _M["queue_gauge"] = meter.create_observable_gauge("v2pdf_queue_queued", [_queued],
+    _M["queue_gauge"] = meter.create_observable_gauge("v2md_queue_queued", [_queued],
                                                       description="排队中的 run")
-    _M["active_gauge"] = meter.create_observable_gauge("v2pdf_run_active", [_active],
+    _M["active_gauge"] = meter.create_observable_gauge("v2md_run_active", [_active],
                                                        description="运行中 run（0/1）")
 
 
@@ -171,7 +171,7 @@ def record(rec: dict, *, run_id: str, label: str, trace_name: str = "",
     V2MD_OTEL_INCLUDE_CONTENT=off 阻断 LLM prompt/completion 正文，只保留 usage/长度
     元数据；正文不经 collector/Langfuse，也不落 jsonl/SSE。
 
-    注意：video2pdf 自有 record（而非 SDK 的 record）：
+    注意：video2md 自有 record（而非 SDK 的 record）：
     - LLM gen_ai 映射、user_id 追溯传播、graph:end 根输出写入——均视频特有逻辑。
     """
     if not _ensure_started():

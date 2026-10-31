@@ -107,7 +107,7 @@ _DOUYIN_UA = ("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKi
               "(KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1")
 
 
-_TTWID_CACHE = Path.home() / ".cache" / "video2pdf" / "douyin-ttwid.txt"
+_TTWID_CACHE = Path.home() / ".cache" / "video2md" / "douyin-ttwid.txt"
 
 
 
@@ -274,7 +274,7 @@ def douyin_user_resolve(url: str, *, max_pages: int = 40, budget_s: float = 240.
 
     # 枚举结果磁盘缓存（6h）：同一博主反复跑/重试不再碰抖音页面 —— 今晚的软风控
     # 就是调试期重复扫主页堆出来的，缓存是风控的第一道防线
-    cache_file = Path.home() / ".cache" / "video2pdf" / f"douyin-user-{sec_uid[:24]}.json"
+    cache_file = Path.home() / ".cache" / "video2md" / f"douyin-user-{sec_uid[:24]}.json"
     try:
         if cache_file.exists() and time.time() - cache_file.stat().st_mtime < 6 * 3600:
             cached = json.loads(cache_file.read_text())
@@ -449,9 +449,9 @@ def _clean_ytdlp_err(stderr: str) -> str:
 
 # 国内视频站直连：no_proxy 通配符（*.bilibili.com）yt-dlp/urllib 根本不认（实测 serve 经
 # 17898 代理出口被 B 站 412 风控打满，直连/7897 出口均正常）——子进程显式剥代理，不靠 no_proxy。
-# 云端例外（2026-09-22）：机房 IP 被国内站风控（B站 412 秒拒），设 V2PDF_PROXY（如
-# http://127.0.0.1:17897 隧道出口）后国内站也走该代理；V2PDF_PROXY_DOMESTIC=1 显式开启。
-# V2PDF_PROXY 只作用于 yt-dlp 子进程，不污染进程内 httpx（LLM 中转直连更快）。
+# 云端例外（2026-09-22）：机房 IP 被国内站风控（B站 412 秒拒），设 V2MD_PROXY（如
+# http://127.0.0.1:17897 隧道出口）后国内站也走该代理；V2MD_PROXY_DOMESTIC=1 显式开启。
+# V2MD_PROXY 只作用于 yt-dlp 子进程，不污染进程内 httpx（LLM 中转直连更快）。
 _PROXY_KEYS = ("HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "http_proxy", "https_proxy", "all_proxy")
 
 
@@ -465,7 +465,7 @@ def _explicit_direct_host(url: str) -> bool:
     host = (urlsplit(url or "").hostname or "").rstrip(".").casefold()
     if not host:
         return False
-    for raw in (os.environ.get("V2PDF_DIRECT_HOSTS") or "").split(","):
+    for raw in (os.environ.get("V2MD_DIRECT_HOSTS") or "").split(","):
         entry = raw.strip().rstrip(".").casefold()
         if not entry:
             continue
@@ -481,8 +481,8 @@ def _explicit_direct_host(url: str) -> bool:
 
 def _subprocess_env(url: str) -> dict | None:
     """yt-dlp 子进程的代理环境。国内站默认剥代理直连；境外站默认继承父进程。
-    配了 V2PDF_PROXY 时显式注入（容器/服务器场景父进程可能没代理环境）；
-    V2PDF_PROXY_DOMESTIC=1 时国内站也走代理（机房 IP 被风控的云上场景）。"""
+    配了 V2MD_PROXY 时显式注入（容器/服务器场景父进程可能没代理环境）；
+    V2MD_PROXY_DOMESTIC=1 时国内站也走代理（机房 IP 被风控的云上场景）。"""
     if _explicit_direct_host(url):
         env = dict(os.environ)
         for k in _PROXY_KEYS:
@@ -490,13 +490,13 @@ def _subprocess_env(url: str) -> dict | None:
         return env
     domestic = bool(_DIRECT_HOST_RE.search(url or ""))
     domestic_forced_proxy = domestic and \
-        (os.environ.get("V2PDF_PROXY_DOMESTIC") or "").lower() in ("1", "true", "on")
+        (os.environ.get("V2MD_PROXY_DOMESTIC") or "").lower() in ("1", "true", "on")
     if domestic and not domestic_forced_proxy:
         env = dict(os.environ)
         for k in _PROXY_KEYS:
             env.pop(k, None)
         return env
-    px = os.environ.get("V2PDF_PROXY", "")
+    px = os.environ.get("V2MD_PROXY", "")
     if px:
         env = dict(os.environ)
         for k in _PROXY_KEYS:

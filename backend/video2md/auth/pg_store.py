@@ -27,7 +27,7 @@ if TYPE_CHECKING:
 
 class PostgresIdentityStore(IdentityStore):
     def __init__(self, pool: ConnectionPool):
-        self.pool = pool  # 建表已上收 video2pdf/migrations/0001（P0-5），构造只接线
+        self.pool = pool  # 建表已上收 video2md/migrations/0001（P0-5），构造只接线
 
     # ---- 内部：用户记录读写（行锁串行化，防并发回填/追加丢更新）
 

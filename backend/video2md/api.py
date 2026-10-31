@@ -2,7 +2,7 @@
 
 Dify 时代的双进程分工（Dify 画布轮询 ←HTTP→ serve.py 阶段打工）收拢为单进程：
 POST /runs 入队 → 后台任务内嵌跑完整张 LangGraph（阶段即节点），客户端轮询
-GET /runs/{id} 看终态。并发上限纪律：asyncio 信号量=V2PDF_MAX_CONCURRENT_RUNS
+GET /runs/{id} 看终态。并发上限纪律：asyncio 信号量=V2MD_MAX_CONCURRENT_RUNS
 （默认 1 = 单 worker 语义；生产多用户调大，checkpointer 建议切 postgres，
 vault 自托管姿势建议保持 1）。入队前配额闸：总队列/每用户在途/60s 滑窗提交频率。
 
@@ -151,7 +151,7 @@ def _preflight() -> dict:
     except Exception as exc:
         add("outbox" if artsink.current_mode() == "deliver" else "vault",
             False, str(exc)[:120])
-    remote = (ENV.get("V2PDF_REMOTE") or "").strip()
+    remote = (ENV.get("V2MD_REMOTE") or "").strip()
     if remote.lower() in ("colab", "colab-cli"):
         from .colab import health
         ok, detail = health()
@@ -162,7 +162,7 @@ def _preflight() -> dict:
         # 池子 token 闸门在产（gpu_router B4a）：裸调 /status 得 401 JSON——providers
         # 解析为空列表造成「可用 provider: 无」假阴性（2026-09-27 实测入册；
         # token 未设/空 = 不带头，本地裸池向后兼容，同 util 池客户端口径）
-        _tok = (ENV.get("V2PDF_POOL_TOKEN") or "").strip()
+        _tok = (ENV.get("V2MD_POOL_TOKEN") or "").strip()
         _hdr = {"Authorization": f"Bearer {_tok}"} if _tok else {}
         ok, detail = False, ""
         try:
@@ -233,14 +233,14 @@ def _cleanup_stale_runs(max_age_days: int = 30, idle_hours: float = 24.0) -> Non
 
 def _prune_orphan_tmps(min_age_h: float = 6.0) -> None:
     """清没人认领的 run 临时目录：runs.json 记录丢失或进程被 SIGKILL 时，tmp 目录永久残留，
-    30 天兜底等于不清。只动 `video2pdf-run-*` 与改名前遗留的 `video2md-run-*`（CLI 的 `video2pdf-*` 由 finally 自清）。
+    30 天兜底等于不清。只动 `video2md-run-*` 与改名前遗留的 `video2pdf-run-*`（CLI 的 `video2md-*` 由 finally 自清）。
 
     6 小时内动过的目录视为可能在跑（目录 mtime 随文件增删刷新），不清。
     """
     tdir = Path(tempfile.gettempdir())
     claimed = {r.get("tmp") for r in _load_runs().values() if not r.get("deleted")}
     n = 0
-    for d in [*tdir.glob("video2pdf-run-*"), *tdir.glob("video2md-run-*")]:
+    for d in [*tdir.glob("video2md-run-*"), *tdir.glob("video2pdf-run-*")]:
         if str(d) in claimed:
             continue
         try:
@@ -284,8 +284,8 @@ def _sweep_outbox() -> int:
 
 # ---------------------------------------------------------------- 任务表
 _TASKS: dict[str, dict] = {}          # run_id → {status, url, owner, created, started, finished, errors}
-_SEMA = asyncio.Semaphore(MAX_CONCURRENT_RUNS)   # 并发闸门：默认 1=单 worker 语义（V2PDF_MAX_CONCURRENT_RUNS）
-_CHECKPOINTER = None                  # lifespan 注入（sqlite/postgres 由 V2PDF_CHECKPOINTER 定）
+_SEMA = asyncio.Semaphore(MAX_CONCURRENT_RUNS)   # 并发闸门：默认 1=单 worker 语义（V2MD_MAX_CONCURRENT_RUNS）
+_CHECKPOINTER = None                  # lifespan 注入（sqlite/postgres 由 V2MD_CHECKPOINTER 定）
 def _ck_closer() -> None:
     pass  # checkpointer 资源释放钩子（PG 分支关连接池）
 
@@ -293,7 +293,7 @@ _TASKS_KEEP = 200                     # 内存任务表上限（超出裁最老�
 
 _PROC_ID = uuid.uuid4().hex[:8]       # 副本身份：claimed_by 钉名 / watchdog steal 用
 
-# P4b 多副本档（V2PDF_TASKS_STORE=postgres）：_TASKS 写路径保留不动（本进程实时视图），
+# P4b 多副本档（V2MD_TASKS_STORE=postgres）：_TASKS 写路径保留不动（本进程实时视图），
 # 读侧换 PG 真相源——/queue、配额两闸+滑窗、dedup 判活、watchdog 大盘巡检、启动恢复
 # 认领全部走 v2pdf_runs（record jsonb 是状态唯一真相，status 提取列是其可查镜像）。
 # 缺省 json 档 _tasks_backend() 恒 None，下列新代码路径整体不激活。
@@ -305,7 +305,7 @@ def _tasks_backend():
     global _TASKS_PG, _tasks_pg_resolved
     if not _tasks_pg_resolved:
         _tasks_pg_resolved = True
-        if (ENV.get("V2PDF_TASKS_STORE") or "").strip().lower() == "postgres":
+        if (ENV.get("V2MD_TASKS_STORE") or "").strip().lower() == "postgres":
             from . import pg, pgstore
             _TASKS_PG = pgstore.PostgresTaskStore(pg.shared_pool())
     return _TASKS_PG
@@ -426,7 +426,7 @@ def _admit_submission(uid: str) -> None:
     """POST /runs 入队前的配额闸：总队列 / 每用户在途 / 滑窗提交频率 / 月度预算（P2-2）。
 
     超限一律 429 + X-Error 符号码（错误信封统一转译）；0 = 该项不设限。
-    PG 档（V2PDF_TASKS_STORE=postgres，多副本）各闸全读 DB 真相源——各副本计数一致、
+    PG 档（V2MD_TASKS_STORE=postgres，多副本）各闸全读 DB 真相源——各副本计数一致、
     滑窗跨进程不丢；json 档逐字节现状（进程内视图）。
     """
     be = _tasks_backend()
@@ -435,7 +435,7 @@ def _admit_submission(uid: str) -> None:
         if spent >= BUDGET_MONTH_USD:
             raise HTTPException(
                 429, f"本月预算已用尽（${spent:.2f}/${BUDGET_MONTH_USD:.2f}），"
-                     f"下月自动重置或联系管理员调整 V2PDF_BUDGET_MONTH_USD",
+                     f"下月自动重置或联系管理员调整 V2MD_BUDGET_MONTH_USD",
                 headers={"X-Error": "BUDGET_EXCEEDED"})
     if be is not None:
         if QUEUE_MAX:
@@ -509,14 +509,14 @@ def _upload_magic_ok(path: Path, ext: str) -> bool:
 def _validate_run_url(url: str, uid: str) -> None:
     """非 http 输入的白名单闸（终局布局·产物层：不收裸本地路径）。
 
-    V2PDF_LOCAL_PATHS：auto（默认）= AUTH=off 放行（开发/自托管），AUTH≠off 只认本人
+    V2MD_LOCAL_PATHS：auto（默认）= AUTH=off 放行（开发/自托管），AUTH≠off 只认本人
     uploads 目录内路径；allow/deny 显式覆盖。拒绝 → 422 LOCAL_PATH_FORBIDDEN。
     """
     if url.startswith(("http://", "https://")):
         return
     if LOCAL_PATHS == "allow":
         return
-    if LOCAL_PATHS == "auto" and (ENV.get("V2PDF_AUTH") or "off").strip().lower() == "off":
+    if LOCAL_PATHS == "auto" and (ENV.get("V2MD_AUTH") or "off").strip().lower() == "off":
         return  # 开发/自托管姿势：本地路径输入是文档化能力（e2e/batch/容器内路径）
     inside = False
     try:
@@ -527,8 +527,8 @@ def _validate_run_url(url: str, uid: str) -> None:
         inside = False
     if inside:
         return
-    hint = ("本地路径输入已被禁用（V2PDF_LOCAL_PATHS=deny）" if LOCAL_PATHS == "deny"
-            else "多用户档不收裸本地路径：先 POST /uploads 上传，或自托管设 V2PDF_LOCAL_PATHS=allow")
+    hint = ("本地路径输入已被禁用（V2MD_LOCAL_PATHS=deny）" if LOCAL_PATHS == "deny"
+            else "多用户档不收裸本地路径：先 POST /uploads 上传，或自托管设 V2MD_LOCAL_PATHS=allow")
     raise HTTPException(422, hint, headers={"X-Error": "LOCAL_PATH_FORBIDDEN"})
 
 
@@ -908,17 +908,17 @@ def _ensure_database_ready() -> None:
     production process must either have a complete PostgreSQL configuration or
     explicitly use the JSON/SQLite development defaults.
     """
-    pg_keys = ("V2PDF_RUNS_STORE", "V2PDF_STATE_STORE", "V2PDF_USERS_STORE",
-               "V2PDF_TASKS_STORE", "V2PDF_PREFS_STORE", "V2PDF_EVENTS",
-               "V2PDF_CHECKPOINTER")
+    pg_keys = ("V2MD_RUNS_STORE", "V2MD_STATE_STORE", "V2MD_USERS_STORE",
+               "V2MD_TASKS_STORE", "V2MD_PREFS_STORE", "V2MD_EVENTS",
+               "V2MD_CHECKPOINTER")
     wants_pg = any((ENV.get(key) or "").strip().lower() == "postgres" or
-                    (key == "V2PDF_EVENTS" and (ENV.get(key) or "").strip().lower() == "pg")
+                    (key == "V2MD_EVENTS" and (ENV.get(key) or "").strip().lower() == "pg")
                     for key in pg_keys)
     if not wants_pg:
         return
     from . import pg
     if not pg.pg_enabled():
-        raise RuntimeError("已启用 PostgreSQL 存储，但未配置 V2PDF_PG_DSN")
+        raise RuntimeError("已启用 PostgreSQL 存储，但未配置 V2MD_PG_DSN")
     # shared_pool validates the migration version before accepting traffic.
     pg.shared_pool()
 
@@ -984,7 +984,7 @@ async def _lifespan(app: FastAPI):
     sweeper = (asyncio.create_task(_outbox_sweeper())
                if artsink.current_mode() == "deliver" else None)
     uploads_sw = asyncio.create_task(_uploads_sweeper())
-    # run 卡死看门狗：周期扫内存任务表，心跳超时按 V2PDF_WATCHDOG_ACTION 处置
+    # run 卡死看门狗：周期扫内存任务表，心跳超时按 V2MD_WATCHDOG_ACTION 处置
     # （mark=标 error 等人工；exit=进程退出靠容器重启自愈，见 watchdog.py 模块注释）
     wd = asyncio.create_task(watchdog.loop(_TASKS, WATCHDOG_PERIOD_S))
     qhb = asyncio.create_task(_queue_hb_loop())  # 排队项心跳（P1-1）：大盘接管判据的续约源
@@ -1006,8 +1006,8 @@ async def _lifespan(app: FastAPI):
         pg.close_shared_pool()  # 三存储/checkpointer/事件扇出共用的进程级池
 
 
-_production = (ENV.get("V2PDF_ENV") or "").strip().lower() == "production"
-app = FastAPI(title="video2pdf", version=VERSION, lifespan=_lifespan,
+_production = (ENV.get("V2MD_ENV") or "").strip().lower() == "production"
+app = FastAPI(title="video2md", version=VERSION, lifespan=_lifespan,
               docs_url=None if _production else "/docs", redoc_url=None,
               openapi_url=None if _production else "/openapi.json")
 app.include_router(colab_auth_router)
@@ -1217,18 +1217,18 @@ _GOOGLE_OAUTH_REDIRECTS: dict[str, str] = {}  # state → 登录后回到的站�
 def _google_oauth_timeout_s() -> float:
     """Token exchange timeout, bounded so a bad deployment cannot hang callbacks."""
     try:
-        return min(60.0, max(3.0, float(ENV.get("V2PDF_GOOGLE_OAUTH_TIMEOUT_S", "15"))))
+        return min(60.0, max(3.0, float(ENV.get("V2MD_GOOGLE_OAUTH_TIMEOUT_S", "15"))))
     except (TypeError, ValueError):
         return 15.0
 
 
 def _google_oauth_proxy() -> str | None:
     """Optional dedicated OAuth proxy; reject the retired 17898 endpoint."""
-    proxy = (ENV.get("V2PDF_GOOGLE_OAUTH_PROXY_URL") or "").strip()
+    proxy = (ENV.get("V2MD_GOOGLE_OAUTH_PROXY_URL") or "").strip()
     if not proxy:
         return None
     if ":17898" in proxy or "127.0.0.1:17898" in proxy:
-        raise RuntimeError("V2PDF_GOOGLE_OAUTH_PROXY_URL 指向已弃用的 17898 代理")
+        raise RuntimeError("V2MD_GOOGLE_OAUTH_PROXY_URL 指向已弃用的 17898 代理")
     return proxy
 # 口径同 _DEVICE_WIN：单节点单副本安全；多副本各副本独立 dict 会挂——扩副本前先挪共享存储。
 
@@ -1237,7 +1237,7 @@ def _google_web_creds() -> tuple[str, str]:
     """网页端授权码流凭据：优先 GOOGLE_WEB_*（OAuth 应用里「Web」型 client），缺省回落
     GOOGLE_CLIENT_*。设备流的 GOOGLE_CLIENT_* 是「TV 与 Limited Input」型（Web 型无设备码
     端点），两者并存时必须分两套 env——本函数只管发起/换票侧取哪对；验签侧的多 audience
-    收口在 video2pdf/auth/ext_google.py。回落语义保证单 client 开发档零配置。"""
+    收口在 video2md/auth/ext_google.py。回落语义保证单 client 开发档零配置。"""
     cid = (ENV.get("GOOGLE_WEB_CLIENT_ID") or ENV.get("GOOGLE_CLIENT_ID") or "").strip()
     secret = (ENV.get("GOOGLE_WEB_CLIENT_SECRET") or ENV.get("GOOGLE_CLIENT_SECRET") or "").strip()
     return cid, secret
@@ -1246,13 +1246,13 @@ def _google_web_creds() -> tuple[str, str]:
 def _google_public_base() -> str:
     """对外可达的 api scheme+host（redirect_uri 前缀）。生产=网关 https 域名，
     Google 对 redirect_uri 在授权页与换票时逐字比对、且须与控制台登记一致。"""
-    return (ENV.get("V2PDF_PUBLIC_BASE_URL") or "http://127.0.0.1:8790").rstrip("/")
+    return (ENV.get("V2MD_PUBLIC_BASE_URL") or "http://127.0.0.1:8790").rstrip("/")
 
 
 def _google_web_base() -> str:
     """前端 origin：成功 302 回品牌首页 #id_token=…，失败 #auth_error=…（fragment
     不进服务端日志/代理）。"""
-    return (ENV.get("V2PDF_WEB_BASE_URL") or "http://localhost:5173").rstrip("/")
+    return (ENV.get("V2MD_WEB_BASE_URL") or "http://localhost:5173").rstrip("/")
 
 
 def _google_state_purge() -> None:
@@ -1288,6 +1288,8 @@ def _google_error_redirect(msg: str, back: str = "") -> RedirectResponse:
 
 def _google_finish(resp: RedirectResponse) -> RedirectResponse:
     """所有出口统一清 CSRF state cookie（一次性，用完即焚）。"""
+    resp.delete_cookie("v2md_oauth_state", path="/auth/google/callback")
+    # 清理改名前 cookie，避免旧浏览器残留继续影响回调。
     resp.delete_cookie("v2pdf_oauth_state", path="/auth/google/callback")
     return resp
 
@@ -1328,7 +1330,7 @@ async def auth_google_login(request: Request, redirect: str = "", terms_accepted
     resp = RedirectResponse(f"{_GOOGLE_OAUTH_AUTH_URL}?{q}", status_code=302)
     # 登录 CSRF 闸：state 与浏览器绑定（HttpOnly 防脚本读；SameSite=Lax 保证 Google 顶层
     # 跳回本端点时仍携带；Path 只对回调生效，不污染其它请求）。
-    resp.set_cookie("v2pdf_oauth_state", state, max_age=_GOOGLE_STATE_TTL_S,
+    resp.set_cookie("v2md_oauth_state", state, max_age=_GOOGLE_STATE_TTL_S,
                     httponly=True, samesite="lax", path="/auth/google/callback")
     return resp
 
@@ -1343,7 +1345,8 @@ async def auth_google_callback(request: Request, code: str = "", state: str = ""
     ip = _client_ip(request)
     exp = _GOOGLE_OAUTH_STATES.pop(state, None) if state else None
     back = _GOOGLE_OAUTH_REDIRECTS.pop(state, "") if state else ""
-    cookie_state = request.cookies.get("v2pdf_oauth_state") or ""
+    cookie_state = (request.cookies.get("v2md_oauth_state")
+                    or request.cookies.get("v2pdf_oauth_state") or "")
     if exp is None or exp <= time.monotonic() or cookie_state != state:
         _req_log("GET", "/auth/google/callback", 400, user=f"(anon:{ip})")
         return _google_finish(_google_error_redirect("登录状态已过期或校验失败，请重新登录", back))
@@ -1714,7 +1717,7 @@ def get_run_media(run_id: str, name: str, ident: Identity = Depends(current_iden
 
 def _zip_dir(src: Path) -> tuple[str, int]:
     """目录现打包 zip（temp 文件，发送方负责删）→ (路径, 字节数)。结构原样保留。"""
-    fd, zpath = tempfile.mkstemp(prefix=f"v2pdf-bundle-{src.name}-", suffix=".zip")
+    fd, zpath = tempfile.mkstemp(prefix=f"video2md-bundle-{src.name}-", suffix=".zip")
     os.close(fd)
     try:
         with zipfile.ZipFile(zpath, "w", zipfile.ZIP_DEFLATED) as zf:
@@ -1740,7 +1743,7 @@ def get_run_bundle(run_id: str, ident: Identity = Depends(current_identity)) -> 
     zpath, size = _zip_dir(src)
     _req_log("GET", f"/runs/{run_id}/bundle", 200, user=ident.uid, zip_bytes=size)
     return FileResponse(zpath, media_type="application/zip",
-                        filename=f"video2pdf-{run_id}.zip",
+                        filename=f"video2md-{run_id}.zip",
                         background=BackgroundTask(_unlink_quiet, zpath))
 
 
@@ -1846,7 +1849,7 @@ async def resume_run(run_id: str, ident: Identity = Depends(current_identity)) -
     fresh = None
     try:
         if run.get("tmp_cleaned") or not Path(run.get("tmp") or "/nonexistent").exists():
-            fresh = Path(tempfile.mkdtemp(prefix="video2pdf-run-"))
+            fresh = Path(tempfile.mkdtemp(prefix="video2md-run-"))
             shelf, _expires = _outbox_live(run) if artsink.current_mode() == "deliver" else (None, None)
             if shelf is not None:
                 shutil.copytree(shelf, fresh / "outbox")
@@ -1912,7 +1915,7 @@ async def run_events(run_id: str, request: Request,
 
     图在工作线程里 publish → 主循环 call_soon_threadsafe 投递；慢/断客户端靠 keepalive +
     队列上限丢弃兜底，绝不反压主管线。轮询 GET /runs/{id} 仍并存（前端可只用其一）。
-    V2PDF_EVENTS=pg 档订阅会拉起 events 的 LISTEN 泵：别的副本驱动该 run 时，终态事件经
+    V2MD_EVENTS=pg 档订阅会拉起 events 的 LISTEN 泵：别的副本驱动该 run 时，终态事件经
     跨进程扇出到达本端点——run_finalized 关流不要求 SSE 连接与驱动进程同侧。
     """
     _require_run_access(run_id, ident)
@@ -1962,7 +1965,7 @@ def get_cost(ident: Identity = Depends(current_identity)) -> dict:
              for r in _load_runs().values()
              if r.get("owner") == ident.uid and (r.get("created") or "") >= since]
     items.sort(key=lambda r: r.get("created") or "", reverse=True)
-    policy = ENV.get("V2PDF_GPU_PRICE_POLICY", "metered")
+    policy = ENV.get("V2MD_GPU_PRICE_POLICY", "metered")
     return {"uid": ident.uid, "month": since, "spend_usd": u["spend_usd"],
             "budget_usd": BUDGET_MONTH_USD, "usage": u,
             "gpu_policy": policy, "runs": items,
@@ -1970,7 +1973,7 @@ def get_cost(ident: Identity = Depends(current_identity)) -> dict:
                 and (PRICE_GPU_MIN > 0 or (PRICE_GPU_MIN == 0 and policy == "free")),
             "prices": {"llm_in_mtok": PRICE_LLM_IN_MTOK, "llm_out_mtok": PRICE_LLM_OUT_MTOK,
                        "gpu_min": PRICE_GPU_MIN,
-                       "llm_cached_in_mtok": float(ENV.get("V2PDF_PRICE_LLM_CACHED_IN_MTOK") or 0)}}
+                       "llm_cached_in_mtok": float(ENV.get("V2MD_PRICE_LLM_CACHED_IN_MTOK") or 0)}}
 
 
 # ---------------------------------------------------------------- 会员/配额展示档（web 个人页）
@@ -2057,7 +2060,7 @@ def healthz() -> dict:
 def preflight(request: Request, ident: Identity | None = Depends(optional_identity)) -> dict:
     full = _preflight()
     host = (request.client.host if request.client else "") or ""
-    real_auth = (ENV.get("V2PDF_AUTH") or "off").strip().lower() not in ("", "off", "none")
+    real_auth = (ENV.get("V2MD_AUTH") or "off").strip().lower() not in ("", "off", "none")
     return full if _preflight_privileged(host, real_auth and ident is not None) \
         else _preflight_public(full)
 
@@ -2066,7 +2069,7 @@ def preflight(request: Request, ident: Identity | None = Depends(optional_identi
 # paths for backwards compatibility, and let the final catch-all serve Vue
 # history routes such as / and /read/:id. If the bundle is not present
 # (tests and API-only development images), these handlers remain ordinary 404s.
-_WEB_DIST = Path(ENV.get("V2PDF_WEB_DIST") or "/app/web-dist").resolve()
+_WEB_DIST = Path(ENV.get("V2MD_WEB_DIST") or "/app/web-dist").resolve()
 _API_PATH_PREFIXES = (
     "auth/", "runs", "uploads", "settings/", "prefs", "healthz", "preflight",
     "queue", "me", "quota", "cost", "docs", "openapi", "redoc",
@@ -2110,6 +2113,6 @@ def configure_subprocess_path() -> str:
 def cmd_api(port: int) -> None:
     # launchd/容器环境 PATH 极简；镜像 CLI 安装在当前虚拟环境的 bin 目录。
     configure_subprocess_path()
-    host = ENV.get("V2PDF_HOST", "127.0.0.1")  # 容器内设 0.0.0.0；无认证，别暴露公网
-    print(f"🎬 video2pdf LangGraph 服务 → http://{host}:{port}")
+    host = ENV.get("V2MD_HOST", "127.0.0.1")  # 容器内设 0.0.0.0；无认证，别暴露公网
+    print(f"🎬 video2md LangGraph 服务 → http://{host}:{port}")
     uvicorn.run(app, host=host, port=port, log_level="warning")

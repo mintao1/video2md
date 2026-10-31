@@ -11,7 +11,7 @@ SSE 扇出/磁盘增长），不是生产吞吐——真实 GPU 延迟归 gpu_ro
   --ramp-max C 拐点：默认限流档（USER_QUEUE_MAX=5/滑窗 30），1→C 并发同用户提交斜坡，
                记首个 429 的并发数与错误码（配额闸语义实测）
   --sse N      扇出：单 run N 个并发 SSE 订阅，收终态事件的比例（理论界=500 事件/订阅）
-  --pg         PG 档吞吐对照组（需 V2PDF_TEST_PG_DSN）：json vs PG 吞吐差 + jsonb 膨胀率
+  --pg         PG 档吞吐对照组（需 V2MD_TEST_PG_DSN）：json vs PG 吞吐差 + jsonb 膨胀率
                + 无 PoolTimeout 断言（P1-8 预算下的池压力）
 
 跑法：uv run --project backend python backend/scripts/loadtest.py [--runs 10] [--ramp-max 30] [--sse 20] [--pg]
@@ -39,7 +39,7 @@ PORT_PG = 9836         # PG 档对照（--pg）
 POOL_PORT = 9831
 POOL = f"http://127.0.0.1:{POOL_PORT}"
 
-TMP = Path(tempfile.mkdtemp(prefix="v2pdf-load-"))
+TMP = Path(tempfile.mkdtemp(prefix="v2md-load-"))
 VAULT = TMP / "vault"
 MEAS: dict[str, str] = {}
 
@@ -48,7 +48,7 @@ def _kill_port_squatters() -> None:
     """崩溃孤儿清场：上轮异常退出会留 api/mockpool 孤儿占端口（errno 48 实证），
     新进程绑不上、请求打到旧孤儿上——测量全歪。"""
     subprocess.run(["bash", "-c",
-                    'pkill -9 -f "video2pdf api --port 983" 2>/dev/null; '
+                    'pkill -9 -f "video2md api --port 983" 2>/dev/null; '
                     'pkill -9 -f "mock_pool:app --host 127.0.0.1 --port 9831" 2>/dev/null; true'],
                    check=False)
     time.sleep(1)
@@ -66,18 +66,18 @@ def _fixture(dur: int = 8) -> Path:
 
 def _boot(port: int, extra_env: dict[str, str]) -> subprocess.Popen:
     env = {**os.environ,
-           "V2PDF_FAKE_LLM": "1",
-           "V2PDF_REMOTE": POOL, "V2PDF_OCR_REMOTE": POOL, "V2PDF_CLIPS_REMOTE": POOL,
-           "V2PDF_CLIPS_SOURCE": "remote",
-           "V2PDF_USERS_FILE": str(TMP / f"users-{port}.json"),
-           "OBSIDIAN_VAULT": str(VAULT), "V2PDF_LOG_DIR": str(TMP / f"logs-{port}"),
-           "V2PDF_SECRETS_FILE": str(TMP / "nonexistent.env"),
+           "V2MD_FAKE_LLM": "1",
+           "V2MD_REMOTE": POOL, "V2MD_OCR_REMOTE": POOL, "V2MD_CLIPS_REMOTE": POOL,
+           "V2MD_CLIPS_SOURCE": "remote",
+           "V2MD_USERS_FILE": str(TMP / f"users-{port}.json"),
+           "OBSIDIAN_VAULT": str(VAULT), "V2MD_LOG_DIR": str(TMP / f"logs-{port}"),
+           "V2MD_SECRETS_FILE": str(TMP / "nonexistent.env"),
            "LANGFUSE_PK": "", "LANGFUSE_SK": "", "OTEL_EXPORTER_OTLP_ENDPOINT": "",
-           "V2PDF_REMOTE_ENV": "", **{k: v for k, v in extra_env.items() if v}}
-    env.pop("V2PDF_REMOTE_ENV", None)
-    env["PYTHONPATH"] = str(REPO / "backend")  # 子进程 python -m video2pdf（package=false）
+           "V2MD_REMOTE_ENV": "", **{k: v for k, v in extra_env.items() if v}}
+    env.pop("V2MD_REMOTE_ENV", None)
+    env["PYTHONPATH"] = str(REPO / "backend")  # 子进程 python -m video2md（package=false）
     log = open(TMP / f"api-{port}.log", "w")
-    proc = subprocess.Popen([sys.executable, "-m", "video2pdf", "api", "--port", str(port)],
+    proc = subprocess.Popen([sys.executable, "-m", "video2md", "api", "--port", str(port)],
                             env=env, stdout=log, stderr=subprocess.STDOUT, cwd=str(REPO))
     for _ in range(60):
         try:
@@ -216,9 +216,9 @@ async def main() -> None:
     ap.add_argument("--runs", type=int, default=10)
     ap.add_argument("--ramp-max", type=int, default=50)
     ap.add_argument("--sse", type=int, default=20)
-    ap.add_argument("--pg", action="store_true", help="加跑 PG 档对照组（需 V2PDF_TEST_PG_DSN）")
+    ap.add_argument("--pg", action="store_true", help="加跑 PG 档对照组（需 V2MD_TEST_PG_DSN）")
     a = ap.parse_args()
-    dsn = os.environ.get("V2PDF_TEST_PG_DSN") or ""
+    dsn = os.environ.get("V2MD_TEST_PG_DSN") or ""
 
     _kill_port_squatters()
     fixture = _fixture(8)
@@ -237,37 +237,37 @@ async def _main_scenarios(a, dsn: str, fixture: Path) -> None:
     # A：默认限流档（SSE 先行——斜坡会烧穿 30/min 滑窗，顺序反了 SSE 拿不到 run）。
     # 沙箱纪律：每个节点必须钉 RUNS/STATE/USERS 三件套到 TMP——漏一个就读写
     # 仓库根的真实数据（实证：斜坡轮污染了真实 runs.json 11 条）。
-    _PROCS[PORT_A] = _boot(PORT_A, {"V2PDF_RUNS_FILE": str(TMP / f"runs-{PORT_A}.json"),
-                                    "V2PDF_STATE_FILE": str(TMP / f"state-{PORT_A}.json")})
+    _PROCS[PORT_A] = _boot(PORT_A, {"V2MD_RUNS_FILE": str(TMP / f"runs-{PORT_A}.json"),
+                                    "V2MD_STATE_FILE": str(TMP / f"state-{PORT_A}.json")})
     await _sse_fanout(PORT_A, fixture, a.sse)
     await _drain(f"http://127.0.0.1:{PORT_A}", a.sse)
     await _ramp(PORT_A, fixture, a.ramp_max)
 
     # B：放开限流（吞吐 + 磁盘）
-    _PROCS[PORT_B] = _boot(PORT_B, {"V2PDF_QUEUE_MAX": "0", "V2PDF_USER_QUEUE_MAX": "0",
-                                    "V2PDF_USER_SUBMIT_PER_MIN": "0",
-                                    "V2PDF_RUNS_FILE": str(TMP / f"runs-{PORT_B}.json"),
-                                    "V2PDF_STATE_FILE": str(TMP / f"state-{PORT_B}.json")})
+    _PROCS[PORT_B] = _boot(PORT_B, {"V2MD_QUEUE_MAX": "0", "V2MD_USER_QUEUE_MAX": "0",
+                                    "V2MD_USER_SUBMIT_PER_MIN": "0",
+                                    "V2MD_RUNS_FILE": str(TMP / f"runs-{PORT_B}.json"),
+                                    "V2MD_STATE_FILE": str(TMP / f"state-{PORT_B}.json")})
     await _throughput(PORT_B, fixture, a.runs, tag="json")
 
     if a.pg:
         if not dsn:
-            print("· --pg 跳过：未配 V2PDF_TEST_PG_DSN")
+            print("· --pg 跳过：未配 V2MD_TEST_PG_DSN")
         else:
-            from video2pdf import pg as pgmod
-            from video2pdf import pgmigrate
+            from video2md import pg as pgmod
+            from video2md import pgmigrate
             pool = pgmod.make_pool(dsn)
             pgmigrate.apply_migrations(pool)
             with pool.connection() as conn:
                 conn.execute("TRUNCATE v2pdf_runs, v2pdf_submit_log, v2pdf_state, v2pdf_users, v2pdf_identities")
             pool.close()
             _PROCS[PORT_PG] = _boot(PORT_PG, {
-                "V2PDF_QUEUE_MAX": "0", "V2PDF_USER_QUEUE_MAX": "0", "V2PDF_USER_SUBMIT_PER_MIN": "0",
-                "V2PDF_RUNS_FILE": str(TMP / f"runs-{PORT_PG}.json"),
-                "V2PDF_STATE_FILE": str(TMP / f"state-{PORT_PG}.json"),
-                "V2PDF_RUNS_STORE": "postgres", "V2PDF_TASKS_STORE": "postgres",
-                "V2PDF_STATE_STORE": "postgres", "V2PDF_USERS_STORE": "postgres",
-                "V2PDF_EVENTS": "pg", "V2PDF_PG_DSN": dsn})
+                "V2MD_QUEUE_MAX": "0", "V2MD_USER_QUEUE_MAX": "0", "V2MD_USER_SUBMIT_PER_MIN": "0",
+                "V2MD_RUNS_FILE": str(TMP / f"runs-{PORT_PG}.json"),
+                "V2MD_STATE_FILE": str(TMP / f"state-{PORT_PG}.json"),
+                "V2MD_RUNS_STORE": "postgres", "V2MD_TASKS_STORE": "postgres",
+                "V2MD_STATE_STORE": "postgres", "V2MD_USERS_STORE": "postgres",
+                "V2MD_EVENTS": "pg", "V2MD_PG_DSN": dsn})
             t0 = time.monotonic()
             await _throughput(PORT_PG, fixture, a.runs, tag="pg")
             time.monotonic() - t0

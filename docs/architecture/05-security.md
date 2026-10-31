@@ -20,9 +20,9 @@
 - **归属隔离**：run owner=内部 uid，越权 403/无 run 404（`api.py:283-296`）；dedup 按 owner 隔离；`GET /runs` owner 过滤。
 - **错误信封**：统一 `{"error":{code,message,details}}`，不泄栈（`api.py:634-661`）。
 - **上传面**：后缀白名单 + 魔数校验（首 16 字节容器头比对，不符即删 + 422，P0-6）+ `sanitize_filename` + 1MB 分块流式 + 单文件上限 + 每用户配额 + TTL（`api.py` post_upload）。
-- **生产防呆**：`V2PDF_ENV=production` + `V2PDF_AUTH=off/缺省` import 期 `RuntimeError` 拒起（P0-1，`config.py` DEPLOY_ENV）。
-- **路径闸**：`V2PDF_LOCAL_PATHS` auto/allow/deny；鉴权档只认本人 uploads 目录内路径（`api.py:353-376`）。
-- **密钥管理**：SSOT `~/.config/video2pdf.env`（0600）；服务器 `secrets/` 挂 ro；`.env`/`secrets/` 在 .gitignore；git 历史扫描无泄漏（2026-09-24 核对）。
+- **生产防呆**：`V2MD_ENV=production` + `V2MD_AUTH=off/缺省` import 期 `RuntimeError` 拒起（P0-1，`config.py` DEPLOY_ENV）。
+- **路径闸**：`V2MD_LOCAL_PATHS` auto/allow/deny；鉴权档只认本人 uploads 目录内路径（`api.py:353-376`）。
+- **密钥管理**：SSOT `~/.config/video2md.env`（0600）；服务器 `secrets/` 挂 ro；`.env`/`secrets/` 在 .gitignore；git 历史扫描无泄漏（2026-09-24 核对）。
 - **出网风控口径**：国内站必须大陆住宅出口（硬约束，见 02 篇）。
 
 ## 已知缺口（批判② S1–S8 全表）
@@ -47,10 +47,10 @@
 | P0-3 ✅ 63bfe84 | preflight 匿名面 detail 剥除（回环/真实认证可见完整版） |
 | P0-4 ✅ | 仓内 deploy/nginx.conf + compose nginx 服务 + smoke_proxy.sh CI 验证 + deploy.sh 断言 |
 | P0-6 ✅ 7ae5b7b | 上传魔数校验（文本改名 422 即删） |
-| `V2PDF_AUTH` | `google`（或含 google/wechat 的组合），**机制保证**（P0-1 ✅ fail-fast 已落地） |
-| `V2PDF_ARTIFACT_MODE` | `deliver`（多用户「云端不储存」） |
-| `V2PDF_CORS_ORIGINS` | 只列真实前端 origin |
-| `V2PDF_ENV` | `production`（Langfuse 分项目 + 生产档位防呆开关） |
+| `V2MD_AUTH` | `google`（或含 google/wechat 的组合），**机制保证**（P0-1 ✅ fail-fast 已落地） |
+| `V2MD_ARTIFACT_MODE` | `deliver`（多用户「云端不储存」） |
+| `V2MD_CORS_ORIGINS` | 只列真实前端 origin |
+| `V2MD_ENV` | `production`（Langfuse 分项目 + 生产档位防呆开关） |
 | 反代 | ✅ 仓内配置（P0-4）：SSE 关缓冲、OpenAPI 面 deny、`limit_req` 双 zone、body 2g；TLS 证书部署期接 `deploy/certs/` |
 | 安全组 | 只放 80/443（02 篇网络口径逐项核对） |
 | 密钥 | `secrets/` 0600 + 已入密码管理器/备份方案（09 篇） |

@@ -1,6 +1,6 @@
 # 批判②：ISO/IEC 25010 质量属性横切评估
 
-- **批判对象**：video2pdf 系统整体（代码 + 部署资产 + 运维口径），对照「企业级云端生产」基线
+- **批判对象**：video2md 系统整体（代码 + 部署资产 + 运维口径），对照「企业级云端生产」基线
 - **方法**：ISO/IEC 25010 质量模型裁剪为八维；每维给 **现状证据 → 风险评级 → 与企业基线的差距 → ROADMAP 指向**
 - **风险评级**：🔴H = 上公网前必须清偿；🟡M = 上量前必须；🟢L = 规模化阶段增强
 - **与批判①的关系**：① 按「层」做叙述-现实对照（改错）；本篇按「属性」做横切定价（补缺）。同一缺口在两篇中互相引用（如 `①E3` = 批判①硬错误 3 号）
@@ -33,13 +33,13 @@
 
 | # | 缺口 | 证据 | 风险 |
 |---|---|---|---|
-| S1 | `V2PDF_ENV=production` 与 `V2PDF_AUTH=off` 可共存，启动不抗议 | `config.py` 无此校验；compose 已配 `V2PDF_ENV=production`（`docker-compose.yml:56`） | 一次漏配 = 全量用户数据互通（共享 dev uid）。config.py 已有 fail-fast 先例（L113-115）却未覆盖最危险的组合 |
+| S1 | `V2MD_ENV=production` 与 `V2MD_AUTH=off` 可共存，启动不抗议 | `config.py` 无此校验；compose 已配 `V2MD_ENV=production`（`docker-compose.yml:56`） | 一次漏配 = 全量用户数据互通（共享 dev uid）。config.py 已有 fail-fast 先例（L113-115）却未覆盖最危险的组合 |
 | S2 | `/auth/device/code`、`/auth/device/token` 匿名 + 零频控 | `api.py:708-739` | 可无限刷 Google device/code，耗 OAuth 配额、触 Google 风控（可能封 client_id） |
 | S3 | `/preflight` 匿名返回内部路径、磁盘余量、算力池 provider 清单 | `api.py:93-141, 1035-1037` | 侦察面：攻击者据此画像基础设施 |
 | S4 | `/docs`、`/openapi.json` 无条件开放 | `api.py:620-621` | 全量 API 契约公开（含错误码语义）；README 自述靠网关关，但网关配置不在仓（① 入口层） |
 | S5 | 上传无 magic number 校验 | `api.py:350, 673` | 伪装后缀的任意内容可进入 yt-dlp/ffmpeg 解析路径（历史 CVE 密集区） |
 | S6 | 脱敏正则只盖 `sk-`/`app-`/`dataset-` 三种前缀 | `util.py:112-118` | Google token、微信 secret、PG DSN 口令等形态进日志 jsonl 无遮盖 |
-| S7 | compose PG 默认口令 `v2pdf-loopback-only` | `docker-compose.yml:98` | 回环绑定时可接受；DSN 指外部库/绑定误开即沦陷——默认值命名是唯一防线 |
+| S7 | compose PG 默认口令 `v2md-loopback-only` | `docker-compose.yml:98` | 回环绑定时可接受；DSN 指外部库/绑定误开即沦陷——默认值命名是唯一防线 |
 | S8 | gpu_router `:9700` 无认证；colab quick tunnel 无鉴权公网 URL | `docker-compose.yml:25-26` 注释自述 | 「网络位置即信任」模型被 tunnel 打出公网缺口 |
 
 **与企业基线的差距**：企业基线要求「危险配置启动期爆炸」（S1）、「匿名面先于认证面设防」（S2/S3/S4）、「上传内容嗅探」（S5）。当前防护重心恰好倒挂。
@@ -60,7 +60,7 @@
 
 **现状**：全维度空白。
 
-- 无容量模型：`V2PDF_MAX_CONCURRENT_RUNS` 默认 1，README 无「调到 N 需要什么资源」的任何指引（2C4G 起步是唯二数字之一）
+- 无容量模型：`V2MD_MAX_CONCURRENT_RUNS` 默认 1，README 无「调到 N 需要什么资源」的任何指引（2C4G 起步是唯二数字之一）
 - 无负载测试：CI 全是功能测试与单链冒烟，无并发压力/队列积压/磁盘增长的任何基准
 - 无增长估算：uploads 配额 5GB/用户 × N 用户 = ？outbox TTL 24h 的峰值驻留 = ？runs.json/jsonb 记录随时间的膨胀率 = ？全部无答案
 - 无 SLO：「服务多好算好」从未定义（详见可观测性维度）

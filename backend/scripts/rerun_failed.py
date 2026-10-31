@@ -6,7 +6,7 @@ import time
 
 import httpx
 
-API = (os.environ.get("V2PDF_API") or "http://127.0.0.1:8790").rstrip("/")
+API = (os.environ.get("V2MD_API") or "http://127.0.0.1:8790").rstrip("/")
 
 URLS_DEFAULT = [
     "https://www.bilibili.com/video/BV1ADge6YEvE",

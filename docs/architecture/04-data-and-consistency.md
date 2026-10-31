@@ -14,7 +14,7 @@
 | logs（run 遥测） | `logs/run-YYYY-MM-DD.jsonl` | 同（data 卷） | 本地真相，append-only |
 | 产物 | vault 直写 | outbox 在架（TTL/ACK 即焚） | 多用户形态不留存 |
 | 上传源文件 | `data/uploads/<uid>/` | 同 | TTL 24h 物理删 |
-| run 临时目录 | `/tmp/video2pdf-run-*` | 同（容器 tmp） | 跑完必删；清扫双兜底 |
+| run 临时目录 | `/tmp/video2md-run-*` | 同（容器 tmp） | 跑完必删；清扫双兜底 |
 
 ## 存储分派（P3）
 
@@ -22,12 +22,12 @@
 
 | 开关 | 适配器 | 语义映射 |
 |---|---|---|
-| `V2PDF_RUNS_STORE` | `PostgresRunsStore`（`pgstore.py:35-77`） | json「锁内读改写」→ 行级 upsert（`ON CONFLICT`），**禁用全表替换**（多实例覆盖风险） |
-| `V2PDF_STATE_STORE` | `PostgresStateStore`（`pgstore.py:80-107`） | 全量替换 → 逐 fp upsert（键只增不删，语义等价） |
-| `V2PDF_USERS_STORE` | `PostgresIdentityStore`（`auth/pg_store.py`） | acctkit `IdentityStore` 同协议适配器 |
-| `V2PDF_CHECKPOINTER` | langgraph `PostgresSaver` | sqlite → PG（并发>1 建议切） |
-| `V2PDF_EVENTS` | local ｜ pg（LISTEN/NOTIFY） | 见下「事件总线」 |
-| `V2PDF_TASKS_STORE` | `PostgresTaskStore`（`pgstore.py:110-305`） | 见下「任务表两档口径」 |
+| `V2MD_RUNS_STORE` | `PostgresRunsStore`（`pgstore.py:35-77`） | json「锁内读改写」→ 行级 upsert（`ON CONFLICT`），**禁用全表替换**（多实例覆盖风险） |
+| `V2MD_STATE_STORE` | `PostgresStateStore`（`pgstore.py:80-107`） | 全量替换 → 逐 fp upsert（键只增不删，语义等价） |
+| `V2MD_USERS_STORE` | `PostgresIdentityStore`（`auth/pg_store.py`） | acctkit `IdentityStore` 同协议适配器 |
+| `V2MD_CHECKPOINTER` | langgraph `PostgresSaver` | sqlite → PG（并发>1 建议切） |
+| `V2MD_EVENTS` | local ｜ pg（LISTEN/NOTIFY） | 见下「事件总线」 |
+| `V2MD_TASKS_STORE` | `PostgresTaskStore`（`pgstore.py:110-305`） | 见下「任务表两档口径」 |
 
 json 档并发纪律：线程锁 + `fcntl` flock + per-pid tmp rename 原子写（`runs.py:108-140`）。PG 档四消费者（三存储 + checkpointer + events）共用一个进程级池（`pg.py:33-46`，min1/max5、autocommit、prepare_threshold=0）。
 
@@ -38,12 +38,12 @@ json 档并发纪律：线程锁 + `fcntl` flock + per-pid tmp rename 原子写�
 | `v2pdf_runs` | `migrations/0001_init.sql` | run_id PK + owner/status/created 提取列 + `record jsonb`（**唯一真相**，提取列是其可查镜像）+ claimed_by（P4b 租约） |
 | `v2pdf_state` | `migrations/0001_init.sql` | fp PK + record jsonb |
 | `v2pdf_users` / `v2pdf_identities` | `migrations/0001_init.sql` | uid PK；(provider, external_id) PK → uid |
-| `v2pdf_submit_log` | `migrations/0001_init.sql` | 60s 滑窗限流计数（单语句 upsert 原子判定） |
+| `v2md_submit_log` | `migrations/0001_init.sql` | 60s 滑窗限流计数（单语句 upsert 原子判定） |
 | `v2pdf_schema_version` | `pgmigrate.py` 建表 | 迁移记账（version PK + 文件名 + 应用时间） |
 
-**schema 迁移纪律（P0-5 ✅）**：`video2pdf/migrations/`（包内目录，随镜像走）是 DDL 唯一真相，
+**schema 迁移纪律（P0-5 ✅）**：`video2md/migrations/`（包内目录，随镜像走）是 DDL 唯一真相，
 store 构造函数只接线不建表；`v2pdf_schema_version` 逐迁移记账；`pg.shared_pool()` 建池即校验，
-落后/超前一律拒起并提示 `python -m video2pdf migrate`（deploy.sh 在 up -d 后自动跑该步，
+落后/超前一律拒起并提示 `python -m video2md migrate`（deploy.sh 在 up -d 后自动跑该步，
 json 档跳过）。全部迁移幂等（IF NOT EXISTS）——存量库重跑 no-op 直接补记版本行（基线盖戳）。
 边界：langgraph `PostgresSaver.setup()` 自管的 `checkpoints*` 表族同库共存，不收编。
 加新迁移 = 落一个 `NNNN_*.sql` + `pgmigrate.MIGRATIONS` 注册表加一行。
@@ -52,20 +52,20 @@ json 档跳过）。全部迁移幂等（IF NOT EXISTS）——存量库重跑 n
 
 ## 任务表两档口径（批判① E2 修订后）
 
-| | json 档（缺省） | postgres 档（`V2PDF_TASKS_STORE=postgres`） |
+| | json 档（缺省） | postgres 档（`V2MD_TASKS_STORE=postgres`） |
 |---|---|---|
 | 写路径 | `_TASKS` 进程内 dict | **进程内实时视图 + 关键态落库**（P1-1）：`_enqueue` 即 `mark_queued` 翻 queued+钉名 claimed_by；`_drive` 起跑 `still_mine` 复核，被划走静默让位 |
 | 读侧 | 进程内视图 | **PG 真相源**：`/queue` 计数、配额三闸、dedup 判活、watchdog 大盘巡检（running 卡死 2h 判定标 error + queued 短租约 3×period 接管重投）、启动恢复（属主甄别：`recovery_scan`+`claim_dead`+phb 进程心跳——B 重启不抢 A 活 run，死属主窗后认领）全走 `v2pdf_runs` |
 | 跨副本 | 各自为战 | 各副本看到同一队列（读侧含排队项）；`GET /runs/{id}` 的 `task` 段仍只读本进程（`api.py:852-856`） |
-| 滑窗限流 | 进程内 deque | `v2pdf_submit_log` 单语句 upsert，跨进程一致 |
+| 滑窗限流 | 进程内 deque | `v2md_submit_log` 单语句 upsert，跨进程一致 |
 
 **不变量**：`record jsonb` 是状态唯一真相；`status` 提取列由 `merge()` 整行覆盖同步，两态天然一致。
 
 ## 事件总线（local ｜ pg）
 
 - `local`（缺省）：进程内 `dict[run_id → list[Queue]]`，工作线程 `call_soon_threadsafe` 投递，慢客户端队列满丢新事件（不反压）。
-- `pg`：publish 在本地扇出外补一条 `NOTIFY v2pdf_events`；专用 LISTEN 连接的后台泵线程把他进程通知投给本进程订阅者（payload 带 `src` 进程号去重回声）。`bind_loop` 有界等 `_PUMP_READY`（5s）——NOTIFY 只投给已在 LISTEN 的会话，不回补（`events.py:51-60`，CI 竞态修复 f6a4a0e）。
-- 指令通道 `v2pdf_cmds`：同泵多 LISTEN 一个 channel，当前只有 `hb`（watchdog 心跳跨进程广播 → `_LOCAL_HB` 缓存）。
+- `pg`：publish 在本地扇出外补一条 `NOTIFY v2md_events`；专用 LISTEN 连接的后台泵线程把他进程通知投给本进程订阅者（payload 带 `src` 进程号去重回声）。`bind_loop` 有界等 `_PUMP_READY`（5s）——NOTIFY 只投给已在 LISTEN 的会话，不回补（`events.py:51-60`，CI 竞态修复 f6a4a0e）。
+- 指令通道 `v2md_cmds`：同泵多 LISTEN 一个 channel，当前只有 `hb`（watchdog 心跳跨进程广播 → `_LOCAL_HB` 缓存）。
 - 上限：NOTIFY payload ≤7900B，超长截断为骨架（`events.py:111-125`）。
 
 ## 一致性口径（显式承诺）

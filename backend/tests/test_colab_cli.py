@@ -6,20 +6,20 @@ from pathlib import Path
 
 import pytest
 
-from video2pdf import artsink, colab
-from video2pdf.clips import remote_cut_clips
-from video2pdf.frames import ocr_candidates
-from video2pdf.transcribe import transcribe
+from video2md import artsink, colab
+from video2md.clips import remote_cut_clips
+from video2md.frames import ocr_candidates
+from video2md.transcribe import transcribe
 
 
 @pytest.fixture
 def cli(monkeypatch, tmp_path):
     binary = Path(__file__).parent / "fixtures/fake_colab_cli.py"
     for key, value in {
-        "V2PDF_COLAB_BIN": str(binary), "V2PDF_COLAB_LOCK": str(tmp_path / "session.lock"),
-        "V2PDF_COLAB_SESSION": "isolated-test", "V2PDF_REMOTE": "colab-cli",
-        "V2PDF_OCR_REMOTE": "colab-cli", "V2PDF_CLIPS_REMOTE": "colab-cli",
-        "V2PDF_CLIPS_SOURCE": "local", "V2PDF_COLAB_CPU_FALLBACK": "off",
+        "V2MD_COLAB_BIN": str(binary), "V2MD_COLAB_LOCK": str(tmp_path / "session.lock"),
+        "V2MD_COLAB_SESSION": "isolated-test", "V2MD_REMOTE": "colab-cli",
+        "V2MD_OCR_REMOTE": "colab-cli", "V2MD_CLIPS_REMOTE": "colab-cli",
+        "V2MD_CLIPS_SOURCE": "local", "V2MD_COLAB_CPU_FALLBACK": "off",
     }.items():
         monkeypatch.setitem(colab.ENV, key, value)
     monkeypatch.setenv("FAKE_COLAB_ROOT", str(tmp_path / "remote"))
@@ -57,7 +57,7 @@ def test_direct_cli_transcription_ocr_clips_and_session_cleanup(cli):
 
 def test_connected_tenant_routes_all_gpu_work_through_its_own_cli(cli, monkeypatch):
     binary, audio, tmp = cli
-    monkeypatch.setitem(colab.ENV, "V2PDF_COLAB_USERS_DIR", str(tmp / "tenants"))
+    monkeypatch.setitem(colab.ENV, "V2MD_COLAB_USERS_DIR", str(tmp / "tenants"))
     directory = colab.credential_directory("alice")
     directory.mkdir(parents=True)
     (directory / "token.json").write_text("offline-tenant-token")
@@ -85,7 +85,7 @@ def test_connected_tenant_routes_all_gpu_work_through_its_own_cli(cli, monkeypat
 
 def test_two_tenants_use_distinct_cli_homes_and_session_names(cli, monkeypatch):
     _, audio, tmp = cli
-    monkeypatch.setitem(colab.ENV, "V2PDF_COLAB_USERS_DIR", str(tmp / "tenants"))
+    monkeypatch.setitem(colab.ENV, "V2MD_COLAB_USERS_DIR", str(tmp / "tenants"))
     observed = []
     for uid in ("alice", "bob"):
         directory = colab.credential_directory(uid)
@@ -102,7 +102,7 @@ def test_tenant_identity_propagates_into_graph_node_threads(cli, monkeypatch):
     from langgraph.graph import END, START, StateGraph
 
     _, _, tmp = cli
-    monkeypatch.setitem(colab.ENV, "V2PDF_COLAB_USERS_DIR", str(tmp / "tenants"))
+    monkeypatch.setitem(colab.ENV, "V2MD_COLAB_USERS_DIR", str(tmp / "tenants"))
     directory = colab.credential_directory("alice")
     directory.mkdir(parents=True)
     (directory / "token.json").write_text("offline-token")
@@ -127,7 +127,7 @@ def test_failed_tenant_directory_creation_restores_context(cli, monkeypatch):
     _, _, tmp = cli
     occupied = tmp / "not-a-directory"
     occupied.write_text("occupied")
-    monkeypatch.setitem(colab.ENV, "V2PDF_COLAB_USERS_DIR", str(occupied))
+    monkeypatch.setitem(colab.ENV, "V2MD_COLAB_USERS_DIR", str(occupied))
     with pytest.raises(OSError), colab._session(owner="alice"):
         pytest.fail("must not execute when the credential directory cannot be created")
     assert colab._OWNER.get() == "" and colab.machinery.CLI_HOME == ""
@@ -135,7 +135,7 @@ def test_failed_tenant_directory_creation_restores_context(cli, monkeypatch):
 
 def test_unconnected_tenant_cannot_use_a_service_token(cli, monkeypatch):
     _, _, tmp = cli
-    monkeypatch.setitem(colab.ENV, "V2PDF_COLAB_USERS_DIR", str(tmp / "tenants"))
+    monkeypatch.setitem(colab.ENV, "V2MD_COLAB_USERS_DIR", str(tmp / "tenants"))
     shared = tmp / "shared-home"
     token = shared / ".config" / "colab-cli" / "token.json"
     token.parent.mkdir(parents=True)
@@ -150,7 +150,7 @@ def test_unconnected_tenant_cannot_use_a_service_token(cli, monkeypatch):
 
 def test_a_run_cannot_change_tenants_or_routes_midway(cli, monkeypatch):
     _, _, tmp = cli
-    monkeypatch.setitem(colab.ENV, "V2PDF_COLAB_USERS_DIR", str(tmp / "tenants"))
+    monkeypatch.setitem(colab.ENV, "V2MD_COLAB_USERS_DIR", str(tmp / "tenants"))
     with colab.session_scope(owner="alice"):
         assert colab.remote_for_user("pool") == "pool"
         with pytest.raises(RuntimeError, match="不能切换租户"), colab.session_scope(owner="bob"):
@@ -209,7 +209,7 @@ def test_graph_worker_session_is_stopped_after_use(cli, fail):
 def test_clips_stage_stops_before_llm_and_scope_does_not_stop_twice(cli, monkeypatch):
     from langgraph.graph import END, START, StateGraph
 
-    from video2pdf import graph as pipeline
+    from video2md import graph as pipeline
 
     binary, audio, tmp = cli
     stops = []
@@ -277,7 +277,7 @@ def test_failed_shutdown_does_not_hide_original_error(cli, monkeypatch):
 
 def test_graph_terminal_error_survives_failed_colab_shutdown(cli, monkeypatch):
     """A returned graph error must not become ``unknown`` during cleanup."""
-    from video2pdf import graph as pipeline
+    from video2md import graph as pipeline
 
     class ErrorGraph:
         def invoke(self, _initial, config=None):

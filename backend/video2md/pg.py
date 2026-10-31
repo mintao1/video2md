@@ -1,7 +1,7 @@
 """进程级共享 Postgres 设施：连接池单例 + DSN 解析。
 
-存储分派（V2PDF_RUNS_STORE / V2PDF_STATE_STORE / V2PDF_USERS_STORE = postgres 时）
-与 checkpointer 的 postgres 档、事件扇出（V2PDF_EVENTS=pg）共用这一个池——
+存储分派（V2MD_RUNS_STORE / V2MD_STATE_STORE / V2MD_USERS_STORE = postgres 时）
+与 checkpointer 的 postgres 档、事件扇出（V2MD_EVENTS=pg）共用这一个池——
 四个消费者各开一套连接没有必要。池 lazy 建立（首次 shared_pool() 时），
 api lifespan 退出时 close_shared_pool() 统一收尾；CLI（graph-run/__main__）进程
 退出即释放，无需显式关。
@@ -60,7 +60,7 @@ def tenant_connection(pool: ConnectionPool):
 
 
 def pg_dsn() -> str:
-    return (ENV.get("V2PDF_PG_DSN") or "").strip()
+    return (ENV.get("V2MD_PG_DSN") or "").strip()
 
 
 def pg_migrate_dsn() -> str:
@@ -71,7 +71,7 @@ def pg_migrate_dsn() -> str:
     dedicated value, in which case the application DSN remains the historical
     fallback.
     """
-    return (ENV.get("V2PDF_PG_MIGRATE_DSN") or pg_dsn()).strip()
+    return (ENV.get("V2MD_PG_MIGRATE_DSN") or pg_dsn()).strip()
 
 
 def pg_enabled() -> bool:
@@ -86,7 +86,7 @@ def pg_timeout_s() -> float:
     把每轮巡检冻在默认 30s。预算钳 ≥1s 防误配成 0（等价禁用全部超时）。
     """
     try:
-        return max(float(ENV.get("V2PDF_PG_TIMEOUT_S", "10") or 10), 1.0)
+        return max(float(ENV.get("V2MD_PG_TIMEOUT_S", "10") or 10), 1.0)
     except ValueError:
         return 10.0
 
@@ -109,12 +109,12 @@ def shared_pool() -> ConnectionPool:
     """lazy 单例；DSN 缺失抛 RuntimeError（调用方应先 pg_enabled() 判档）。
 
     P0-5：建池即校验 schema 版本——store/checkpointer/events 全走本收口，落后/超前
-    一律拒起并提示跑 `python -m video2pdf migrate`。make_pool 不校验（migrate CLI
+    一律拒起并提示跑 `python -m video2md migrate`。make_pool 不校验（migrate CLI
     与真库测试用 make_pool 自管 schema）。"""
     global _POOL
     if _POOL is None:
         if not pg_enabled():
-            raise RuntimeError("V2PDF_PG_DSN 未配置：PG 档存储/事件扇出不可用")
+            raise RuntimeError("V2MD_PG_DSN 未配置：PG 档存储/事件扇出不可用")
         _POOL = make_pool(pg_dsn())
         from .pgmigrate import validate_schema
         validate_schema(_POOL)

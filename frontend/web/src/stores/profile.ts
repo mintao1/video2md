@@ -5,7 +5,14 @@ import type { Quota } from '../types'
 
 export const useProfileStore = defineStore('profile', () => {
   const quota = ref<Quota | null>(null)
-  const notionSync = ref(localStorage.getItem('v2pdf_notion_sync') !== '0')
+  const notionKey = 'v2md_notion_sync'
+  const legacyNotionKey = 'v2pdf_notion_sync'
+  const storedNotionSync = localStorage.getItem(notionKey) ?? localStorage.getItem(legacyNotionKey)
+  if (localStorage.getItem(notionKey) === null && storedNotionSync !== null) {
+    localStorage.setItem(notionKey, storedNotionSync)
+    localStorage.removeItem(legacyNotionKey)
+  }
+  const notionSync = ref(storedNotionSync !== '0')
 
   async function load() {
     quota.value = await api.getQuota()
@@ -13,7 +20,7 @@ export const useProfileStore = defineStore('profile', () => {
 
   function setNotionSync(on: boolean) {
     notionSync.value = on
-    localStorage.setItem('v2pdf_notion_sync', on ? '1' : '0')
+    localStorage.setItem(notionKey, on ? '1' : '0')
   }
 
   return { quota, notionSync, load, setNotionSync }

@@ -61,7 +61,7 @@ from .util import (
 # 本地管线拆成阶段：download → transcribe → frames → ocr → select → clips → note。
 # graph 的阶段节点直调 _run_stage（进程内）；LLM 在中间做「内容选帧」与「改写」决策。
 # `__stage` 子命令保留手动排障入口（单阶段子进程重放）；CLI 直跑路径复用同一套函数。
-RUNS_FILE = Path(ENV.get("V2PDF_RUNS_FILE", str(PROJ / "runs.json")))
+RUNS_FILE = Path(ENV.get("V2MD_RUNS_FILE", str(PROJ / "runs.json")))
 
 
 _RUNS_LOCK = threading.Lock()
@@ -75,8 +75,8 @@ STAGES = ("download", "transcribe", "frames", "ocr", "select", "clips", "note")
 
 
 # ------------------------------------------------------- 存储后端分派（P3：json|postgres）
-# 缺省 json = 文件档逐字节照旧（全部既有测试/工具即回归证明）；V2PDF_RUNS_STORE=postgres
-# 且 V2PDF_PG_DSN 在 → _load_runs/_runs_merge 委托 PostgresRunsStore（行级原子，锁内化），
+# 缺省 json = 文件档逐字节照旧（全部既有测试/工具即回归证明）；V2MD_RUNS_STORE=postgres
+# 且 V2MD_PG_DSN 在 → _load_runs/_runs_merge 委托 PostgresRunsStore（行级原子，锁内化），
 # _runs_file_lock 变 no-op——调用方「with lock: merge」的成对纪律零改动。
 _RUNS_PG = None            # PostgresRunsStore | None（测试可直改本属性切档）
 _runs_pg_resolved = False
@@ -86,7 +86,7 @@ def _runs_backend():
     global _RUNS_PG, _runs_pg_resolved
     if not _runs_pg_resolved:
         _runs_pg_resolved = True
-        if (ENV.get("V2PDF_RUNS_STORE") or "").strip().lower() == "postgres":
+        if (ENV.get("V2MD_RUNS_STORE") or "").strip().lower() == "postgres":
             from . import pg, pgstore
             _RUNS_PG = pgstore.PostgresRunsStore(pg.shared_pool())
     return _RUNS_PG
@@ -253,7 +253,7 @@ def create_run(url: str, part_items: str = "", force: bool = False,
         "url": url, "part_items": part_items,
         "owner": owner,
         "created": datetime.now().isoformat(timespec="seconds"),
-        "tmp": tempfile.mkdtemp(prefix="video2pdf-run-"),
+        "tmp": tempfile.mkdtemp(prefix="video2md-run-"),
         "total": len(entries),
         "entries": entries,
         "artifacts": artifacts,
@@ -297,7 +297,7 @@ def _run_stage(run: dict, stage: str, args: dict) -> None:
     """对 run 内每个条目执行阶段函数；单条失败不阻断其余。幂等由各阶段产物字段保证。
 
     熔断：连续 N 条同一错误签名 → 判定全局故障（token 过期/断网/风控），立刻终止阶段。
-    全局型错误（认证/网络类，_CB_GLOBAL_PAT）2 连即熔，其余 V2PDF_CB_THRESHOLD（默认 3）连熔——
+    全局型错误（认证/网络类，_CB_GLOBAL_PAT）2 连即熔，其余 V2MD_CB_THRESHOLD（默认 3）连熔——
     不把 27 条各自白烧 5 分钟才发现是同一个死法。
 
     观测：run 级 RunLog（run_id 复用，trace 跨子进程拼合）——阶段 1 个 span、
@@ -392,7 +392,7 @@ def _add_usage_settlement(run: dict, delta: dict) -> dict:
                   + delta.get("gpu_s", 0) / 60 * PRICE_GPU_MIN)
     pricing = {"llm_in_mtok": PRICE_LLM_IN_MTOK, "llm_out_mtok": PRICE_LLM_OUT_MTOK,
                "llm_cached_in_mtok": PRICE_LLM_CACHED_IN_MTOK, "gpu_min": PRICE_GPU_MIN,
-               "gpu_policy": ENV.get("V2PDF_GPU_PRICE_POLICY", "metered"), "currency": "USD"}
+               "gpu_policy": ENV.get("V2MD_GPU_PRICE_POLICY", "metered"), "currency": "USD"}
     run["cost_usd"] = round(float(run.get("cost_usd") or 0) + cost_delta, 6)
     run["usage"] = usage
     run["cost_pricing"] = pricing
@@ -453,7 +453,7 @@ def month_rollup(uid: str, since_iso: str) -> dict:
 
 # ---------------------------------------------------------------- P1-2 协作式取消
 # run_id 集合（GIL 下 set 读写原子；cmd 泵线程写、图工作线程读）。本进程驱动的 run
-# 收到取消请求（api 端点本地直置 / events v2pdf_cmds 远端广播→_on_cmd 只对本地驱动的
+# 收到取消请求（api 端点本地直置 / events v2md_cmds 远端广播→_on_cmd 只对本地驱动的
 # run 落标志）后，条目循环头查到即抛 SystemExit——走既有熔断语义，run_graph 捕获后
 # 终态 error 留痕（验收口径 error(cancelled)）。已知限制：长单阶段（如 3h 转录）内部
 # 无取消点，取消在下一循环头生效（ROADMAP P1-2 处方即「阶段循环头查标志」）。
@@ -516,7 +516,7 @@ def _run_stage_inner(run: dict, stage: str, args: dict, log: "RunLog") -> None:
     tmp.mkdir(parents=True, exist_ok=True)  # 目录丢了（系统清理/上轮异常中断）会让 download 直接 ENOENT
     failed: list[str] = []
     last_sig, streak, breaker = "", 0, ""
-    cb_threshold = int(ENV.get("V2PDF_CB_THRESHOLD", "3"))
+    cb_threshold = int(ENV.get("V2MD_CB_THRESHOLD", "3"))
     ok_field = _STAGE_OK_FIELD.get(stage)
     for idx, entry in enumerate(run["entries"], 1):
         from . import watchdog  # 惰性导入：每条目开头打心跳（长阶段日志稀疏，事件流会饿）
@@ -611,7 +611,7 @@ def _run_stage_inner(run: dict, stage: str, args: dict, log: "RunLog") -> None:
 
 
 def cmd_stage(run_id: str, stage: str, args_json: str) -> None:
-    """单阶段手动排障入口：`python -m video2pdf __stage <run_id> <stage> '<args JSON>'`。"""
+    """单阶段手动排障入口：`python -m video2md __stage <run_id> <stage> '<args JSON>'`。"""
     if stage not in STAGES:
         print(f"❌ 未知阶段 {stage}（可选 {','.join(STAGES)}）")
         sys.exit(1)
@@ -696,9 +696,9 @@ def _stage_transcribe(run, entry, art, tmp, args):
         # 正常路径 download 失败即 fail 节点终止（到不了这里）；保留防御：幂等重入/
         # __stage 手动乱序执行时给出人话而不是 KeyError 'video'
         raise SystemExit("无视频产物（download 未成功），跳过转写")
-    segs, conf, dropped = transcribe(Path(art["video"]), args.get("model") or ENV.get("V2PDF_WHISPER_MODEL") or "turbo",
+    segs, conf, dropped = transcribe(Path(art["video"]), args.get("model") or ENV.get("V2MD_WHISPER_MODEL") or "turbo",
                                      args.get("language") or "zh", tmp,
-                                     args.get("remote") or ENV.get("V2PDF_REMOTE", ""))
+                                     args.get("remote") or ENV.get("V2MD_REMOTE", ""))
     if not segs:
         raise SystemExit("转写结果为空（未识别到语音段）")
     art.update(segs=segs, conf=conf, dropped=dropped)
@@ -720,17 +720,17 @@ def _stage_frames(run, entry, art, tmp, args):
         # 图文帖：图集本身就是全部候选帧（t 用序号合成，仅作排序锚）
         cands = [(float(i), Path(p)) for i, p in enumerate(art["images"], 1)]
         art["candidates"] = [[t, str(f.relative_to(tmp))] for t, f in cands]
-        art["ocr_engine"] = args.get("ocr") or ("remote" if ENV.get("V2PDF_OCR_REMOTE") else "vision")
+        art["ocr_engine"] = args.get("ocr") or ("remote" if ENV.get("V2MD_OCR_REMOTE") else "vision")
         print(f"    🎞 图文直通候选 {len(cands)} 张")
         return
     if not art.get("video"):
         raise SystemExit("无视频产物（download 未成功），跳过抽帧")
     video = Path(art["video"])
     pool = frame_pool_size(int(args.get("max_frames") or 60),
-                           args.get("ocr") or ("remote" if ENV.get("V2PDF_OCR_REMOTE") else "vision"))
+                           args.get("ocr") or ("remote" if ENV.get("V2MD_OCR_REMOTE") else "vision"))
     cands = extract_frame_candidates(video, pool, art["duration"], tmp)
     art["candidates"] = [[t, str(f.relative_to(tmp))] for t, f in cands]  # 相对路径：JSON 可序列化
-    art["ocr_engine"] = args.get("ocr") or ("remote" if ENV.get("V2PDF_OCR_REMOTE") else "vision")
+    art["ocr_engine"] = args.get("ocr") or ("remote" if ENV.get("V2MD_OCR_REMOTE") else "vision")
     _art_info(stage="frames", candidates=len(cands))
     print(f"    🎞 候选帧 {len(cands)} 张（池 {pool}）")
 
@@ -761,10 +761,10 @@ def _stage_ocr(run, entry, art, tmp, args):
     cands = [(t, _cand_path(rel, tmp)) for t, rel in art["candidates"]]
     # 注意用 `or` 而不是 .get(k, 默认)：调用方未填时传的是空串，空串不走默认值，
     # 会把 ocr 静默切到 gemini（实测：整批 OCR 命中 0，因为空串 != "vision"）
-    # remote：V2PDF_OCR_REMOTE 指向 GPU 路由（或任意参考服务端）时默认外移
+    # remote：V2MD_OCR_REMOTE 指向 GPU 路由（或任意参考服务端）时默认外移
     from .colab import remote_for_user
 
-    ocr_engine = args.get("ocr") or ("remote" if remote_for_user(ENV.get("V2PDF_OCR_REMOTE", "")) else "vision")
+    ocr_engine = args.get("ocr") or ("remote" if remote_for_user(ENV.get("V2MD_OCR_REMOTE", "")) else "vision")
     ocr_items, ocr_raw = ocr_candidates(cands, ocr_engine)
     if len(ocr_raw) != len(cands) or any(row[3] for row in ocr_raw):
         raise SystemExit("OCR 帧处理失败或结果不完整，暂不进行模型生成；请补跑失败条目")
@@ -858,7 +858,7 @@ def _stage_clips(run, entry, art, tmp, args):
         return
     from .colab import remote_for_user
 
-    clips_remote = remote_for_user((ENV.get("V2PDF_CLIPS_REMOTE") or "").strip())
+    clips_remote = remote_for_user((ENV.get("V2MD_CLIPS_REMOTE") or "").strip())
     if clips_remote.lower() in ("colab", "colab-cli") or clips_remote.startswith(("http://", "https://")):
         # GPU 算力池/参考服务端：远端失败即本条目失败，异常上抛、不回退本地——
         # 本地 CPU 重剪是整条管线最大头（实测占 97min/条），静默回退会把批次拖垮；
@@ -927,9 +927,9 @@ def _stage_note(run, entry, art, tmp, args):
     if not art.get("images") and not args.get("no_clips"):
         clips = art.get("clips")
         if clips is None:
-            if published and (ENV.get("V2PDF_CLIPS_REMOTE") or "").strip():
+            if published and (ENV.get("V2MD_CLIPS_REMOTE") or "").strip():
                 # 远端剪辑开启时本地补剪等同回退 CPU 重活——拒绝静默烧，显式失败让人修根因
-                raise SystemExit("clips 阶段无节段产物且已禁用本地回退（V2PDF_CLIPS_REMOTE 已配远端），"
+                raise SystemExit("clips 阶段无节段产物且已禁用本地回退（V2MD_CLIPS_REMOTE 已配远端），"
                                  "拒绝写盘前本地补剪：请先重跑 clips 阶段")
             clips = cut_clip_files(published, Path(art["video"]),
                                    art["duration"], segs=art.get("segs"))

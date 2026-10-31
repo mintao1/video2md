@@ -5,7 +5,7 @@
 
 ## 一句话定位
 
-video2pdf 把视频（B站/YouTube/抖音/小红书链接或上传文件）转化为 Obsidian 文稿式笔记。**LangGraph 进程内编排**，LLM 走 openai-compatible 端点，GPU 重活（转写/OCR/剪辑）外包给独立项目 gpu_router 的远端算力池。生产形态 = **云服务器 · 多用户 API**：登录鉴权 → run 按 uid 归属隔离 → deliver「云端不储存」投递。
+video2md 把视频（B站/YouTube/抖音/小红书链接或上传文件）转化为 Obsidian 文稿式笔记。**LangGraph 进程内编排**，LLM 走 openai-compatible 端点，GPU 重活（转写/OCR/剪辑）外包给独立项目 gpu_router 的远端算力池。生产形态 = **云服务器 · 多用户 API**：登录鉴权 → run 按 uid 归属隔离 → deliver「云端不储存」投递。
 
 ## 上下文图（C4 L1）
 
@@ -15,7 +15,7 @@ video2pdf 把视频（B站/YouTube/抖音/小红书链接或上传文件）转�
 │ ·浏览器 GUI  │             └──────────────┬───────────────────────────┘
 │             │                            │ 回环
 │ ·CLI/批量脚本 │             ┌──────────────▼───────────────────────────┐
-└─────────────┘             │ video2pdf api（FastAPI 单进程，:8790 回环）│
+└─────────────┘             │ video2md api（FastAPI 单进程，:8790 回环）│
                             │  LangGraph 图：resolve→download→transcribe │
                             │  →frames→ocr→select→clips→note→finalize   │
                             └──┬────────┬────────┬────────┬─────────────┘
@@ -60,14 +60,14 @@ POST /runs（配额闸+路径白名单）
 
 | 关注点 | 位置 |
 |---|---|
-| HTTP 面/配额闸/上传/deliver 端点/SSE | `video2pdf/api.py`（1048 行） |
-| 图编排与阶段节点 | `video2pdf/graph.py`、`video2pdf/runs.py` |
-| 存储分派（json） | `video2pdf/runs.py`、`video2pdf/state.py`、`acctkit/store.py` |
-| 存储分派（postgres） | `video2pdf/pgstore.py`、`video2pdf/auth/pg_store.py`、`video2pdf/pg.py` |
-| 事件总线（local|pg） | `video2pdf/events.py` |
-| 卡死看门狗 | `video2pdf/watchdog.py` |
-| 观测桥（OTel/Langfuse/指标） | `video2pdf/observability.py`、`video2pdf/graph_obs.py` |
-| 鉴权引擎（可复用模块） | `acctkit/`（宿主接线 `video2pdf/auth/`） |
+| HTTP 面/配额闸/上传/deliver 端点/SSE | `video2md/api.py`（1048 行） |
+| 图编排与阶段节点 | `video2md/graph.py`、`video2md/runs.py` |
+| 存储分派（json） | `video2md/runs.py`、`video2md/state.py`、`acctkit/store.py` |
+| 存储分派（postgres） | `video2md/pgstore.py`、`video2md/auth/pg_store.py`、`video2md/pg.py` |
+| 事件总线（local|pg） | `video2md/events.py` |
+| 卡死看门狗 | `video2md/watchdog.py` |
+| 观测桥（OTel/Langfuse/指标） | `video2md/observability.py`、`video2md/graph_obs.py` |
+| 鉴权引擎（可复用模块） | `acctkit/`（宿主接线 `video2md/auth/`） |
 | 算力插件 | `gpu_plugins/v2md/`（契约见 [07 篇](07-gpu-pool-contract.md)） |
 | 部署/观测/告警配置 | `deploy/`、`docker-compose*.yml`、`scripts/` |
 

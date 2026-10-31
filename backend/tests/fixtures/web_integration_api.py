@@ -15,28 +15,28 @@ from pathlib import Path
 root = Path(sys.argv[1])
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 os.environ.update({
-    "V2PDF_SECRETS_FILE": str(root / "no-secrets.env"),
-    "V2PDF_ENV": "development", "V2PDF_AUTH": "off", "V2PDF_AUTH_PROVIDERS": "off",
-    "V2PDF_RUNS_STORE": "json", "V2PDF_STATE_STORE": "json", "V2PDF_USERS_STORE": "json",
-    "V2PDF_TASKS_STORE": "json", "V2PDF_PREFS_STORE": "json", "V2PDF_ARTIFACT_MODE": "vault",
-    "V2PDF_RUNS_FILE": str(root / "runs.json"), "V2PDF_STATE_FILE": str(root / "state.json"),
-    "V2PDF_USERS_FILE": str(root / "users.json"), "V2PDF_PREFS_FILE": str(root / "prefs.json"),
-    "V2PDF_LLM_SETTINGS_FILE": str(root / "llm-settings.json"),
-    "V2PDF_LOG_DIR": str(root / "logs"), "V2PDF_UPLOADS_DIR": str(root / "uploads"),
-    "OBSIDIAN_VAULT": str(root / "vault"), "V2PDF_REMOTE": "off", "V2PDF_OCR_REMOTE": "off",
-    "V2PDF_CLIPS_REMOTE": "off", "V2PDF_FAKE_LLM": "1", "V2PDF_EVAL": "off",
+    "V2MD_SECRETS_FILE": str(root / "no-secrets.env"),
+    "V2MD_ENV": "development", "V2MD_AUTH": "off", "V2MD_AUTH_PROVIDERS": "off",
+    "V2MD_RUNS_STORE": "json", "V2MD_STATE_STORE": "json", "V2MD_USERS_STORE": "json",
+    "V2MD_TASKS_STORE": "json", "V2MD_PREFS_STORE": "json", "V2MD_ARTIFACT_MODE": "vault",
+    "V2MD_RUNS_FILE": str(root / "runs.json"), "V2MD_STATE_FILE": str(root / "state.json"),
+    "V2MD_USERS_FILE": str(root / "users.json"), "V2MD_PREFS_FILE": str(root / "prefs.json"),
+    "V2MD_LLM_SETTINGS_FILE": str(root / "llm-settings.json"),
+    "V2MD_LOG_DIR": str(root / "logs"), "V2MD_UPLOADS_DIR": str(root / "uploads"),
+    "OBSIDIAN_VAULT": str(root / "vault"), "V2MD_REMOTE": "off", "V2MD_OCR_REMOTE": "off",
+    "V2MD_CLIPS_REMOTE": "off", "V2MD_FAKE_LLM": "1", "V2MD_EVAL": "off",
     # The live LLM-settings endpoint now encrypts credentials in every mode.
     # Keep the fixture deterministic while exercising the same encryption path;
     # this is test-only material and never represents a production secret.
-    "V2PDF_LLM_SETTINGS_KEY": "hex:" + "11" * 32,
-    "V2PDF_LOCAL_PATHS": "deny", "V2PDF_BUDGET_MONTH_USD": "0",
+    "V2MD_LLM_SETTINGS_KEY": "hex:" + "11" * 32,
+    "V2MD_LOCAL_PATHS": "deny", "V2MD_BUDGET_MONTH_USD": "0",
     "OTEL_EXPORTER_OTLP_ENDPOINT": "", "LANGFUSE_PK": "", "LANGFUSE_SK": "",
     "TMPDIR": str(root),
     # Browser-level integration tests run from the local Vite origin. Keep the
     # fixture usable for both hostnames used by the dev server; callers can
     # still override this explicitly for a stricter CORS test.
-    "V2PDF_CORS_ORIGINS": os.environ.get(
-        "V2PDF_TEST_CORS_ORIGIN",
+    "V2MD_CORS_ORIGINS": os.environ.get(
+        "V2MD_TEST_CORS_ORIGIN",
         "http://localhost:5173,http://127.0.0.1:5173",
     ),
 })
@@ -45,8 +45,8 @@ import uvicorn  # noqa: E402
 from fastapi import HTTPException, Request  # noqa: E402
 
 from acctkit.models import Identity  # noqa: E402
-from video2pdf import api, runs  # noqa: E402
-from video2pdf.auth import current_identity  # noqa: E402
+from video2md import api, runs  # noqa: E402
+from video2md.auth import current_identity  # noqa: E402
 
 
 async def identity(request: Request) -> Identity:
@@ -76,7 +76,7 @@ async def range_media_audit(request, call_next):
 
 @api.app.post("/__tests/seed-range-media")
 def seed_range_media():
-    from video2pdf.config import OUT_DIR
+    from video2md.config import OUT_DIR
     body = bytes(i % 251 for i in range(150000))
     (OUT_DIR / "attachments/range-demo.mp4").write_bytes(body)
     records = runs._load_runs()
@@ -131,16 +131,16 @@ async def reset():
 
     from PIL import Image, ImageDraw
 
-    from video2pdf.config import OUT_DIR
+    from video2md.config import OUT_DIR
     directory = OUT_DIR / "attachments"
     directory.mkdir(parents=True, exist_ok=True)
     image = Image.new("RGB", (640, 240), "#ede9fe")
-    ImageDraw.Draw(image).text((35, 90), "VIDEO2PDF MEDIA TEST", fill="#4c1d95", font_size=36)
+    ImageDraw.Draw(image).text((35, 90), "VIDEO2MD MEDIA TEST", fill="#4c1d95", font_size=36)
     image.save(directory / "demo.png")
     note = next(iter(records["finished"]["artifacts"].values()))
     note["md"] += "\n\n![[attachments/demo.png]]"
-    if os.environ.get("V2PDF_TEST_VIDEO"):
-        shutil.copyfile(os.environ["V2PDF_TEST_VIDEO"], directory / "demo.mp4")
+    if os.environ.get("V2MD_TEST_VIDEO"):
+        shutil.copyfile(os.environ["V2MD_TEST_VIDEO"], directory / "demo.mp4")
         note["md"] += "\n\n![[attachments/demo.mp4]]"
     runs._save_runs(records)
     return {"ok": True}
@@ -189,7 +189,7 @@ async def set_test_budget(request: Request):
 
 
 sock = socket.socket()
-sock.bind(("127.0.0.1", int(os.environ.get("V2PDF_TEST_PORT", "0"))))
+sock.bind(("127.0.0.1", int(os.environ.get("V2MD_TEST_PORT", "0"))))
 print(json.dumps({"base_url": f"http://127.0.0.1:{sock.getsockname()[1]}"}), flush=True)
 server = uvicorn.Server(uvicorn.Config(api.app, lifespan="off", log_level="error"))
 server.run(sockets=[sock])

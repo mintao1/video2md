@@ -13,7 +13,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from video2pdf.frames import _NORM, ocr_remote, ocr_vision
+from video2md.frames import _NORM, ocr_remote, ocr_vision
 
 
 def main() -> int:

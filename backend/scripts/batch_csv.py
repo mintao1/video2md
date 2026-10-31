@@ -28,7 +28,7 @@ def _api_base() -> str:
     if "--api" in sys.argv:
         return sys.argv[sys.argv.index("--api") + 1].rstrip("/")
     import os
-    return (os.environ.get("V2PDF_API") or "http://127.0.0.1:8790").rstrip("/")
+    return (os.environ.get("V2MD_API") or "http://127.0.0.1:8790").rstrip("/")
 
 
 API = _api_base()

@@ -76,19 +76,19 @@ def test_ci_executes_application_boundaries_as_well_as_the_catalog():
 
 
 def test_application_runner_uses_disposable_stores_and_does_not_inherit_secrets(monkeypatch, tmp_path):
-    monkeypatch.setenv("V2PDF_SECRETS_FILE", str(tmp_path / "real-secrets"))
+    monkeypatch.setenv("V2MD_SECRETS_FILE", str(tmp_path / "real-secrets"))
     monkeypatch.setenv("LLM_API_KEY", "private-sentinel")
-    monkeypatch.setenv("V2PDF_RUNS_FILE", str(tmp_path / "real-runs.json"))
+    monkeypatch.setenv("V2MD_RUNS_FILE", str(tmp_path / "real-runs.json"))
     calls = []
 
     def run(command, *, cwd, env, check):
         calls.append((command, cwd))
-        assert env["V2PDF_SECRETS_FILE"] != str(tmp_path / "real-secrets")
-        assert not Path(env["V2PDF_SECRETS_FILE"]).exists()
+        assert env["V2MD_SECRETS_FILE"] != str(tmp_path / "real-secrets")
+        assert not Path(env["V2MD_SECRETS_FILE"]).exists()
         assert env["LLM_API_KEY"] == ""
-        assert env["V2PDF_RUNS_FILE"] != str(tmp_path / "real-runs.json")
-        assert env["V2PDF_AUTH"] == "off" and env["V2PDF_FAKE_LLM"] == "1"
-        assert env.get("V2PDF_REMOTE", "") == ""
+        assert env["V2MD_RUNS_FILE"] != str(tmp_path / "real-runs.json")
+        assert env["V2MD_AUTH"] == "off" and env["V2MD_FAKE_LLM"] == "1"
+        assert env.get("V2MD_REMOTE", "") == ""
         return subprocess.CompletedProcess(command, 0)
 
     monkeypatch.setattr(catalog.subprocess, "run", run)

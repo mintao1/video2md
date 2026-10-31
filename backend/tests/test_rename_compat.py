@@ -1,4 +1,4 @@
-"""改名兼容层（video2md → video2pdf）：旧环境变量、旧入口、存量 v2md_* 表都要继续可用。"""
+"""video2md canonical naming with video2pdf environment/import compatibility."""
 from __future__ import annotations
 
 import os
@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 
 BACKEND = Path(__file__).resolve().parent.parent
-DSN = os.environ.get("V2PDF_TEST_PG_DSN")
+DSN = os.environ.get("V2MD_TEST_PG_DSN")
 
 
 def _run(code: str, **env: str) -> subprocess.CompletedProcess:
@@ -20,34 +20,34 @@ def _run(code: str, **env: str) -> subprocess.CompletedProcess:
 
 
 def test_legacy_env_fills_new_keys_and_warns():
-    r = _run("import os; from video2pdf.config import ENV; "
-             "print(ENV['V2PDF_PORT'], os.environ['V2PDF_PORT'])", V2MD_PORT="9123")
+    r = _run("import os; from video2md.config import ENV; "
+             "print(ENV['V2MD_PORT'], os.environ['V2MD_PORT'])", V2PDF_PORT="9123")
     assert r.returncode == 0, r.stderr
     assert r.stdout.split() == ["9123", "9123"]
-    assert "V2MD_PORT" in r.stderr
+    assert "V2PDF_PORT" in r.stderr
 
 
 def test_new_env_wins_over_legacy():
-    r = _run("from video2pdf.config import ENV; print(ENV['V2PDF_PORT'])",
-             V2MD_PORT="9123", V2PDF_PORT="9456")
+    r = _run("from video2md.config import ENV; print(ENV['V2MD_PORT'])",
+             V2PDF_PORT="9123", V2MD_PORT="9456")
     assert r.returncode == 0, r.stderr
     assert r.stdout.strip() == "9456"
 
 
 def test_legacy_import_path_is_the_same_module():
-    r = _run("import video2md.config as a, video2pdf.config as b; print(a is b)")
+    r = _run("import video2pdf.config as a, video2md.config as b; print(a is b)")
     assert r.returncode == 0, r.stderr
     assert r.stdout.strip() == "True"
 
 
-@pytest.mark.skipif(not DSN, reason="requires disposable V2PDF_TEST_PG_DSN")
+@pytest.mark.skipif(not DSN, reason="requires disposable V2MD_TEST_PG_DSN")
 def test_migrate_renames_legacy_tables_and_keeps_rows():
     import psycopg
     from psycopg import sql
     from psycopg.conninfo import make_conninfo
 
-    from video2pdf import pg
-    from video2pdf.pgmigrate import SCHEMA_LATEST, apply_migrations, validate_schema
+    from video2md import pg
+    from video2md.pgmigrate import SCHEMA_LATEST, apply_migrations, validate_schema
 
     db = f"rename_{uuid.uuid4().hex[:8]}"
     with psycopg.connect(DSN, autocommit=True) as admin:

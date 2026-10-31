@@ -5,7 +5,20 @@ import type { Book } from '../types'
 
 export type ViewMode = 'list' | 'grid'
 
-const VIEW_KEY = 'v2pdf_library_view'
+const VIEW_KEY = 'v2md_library_view'
+const LEGACY_VIEW_KEY = 'v2pdf_library_view'
+
+function readViewMode(): ViewMode {
+  const current = localStorage.getItem(VIEW_KEY)
+  if (current === 'list' || current === 'grid') return current
+  const legacy = localStorage.getItem(LEGACY_VIEW_KEY)
+  if (legacy === 'list' || legacy === 'grid') {
+    localStorage.setItem(VIEW_KEY, legacy)
+    localStorage.removeItem(LEGACY_VIEW_KEY)
+    return legacy
+  }
+  return 'list'
+}
 
 export const useLibraryStore = defineStore('library', () => {
   const books = ref<Book[]>([])
@@ -13,7 +26,7 @@ export const useLibraryStore = defineStore('library', () => {
   const loadedAt = ref<Date | null>(null)
   const query = ref('')
   const category = ref<'all' | 'fav' | Book['category']>('all')
-  const viewMode = ref<ViewMode>((localStorage.getItem(VIEW_KEY) as ViewMode) || 'list')
+  const viewMode = ref<ViewMode>(readViewMode())
 
   const filtered = computed(() => {
     const q = query.value.trim().toLowerCase()

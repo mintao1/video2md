@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""test_pg_stores.py — P3/P4a PG 档真库测试（需要 V2PDF_TEST_PG_DSN；未配则整文件 skip）。
+"""test_pg_stores.py — P3/P4a PG 档真库测试（需要 V2MD_TEST_PG_DSN；未配则整文件 skip）。
 
 覆盖：
 - 迁移纪律（P0-5）：裸库校验拒起、apply_migrations 首应用/幂等重跑、版本改低拒起、重跑自愈
@@ -13,7 +13,7 @@
   recover_candidates 认领互斥+tmp 缺失直接 error、steal_if_unclaimed 租约拒抢/过期抢到、
   heartbeat 终态不续、submit_window_count 滑窗限频
 
-运行：V2PDF_TEST_PG_DSN=postgresql://v2pdf:v2pdf@127.0.0.1:5432/v2pdf python3 test_pg_stores.py
+运行：V2MD_TEST_PG_DSN=postgresql://v2pdf:v2pdf@127.0.0.1:5432/v2pdf python3 test_pg_stores.py
 （CI 由 services: postgres 提供；本地 docker run 临时库即可——测试自带 TRUNCATE，别指生产库）
 """
 import asyncio
@@ -25,31 +25,31 @@ import threading
 import time
 from pathlib import Path
 
-DSN = os.environ.get("V2PDF_TEST_PG_DSN") or ""
+DSN = os.environ.get("V2MD_TEST_PG_DSN") or ""
 if not DSN:
     import pytest
-    pytest.skip("未配 V2PDF_TEST_PG_DSN（PG 真库测试只在有库的环境跑）", allow_module_level=True)
+    pytest.skip("未配 V2MD_TEST_PG_DSN（PG 真库测试只在有库的环境跑）", allow_module_level=True)
 
 # The CI fixture provisions a DML-only role so the RLS checks below exercise
 # the same path as production API traffic.  Local runs may omit this value;
 # the store regression suite remains useful with the historical superuser DSN.
-APP_DSN = os.environ.get("V2PDF_TEST_APP_DSN") or ""
+APP_DSN = os.environ.get("V2MD_TEST_APP_DSN") or ""
 
-# 在 import video2pdf 之前定档：config.ENV 是 import 时快照
+# 在 import video2md 之前定档：config.ENV 是 import 时快照
 os.environ.update({
-    "V2PDF_PG_DSN": DSN,
-    "V2PDF_RUNS_FILE": str(Path(tempfile.mkdtemp(prefix="v2pdf-pgt-runs-")) / "unused.json"),
-    "V2PDF_STATE_FILE": str(Path(tempfile.mkdtemp(prefix="v2pdf-pgt-state-")) / "unused.json"),
-    "V2PDF_USERS_FILE": str(Path(tempfile.mkdtemp(prefix="v2pdf-pgt-users-")) / "unused.json"),
-    "V2PDF_SECRETS_FILE": "/nonexistent",  # 隔离宿主凭证文件
-    "V2PDF_FAKE_LLM": "1",
+    "V2MD_PG_DSN": DSN,
+    "V2MD_RUNS_FILE": str(Path(tempfile.mkdtemp(prefix="v2md-pgt-runs-")) / "unused.json"),
+    "V2MD_STATE_FILE": str(Path(tempfile.mkdtemp(prefix="v2md-pgt-state-")) / "unused.json"),
+    "V2MD_USERS_FILE": str(Path(tempfile.mkdtemp(prefix="v2md-pgt-users-")) / "unused.json"),
+    "V2MD_SECRETS_FILE": "/nonexistent",  # 隔离宿主凭证文件
+    "V2MD_FAKE_LLM": "1",
 })
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # backend/（包根）
 
 from acctkit.models import Principal  # noqa: E402
-from video2pdf import events, pg, pgstore, runs, util, watchdog  # noqa: E402
-from video2pdf.auth.pg_store import PostgresIdentityStore  # noqa: E402
-from video2pdf.config import ENV  # noqa: E402
+from video2md import events, pg, pgstore, runs, util, watchdog  # noqa: E402
+from video2md.auth.pg_store import PostgresIdentityStore  # noqa: E402
+from video2md.config import ENV  # noqa: E402
 
 pool = pg.make_pool(DSN)  # 独立池（绕开 shared 单例——shared 建池即校验 schema，本测试自管）
 
@@ -61,7 +61,7 @@ def _truncate(*tables: str) -> None:
 
 
 # ---- 0. 迁移纪律（P0-5：migrations/ 基线 + v2pdf_schema_version + 落后/超前拒起）-------
-from video2pdf import pgmigrate  # noqa: E402
+from video2md import pgmigrate  # noqa: E402
 
 with pool.connection() as conn:  # 重置版本表：重跑本测试时也走「存量表盖戳」路径
     conn.execute("DROP TABLE IF EXISTS v2pdf_schema_version")
@@ -100,7 +100,7 @@ rls_rows = conn.execute(
     "SELECT count(*) FROM pg_class "
     "WHERE relname IN ('v2pdf_runs','v2pdf_state','v2pdf_submit_log',"
     "'v2pdf_users','v2pdf_identities','v2pdf_membership','v2pdf_prefs',"
-    "'v2pdf_llm_settings') AND relrowsecurity AND relforcerowsecurity").fetchone()
+    "'v2md_llm_settings') AND relrowsecurity AND relforcerowsecurity").fetchone()
 assert rls_rows[0] == 8, rls_rows
 print("✅ 生产角色/RLS 合约（无 superuser/BYPASSRLS；8 张租户表 FORCE RLS）")
 
@@ -138,7 +138,7 @@ if APP_DSN:
     finally:
         app_pool.close()
 else:
-    print("⚠️ 未配置 V2PDF_TEST_APP_DSN，跳过 DML-only 双租户交叉访问")
+    print("⚠️ 未配置 V2MD_TEST_APP_DSN，跳过 DML-only 双租户交叉访问")
 
 
 # ---- 0.5 PostgresMembershipStore（0002：web 个人页会员/配额展示档）------------------
@@ -199,7 +199,7 @@ except RuntimeError:
 
 # json 缺省档回归：切回 json（模块属性），临时文件走原路径
 runs._RUNS_PG = None
-_jsondir = Path(tempfile.mkdtemp(prefix="v2pdf-pgt-json-"))
+_jsondir = Path(tempfile.mkdtemp(prefix="v2md-pgt-json-"))
 runs.RUNS_FILE = _jsondir / "runs.json"
 runs._RUNS_LOCKFILE = runs.RUNS_FILE.with_suffix(".lock")
 with runs._runs_file_lock():
@@ -273,7 +273,7 @@ assert n_users == 2, f"并发首登不得留孤儿账号行（期望 2：g1+race
 print("✅ PostgresIdentityStore（开户/回填/归并/并发首登收敛）")
 
 # ---- 4. events PG 扇出（跨「进程」互通 + 回声去重）-----------------------------------
-ENV["V2PDF_EVENTS"] = "pg"  # events 每调用现读 config.ENV（dict 同对象）
+ENV["V2MD_EVENTS"] = "pg"  # events 每调用现读 config.ENV（dict 同对象）
 
 
 async def _evt_main() -> None:
@@ -307,7 +307,7 @@ def _simulate_other_proc(src: str) -> None:
 
 
 async def _cmd_main() -> None:
-    events.bind_loop(asyncio.get_running_loop())  # 拉起 LISTEN 泵（含 v2pdf_cmds 通道）
+    events.bind_loop(asyncio.get_running_loop())  # 拉起 LISTEN 泵（含 v2md_cmds 通道）
     await asyncio.to_thread(_simulate_other_proc, "other-proc")
     deadline = time.monotonic() + 8
     while time.monotonic() < deadline and "hb-run" not in watchdog._LOCAL_HB:
@@ -322,7 +322,7 @@ async def _cmd_main() -> None:
 asyncio.run(_evt_main())
 asyncio.run(_cmd_main())
 events.shutdown()
-ENV["V2PDF_EVENTS"] = "local"
+ENV["V2MD_EVENTS"] = "local"
 watchdog._LOCAL_HB.clear()
 print("✅ events PG 扇出（跨进程互通/回声去重）+ cmd 心跳通道")
 
@@ -459,8 +459,8 @@ assert tasks.still_mine("p2", "procA") is False          # 已被划走 → 静�
 assert tasks.still_mine("p_term", "procB") is False      # 终态不驱动
 
 # 大盘接管走查（watchdog 集成）：无主停滞 queued → steal + _STEALER 重投，不标 error
-import video2pdf.api as vapi  # noqa: E402
-from video2pdf import watchdog as vwd  # noqa: E402
+import video2md.api as vapi  # noqa: E402
+from video2md import watchdog as vwd  # noqa: E402
 
 vwd._reset_for_tests()
 vapi._TASKS.clear()
@@ -497,7 +497,7 @@ print("✅ P1-1 排队租约（落库钉名/心跳/短租约接管/让位判据/
 
 
 # ---- 7. P1-2：cmd 取消通道（远端广播 → 本地驱动 run 落标志，外部 run 不泄漏）---------
-from video2pdf import runs as vruns  # noqa: E402
+from video2md import runs as vruns  # noqa: E402
 
 vwd._reset_for_tests()
 vapi._TASKS.clear()
@@ -666,7 +666,7 @@ holder.execute("SELECT pg_advisory_unlock(9201)")
 # 连接预算有界：黑洞地址——open=True 不阻塞（psycopg_pool 后台重连，实测 0.3s 返回），
 # 预算在首次 connection() 处生效（PoolTimeout 精确按预算；启动 fail-fast 由 shared_pool
 # 的 validate_schema 首连兜住，同样有界）
-ENV["V2PDF_PG_TIMEOUT_S"] = "2"
+ENV["V2MD_PG_TIMEOUT_S"] = "2"
 _bh = None
 try:
     _bh = pg.make_pool("postgresql://v2pdf:v2pdf@10.255.255.1:5432/x")
@@ -682,7 +682,7 @@ try:
 finally:
     if _bh is not None:
         _bh.close()
-    ENV.pop("V2PDF_PG_TIMEOUT_S", None)
+    ENV.pop("V2MD_PG_TIMEOUT_S", None)
 print("✅ P1-8 PG 超时预算（statement_timeout 生效/挂起打断/连接预算有界）")
 
 # ---- 10. P2-2 成本归因（PG 档月度查询/预算闸读数）------------------------------------

@@ -47,7 +47,7 @@ def _factory(env: Mapping[str, str]):
     return MultiAudGoogleProvider(
         base or web,
         audiences=cids or [""],
-        proxy_url=(env.get("V2PDF_GOOGLE_OAUTH_PROXY_URL") or "").strip(),
+        proxy_url=(env.get("V2MD_GOOGLE_OAUTH_PROXY_URL") or "").strip(),
     )
 
 

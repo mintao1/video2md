@@ -48,9 +48,9 @@ _TRANSPORT = None  # 测试注入 httpx.MockTransport；None = 真实网络
 _sleep = time.sleep  # 测试替换掉，免得重试间隔真等
 
 
-# 假 LLM 模式（V2PDF_FAKE_LLM=1）：e2e / Docker 冒烟不烧真实 token 的确定性出口。
+# 假 LLM 模式（V2MD_FAKE_LLM=1）：e2e / Docker 冒烟不烧真实 token 的确定性出口。
 # 只替代「文本生成」，解析/过滤/门禁全走真代码——测的正是后者。
-_FAKE_LLM = (ENV.get("V2PDF_FAKE_LLM") or "").lower() in ("1", "true", "on")
+_FAKE_LLM = (ENV.get("V2MD_FAKE_LLM") or "").lower() in ("1", "true", "on")
 
 _FAKE_META = '{"title": "测试笔记（假LLM）", "tags": ["e2e", "测试"], "summary": "离线冒烟摘要"}'
 
@@ -90,7 +90,7 @@ def chat(system: str, user: str, *, task: str, temperature: float, max_tokens: i
     失败即 RuntimeError，不静默降级。
 
     model=None 用 LLM_MODEL；judge 之类想单独换模型的调用方显式传（evals 走
-    V2PDF_JUDGE_MODEL——中转对某模型回包不规范/慢时不用动主管线）。
+    V2MD_JUDGE_MODEL——中转对某模型回包不规范/慢时不用动主管线）。
     attempts：judge 评测链（多子调用串行，单次失败概率被放大）可放宽到 5。
 
     强制流式（stream=True）：长生成（organize 16000 tokens）在中转边缘（Cloudflare）
@@ -109,7 +109,7 @@ def chat(system: str, user: str, *, task: str, temperature: float, max_tokens: i
     if not base or not key:
         raise SystemExit("LLM_BASE_URL / LLM_API_KEY 未配置：写入 .env 或环境变量")
     use_model = model or (settings.get("model") if settings else None) or LLM_MODEL
-    headers = {"Authorization": f"Bearer {key}", "User-Agent": "video2pdf/0.2.0"}
+    headers = {"Authorization": f"Bearer {key}", "User-Agent": "video2md/0.2.0"}
     if urlsplit(base).hostname == "opencode.ai":
         # Identify the real application, and share one session across a run's
         # stages/retries. No account identity or credentials go into this header.

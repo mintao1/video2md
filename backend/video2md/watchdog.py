@@ -10,12 +10,12 @@ ping），回答不了「run 活着但卡住」。
   3. 兜底：_TASKS[run_id]["started"] 与 runs.json 最近 stages[*].ts（进程重启后仍有据可查）
 
 判定：api 进程内 asyncio 周期任务，对内存任务表里 status=="running" 的 run，
-最近活动龄 > V2PDF_WATCHDOG_TIMEOUT_S（默认 7200s）→ 卡死；三层全无信号则放过
+最近活动龄 > V2MD_WATCHDOG_TIMEOUT_S（默认 7200s）→ 卡死；三层全无信号则放过
 （无法判定时不误杀，api 路径 started 恒有值，此态只出现在异常注入里）。
 
-动作（V2PDF_WATCHDOG_ACTION，默认 mark）：
+动作（V2MD_WATCHDOG_ACTION，默认 mark）：
   mark  = run 置 error（runs.json + 内存任务表同步翻转，SSE/轮询面自动生效）+ 死人开关
-          /fail + 指标 v2pdf_watchdog_trips_total。注意：卡死线程无法强杀，信号量仍被占
+          /fail + 指标 v2md_watchdog_trips_total。注意：卡死线程无法强杀，信号量仍被占
           ——需人工重启恢复队列（告警会响）。
   exit  = 同上标记后 os._exit(70)：容器 restart: unless-stopped 秒级自愈；重启后 lifespan
           只重投 runs.json 里 status=="running" 的 run，已标 error 的不会死循环。
@@ -79,7 +79,7 @@ def heartbeat_local(run_id: str) -> None:
 def touch(run_id: str) -> None:
     """心跳打点：任何管线异常都不许外抛（看门狗绝不能成为新的故障面）。
 
-    P4b 多副本档（V2PDF_TASKS_STORE=postgres）追加 DB updated 刷新 + cmd 广播
+    P4b 多副本档（V2MD_TASKS_STORE=postgres）追加 DB updated 刷新 + cmd 广播
     （他进程泵收 → heartbeat_local），让三层信号第一层跨进程可用。整段再包一层
     swallow——心跳通知失败绝不影响主管线，本地打点永远先完成。
     """

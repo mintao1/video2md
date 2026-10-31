@@ -31,8 +31,8 @@ class CompleteBody(BaseModel):
 
 
 def _allowed(request: Request, ident: Identity) -> bool:
-    if (ENV.get("V2PDF_AUTH") or "off").lower() in ("off", "none", ""):
-        return ((ENV.get("V2PDF_ENV") or "development") != "production"
+    if (ENV.get("V2MD_AUTH") or "off").lower() in ("off", "none", ""):
+        return ((ENV.get("V2MD_ENV") or "development") != "production"
                 and request.client is not None
                 and request.client.host in ("127.0.0.1", "::1", "localhost"))
     return bool(ident.uid) and ident.provider in ("google", "google_device")
@@ -71,8 +71,8 @@ def _flow(**kwargs):
                         resources.files("colab_cli").joinpath("oauth_config.json").read_text())
     flow = InstalledAppFlow.from_client_config(config, PUBLIC_SCOPES, **kwargs)
     flow.redirect_uri = REMOTE_REDIRECT_URI
-    proxy = (ENV.get("V2PDF_GOOGLE_OAUTH_PROXY_URL")
-             or ENV.get("V2MD_GOOGLE_OAUTH_PROXY_URL") or "").strip()
+    proxy = (ENV.get("V2MD_GOOGLE_OAUTH_PROXY_URL")
+             or ENV.get("V2PDF_GOOGLE_OAUTH_PROXY_URL") or "").strip()
     if proxy:
         flow.oauth2session.proxies.update({"http": proxy, "https": proxy})
     return flow
@@ -85,8 +85,8 @@ def _oauth_proxy_options() -> dict[str, str] | None:
     ``requests``. Passing the default ``None`` overrides the session proxy
     mapping, so the production CONNECT relay must be supplied explicitly.
     """
-    proxy = (ENV.get("V2PDF_GOOGLE_OAUTH_PROXY_URL")
-             or ENV.get("V2MD_GOOGLE_OAUTH_PROXY_URL") or "").strip()
+    proxy = (ENV.get("V2MD_GOOGLE_OAUTH_PROXY_URL")
+             or ENV.get("V2PDF_GOOGLE_OAUTH_PROXY_URL") or "").strip()
     return {"http": proxy, "https": proxy} if proxy else None
 
 
@@ -94,8 +94,8 @@ def _credential_subject(credentials) -> str:
     from google.auth.transport.requests import AuthorizedSession
 
     with AuthorizedSession(credentials) as session:
-        proxy = (ENV.get("V2PDF_GOOGLE_OAUTH_PROXY_URL")
-                 or ENV.get("V2MD_GOOGLE_OAUTH_PROXY_URL") or "").strip()
+        proxy = (ENV.get("V2MD_GOOGLE_OAUTH_PROXY_URL")
+                 or ENV.get("V2PDF_GOOGLE_OAUTH_PROXY_URL") or "").strip()
         if proxy:
             session.proxies.update({"http": proxy, "https": proxy})
         proxy_options = _oauth_proxy_options()

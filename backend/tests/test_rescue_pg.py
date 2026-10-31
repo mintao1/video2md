@@ -5,7 +5,7 @@
 断言：rescue 子进程在 PG 档捞出 partial run → **复用旧 tmp 视频**（不重新下载）→
 新 run 驱动到 done 并出笔记（vault 产物）→ 旧视频文件原位保留（copy 非搬移）。
 
-运行：V2PDF_TEST_PG_DSN=postgresql://v2pdf:v2pdf@127.0.0.1:5432/v2pdf python3 test_rescue_pg.py
+运行：V2MD_TEST_PG_DSN=postgresql://v2pdf:v2pdf@127.0.0.1:5432/v2pdf python3 test_rescue_pg.py
 （CI 由 test job 的 PG service 提供；本地 8790 有服务在跑时 rescue 的 healthz 防护
 会按设计拒跑——先停本地 api 再跑本测试。）
 """
@@ -16,27 +16,27 @@ import tempfile
 import time
 from pathlib import Path
 
-DSN = os.environ.get("V2PDF_TEST_PG_DSN") or ""
+DSN = os.environ.get("V2MD_TEST_PG_DSN") or ""
 if not DSN:
     import pytest
-    pytest.skip("未配 V2PDF_TEST_PG_DSN（rescue PG E2E 只在有库的环境跑）", allow_module_level=True)
+    pytest.skip("未配 V2MD_TEST_PG_DSN（rescue PG E2E 只在有库的环境跑）", allow_module_level=True)
 
 REPO = Path(__file__).resolve().parents[2]  # 仓根（deploy/ 留根）
-TMP = Path(tempfile.mkdtemp(prefix="v2pdf-rescue-pg-"))
+TMP = Path(tempfile.mkdtemp(prefix="v2md-rescue-pg-"))
 VAULT = TMP / "vault"
 POOL_PORT = 9799
 POOL = f"http://127.0.0.1:{POOL_PORT}"
 
-# video2pdf 侧种子写入：import 前定档（config.ENV 是 import 时快照）
+# video2md 侧种子写入：import 前定档（config.ENV 是 import 时快照）
 os.environ.update({
-    "V2PDF_PG_DSN": DSN, "V2PDF_RUNS_STORE": "postgres", "V2PDF_TASKS_STORE": "postgres",
-    "V2PDF_STATE_FILE": str(TMP / "state.json"), "V2PDF_USERS_FILE": str(TMP / "users.json"),
-    "V2PDF_LOG_DIR": str(TMP / "logs"), "V2PDF_SECRETS_FILE": str(TMP / "nonexistent.env"),
-    "V2PDF_AUTH": "off", "V2PDF_FAKE_LLM": "1", "V2PDF_REMOTE": "", "OBSIDIAN_VAULT": str(VAULT),
+    "V2MD_PG_DSN": DSN, "V2MD_RUNS_STORE": "postgres", "V2MD_TASKS_STORE": "postgres",
+    "V2MD_STATE_FILE": str(TMP / "state.json"), "V2MD_USERS_FILE": str(TMP / "users.json"),
+    "V2MD_LOG_DIR": str(TMP / "logs"), "V2MD_SECRETS_FILE": str(TMP / "nonexistent.env"),
+    "V2MD_AUTH": "off", "V2MD_FAKE_LLM": "1", "V2MD_REMOTE": "", "OBSIDIAN_VAULT": str(VAULT),
 })
 sys.path.insert(0, str(REPO / "backend"))
 
-from video2pdf import pg, pgmigrate, pgstore  # noqa: E402
+from video2md import pg, pgmigrate, pgstore  # noqa: E402
 
 pool = pg.make_pool(DSN)
 pgmigrate.apply_migrations(pool)  # 基线幂等（CI 库可能已被 test_pg_stores 用过）
@@ -81,13 +81,13 @@ try:
 
     # ---- 3. rescue 子进程（PG 档 env 自动分派）------------------------------------------
     r_env = {**os.environ,
-             "V2PDF_PG_DSN": DSN, "V2PDF_RUNS_STORE": "postgres", "V2PDF_TASKS_STORE": "postgres",
-             "V2PDF_STATE_FILE": str(TMP / "state.json"), "V2PDF_USERS_FILE": str(TMP / "users.json"),
-             "V2PDF_LOG_DIR": str(TMP / "logs"), "V2PDF_SECRETS_FILE": str(TMP / "nonexistent.env"),
-             "OBSIDIAN_VAULT": str(VAULT), "V2PDF_AUTH": "off", "V2PDF_FAKE_LLM": "1",
-             "V2PDF_REMOTE": POOL, "V2PDF_OCR_REMOTE": POOL, "V2PDF_CLIPS_REMOTE": POOL,
-             "V2PDF_CLIPS_SOURCE": "remote", "PYTHONUNBUFFERED": "1",
-             "V2PDF_PORT": str(POOL_PORT + 1)}  # healthz 防护探测位（本测试无 api 在跑）
+             "V2MD_PG_DSN": DSN, "V2MD_RUNS_STORE": "postgres", "V2MD_TASKS_STORE": "postgres",
+             "V2MD_STATE_FILE": str(TMP / "state.json"), "V2MD_USERS_FILE": str(TMP / "users.json"),
+             "V2MD_LOG_DIR": str(TMP / "logs"), "V2MD_SECRETS_FILE": str(TMP / "nonexistent.env"),
+             "OBSIDIAN_VAULT": str(VAULT), "V2MD_AUTH": "off", "V2MD_FAKE_LLM": "1",
+             "V2MD_REMOTE": POOL, "V2MD_OCR_REMOTE": POOL, "V2MD_CLIPS_REMOTE": POOL,
+             "V2MD_CLIPS_SOURCE": "remote", "PYTHONUNBUFFERED": "1",
+             "V2MD_PORT": str(POOL_PORT + 1)}  # healthz 防护探测位（本测试无 api 在跑）
     (VAULT / "资料库" / "视频笔记").mkdir(parents=True, exist_ok=True)
     r = subprocess.run([sys.executable, str(REPO / "backend" / "scripts" / "rescue_partial.py"),
                         "resc1", "--max-entries", "1", "--no-tmp-guard"],

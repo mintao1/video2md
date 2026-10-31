@@ -28,7 +28,7 @@ function extractCallouts(md: string): { markdown: string; callouts: PdfCallout[]
       title: match[2]?.trim() || match[1],
       body: body.join('\n').trim(),
     })
-    output.push(`<!--V2PDF_CALLOUT_${callouts.length - 1}-->`)
+    output.push(`<!--V2MD_CALLOUT_${callouts.length - 1}-->`)
   }
   return { markdown: output.join('\n'), callouts }
 }
@@ -51,7 +51,7 @@ function renderNote(md: string, mediaUrls: Record<string, string>): string {
     return `<aside class="md-callout md-callout-${callout.type}"><h3>${escapeHtml(callout.title)}</h3><div>${body}</div></aside>`
   })
   extracted.callouts.forEach((_callout, index) => {
-    source = source.replace(`<!--V2PDF_CALLOUT_${index}-->`, calloutHtml[index] ?? '')
+    source = source.replace(`<!--V2MD_CALLOUT_${index}-->`, calloutHtml[index] ?? '')
   })
 
   const fragment = DOMPurify.sanitize(marked.parse(source, { async: false }) as string, {
@@ -59,11 +59,11 @@ function renderNote(md: string, mediaUrls: Record<string, string>): string {
   })
   // DOMPurify strips blob: URLs by design. Restore only URLs created from
   // authenticated media responses after all generated markup is sanitized.
-  for (const element of fragment.querySelectorAll('img[data-v2pdf-media], video[data-v2pdf-media]')) {
-    const name = element.getAttribute('data-v2pdf-media') ?? ''
+  for (const element of fragment.querySelectorAll('img[data-v2md-media], video[data-v2md-media]')) {
+    const name = element.getAttribute('data-v2md-media') ?? ''
     const url = mediaUrls[name]
     if (url?.startsWith('blob:')) element.setAttribute('src', url)
-    element.removeAttribute('data-v2pdf-media')
+    element.removeAttribute('data-v2md-media')
   }
   const container = document.createElement('div')
   container.append(fragment)

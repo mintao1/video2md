@@ -9,7 +9,7 @@ def _record(text):
 
 
 def test_short_transcript_is_rejected_before_selection_llm(monkeypatch):
-    from video2pdf import graph
+    from video2md import graph
 
     record = _record('字' * 193)
     monkeypatch.setattr(graph, '_reload', lambda *args: record)
@@ -20,7 +20,7 @@ def test_short_transcript_is_rejected_before_selection_llm(monkeypatch):
 
 
 def test_short_entry_is_rejected_before_organize_and_metadata(monkeypatch):
-    from video2pdf import graph
+    from video2md import graph
 
     record = _record('字' * 193)
     monkeypatch.setattr(graph, '_reload', lambda *args: record)
@@ -33,7 +33,7 @@ def test_short_entry_is_rejected_before_organize_and_metadata(monkeypatch):
 
 
 def test_exact_quality_threshold_still_selects_frames(monkeypatch):
-    from video2pdf import graph
+    from video2md import graph
 
     record = _record('字' * graph.MIN_NOTE_TRANSCRIPT_CHARS)
     monkeypatch.setattr(graph, '_reload', lambda *args: record)
@@ -42,7 +42,7 @@ def test_exact_quality_threshold_still_selects_frames(monkeypatch):
 
 
 def test_partial_finalize_preserves_quality_failure_reason(monkeypatch):
-    from video2pdf import graph
+    from video2md import graph
 
     record = _record('字' * 193)
     record['partial_failures'] = {'note': ['1']}
@@ -54,7 +54,7 @@ def test_partial_finalize_preserves_quality_failure_reason(monkeypatch):
 
 
 def test_compiled_graph_stops_short_content_before_publishing_or_clipping(monkeypatch):
-    from video2pdf import graph
+    from video2md import graph
 
     record = _record('字' * 193)
     visited = []

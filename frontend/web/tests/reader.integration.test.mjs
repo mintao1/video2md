@@ -37,7 +37,7 @@ it('extracts Obsidian callouts into stable typed blocks without losing body mark
     ['info', false, '视频信息'], ['tip', true, '章节导航'],
   ])
   assert.match(result.callouts[0].body, /来源：测试/)
-  assert.match(result.markdown, /V2PDF_CALLOUT_0/)
+  assert.match(result.markdown, /V2MD_CALLOUT_0/)
   assert.doesNotMatch(result.markdown, /\[!info\]|\[!tip\]/)
 })
 

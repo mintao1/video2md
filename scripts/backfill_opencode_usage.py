@@ -105,13 +105,13 @@ def backup(record: dict, directory: Path, correction_id: str) -> Path:
 
 
 def apply(plan: dict, backup_dir: Path) -> dict:
-    from video2pdf import runs
+    from video2md import runs
     be = runs._runs_backend()
     saved = None
     if be is not None:
         from psycopg.types.json import Json
         with be.pool.connection() as conn, conn.transaction():
-            row = conn.execute('SELECT record FROM v2pdf_runs WHERE run_id=%s FOR UPDATE',
+            row = conn.execute('SELECT record FROM v2md_runs WHERE run_id=%s FOR UPDATE',
                                (plan['run_id'],)).fetchone()
             if row is None:
                 raise ValueError('Correction run not found')
@@ -119,7 +119,7 @@ def apply(plan: dict, backup_dir: Path) -> dict:
             if changed:
                 saved = backup(row[0], backup_dir, plan['correction_id'])
                 # Only the selected locked row changes; all non-accounting fields are preserved.
-                conn.execute('UPDATE v2pdf_runs SET record=%s::jsonb, updated=now() WHERE run_id=%s',
+                conn.execute('UPDATE v2md_runs SET record=%s::jsonb, updated=now() WHERE run_id=%s',
                              (Json(updated), plan['run_id']))
     else:
         with runs._runs_file_lock():

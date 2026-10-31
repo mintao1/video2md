@@ -31,7 +31,7 @@ _OWNER: contextvars.ContextVar[str] = contextvars.ContextVar("colab_owner", defa
 def tenant_home(uid: str) -> Path:
     if not uid:
         raise ValueError("Colab tenant uid is required")
-    root = Path(ENV.get("V2PDF_COLAB_USERS_DIR") or PROJ / "data" / "colab-users")
+    root = Path(ENV.get("V2MD_COLAB_USERS_DIR") or PROJ / "data" / "colab-users")
     return root / hashlib.sha256(uid.encode()).hexdigest()
 
 
@@ -47,7 +47,7 @@ def remote_for_user(default: str) -> str:
 
 def configured() -> bool:
     return any((ENV.get(key) or "").strip().lower() in ("colab", "colab-cli")
-               for key in ("V2PDF_REMOTE", "V2PDF_OCR_REMOTE", "V2PDF_CLIPS_REMOTE"))
+               for key in ("V2MD_REMOTE", "V2MD_OCR_REMOTE", "V2MD_CLIPS_REMOTE"))
 
 
 @contextlib.contextmanager
@@ -56,7 +56,7 @@ def _session(wait: bool = True, *, owner: str | None = None):
     try:
         uid = _OWNER.get()
         path = (tenant_home(uid) / "execution.lock" if uid else
-                Path(ENV.get("V2PDF_COLAB_LOCK") or PROJ / "data" / "colab.lock"))
+                Path(ENV.get("V2MD_COLAB_LOCK") or PROJ / "data" / "colab.lock"))
         path.parent.mkdir(mode=0o750, parents=True, exist_ok=True)
         if not _LOCK.acquire(blocking=wait):
             raise BlockingIOError("Colab busy")
@@ -83,14 +83,14 @@ def _session(wait: bool = True, *, owner: str | None = None):
 
 def _configure():
     uid = _OWNER.get()
-    name = ENV.get("V2PDF_COLAB_SESSION") or "v2pdf-whisper"
+    name = ENV.get("V2MD_COLAB_SESSION") or "v2md-whisper"
     machinery.SESSION = name + "-" + hashlib.sha256(uid.encode()).hexdigest()[:16] if uid else name
     machinery.CLI_HOME = str(tenant_home(uid)) if uid else ""
-    machinery.BIN_OVERRIDE = ENV.get("V2PDF_COLAB_BIN") or ""
-    machinery.MAX_WAIT_S = int(ENV.get("V2PDF_COLAB_MAX_WAIT_S") or 2700)
+    machinery.BIN_OVERRIDE = ENV.get("V2MD_COLAB_BIN") or ""
+    machinery.MAX_WAIT_S = int(ENV.get("V2MD_COLAB_MAX_WAIT_S") or 2700)
     machinery.QUEUE_URL = ""
     machinery.KEEP_SESSION = True  # This adapter owns shutdown, including standalone calls.
-    machinery.ALLOW_CPU_FALLBACK = (ENV.get("V2PDF_COLAB_CPU_FALLBACK") or "off") == "on"
+    machinery.ALLOW_CPU_FALLBACK = (ENV.get("V2MD_COLAB_CPU_FALLBACK") or "off") == "on"
 
 @contextlib.contextmanager
 def session_scope(owner: str | None = None, *, suppress_cleanup_errors: bool = False):
@@ -149,7 +149,7 @@ def health() -> tuple[bool, str]:
             binary = machinery._colab_bin()
             if not shutil.which(binary):
                 return False, "未安装 colab CLI：uv sync 后重试"
-            if (ENV.get("V2PDF_AUTH") or "off").lower() not in ("off", "none", ""):
+            if (ENV.get("V2MD_AUTH") or "off").lower() not in ("off", "none", ""):
                 return True, "Colab CLI 可用；每个用户需连接自己的 Colab 账号"
             if not (Path.home() / ".config/colab-cli/token.json").is_file():
                 return False, "Colab CLI 未授权：先运行 colab sessions 完成登录"

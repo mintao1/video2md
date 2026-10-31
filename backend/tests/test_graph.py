@@ -13,9 +13,9 @@ os.environ["LANGFUSE_PK"] = os.environ["LANGFUSE_SK"] = ""  # 观测 sink 强制
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # backend/（包根）
 
-from video2pdf import graph, observability, runs, util
+from video2md import graph, observability, runs, util
 
-_TMP = Path(tempfile.mkdtemp(prefix="video2pdf-test-graph-"))
+_TMP = Path(tempfile.mkdtemp(prefix="video2md-test-graph-"))
 
 # ---- 隔离文件 SSOT：state.json / runs.json / runs.lock / 日志目录全部进 tmp ----
 _ORIG_STATE_FILE = util.STATE_FILE
@@ -186,8 +186,8 @@ print("✅ 7. SqliteSaver 落库 + done 后 delete_thread 裁剪")
 saver2, closer2 = graph.make_checkpointer_from_env({})  # 缺省 → sqlite 分支（closer no-op）
 assert type(saver2).__name__ == "SqliteSaver" and callable(closer2)
 closer2()
-for bad, why in [({"V2PDF_CHECKPOINTER": "mysql"}, "未知类型"),
-                 ({"V2PDF_CHECKPOINTER": "postgres"}, "没配 DSN")]:
+for bad, why in [({"V2MD_CHECKPOINTER": "mysql"}, "未知类型"),
+                 ({"V2MD_CHECKPOINTER": "postgres"}, "没配 DSN")]:
     try:
         graph.make_checkpointer_from_env(bad)
         raise AssertionError(f"应报错（{why}）却没报")
@@ -196,10 +196,10 @@ for bad, why in [({"V2PDF_CHECKPOINTER": "mysql"}, "未知类型"),
 print("✅ 7b. checkpointer env 分派（sqlite 默认；postgres 守卫在 import 前，不联网）")
 
 
-# ---- 8. V2PDF_EVAL=1：eval_entry 接线——本 run 写盘条目评测 / 失败不致命 / 缺省不接线
-from video2pdf import evals as _ev
+# ---- 8. V2MD_EVAL=1：eval_entry 接线——本 run 写盘条目评测 / 失败不致命 / 缺省不接线
+from video2md import evals as _ev
 
-os.environ["V2PDF_EVAL"] = "1"
+os.environ["V2MD_EVAL"] = "1"
 _note_md = _TMP / "笔记1.md"
 _note_md.write_text("# 笔记\n正文" * 50, encoding="utf-8")
 _tr_md = _TMP / "t.md"
@@ -235,20 +235,20 @@ assert any("eval 条目" in e for e in final["errors"]), final["errors"]
 
 # 缺省（开关关）→ 不接线，拓扑零变化
 _ev.score_note = _ev_score_orig
-os.environ.pop("V2PDF_EVAL")
+os.environ.pop("V2MD_EVAL")
 _fresh()
 final = graph.run_graph("/tmp/fake.mp4", checkpointer=None)
 assert final["status"] == "done" and len(_ev_calls) == 1  # 没新增评测调用
 _ev.report_scores = _ev_rep_orig
-print("✅ 8. V2PDF_EVAL 在线评测节点：接线评测写回 artifacts / 失败不致命 / 缺省不接线")
+print("✅ 8. V2MD_EVAL 在线评测节点：接线评测写回 artifacts / 失败不致命 / 缺省不接线")
 
 
 # ---- 9. deliver 模式：artsink 激活缝 + finalize 搬家剥正文 ----------------------
 from datetime import datetime as _dt
 
-from video2pdf import artsink
-from video2pdf import config as v2config
-from video2pdf import note as note_mod
+from video2md import artsink
+from video2md import config as v2config
+from video2md import note as note_mod
 
 _orig_mode, _orig_ob, _orig_outdir = (v2config.ARTIFACT_MODE,
                                       v2config.OUTBOX_DIR, v2config.OUT_DIR)

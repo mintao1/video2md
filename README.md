@@ -1,8 +1,8 @@
-# video2pdf
+# video2md
 
 **把一段课程视频，变成一份可以直接阅读的图文文稿。**
 
-粘贴 B 站、YouTube、抖音、小红书链接或上传本地视频，video2pdf 自动完成转写、抽帧、OCR、关键画面选择和正文整理，产出带时间戳章节、插图、视频片段和完整转录本的文稿，在网页阅读器里阅读或导出。
+粘贴 B 站、YouTube、抖音、小红书链接或上传本地视频，video2md 自动完成转写、抽帧、OCR、关键画面选择和正文整理，产出带时间戳章节、插图、视频片段和完整转录本的文稿，在网页阅读器里阅读或导出。
 
 > 导出格式：PDF（浏览器打印窗口中选择「保存为 PDF」，保留插图与公式）和 Markdown。EPUB 与 LaTeX 暂未开放。
 
@@ -12,7 +12,7 @@
 
 看课程、讲座、技术分享视频的学习者，想把内容沉淀进自己的知识库，但手动记笔记慢，纯转录稿又没法读：没有结构、没有画面，也找不回原视频的位置。
 
-video2pdf 产出的不是转录稿，而是**可阅读的文稿**：LLM 按章节改写正文，配上从视频里挑出的关键画面和片段，每个章节都带时间戳，完整转录本作为附件保留，随时可以回查原话。
+video2md 产出的不是转录稿，而是**可阅读的文稿**：LLM 按章节改写正文，配上从视频里挑出的关键画面和片段，每个章节都带时间戳，完整转录本作为附件保留，随时可以回查原话。
 
 ## 🧭 用户怎么用
 
@@ -104,7 +104,7 @@ attachments/<slug>-cNN-<mmss>.mp4  视频片段
 ```bash
 cd backend
 uv sync --frozen
-uv run python -m video2pdf api
+uv run python -m video2md api
 ```
 
 服务默认监听 `http://127.0.0.1:8790`。提交一个视频任务：
@@ -128,7 +128,7 @@ GET  /queue                查看队列长度与运行中的任务
 
 ```bash
 cd backend
-uv run python -m video2pdf graph-run <url> [--force] [--review] [--max-frames 60]
+uv run python -m video2md graph-run <url> [--force] [--review] [--max-frames 60]
 ```
 
 ### 前端
@@ -146,13 +146,13 @@ npm run dev
 生产形态是云服务器上的多用户 API：FastAPI 负责鉴权和任务编排，反向代理提供 TLS，GPU 阶段通过 Colab CLI 连接用户自己的 Colab 会话。
 
 ```dotenv
-V2PDF_REMOTE=colab-cli
-V2PDF_OCR_REMOTE=colab-cli
-V2PDF_CLIPS_REMOTE=colab-cli
-V2PDF_COLAB_SESSION=v2pdf-whisper
+V2MD_REMOTE=colab-cli
+V2MD_OCR_REMOTE=colab-cli
+V2MD_CLIPS_REMOTE=colab-cli
+V2MD_COLAB_SESSION=v2md-whisper
 ```
 
-T4 不可用时默认明确报错；只有设置 `V2PDF_COLAB_CPU_FALLBACK=on` 才允许 CPU 降级。部署前请阅读 [架构索引](docs/architecture/README.md)、[运行拓扑与部署](docs/architecture/02-runtime-topology.md)、[HTTP 契约与鉴权](docs/architecture/03-api-contract.md)、[安全检查清单](docs/architecture/05-security.md) 和 [灾备 runbook](docs/architecture/09-disaster-recovery.md)。
+T4 不可用时默认明确报错；只有设置 `V2MD_COLAB_CPU_FALLBACK=on` 才允许 CPU 降级。部署前请阅读 [架构索引](docs/architecture/README.md)、[运行拓扑与部署](docs/architecture/02-runtime-topology.md)、[HTTP 契约与鉴权](docs/architecture/03-api-contract.md)、[安全检查清单](docs/architecture/05-security.md) 和 [灾备 runbook](docs/architecture/09-disaster-recovery.md)。
 
 平台工程部分（Kubernetes 清单、多 GPU 供应商路由、OpenTelemetry / Prometheus / Langfuse 可观测性）只在多副本部署时需要，本地自用可以忽略。
 
@@ -160,8 +160,8 @@ T4 不可用时默认明确报错；只有设置 `V2PDF_COLAB_CPU_FALLBACK=on` �
 
 ```bash
 cd backend
-uv run ruff check video2pdf acctkit scripts
-uv run mypy video2pdf acctkit
+uv run ruff check video2md acctkit scripts
+uv run mypy video2md acctkit
 uv run pytest
 
 cd ..
@@ -177,8 +177,8 @@ CI 在 push 和 pull request 中运行后端测试、评测回放、lint、进�
 ### 项目结构
 
 ```text
-video2pdf/
-├── backend/video2pdf/   LangGraph 管线、FastAPI、存储和任务状态
+video2md/
+├── backend/video2md/   LangGraph 管线、FastAPI、存储和任务状态
 ├── backend/acctkit/    账号鉴权模块
 ├── backend/gpu_plugins/    算力池 provider 与参考实现
 ├── backend/tests/      契约、单元和回归测试
@@ -193,7 +193,7 @@ video2pdf/
 - [设计决策](docs/design-decisions.md)
 - [评测汇总](docs/evals/SUMMARY.md)
 - [系统总览](docs/architecture/01-overview.md)
-- [改名 video2md → video2pdf](docs/architecture/10-rename-video2pdf.md)
+- [项目命名与兼容策略](docs/architecture/10-rename-video2md.md)
 - [API 契约](docs/architecture/03-api-contract.md)
 - [数据与一致性](docs/architecture/04-data-and-consistency.md)
 - [前端说明](frontend/web/README.md)

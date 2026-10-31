@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # P1-4 双副本真进程冒烟：PG 档任务表/事件通道 + 属主甄别恢复 + 跨副本取消/接管/SSE。
 # 进程级（同机两 api 进程，仿 smoke_ci.sh——不上 docker，CI 复用 test job 的 PG service）。
-# 前提：V2PDF_TEST_PG_DSN（或 SMOKE_PG_DSN）指向可清库的测试 PG；本地未配则起临时容器。
+# 前提：V2MD_TEST_PG_DSN（或 SMOKE_PG_DSN）指向可清库的测试 PG；本地未配则起临时容器。
 # 快租约档：WATCHDOG_PERIOD_S=5 / TIMEOUT_S=15 / 排队租约=max(3×5,30)=30s / phb 甄别窗 30s。
 #
 # 断言面（ROADMAP P1-4 + 批判补遗② + P1-2/P1-1 双进程验收）：
@@ -12,15 +12,15 @@
 #   ⑤ 杀 A → B 接管：queued 项短租约认领重投 done；running 残档标错后重投 done（P1-1 验收）
 set -euo pipefail
 cd "$(dirname "$0")/.."
-export PYTHONPATH="$PWD/backend"   # package=false：python -m video2pdf 靠包根上 path
+export PYTHONPATH="$PWD/backend"   # package=false：python -m video2md 靠包根上 path
 
 PORT_A="${SMOKE_PORT_A:-8801}"
 PORT_B="${SMOKE_PORT_B:-8802}"
 A="http://127.0.0.1:$PORT_A"
 B="http://127.0.0.1:$PORT_B"
 POOL="http://127.0.0.1:9796"
-DSN="${SMOKE_PG_DSN:-${V2PDF_TEST_PG_DSN:-}}"
-TMP=$(mktemp -d /tmp/v2pdf-smoke-rep-XXXXXX)
+DSN="${SMOKE_PG_DSN:-${V2MD_TEST_PG_DSN:-}}"
+TMP=$(mktemp -d /tmp/v2md-smoke-rep-XXXXXX)
 VAULT="$TMP/vault"
 API_A_PID=""; API_B_PID=""; POOL_PID=""; PG_CID=""
 fail() { echo "❌ $1"; for l in "$TMP/a.log" "$TMP/b.log"; do echo "── $l"; tail -20 "$l" 2>/dev/null || true; done; exit 1; }
@@ -29,7 +29,7 @@ stat_of() { python3 -c "import json,sys; d=json.load(sys.stdin); t=d.get('task')
 
 command -v ffmpeg >/dev/null || fail "缺 ffmpeg"
 stop_node() {  # 杀真身：API_x_PID 是 env/uv 包装进程，kill 它 python 成孤儿继续占端口（实测 errno 48）
-  pkill -9 -f "video2pdf api --port $1" 2>/dev/null || true
+  pkill -9 -f "video2md api --port $1" 2>/dev/null || true
   sleep 1
 }
 cleanup() {
@@ -44,13 +44,13 @@ trap cleanup EXIT
 
 # —— 0. PG：未配 DSN 则起临时容器（CI 用 job env 的 service PG）——
 if [ -z "$DSN" ]; then
-  command -v docker >/dev/null || fail "缺 V2PDF_TEST_PG_DSN 且无 docker 可起临时 PG"
-  PG_CID=$(docker run -d -p 127.0.0.1:55433:5432 -e POSTGRES_USER=v2pdf \
-    -e POSTGRES_PASSWORD=v2pdf -e POSTGRES_DB=v2pdf postgres:17-alpine)
-  for _ in $(seq 1 30); do docker exec "$PG_CID" pg_isready -U v2pdf -d v2pdf >/dev/null 2>&1 && break; sleep 1; done
-  DSN="postgresql://v2pdf:v2pdf@127.0.0.1:55433/v2pdf"
+  command -v docker >/dev/null || fail "缺 V2MD_TEST_PG_DSN 且无 docker 可起临时 PG"
+  PG_CID=$(docker run -d -p 127.0.0.1:55433:5432 -e POSTGRES_USER=v2md \
+    -e POSTGRES_PASSWORD=v2md -e POSTGRES_DB=v2md postgres:17-alpine)
+  for _ in $(seq 1 30); do docker exec "$PG_CID" pg_isready -U v2md -d v2md >/dev/null 2>&1 && break; sleep 1; done
+  DSN="postgresql://v2md:v2md@127.0.0.1:55433/v2md"
 fi
-V2PDF_PG_DSN="$DSN" uv run --project backend python -m video2pdf migrate >/dev/null || fail "migrate 未过"
+V2MD_PG_DSN="$DSN" uv run --project backend python -m video2md migrate >/dev/null || fail "migrate 未过"
 echo "PG 就绪 + schema 迁移完成"
 
 # —— 1. 夹具：长视频（run1 保活过甄别窗）+ 短视频（后续各阶段提速）——
@@ -70,24 +70,24 @@ for _ in $(seq 1 20); do curl -s -m 2 "$POOL/ping" >/dev/null 2>&1 && break; sle
 curl -s -m 2 "$POOL/ping" >/dev/null || fail "mockpool 未起"
 
 node_env() {  # 双副本共用：同 vault/同 users.json（off 档 dev uid 收敛）；state 日志各一份
-  printf '%s' "PYTHONUNBUFFERED=1 V2PDF_FAKE_LLM=1 V2PDF_PG_DSN=$DSN \
-V2PDF_RUNS_STORE=postgres V2PDF_TASKS_STORE=postgres V2PDF_EVENTS=pg \
-V2PDF_REMOTE=$POOL V2PDF_OCR_REMOTE=$POOL V2PDF_CLIPS_REMOTE=$POOL V2PDF_CLIPS_SOURCE=remote \
-V2PDF_WATCHDOG_PERIOD_S=5 V2PDF_WATCHDOG_TIMEOUT_S=15 V2PDF_MAX_CONCURRENT_RUNS=1 \
-V2PDF_USERS_FILE=$TMP/users.json OBSIDIAN_VAULT=$VAULT \
-V2PDF_LOG_DIR=$TMP/logs LANGFUSE_PK='' LANGFUSE_SK='' OTEL_EXPORTER_OTLP_ENDPOINT=''"
+  printf '%s' "PYTHONUNBUFFERED=1 V2MD_FAKE_LLM=1 V2MD_PG_DSN=$DSN \
+V2MD_RUNS_STORE=postgres V2MD_TASKS_STORE=postgres V2MD_EVENTS=pg \
+V2MD_REMOTE=$POOL V2MD_OCR_REMOTE=$POOL V2MD_CLIPS_REMOTE=$POOL V2MD_CLIPS_SOURCE=remote \
+V2MD_WATCHDOG_PERIOD_S=5 V2MD_WATCHDOG_TIMEOUT_S=15 V2MD_MAX_CONCURRENT_RUNS=1 \
+V2MD_USERS_FILE=$TMP/users.json OBSIDIAN_VAULT=$VAULT \
+V2MD_LOG_DIR=$TMP/logs LANGFUSE_PK='' LANGFUSE_SK='' OTEL_EXPORTER_OTLP_ENDPOINT=''"
 }
 start_a() {
-  env $(node_env) V2PDF_STATE_FILE="$TMP/state-a.json" \
-    uv run --project backend python -m video2pdf api --port "$PORT_A" > "$TMP/a.log" 2>&1 &
+  env $(node_env) V2MD_STATE_FILE="$TMP/state-a.json" \
+    uv run --project backend python -m video2md api --port "$PORT_A" > "$TMP/a.log" 2>&1 &
   API_A_PID=$!
   for _ in $(seq 1 40); do curl -s -m 2 "$A/healthz" >/dev/null 2>&1 && break; sleep 1; done
   curl -s -m 2 "$A/healthz" >/dev/null || fail "api A 未起"
   kill -0 "$API_A_PID" 2>/dev/null || fail "api A 起后即死（端口被幽灵进程占用？pkill -f 清残留）"
 }
 start_b() {
-  env $(node_env) V2PDF_STATE_FILE="$TMP/state-b.json" \
-    uv run --project backend python -m video2pdf api --port "$PORT_B" > "$TMP/b.log" 2>&1 &
+  env $(node_env) V2MD_STATE_FILE="$TMP/state-b.json" \
+    uv run --project backend python -m video2md api --port "$PORT_B" > "$TMP/b.log" 2>&1 &
   API_B_PID=$!
   for _ in $(seq 1 40); do curl -s -m 2 "$B/healthz" >/dev/null 2>&1 && break; sleep 1; done
   curl -s -m 2 "$B/healthz" >/dev/null || fail "api B 未起"

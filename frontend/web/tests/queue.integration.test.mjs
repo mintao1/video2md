@@ -55,7 +55,7 @@ async function waitForBackend() {
 }
 
 before(async () => {
-  temp = await mkdtemp(resolve(tmpdir(), 'v2pdf-web-integration-'))
+  temp = await mkdtemp(resolve(tmpdir(), 'v2md-web-integration-'))
   Object.defineProperty(globalThis, 'localStorage', {
     configurable: true,
     value: {
@@ -64,7 +64,7 @@ before(async () => {
       removeItem: (key) => storage.delete(key),
     },
   })
-  backend = spawn(process.env.V2PDF_TEST_PYTHON || resolve(repoRoot, 'backend/.venv/bin/python'), [
+  backend = spawn(process.env.V2MD_TEST_PYTHON || resolve(repoRoot, 'backend/.venv/bin/python'), [
     resolve(repoRoot, 'backend/tests/fixtures/web_integration_api.py'), temp,
   ], { cwd: repoRoot, stdio: ['ignore', 'pipe', 'pipe'] })
   backend.on('error', (error) => { spawnError = error })
@@ -87,7 +87,7 @@ before(async () => {
 
 beforeEach(async () => {
   storage.clear()
-  storage.set('v2pdf_token', 'integration-alice')
+  storage.set('v2md_token', 'integration-alice')
   setActivePinia(createPinia())
   assert.equal((await http('/__tests/reset', { method: 'POST' })).status, 200)
 })
@@ -171,7 +171,7 @@ describe('queue store → HTTP client → FastAPI', () => {
   })
 
   it('rejects requests without usable credentials', async () => {
-    storage.delete('v2pdf_token')
+    storage.delete('v2md_token')
     await assert.rejects(() => api.listRuns(), { name: 'ApiRequestError', code: 401 })
   })
 
@@ -232,7 +232,7 @@ describe('library live adapter → FastAPI preferences and notes', () => {
 
   it('does not disclose Alice’s preferences to Bob', async () => {
     await api.saveProgress('finished', 42)
-    storage.set('v2pdf_token', 'integration-bob')
+    storage.set('v2md_token', 'integration-bob')
     assert.deepEqual(await api.getBooks(), [])
     const response = await http('/prefs', { headers: { Authorization: 'Bearer integration-bob' } })
     assert.deepEqual((await response.json()).items, [])
@@ -250,7 +250,7 @@ it('fetches referenced media as an authenticated binary response', async () => {
   const blob = await api.getMedia('finished', 'demo.png')
   assert.equal(blob.type, 'image/png')
   assert.deepEqual([...new Uint8Array(await blob.arrayBuffer()).slice(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10])
-  storage.set('v2pdf_token', 'integration-bob')
+  storage.set('v2md_token', 'integration-bob')
   await assert.rejects(() => api.getMedia('finished', 'demo.png'), { code: 403 })
 })
 
@@ -266,7 +266,7 @@ it('the actual getMedia adapter uses authenticated ranges through FastAPI for MP
   assert.deepEqual(audit.map(row => row.range), ['bytes=0-65535', 'bytes=65536-131071', 'bytes=131072-196607'])
   assert.ok(audit.every(row => row.authenticated && row.status === 206))
   assert.ok(audit.slice(1).every(row => row.if_range === audit[1].if_range && row.if_range))
-  storage.set('v2pdf_token', 'integration-bob')
+  storage.set('v2md_token', 'integration-bob')
   await assert.rejects(() => api.getMedia('finished', 'range-demo.mp4'), { code: 403 })
   const denied = (await (await http('/__tests/range-audit', { method: 'POST' })).json()).requests.at(-1)
   assert.equal(denied.status, 403)
@@ -277,7 +277,7 @@ it('reports unavailable bundles instead of a fake successful download', async ()
 })
 
 it('persists private LLM settings through the live API without returning or caching its key', async () => {
-  storage.set('v2pdf_token', 'integration-alice')
+  storage.set('v2md_token', 'integration-alice')
   try {
     const saved = await api.saveLlmSettings({
       base_url: 'https://llm.example.test/v1', api_key: 'fixture-only-secret', model: 'test-model',
@@ -291,14 +291,14 @@ it('persists private LLM settings through the live API without returning or cach
     assert.equal((await api.getLlmSettings()).base_url, 'https://llm.example.test/v1')
     await api.saveLlmSettings({ base_url: 'https://llm.example.test/v2', model: 'new-model' })
     assert.equal((await api.getLlmSettings()).has_api_key, true)
-    storage.set('v2pdf_token', 'integration-bob')
+    storage.set('v2md_token', 'integration-bob')
     assert.equal((await api.getLlmSettings()).configured, false)
-    storage.set('v2pdf_token', 'integration-alice')
+    storage.set('v2md_token', 'integration-alice')
     assert.equal([...storage.values()].includes('fixture-only-secret'), false)
     await api.clearLlmSettings()
     assert.equal((await api.getLlmSettings()).has_api_key, false)
   } finally {
-    storage.set('v2pdf_token', 'integration-alice')
+    storage.set('v2md_token', 'integration-alice')
     await api.clearLlmSettings()
   }
 })
@@ -334,7 +334,7 @@ it('loads actual monthly billing details and renders per-run usage instead of an
   assert.match(html, /1000 tokens/)
   assert.match(html, /180.000 秒/)
   assert.match(html, /\$0.000280/)
-  storage.set('v2pdf_token', 'integration-bob')
+  storage.set('v2md_token', 'integration-bob')
   assert.deepEqual((await api.getCost()).runs, [])
 })
 

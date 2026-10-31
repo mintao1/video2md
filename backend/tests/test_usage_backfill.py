@@ -87,7 +87,7 @@ def test_tampered_plan_and_changed_corrected_record_rejected():
 
 
 def test_json_store_atomic_backup_other_run_and_repeat(tmp_path, monkeypatch):
-    from video2pdf import runs
+    from video2md import runs
     record, raw = evidence()
     ledger = tmp_path / 'runs.json'
     other = {'run_id': 'other', 'status': 'running', 'usage': {'llm_in_tok': 900}}
@@ -106,7 +106,7 @@ def test_json_store_atomic_backup_other_run_and_repeat(tmp_path, monkeypatch):
 
 
 def test_failed_backup_never_mutates_ledger(tmp_path, monkeypatch):
-    from video2pdf import runs
+    from video2md import runs
     record, raw = evidence()
     ledger = tmp_path / 'runs.json'
     original = json.dumps({'fixture': record})
@@ -126,7 +126,7 @@ def test_postgres_uses_locked_row_transaction_and_leaves_other_fields(tmp_path, 
     from contextlib import nullcontext
     from types import SimpleNamespace
 
-    from video2pdf import runs
+    from video2md import runs
     record, raw = evidence()
     plan = mod.prepare(raw, record)
     if stale:
@@ -163,7 +163,7 @@ def test_backfill_check_is_in_ci():
 
 
 def test_resumed_run_settles_new_usage_without_losing_correction(tmp_path, monkeypatch):
-    from video2pdf import runs
+    from video2md import runs
     record, raw = evidence()
     corrected, _ = mod.correct(record, mod.prepare(raw, record))
     ledger = tmp_path / 'runs.json'
@@ -191,7 +191,7 @@ def test_resumed_run_settles_new_usage_without_losing_correction(tmp_path, monke
 def test_transcribe_timeout_still_records_wall_clock(tmp_path, monkeypatch):
     import httpx
 
-    from video2pdf import runs, transcribe
+    from video2md import runs, transcribe
     audio = tmp_path / 'remote-audio.m4a'
     audio.write_bytes(b'audio fixture')
     monkeypatch.setattr(transcribe, 'run', lambda args: None)
@@ -225,7 +225,7 @@ def test_real_historical_8000_token_gap_replayed_through_correction():
 def test_transcribe_budget_and_evaluation_case_inventory():
     import inspect
 
-    from video2pdf import transcribe
+    from video2md import transcribe
     assert 'read=5400.0' in inspect.getsource(transcribe.remote_transcribe)
     cases = [json.loads(line) for line in (ROOT / 'docs/evals/production-resolution-eval-set.jsonl').read_text().splitlines()]
     assert {c['id'] for c in cases} == {f'pri-{n:03}' for n in range(1, 14)}
@@ -236,7 +236,7 @@ def test_postgres_resume_settlement_locks_latest_row_and_consumes_delta_once(mon
     from contextlib import nullcontext
     from types import SimpleNamespace
 
-    from video2pdf import runs
+    from video2md import runs
     record, raw = evidence()
     corrected, _ = mod.correct(record, mod.prepare(raw, record))
     calls = []

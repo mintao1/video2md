@@ -30,10 +30,10 @@ def _encryption_key() -> bytes:
     There is deliberately no generated/default key: losing the key must fail
     closed rather than silently making old credentials unrecoverable.
     """
-    raw = (config.ENV.get("V2PDF_LLM_SETTINGS_KEY")
-           or config.ENV.get("V2MD_LLM_SETTINGS_KEY") or "").strip()
+    raw = (config.ENV.get("V2MD_LLM_SETTINGS_KEY")
+           or config.ENV.get("V2PDF_LLM_SETTINGS_KEY") or "").strip()
     if not raw:
-        raise CredentialEncryptionError("未配置 V2PDF_LLM_SETTINGS_KEY，无法读取用户 LLM 凭据")
+        raise CredentialEncryptionError("未配置 V2MD_LLM_SETTINGS_KEY，无法读取用户 LLM 凭据")
     try:
         if raw.startswith("hex:"):
             key = bytes.fromhex(raw[4:])
@@ -41,9 +41,9 @@ def _encryption_key() -> bytes:
             encoded = raw.removeprefix("base64:").encode("ascii")
             key = base64.urlsafe_b64decode(encoded + b"=" * (-len(encoded) % 4))
     except (ValueError, UnicodeEncodeError) as exc:
-        raise CredentialEncryptionError("V2PDF_LLM_SETTINGS_KEY 格式无效") from exc
+        raise CredentialEncryptionError("V2MD_LLM_SETTINGS_KEY 格式无效") from exc
     if len(key) != 32:
-        raise CredentialEncryptionError("V2PDF_LLM_SETTINGS_KEY 必须解码为 32 字节")
+        raise CredentialEncryptionError("V2MD_LLM_SETTINGS_KEY 必须解码为 32 字节")
     return key
 
 
@@ -151,7 +151,7 @@ def normalize_url(value: str) -> str:
 
 
 def _path() -> Path:
-    return Path(config.ENV.get("V2PDF_LLM_SETTINGS_FILE") or
+    return Path(config.ENV.get("V2MD_LLM_SETTINGS_FILE") or
                 config.PREFS_FILE.with_name("llm-settings.json"))
 
 

@@ -1,7 +1,7 @@
 """HTTP 契约测试（Phase 1）：鉴权（provider 无关）/ owner 越权隔离 / Pydantic 校验 /
 错误信封 / OpenAPI 重开 / SSE 实时进度 / owner 线程到 resolve 去重。
 
-全部离网：持久化文件指向临时目录；V2PDF_AUTH=off（e2e/测试无 token 即可跑，用
+全部离网：持久化文件指向临时目录；V2MD_AUTH=off（e2e/测试无 token 即可跑，用
 X-Test-Auth 头注入不同身份断言多用户隔离）；POST 成功路径 monkeypatch resolve_run、
 种子 run 永不 status=running（否则 lifespan 恢复会真驱动图联网）。
 """
@@ -12,38 +12,37 @@ import os
 import tempfile
 import threading
 import time
-import urllib.parse
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-_TMP = tempfile.mkdtemp(prefix="v2pdf-contract-")
-# —— 必须在 import video2pdf.config 之前设好（config 在 import 时读 env 与算路径）——
+_TMP = tempfile.mkdtemp(prefix="v2md-contract-")
+# —— 必须在 import video2md.config 之前设好（config 在 import 时读 env 与算路径）——
 os.environ.update({
-    "V2PDF_AUTH": "off",
-    "V2PDF_USERS_FILE": str(Path(_TMP) / "users.json"),
-    "V2PDF_RUNS_FILE": str(Path(_TMP) / "runs.json"),
-    "V2PDF_PREFS_FILE": str(Path(_TMP) / "prefs.json"),
-    "V2PDF_STATE_FILE": str(Path(_TMP) / "state.json"),
-    "V2PDF_LOG_DIR": str(Path(_TMP) / "logs"),
-    "V2PDF_UPLOADS_DIR": str(Path(_TMP) / "uploads"),
-    "V2PDF_SECRETS_FILE": str(Path(_TMP) / "nonexistent.env"),
+    "V2MD_AUTH": "off",
+    "V2MD_USERS_FILE": str(Path(_TMP) / "users.json"),
+    "V2MD_RUNS_FILE": str(Path(_TMP) / "runs.json"),
+    "V2MD_PREFS_FILE": str(Path(_TMP) / "prefs.json"),
+    "V2MD_STATE_FILE": str(Path(_TMP) / "state.json"),
+    "V2MD_LOG_DIR": str(Path(_TMP) / "logs"),
+    "V2MD_UPLOADS_DIR": str(Path(_TMP) / "uploads"),
+    "V2MD_SECRETS_FILE": str(Path(_TMP) / "nonexistent.env"),
     "OBSIDIAN_VAULT": str(Path(_TMP) / "vault"),
-    "V2PDF_REMOTE": "off",  # 空串会被 load_env 丢弃→仓库 .env 真值渗入（隔离缺口，
+    "V2MD_REMOTE": "off",  # 空串会被 load_env 丢弃→仓库 .env 真值渗入（隔离缺口，
                            # 实证 9700 下线时 preflight gpu_pool 打红）；"off" 非 http 前缀 → 不做算力池体检
-    "V2PDF_CORS_ORIGINS": "",
-    "V2PDF_USER_SUBMIT_PER_MIN": "1000",  # 套件整体抬高滑窗，配额行为由专测 monkeypatch 收紧
-    "V2PDF_FAKE_LLM": "1",  # 兜底：任何意外真驱动也不烧 token
+    "V2MD_CORS_ORIGINS": "",
+    "V2MD_USER_SUBMIT_PER_MIN": "1000",  # 套件整体抬高滑窗，配额行为由专测 monkeypatch 收紧
+    "V2MD_FAKE_LLM": "1",  # 兜底：任何意外真驱动也不烧 token
 })
 
 import httpx  # noqa: E402
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
-from video2pdf import events, runs  # noqa: E402
-from video2pdf.api import app  # noqa: E402
-from video2pdf.auth import put_identity, resolve_principal  # noqa: E402  # acctkit 接线层
-from video2pdf.graph import resolve_run  # noqa: E402
-from video2pdf.runs import create_run  # noqa: E402
+from video2md import events, runs  # noqa: E402
+from video2md.api import app  # noqa: E402
+from video2md.auth import put_identity, resolve_principal  # noqa: E402  # acctkit 接线层
+from video2md.graph import resolve_run  # noqa: E402
+from video2md.runs import create_run  # noqa: E402
 
 # ---------------------------------------------------------------- fixtures / helpers
 
@@ -72,7 +71,7 @@ def _clean_state():
         p = Path(_TMP) / name
         if p.exists():
             p.unlink()
-    import video2pdf.api as _api
+    import video2md.api as _api
     _api._GOOGLE_OAUTH_STATES.clear()  # OAuth state 单次消费测试的跨用例泄漏闸
     _api._GOOGLE_OAUTH_REDIRECTS.clear()
     _api._DEVICE_WIN.clear()           # IP 滑窗跨用例泄漏闸（设备流/授权码流限流共用一桶）
@@ -120,7 +119,7 @@ def _spa_paths() -> list[str]:
 def test_spa_routes_serve_index_not_api(client, monkeypatch, tmp_path):
     # 生产同源托管 Vite bundle：刷新/直达任一前端路由都必须拿到 index.html；
     # 前端路由一旦与 API 路由或 _API_PATH_PREFIXES 重名，浏览器会看到 JSON（L-01）。
-    from video2pdf import api as _api
+    from video2md import api as _api
     (tmp_path / "index.html").write_text("<!doctype html><div id=app></div>")
     monkeypatch.setattr(_api, "_WEB_DIST", tmp_path.resolve())
     paths = _spa_paths()
@@ -140,60 +139,60 @@ def _import_config_with_env(**overrides):
     import subprocess
     import sys
     env = {**os.environ, **overrides}
-    # The subprocess runs from backend/, but package=false means video2pdf is
+    # The subprocess runs from backend/, but package=false means video2md is
     # not installed into the venv. Preserve the same import path pytest uses.
     env["PYTHONPATH"] = str(Path(__file__).resolve().parent.parent) + os.pathsep + env.get("PYTHONPATH", "")
-    return subprocess.run([sys.executable, "-c", "import video2pdf.config"],
+    return subprocess.run([sys.executable, "-c", "import video2md.config"],
                           capture_output=True, text=True, env=env,
                           cwd=str(Path(__file__).resolve().parent.parent), timeout=60)
 
 
 def test_production_anonymous_auth_is_rejected():
-    assert _import_config_with_env(V2PDF_ENV="production", V2PDF_AUTH="off").returncode != 0
-    assert _import_config_with_env(V2PDF_ENV="production", V2PDF_AUTH="").returncode != 0
-    urls = {"V2PDF_PUBLIC_BASE_URL": "https://v.test", "V2PDF_WEB_BASE_URL": "https://v.test",
-            "V2PDF_LLM_SETTINGS_KEY": "hex:" + "11" * 32}
-    assert _import_config_with_env(V2PDF_ENV="production", V2PDF_AUTH="google",
-                                   V2PDF_ARTIFACT_MODE="deliver",
-                                   V2PDF_OTEL_INCLUDE_CONTENT="off", **urls).returncode == 0
-    assert _import_config_with_env(V2PDF_ENV="production", V2PDF_AUTH="google",
-                                   V2PDF_ARTIFACT_MODE="vault", **urls).returncode != 0
-    assert _import_config_with_env(V2PDF_ENV="production", V2PDF_AUTH="google",
-                                   V2PDF_ARTIFACT_MODE="deliver",
-                                   V2PDF_OTEL_INCLUDE_CONTENT="on", **urls).returncode != 0
+    assert _import_config_with_env(V2MD_ENV="production", V2MD_AUTH="off").returncode != 0
+    assert _import_config_with_env(V2MD_ENV="production", V2MD_AUTH="").returncode != 0
+    urls = {"V2MD_PUBLIC_BASE_URL": "https://v.test", "V2MD_WEB_BASE_URL": "https://v.test",
+            "V2MD_LLM_SETTINGS_KEY": "hex:" + "11" * 32}
+    assert _import_config_with_env(V2MD_ENV="production", V2MD_AUTH="google",
+                                   V2MD_ARTIFACT_MODE="deliver",
+                                   V2MD_OTEL_INCLUDE_CONTENT="off", **urls).returncode == 0
+    assert _import_config_with_env(V2MD_ENV="production", V2MD_AUTH="google",
+                                   V2MD_ARTIFACT_MODE="vault", **urls).returncode != 0
+    assert _import_config_with_env(V2MD_ENV="production", V2MD_AUTH="google",
+                                   V2MD_ARTIFACT_MODE="deliver",
+                                   V2MD_OTEL_INCLUDE_CONTENT="on", **urls).returncode != 0
 
 
 def test_production_google_requires_public_urls():
     # 缺省回落 localhost 会让生产 Google 登录跳回本机——启动期拒绝
-    ok = {"V2PDF_PUBLIC_BASE_URL": "https://v.test", "V2PDF_WEB_BASE_URL": "https://v.test",
-          "V2PDF_LLM_SETTINGS_KEY": "hex:" + "11" * 32}
-    for key in ("V2PDF_PUBLIC_BASE_URL", "V2PDF_WEB_BASE_URL"):
+    ok = {"V2MD_PUBLIC_BASE_URL": "https://v.test", "V2MD_WEB_BASE_URL": "https://v.test",
+          "V2MD_LLM_SETTINGS_KEY": "hex:" + "11" * 32}
+    for key in ("V2MD_PUBLIC_BASE_URL", "V2MD_WEB_BASE_URL"):
         for bad in ("", "http://localhost:5173"):
             env = {**ok, key: bad}
-            r = _import_config_with_env(V2PDF_ENV="production", V2PDF_AUTH="google",
-                                         V2PDF_ARTIFACT_MODE="deliver",
-                                         V2PDF_OTEL_INCLUDE_CONTENT="off", **env)
+            r = _import_config_with_env(V2MD_ENV="production", V2MD_AUTH="google",
+                                         V2MD_ARTIFACT_MODE="deliver",
+                                         V2MD_OTEL_INCLUDE_CONTENT="off", **env)
             assert r.returncode != 0 and key in r.stderr, (key, bad)
 
 
 def test_production_pg_requires_separate_app_and_migrate_roles():
-    urls = {"V2PDF_PUBLIC_BASE_URL": "https://v.test", "V2PDF_WEB_BASE_URL": "https://v.test",
-            "V2PDF_LLM_SETTINGS_KEY": "hex:" + "11" * 32}
-    pg = {"V2PDF_RUNS_STORE": "postgres", "V2PDF_STATE_STORE": "postgres",
-          "V2PDF_USERS_STORE": "postgres", "V2PDF_TASKS_STORE": "postgres",
-          "V2PDF_PREFS_STORE": "postgres", "V2PDF_EVENTS": "pg",
-          "V2PDF_CHECKPOINTER": "postgres"}
-    common = {**urls, **pg, "V2PDF_ENV": "production", "V2PDF_AUTH": "google",
-              "V2PDF_ARTIFACT_MODE": "deliver", "V2PDF_OTEL_INCLUDE_CONTENT": "off"}
+    urls = {"V2MD_PUBLIC_BASE_URL": "https://v.test", "V2MD_WEB_BASE_URL": "https://v.test",
+            "V2MD_LLM_SETTINGS_KEY": "hex:" + "11" * 32}
+    pg = {"V2MD_RUNS_STORE": "postgres", "V2MD_STATE_STORE": "postgres",
+          "V2MD_USERS_STORE": "postgres", "V2MD_TASKS_STORE": "postgres",
+          "V2MD_PREFS_STORE": "postgres", "V2MD_EVENTS": "pg",
+          "V2MD_CHECKPOINTER": "postgres"}
+    common = {**urls, **pg, "V2MD_ENV": "production", "V2MD_AUTH": "google",
+              "V2MD_ARTIFACT_MODE": "deliver", "V2MD_OTEL_INCLUDE_CONTENT": "off"}
     bad = _import_config_with_env(
         **common,
-        V2PDF_PG_DSN="postgresql://postgres:secret@db/v2pdf",
-        V2PDF_PG_MIGRATE_DSN="postgresql://video2md_migrate:secret@db/v2pdf")
+        V2MD_PG_DSN="postgresql://postgres:secret@db/v2pdf",
+        V2MD_PG_MIGRATE_DSN="postgresql://video2md_migrate:secret@db/v2pdf")
     assert bad.returncode != 0 and "video2md_app" in bad.stderr
     good = _import_config_with_env(
         **common,
-        V2PDF_PG_DSN="postgresql://video2md_app:secret@db/v2pdf",
-        V2PDF_PG_MIGRATE_DSN="postgresql://video2md_migrate:secret@db/v2pdf")
+        V2MD_PG_DSN="postgresql://video2md_app:secret@db/v2pdf",
+        V2MD_PG_MIGRATE_DSN="postgresql://video2md_migrate:secret@db/v2pdf")
     assert good.returncode == 0, good.stderr
 
 
@@ -205,32 +204,32 @@ def test_config_spec_aggregate_errors_and_empty_clear():
     import subprocess
     import sys
     # ① 三个非法键全部出现在同一次报错里
-    r = _import_config_with_env(V2PDF_MAX_CONCURRENT_RUNS="abc", V2PDF_WATCHDOG_TIMEOUT_S="-5",
-                                V2PDF_TASKS_STORE="bogus")
+    r = _import_config_with_env(V2MD_MAX_CONCURRENT_RUNS="abc", V2MD_WATCHDOG_TIMEOUT_S="-5",
+                                V2MD_TASKS_STORE="bogus")
     assert r.returncode != 0
-    for key in ("V2PDF_MAX_CONCURRENT_RUNS", "V2PDF_WATCHDOG_TIMEOUT_S", "V2PDF_TASKS_STORE"):
+    for key in ("V2MD_MAX_CONCURRENT_RUNS", "V2MD_WATCHDOG_TIMEOUT_S", "V2MD_TASKS_STORE"):
         assert key in r.stderr, f"汇总报错缺 {key}：{r.stderr[:400]}"
     assert "共 3 处" in r.stderr, r.stderr[:200]      # 一次报全（验收口径）
     # ② 空串=显式清空回落默认（旧 load_env 丢空串 → 真实环境压不掉任何来源值——
     # 该隔离缺口的根修验证；本仓 .env 未设 SPEC 键，断言默认即断言语义）
     code = ("import sys; sys.path.insert(0, '.');"
-            "import video2pdf.config as c; print(c.TASKS_STORE, c.UPLOADS_TTL_H)")
+            "import video2md.config as c; print(c.TASKS_STORE, c.UPLOADS_TTL_H)")
     r2 = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True,
-                env={**os.environ, "V2PDF_TASKS_STORE": "",
-                     "V2PDF_UPLOADS_TTL_H": "",
+                env={**os.environ, "V2MD_TASKS_STORE": "",
+                     "V2MD_UPLOADS_TTL_H": "",
                      "PYTHONPATH": str(Path(__file__).resolve().parent.parent)}, timeout=30)
     assert r2.stdout.split()[:2] == ["json", "24.0"], \
         f"空串未清空：{r2.stdout}{r2.stderr[:200]}"
     # ③ 显式合法值覆盖默认（合并优先级真实生效）
     r3 = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True,
-                        env={**os.environ, "V2PDF_TASKS_STORE": "postgres",
-                             "V2PDF_UPLOADS_TTL_H": "48",
+                        env={**os.environ, "V2MD_TASKS_STORE": "postgres",
+                             "V2MD_UPLOADS_TTL_H": "48",
                              "PYTHONPATH": str(Path(__file__).resolve().parent.parent)}, timeout=30)
     assert r3.stdout.split()[:2] == ["postgres", "48.0"], r3.stdout
 
 
 def test_preflight_privilege_rules():
-    from video2pdf.api import _preflight_privileged, _preflight_public
+    from video2md.api import _preflight_privileged, _preflight_public
     assert _preflight_privileged("127.0.0.1", False) is True      # 回环（deploy.sh/容器体检）
     assert _preflight_privileged("::1", False) is True
     assert _preflight_privileged("localhost", False) is True
@@ -243,8 +242,15 @@ def test_preflight_privilege_rules():
                    "checks": [{"name": "ffmpeg", "ok": True}, {"name": "gpu_pool", "ok": False}]}
 
 
-def test_preflight_anonymous_redacted(client):
+def test_preflight_anonymous_redacted(client, monkeypatch):
     # TestClient host="testclient" 非回环；本套件 AUTH=off 非真实认证 → 全部 detail 剥除
+    # Keep this contract deterministic on developer machines with less than the
+    # production 2 GB free-space threshold.
+    import shutil
+
+    import video2md.api as _api
+    usage = shutil.disk_usage(tempfile.gettempdir())
+    monkeypatch.setattr(_api.shutil, "disk_usage", lambda _path: usage._replace(free=max(usage.free, 3_000_000_000)))
     r = client.get("/preflight")
     assert r.status_code == 200
     assert r.json()["ok"] is True
@@ -276,7 +282,7 @@ def test_owner_scoped_access(client):
 # ---------------------------------------------------------------- 会员/配额展示档（PG off 默认视图）
 
 def test_me_defaults(client):
-    # 本套件无 V2PDF_PG_DSN（json 档）→ /me 回 free 默认视图：uid 回显、id_label 派生
+    # 本套件无 V2MD_PG_DSN（json 档）→ /me 回 free 默认视图：uid 回显、id_label 派生
     put_identity("test", "carol", "u_carol123")
     r = client.get("/me", headers={"X-Test-Auth": "carol"})
     assert r.status_code == 200, r.text
@@ -374,7 +380,7 @@ def test_post_resolve_only_threads_owner(client, monkeypatch):
                  "entries": [{"playlist_index": 1, "url": "e"}],
                  "artifacts": {"e": {"skipped": True}}, "status": "created"}, "", False)
 
-    import video2pdf.graph as graph_mod
+    import video2md.graph as graph_mod
     monkeypatch.setattr(graph_mod, "resolve_run", fake_resolve)
     put_identity("test", "erin", "uid_erin")
     r = client.post("/runs", json={"url": "whatever", "resolve_only": True},
@@ -433,7 +439,7 @@ import uuid
 import zipfile
 from datetime import datetime, timedelta
 
-import video2pdf.config as v2config
+import video2md.config as v2config
 
 _SEED_URL = "https://example.test/deliver-seed"
 
@@ -537,7 +543,7 @@ def test_ttl_expiry_lazy_burns_on_request(client, deliver):
 
 
 def test_sweep_outbox_sweeps_only_expired(client, deliver):
-    from video2pdf.api import _sweep_outbox
+    from video2md.api import _sweep_outbox
     put_identity("test", "alice", "uid_alice")
     _seed_delivered_run("r_old", "uid_alice", deliver, expires_in_h=-1)
     _seed_delivered_run("r_new", "uid_alice", deliver, expires_in_h=6)
@@ -554,7 +560,7 @@ def test_create_run_skip_requires_owner_and_shelf(deliver, monkeypatch):
                   "status": "completed"}}
     (Path(_TMP) / "state.json").write_text(json.dumps(st), encoding="utf-8")
     _seed_delivered_run("r_src", "uid_alice", deliver)
-    import video2pdf.runs as _r
+    import video2md.runs as _r
     monkeypatch.setattr(_r, "resolve_url", lambda u: [{"url": u, "id": ""}])
 
     a = _r.create_run(url, "", False, owner="uid_alice")
@@ -718,14 +724,14 @@ def test_prefs_validation_and_access(client):
 # ---------------------------------------------------------------- /auth/device/*（设备流桥）
 
 def test_auth_device_code_requires_config(client, monkeypatch):
-    import video2pdf.api as _api
+    import video2md.api as _api
     monkeypatch.setattr(_api, "ENV", {})  # 未配 client 凭据 → 500（服务端配置问题）
     assert client.post("/auth/device/code").status_code == 500
 
 
 def test_auth_device_code_proxies_google(client, monkeypatch):
 
-    import video2pdf.api as _api
+    import video2md.api as _api
     monkeypatch.setattr(_api, "ENV", {"GOOGLE_CLIENT_ID": "cid", "GOOGLE_CLIENT_SECRET": "sec"})
 
     class _Resp:
@@ -750,7 +756,7 @@ def test_auth_device_code_proxies_google(client, monkeypatch):
 
 
 def test_auth_device_token_pending_then_ok(client, monkeypatch):
-    import video2pdf.api as _api
+    import video2md.api as _api
     from acctkit import providers as _p
     monkeypatch.setattr(_api, "ENV", {"GOOGLE_CLIENT_ID": "cid", "GOOGLE_CLIENT_SECRET": "sec"})
 
@@ -772,19 +778,19 @@ def test_auth_device_token_pending_then_ok(client, monkeypatch):
 # ------------------------------------------- /auth/google/*（网页端授权码重定向登录）
 
 _GENV = {"GOOGLE_CLIENT_ID": "cid-web", "GOOGLE_CLIENT_SECRET": "sec-web",
-         "V2PDF_WEB_BASE_URL": "http://frontend.test",
-         "V2PDF_PUBLIC_BASE_URL": "http://api.public"}
+         "V2MD_WEB_BASE_URL": "http://frontend.test",
+         "V2MD_PUBLIC_BASE_URL": "http://api.public"}
 
 
 def _seed_state(st: str = "state-ok", ttl: float = 300.0) -> None:
-    import video2pdf.api as _api
+    import video2md.api as _api
     _api._GOOGLE_OAUTH_STATES[st] = time.monotonic() + ttl
 
 
 def test_auth_google_login_redirects_to_google(client, monkeypatch):
     import urllib.parse as _up
 
-    import video2pdf.api as _api
+    import video2md.api as _api
     monkeypatch.setattr(_api, "ENV", dict(_GENV))
     r = client.get("/auth/google/login", params={"terms_accepted": "1"}, follow_redirects=False)
     assert r.status_code == 302
@@ -798,13 +804,13 @@ def test_auth_google_login_redirects_to_google(client, monkeypatch):
     assert "openid" in q["scope"][0]
     st = q["state"][0]
     assert len(st) >= 32 and st in _api._GOOGLE_OAUTH_STATES  # 已登记待消费
-    assert "v2pdf_oauth_state" in r.headers.get("set-cookie", "")  # CSRF 绑定 cookie
+    assert "v2md_oauth_state" in r.headers.get("set-cookie", "")  # CSRF 绑定 cookie
 
 
 def test_auth_google_login_requires_terms_before_oauth(client, monkeypatch):
     import urllib.parse as _up
 
-    import video2pdf.api as _api
+    import video2md.api as _api
     monkeypatch.setattr(_api, "ENV", dict(_GENV))
     blocked = client.get("/auth/google/login", follow_redirects=False)
     assert blocked.status_code == 302
@@ -819,27 +825,8 @@ def test_auth_google_login_requires_terms_before_oauth(client, monkeypatch):
     assert _api._GOOGLE_OAUTH_STATES
 
 
-def test_auth_google_login_requires_terms_before_oauth(client, monkeypatch):
-    """P1 回归：未同意协议时，入口必须在创建 OAuth state 前拒绝请求。"""
-    import video2md.api as _api
-
-    monkeypatch.setattr(_api, "ENV", dict(_GENV))
-    blocked = client.get("/auth/google/login", follow_redirects=False)
-    assert blocked.status_code == 302
-    assert "auth_error=" in blocked.headers["location"]
-    assert "请先阅读并同意" in urllib.parse.unquote(blocked.headers["location"])
-    assert not _api._GOOGLE_OAUTH_STATES
-    assert "accounts.google.com" not in blocked.headers["location"]
-
-    allowed = client.get("/auth/google/login", params={"terms_accepted": "1"},
-                         follow_redirects=False)
-    assert allowed.status_code == 302
-    assert "accounts.google.com" in allowed.headers["location"]
-    assert _api._GOOGLE_OAUTH_STATES
-
-
 def test_auth_google_login_missing_config(client, monkeypatch):
-    import video2pdf.api as _api
+    import video2md.api as _api
     monkeypatch.setattr(_api, "ENV", {})
     r = client.get("/auth/google/login", params={"terms_accepted": "1"}, follow_redirects=False)
     assert r.status_code == 302
@@ -849,7 +836,7 @@ def test_auth_google_login_missing_config(client, monkeypatch):
 
 
 def test_auth_google_login_rate_limit(client):
-    import video2pdf.api as _api
+    import video2md.api as _api
     with pytest.MonkeyPatch.context() as mp:
         mp.setattr(_api, "ENV", dict(_GENV))
         mp.setattr(_api, "DEVICE_RATE_PER_MIN", 2)
@@ -863,7 +850,7 @@ def test_auth_google_login_rate_limit(client):
 
 
 def test_auth_google_callback_happy_path(client, monkeypatch):
-    import video2pdf.api as _api
+    import video2md.api as _api
     from acctkit import providers as _p
     monkeypatch.setattr(_api, "ENV", dict(_GENV))
     _seed_state("st-ok")
@@ -884,26 +871,26 @@ def test_auth_google_callback_happy_path(client, monkeypatch):
     monkeypatch.setattr(_p.GoogleProvider, "_verify",
                         lambda self, t: {"sub": "s1", "email": "a@b.test"})
     r = client.get("/auth/google/callback?code=abc&state=st-ok",
-                   cookies={"v2pdf_oauth_state": "st-ok"}, follow_redirects=False)
+                   cookies={"v2md_oauth_state": "st-ok"}, follow_redirects=False)
     assert r.status_code == 302
     assert r.headers["location"] == "http://frontend.test/#id_token=JWT.WT.OK"
     assert seen["url"] == _api._GOOGLE_OAUTH_TOKEN_URL
     assert seen["data"]["code"] == "abc" and seen["data"]["redirect_uri"] == \
         "http://api.public/auth/google/callback"
     assert "st-ok" not in _api._GOOGLE_OAUTH_STATES  # state 单次消费
-    assert 'v2pdf_oauth_state="";' in r.headers.get("set-cookie", "").replace(" ", "") \
-        or "v2pdf_oauth_state=;" in r.headers.get("set-cookie", "")  # cookie 已焚
+    assert 'v2md_oauth_state="";' in r.headers.get("set-cookie", "").replace(" ", "") \
+        or "v2md_oauth_state=;" in r.headers.get("set-cookie", "")  # cookie 已焚
 
 
 def test_google_oauth_proxy_rejects_retired_17898(monkeypatch):
     """OAuth must never silently fall back to the retired mihomo 17898 port."""
-    import video2pdf.api as _api
+    import video2md.api as _api
     env = dict(_GENV)
-    env["V2PDF_GOOGLE_OAUTH_PROXY_URL"] = "http://127.0.0.1:17898"
+    env["V2MD_GOOGLE_OAUTH_PROXY_URL"] = "http://127.0.0.1:17898"
     monkeypatch.setattr(_api, "ENV", env)
     with pytest.raises(RuntimeError, match="17898"):
         _api._google_oauth_proxy()
-    env["V2PDF_GOOGLE_OAUTH_PROXY_URL"] = ""
+    env["V2MD_GOOGLE_OAUTH_PROXY_URL"] = ""
     assert _api._google_oauth_proxy() is None
 
 
@@ -912,7 +899,7 @@ def test_auth_google_redirect_round_trip(client, monkeypatch):
     站外/协议相对路径不记账（防开放重定向）。"""
     import urllib.parse as _up
 
-    import video2pdf.api as _api
+    import video2md.api as _api
     from acctkit import providers as _p
     monkeypatch.setattr(_api, "ENV", dict(_GENV))
 
@@ -939,7 +926,7 @@ def test_auth_google_redirect_round_trip(client, monkeypatch):
     monkeypatch.setattr(httpx.AsyncClient, "post", _fake_post)
     monkeypatch.setattr(_p.GoogleProvider, "_verify", lambda self, t: {"sub": "s1"})
     r = client.get(f"/auth/google/callback?code=abc&state={st}",
-                   cookies={"v2pdf_oauth_state": st}, follow_redirects=False)
+                   cookies={"v2md_oauth_state": st}, follow_redirects=False)
     assert r.headers["location"] == \
         "http://frontend.test/?redirect=%2Fread%2Fr1%3Fp%3D2#id_token=JWT.WT.OK"
     assert st not in _api._GOOGLE_OAUTH_REDIRECTS
@@ -947,7 +934,7 @@ def test_auth_google_redirect_round_trip(client, monkeypatch):
 
 def test_auth_google_callback_state_rejected(client, monkeypatch):
     """未知 state / 缺 cookie / cookie 不符 → fragment 错误出口；合法 state 被消耗。"""
-    import video2pdf.api as _api
+    import video2md.api as _api
     monkeypatch.setattr(_api, "ENV", dict(_GENV))
 
     def _assert_rejected(r):
@@ -955,7 +942,7 @@ def test_auth_google_callback_state_rejected(client, monkeypatch):
 
     # (a) 未知 state
     _assert_rejected(client.get("/auth/google/callback?code=abc&state=nope",
-                                cookies={"v2pdf_oauth_state": "nope"}, follow_redirects=False))
+                                cookies={"v2md_oauth_state": "nope"}, follow_redirects=False))
     # (b) 合法 state 但缺 cookie
     _seed_state("st-nc")
     _assert_rejected(client.get("/auth/google/callback?code=abc&state=st-nc",
@@ -964,16 +951,16 @@ def test_auth_google_callback_state_rejected(client, monkeypatch):
     # (c) 合法 state + cookie 值不符
     _seed_state("st-bad")
     _assert_rejected(client.get("/auth/google/callback?code=abc&state=st-bad",
-                                cookies={"v2pdf_oauth_state": "other"}, follow_redirects=False))
+                                cookies={"v2md_oauth_state": "other"}, follow_redirects=False))
     # (d) 缺 code（用户在 Google 授权页取消）
     _seed_state("st-nocode")
     r = client.get("/auth/google/callback?state=st-nocode",
-                   cookies={"v2pdf_oauth_state": "st-nocode"}, follow_redirects=False)
+                   cookies={"v2md_oauth_state": "st-nocode"}, follow_redirects=False)
     assert r.status_code == 302 and "auth_error=" in r.headers["location"]
 
 
 def test_auth_google_callback_exchange_rejected(client, monkeypatch):
-    import video2pdf.api as _api
+    import video2md.api as _api
     monkeypatch.setattr(_api, "ENV", dict(_GENV))
     _seed_state("st-x")
 
@@ -988,12 +975,12 @@ def test_auth_google_callback_exchange_rejected(client, monkeypatch):
 
     monkeypatch.setattr(httpx.AsyncClient, "post", _fake_post)
     r = client.get("/auth/google/callback?code=abc&state=st-x",
-                   cookies={"v2pdf_oauth_state": "st-x"}, follow_redirects=False)
+                   cookies={"v2md_oauth_state": "st-x"}, follow_redirects=False)
     assert r.status_code == 302 and "auth_error=" in r.headers["location"]
 
 
 def test_auth_google_callback_verify_fails(client, monkeypatch):
-    import video2pdf.api as _api
+    import video2md.api as _api
     from acctkit import providers as _p
     monkeypatch.setattr(_api, "ENV", dict(_GENV))
     _seed_state("st-v")
@@ -1011,13 +998,13 @@ def test_auth_google_callback_verify_fails(client, monkeypatch):
     monkeypatch.setattr(_p.GoogleProvider, "_verify",
                         lambda self, t: (_ for _ in ()).throw(ValueError("bad aud")))
     r = client.get("/auth/google/callback?code=abc&state=st-v",
-                   cookies={"v2pdf_oauth_state": "st-v"}, follow_redirects=False)
+                   cookies={"v2md_oauth_state": "st-v"}, follow_redirects=False)
     assert r.status_code == 302 and "auth_error=" in r.headers["location"]
 
 
 def test_multi_aud_google_provider_registration():
     from acctkit.providers import make_provider
-    from video2pdf.auth.ext_google import MultiAudGoogleProvider
+    from video2md.auth.ext_google import MultiAudGoogleProvider
 
     # 双 client 并存：audiences 去重保序 [web, tv]
     p = make_provider("google", {"GOOGLE_CLIENT_ID": "tv", "GOOGLE_WEB_CLIENT_ID": "web"})
@@ -1033,7 +1020,7 @@ def test_multi_aud_google_provider_registration():
 # ---------------------------------------------------------------- 配额闸（终局布局·限流配额）
 
 def test_queue_full_429(client):
-    import video2pdf.api as _api
+    import video2md.api as _api
     _api._TASKS["occupied"] = {"status": "queued", "url": "u", "owner": "someone",
                                "created": "x"}
     try:
@@ -1048,7 +1035,7 @@ def test_queue_full_429(client):
 
 
 def test_user_queue_full_429(client):
-    import video2pdf.api as _api
+    import video2md.api as _api
     _api._TASKS["mine"] = {"status": "running", "url": "u", "owner": _dev_uid(),
                            "created": "x"}
     try:
@@ -1062,14 +1049,14 @@ def test_user_queue_full_429(client):
 
 
 def test_rate_limited_429(client, monkeypatch):
-    import video2pdf.api as _api
+    import video2md.api as _api
 
     def fake_resolve(url, part_items, force, run_id, owner):
         return ({"run_id": run_id or "rk", "total": 1,
                  "entries": [{"playlist_index": 1, "url": "e"}],
                  "artifacts": {"e": {}}, "status": "created"}, "", False)
 
-    import video2pdf.graph as graph_mod
+    import video2md.graph as graph_mod
     monkeypatch.setattr(graph_mod, "resolve_run", fake_resolve)
     _api._USER_SUBMIT_TS.clear()
     try:
@@ -1089,7 +1076,7 @@ def test_rate_limited_429(client, monkeypatch):
 
 def _stub_resolve(monkeypatch):
     """POST /runs 成功路径共用：假 resolve（不落盘也行，_TASKS/runs.json 形状由并发专测覆盖）。"""
-    import video2pdf.graph as graph_mod
+    import video2md.graph as graph_mod
 
     def fake_resolve(url, part_items, force, run_id, owner):
         return ({"run_id": run_id or "rk", "total": 1,
@@ -1100,7 +1087,7 @@ def _stub_resolve(monkeypatch):
 
 
 def test_local_path_policy(client, monkeypatch):
-    import video2pdf.api as _api
+    import video2md.api as _api
     _stub_resolve(monkeypatch)
     # auto + AUTH=off（本套件 env）→ 裸路径放行（开发/自托管姿势）
     ok = client.post("/runs", json={"url": "/etc/passwd", "resolve_only": True})
@@ -1125,7 +1112,7 @@ def test_local_path_policy(client, monkeypatch):
     with pytest.MonkeyPatch.context() as mp:
         mp.setattr(_api, "LOCAL_PATHS", "auto")
         mp.setattr(_api, "UPLOADS_DIR", up)
-        mp.setitem(_api.ENV, "V2PDF_AUTH", "google")
+        mp.setitem(_api.ENV, "V2MD_AUTH", "google")
         assert client.post("/runs", json={"url": str(mine),
                                           "resolve_only": True}).status_code == 200
         for bad in ("/etc/passwd", str(other), str(up / "escape.mp4")):
@@ -1134,7 +1121,7 @@ def test_local_path_policy(client, monkeypatch):
 
 
 def test_upload_roundtrip_and_gates(client, monkeypatch):
-    import video2pdf.api as _api
+    import video2md.api as _api
     up = Path(_TMP) / "uploads"
     monkeypatch.setattr(_api, "UPLOADS_DIR", up)
     dev = _dev_uid()
@@ -1197,7 +1184,7 @@ def test_upload_roundtrip_and_gates(client, monkeypatch):
 
 
 def test_sweep_uploads_ttl(client, monkeypatch):
-    import video2pdf.api as _api
+    import video2md.api as _api
     up = Path(_TMP) / "uploads-sweep"
     f = up / _dev_uid() / "old.mp4"
     f.parent.mkdir(parents=True, exist_ok=True)
@@ -1212,8 +1199,8 @@ def test_sweep_uploads_ttl(client, monkeypatch):
 # ---------------------------------------------------------------- 成本归因→预算闸（P2-2）
 
 def test_budget_gate_and_cost_endpoint(client, monkeypatch):
-    import video2pdf.api as _api
-    import video2pdf.runs as _runs_mod
+    import video2md.api as _api
+    import video2md.runs as _runs_mod
     put_identity("test", "alice", "uid_alice")
     # 本月已结算 $5 的 run（json 档：created 用本月真实日期保证进统计窗）
     month_now = datetime.now().strftime("%Y-%m")
@@ -1261,9 +1248,9 @@ def test_budget_gate_and_cost_endpoint(client, monkeypatch):
 
 def test_usage_accumulate_and_settle(monkeypatch, tmp_path):
     """归因链路单测：ContextVar 绑定→bump 累计→settle 按单价结算落记录（幂等）。"""
-    import video2pdf.runs as _runs_mod
-    import video2pdf.util as _util
-    from video2pdf import llm as _llm
+    import video2md.runs as _runs_mod
+    import video2md.util as _util
+    from video2md import llm as _llm
     monkeypatch.setattr(_runs_mod, "RUNS_FILE", tmp_path / "runs.json")
     monkeypatch.setattr(_runs_mod, "_RUNS_LOCKFILE", _runs_mod.RUNS_FILE.with_suffix(".lock"))
 
@@ -1299,7 +1286,7 @@ def test_usage_accumulate_and_settle(monkeypatch, tmp_path):
 
 
 def test_cost_cli_export(client, monkeypatch, capsys):
-    import video2pdf.runs as _runs_mod
+    import video2md.runs as _runs_mod
     put_identity("test", "alice", "uid_alice")
     month_now = datetime.now().strftime("%Y-%m")
     rec = _seed_run("exp1", "uid_alice")
@@ -1308,9 +1295,9 @@ def test_cost_cli_export(client, monkeypatch, capsys):
     rec["usage"] = {"llm_in_tok": 10, "llm_out_tok": 20, "gpu_s": 30.0}
     with _runs_mod._runs_file_lock():
         _runs_mod._runs_merge(rec)
-    import video2pdf.__main__ as main_mod
+    import video2md.__main__ as main_mod
     with pytest.MonkeyPatch.context() as mp:
-        mp.setattr("sys.argv", ["video2pdf", "cost", "--uid", "uid_alice"])
+        mp.setattr("sys.argv", ["video2md", "cost", "--uid", "uid_alice"])
         main_mod.main()
     out = capsys.readouterr().out.strip().splitlines()
     rows = [json.loads(ln) for ln in out]
@@ -1323,7 +1310,7 @@ def test_cost_cli_export(client, monkeypatch, capsys):
 # ---------------------------------------------------------------- 匿名面限流（P0-2）
 
 def test_device_rate_limit_and_xff(client, monkeypatch):
-    import video2pdf.api as _api
+    import video2md.api as _api
 
     async def _fake_google_code():
         return {"device_code": "dc", "user_code": "uc", "expires_in": 1800,
@@ -1383,9 +1370,9 @@ def _cancel_stubs(monkeypatch, graph_fn):
     读记录），假图必须同款收尾——只改 _TASKS 的假图会让顶层 status 永远停在 running。"""
     import asyncio
 
-    import video2pdf.api as _api
-    import video2pdf.graph as graph_mod
-    import video2pdf.runs as _runs_mod
+    import video2md.api as _api
+    import video2md.graph as graph_mod
+    import video2md.runs as _runs_mod
 
     def fake_resolve(url, part_items, force, run_id, owner):
         rec = {"run_id": run_id, "url": url, "part_items": part_items, "owner": owner,
@@ -1487,7 +1474,7 @@ def test_pg_unavailable_503_envelope(client, monkeypatch):
     """P1-8：PG 超预算 → 快速 503（统一信封），不挂死不 500。"""
     from psycopg_pool import PoolTimeout
 
-    import video2pdf.api as _api
+    import video2md.api as _api
 
     class _DeadStore:
         def total_active(self):
@@ -1511,7 +1498,7 @@ def test_stage_loop_head_cancel_gate():
     标志不在 → skipped-only 条目正常走完（不被误伤）。"""
     import tempfile as _tf
 
-    from video2pdf import runs as rmod
+    from video2md import runs as rmod
 
     class _Span:
         def __enter__(self):
@@ -1525,7 +1512,7 @@ def test_stage_loop_head_cancel_gate():
         def span(self, *a, **k):
             return _Span()
 
-    run = {"run_id": "cx1", "tmp": _tf.mkdtemp(prefix="v2pdf-cancel-"), "entries": [{"url": "u"}],
+    run = {"run_id": "cx1", "tmp": _tf.mkdtemp(prefix="v2md-cancel-"), "entries": [{"url": "u"}],
            "artifacts": {"u": {"skipped": True}}, "stages": {}}
     rmod.request_cancel("cx1")
     try:
@@ -1543,7 +1530,7 @@ def test_stage_loop_head_cancel_gate():
 def test_concurrent_runs_and_per_user_cap(client, monkeypatch):
     import asyncio
 
-    import video2pdf.api as _api
+    import video2md.api as _api
 
     def fake_graph(url, *, part_items="", force=False, review=False, max_frames=60,
                    run_id="", checkpointer=None, owner=""):
@@ -1560,7 +1547,7 @@ def test_concurrent_runs_and_per_user_cap(client, monkeypatch):
         runs._save_runs(db)
         return rec, "", False
 
-    import video2pdf.graph as graph_mod
+    import video2md.graph as graph_mod
     monkeypatch.setattr(graph_mod, "resolve_run", fake_resolve)
     monkeypatch.setattr(_api, "run_graph", fake_graph)
     monkeypatch.setattr(_api, "_SEMA", asyncio.Semaphore(2))  # 并发闸门=2
@@ -1596,7 +1583,7 @@ def test_concurrent_runs_and_per_user_cap(client, monkeypatch):
 
 def test_current_log_contextvar_two_threads():
     """并发多 run 时 current_log 按 ContextVar 取本 run 的 log（不再 dict 第一个）。"""
-    from video2pdf import util
+    from video2md import util
     log_a = util.RunLog("stageA", run_id="runA")
     log_b = util.RunLog("stageB", run_id="runB")
     util._STAGE_LOGS.update(runA=log_a, runB=log_b)
@@ -1625,7 +1612,7 @@ def test_current_log_contextvar_two_threads():
 
 def test_state_save_concurrent_no_tear():
     """state.json 原子写：四线程并发全量写，读侧恒为合法完整 JSON。"""
-    from video2pdf import util
+    from video2md import util
 
     def worker(i: int) -> None:
         for k in range(50):
@@ -1679,7 +1666,7 @@ class _FakeTaskStore:
 
 def test_tasks_pg_backend_readside(client, monkeypatch):
     """PG 档读侧换源：/queue、配额闸、滑窗全走 fake backend，不再碰进程内 _TASKS。"""
-    import video2pdf.api as _api
+    import video2md.api as _api
 
     fake = _FakeTaskStore(queued=7, running=3, active_total=10, mine=4)
     monkeypatch.setattr(_api, "_TASKS_PG", fake)
@@ -1711,8 +1698,8 @@ def test_tasks_pg_backend_readside(client, monkeypatch):
 
 def test_tasks_pg_dedup_alive(client, monkeypatch):
     """dedup 判活 PG 档：本进程 _TASKS 无活条目、DB is_alive=True → 不重投，回旧状态。"""
-    import video2pdf.api as _api
-    import video2pdf.graph as graph_mod
+    import video2md.api as _api
+    import video2md.graph as graph_mod
 
     dup_rec = {"run_id": "dupx", "url": "https://example.test/dup", "part_items": "",
                "owner": _dev_uid(), "created": "2026-01-01T00:00:00", "tmp": "",
@@ -1737,8 +1724,8 @@ def test_tasks_pg_dedup_alive(client, monkeypatch):
 
 def test_tasks_pg_dead_dup_requeues(client, monkeypatch):
     """DB 判活=False（崩溃残档）→ 既有重驱路径不变。"""
-    import video2pdf.api as _api
-    import video2pdf.graph as graph_mod
+    import video2md.api as _api
+    import video2md.graph as graph_mod
 
     dup_rec = {"run_id": "dead1", "url": "https://example.test/dead", "part_items": "",
                "owner": _dev_uid(), "created": "2026-01-01T00:00:00", "tmp": "",
@@ -1766,7 +1753,7 @@ def test_tasks_pg_dead_dup_requeues(client, monkeypatch):
 
 
 def run_all() -> None:  # `python3 test_api_contract.py` 兜底（无 pytest 时）
-    # 必须走子进程：直跑时本模块已以 __main__ 身份 exec 过一遍（env 段 + import video2pdf.*），
+    # 必须走子进程：直跑时本模块已以 __main__ 身份 exec 过一遍（env 段 + import video2md.*），
     # 同进程再 pytest.main(__file__) 会把本文件二次加载成独立模块 → 两份 _TMP/两份 config
     # 快照落在不同临时目录，读侧写侧错位（实测泄漏打穿 deliver 幂等与 owner 隔离两例）。
     import subprocess
@@ -1779,7 +1766,7 @@ if __name__ == "__main__":
 
 
 def test_prefs_first_request_creates_nested_directory(client, monkeypatch, tmp_path):
-    from video2pdf import prefs
+    from video2md import prefs
     monkeypatch.setattr(prefs, "_STORE", prefs.JsonPrefsStore(tmp_path / "new-data" / "prefs.json"))
     monkeypatch.setattr(prefs, "_store_resolved", True)
     put_identity("test", "alice", "uid_alice")
@@ -1791,7 +1778,7 @@ def test_prefs_first_request_creates_nested_directory(client, monkeypatch, tmp_p
 
 
 def test_web_media_requires_owner_and_referenced_file(client, tmp_path):
-    from video2pdf.config import OUT_DIR
+    from video2md.config import OUT_DIR
     put_identity("test", "alice", "uid_alice")
     put_identity("test", "bob", "uid_bob")
     _seed_run("web_media", "uid_alice")
@@ -1967,7 +1954,7 @@ def test_deleting_task_keeps_monthly_cost_and_budget_accounting(client):
 
 
 def test_same_url_submission_reuses_an_already_queued_run(client, monkeypatch):
-    import video2pdf.graph as graph_mod
+    import video2md.graph as graph_mod
     real_resolve = graph_mod.resolve_run
     started, release = threading.Event(), threading.Event()
     def workload(url, *, run_id=""):
@@ -2008,7 +1995,7 @@ def test_json_startup_restores_persisted_queued_work(monkeypatch):
 
 @pytest.fixture
 def llm_settings_path(tmp_path, monkeypatch):
-    from video2pdf import config
+    from video2md import config
     monkeypatch.setattr(config, "PREFS_FILE", tmp_path / "prefs.json")
     monkeypatch.setattr(config, "PREFS_STORE", "json")
     monkeypatch.setitem(config.ENV, "V2MD_LLM_SETTINGS_KEY", "hex:" + "11" * 32)
@@ -2017,7 +2004,7 @@ def llm_settings_path(tmp_path, monkeypatch):
 
 
 def test_llm_settings_private_persistent_update_and_clear(client, llm_settings_path):
-    from video2pdf import llm_settings
+    from video2md import llm_settings
     put_identity("test", "alice", "uid_alice")
     put_identity("test", "bob", "uid_bob")
     alice, bob = {"X-Test-Auth": "alice"}, {"X-Test-Auth": "bob"}
@@ -2104,7 +2091,7 @@ def test_llm_user_credentials_follow_graph_threads_without_leaking(llm_settings_
 
     from langgraph.graph import END, START, StateGraph
 
-    from video2pdf import llm, llm_settings
+    from video2md import llm, llm_settings
 
     for uid in ("alice", "bob"):
         llm_settings.update(uid, base_url=f"https://{uid}.example/v1", api_key=uid + "-secret", model=uid)
@@ -2182,7 +2169,7 @@ def test_framework_colab_failure_is_visible_without_provider_secrets(client):
 
 def test_drive_preserves_nested_graph_errors(monkeypatch):
     """node_fail returns errors under ``run``; the task view must retain them."""
-    import video2pdf.api as _api
+    import video2md.api as _api
 
     run_id = "nested-graph-error"
     _api._TASKS[run_id] = {"status": "queued", "url": "fixture", "owner": ""}
@@ -2233,14 +2220,14 @@ def test_partial_without_notes_has_quality_diagnostic_and_is_not_a_book(client):
 
 
 def test_cached_tokens_and_free_gpu_cost_are_settled_with_price_snapshot(monkeypatch, tmp_path):
-    from video2pdf import llm, util
+    from video2md import llm, util
     monkeypatch.setattr(runs, 'RUNS_FILE', tmp_path / 'runs.json')
     monkeypatch.setattr(runs, '_RUNS_LOCKFILE', tmp_path / 'runs.lock')
     monkeypatch.setattr(runs, 'PRICE_LLM_IN_MTOK', 0.14)
     monkeypatch.setattr(runs, 'PRICE_LLM_OUT_MTOK', 0.28)
     monkeypatch.setattr(runs, 'PRICE_LLM_CACHED_IN_MTOK', 0.0028, raising=False)
     monkeypatch.setattr(runs, 'PRICE_GPU_MIN', 0.0)
-    monkeypatch.setitem(runs.ENV, 'V2PDF_GPU_PRICE_POLICY', 'free')
+    monkeypatch.setitem(runs.ENV, 'V2MD_GPU_PRICE_POLICY', 'free')
     runs._USAGE.clear()
     rid = 'cached-priced'
     with runs._runs_file_lock():
@@ -2282,7 +2269,7 @@ def test_stage_proof_records_files_timestamps_and_local_gpu_attribution(tmp_path
 
 def test_completed_live_artifact_submission_reuses_run_without_new_work(client, monkeypatch, tmp_path):
     put_identity('test', 'alice', 'uid_alice')
-    import video2pdf.graph as graph
+    import video2md.graph as graph
     note = tmp_path / 'existing.md'
     note.write_text('# Completed textbook')
     rec = _seed_run('already-billed', 'uid_alice', status='done')
@@ -2325,11 +2312,11 @@ def test_oauth_transport_failure_is_safe_and_fresh_login_recovers(client, monkey
     """Production timeout replay: consume state, show retry, never replay code."""
     import urllib.parse as up
 
-    import video2pdf.api as api
+    import video2md.api as api
     from acctkit.providers import GoogleProvider
 
-    env = {**_GENV, 'V2PDF_GOOGLE_OAUTH_TIMEOUT_S': '9',
-           'V2PDF_GOOGLE_OAUTH_PROXY_URL': 'http://oauth-relay.test:18080'}
+    env = {**_GENV, 'V2MD_GOOGLE_OAUTH_TIMEOUT_S': '9',
+           'V2MD_GOOGLE_OAUTH_PROXY_URL': 'http://oauth-relay.test:18080'}
     monkeypatch.setattr(api, 'ENV', env)
     events, calls = [], []
     monkeypatch.setattr(api, '_req_log', lambda *args, **kw: events.append((args, kw)))
@@ -2372,8 +2359,8 @@ def test_oauth_transport_failure_is_safe_and_fresh_login_recovers(client, monkey
 
 @pytest.mark.parametrize(('value', 'expected'), [('1', 3), ('999', 60), ('invalid', 15), ('9', 9)])
 def test_oauth_exchange_timeout_is_bounded(value, expected, monkeypatch):
-    import video2pdf.api as api
-    monkeypatch.setattr(api, 'ENV', {'V2PDF_GOOGLE_OAUTH_TIMEOUT_S': value})
+    import video2md.api as api
+    monkeypatch.setattr(api, 'ENV', {'V2MD_GOOGLE_OAUTH_TIMEOUT_S': value})
     assert api._google_oauth_timeout_s() == expected
 
 

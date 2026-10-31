@@ -7,7 +7,7 @@
 - apply_migrations：advisory lock 串行化（并发副本/并发跑只一份生效）+ 每迁移
   单事务（SQL 与版本行同进同退）。全部幂等——存量库（基线前建的表）重跑 no-op
   直接补记版本行，即 Flyway「基线盖戳」语义，无需特殊探测分支。
-- validate_schema：库版本落后 → 拒起并提示跑 `python -m video2pdf migrate`；
+- validate_schema：库版本落后 → 拒起并提示跑 `python -m video2md migrate`；
   超前（新库旧代码，回滚场景）→ 拒起提示先处理部署，别让旧代码硬跑新 schema。
 - 校验收口在 pg.shared_pool()（store/checkpointer/events 全走它）；make_pool 不校验
   ——migrate CLI 与真库测试用 make_pool 自管 schema。
@@ -45,7 +45,7 @@ _LEGACY_PREFIX, _PREFIX = "v2md_", "v2pdf_"
 
 
 def _rename_legacy_relations(conn) -> list[str]:
-    """改名兼容（video2md → video2pdf）：存量库 v2md_* 表/索引/序列整体改名为 v2pdf_*。
+    """历史兼容：存量库 v2md_* 表/索引/序列整体改名为 v2pdf_*。
 
     只在「有旧版本表、无新版本表」时执行一次，单事务进退；之后版本表已是新名，
     后续迁移照常按号补齐。返回改名前的关系名列表（空 = 无需改名）。
@@ -116,9 +116,9 @@ def validate_schema(pool: ConnectionPool) -> None:
         v = 0
     if v < SCHEMA_LATEST:
         raise RuntimeError(
-            f"schema 版本落后（库 {v} < 代码 {SCHEMA_LATEST}）：跑 `python -m video2pdf migrate`"
-            " 后再启动（容器：docker compose run --rm --no-deps video2pdf"
-            " python -m video2pdf migrate）")
+            f"schema 版本落后（库 {v} < 代码 {SCHEMA_LATEST}）：跑 `python -m video2md migrate`"
+            " 后再启动（容器：docker compose run --rm --no-deps video2md"
+            " python -m video2md migrate）")
     if v > SCHEMA_LATEST:
         raise RuntimeError(
             f"schema 版本超前（库 {v} > 代码 {SCHEMA_LATEST}）：本代码比库旧——"
