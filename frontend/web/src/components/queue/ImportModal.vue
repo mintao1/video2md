@@ -5,7 +5,7 @@ import BottomSheet from '../common/BottomSheet.vue'
 const props = defineProps<{ modelValue: boolean; error?: string; busy?: boolean }>()
 const emit = defineEmits<{
   (e: 'update:modelValue', v: boolean): void
-  (e: 'start', payload: { url: string; title?: string; file?: File }): void
+  (e: 'start', payload: { url: string; title?: string; file?: File; partItems?: string }): void
   (e: 'draft'): void
 }>()
 
@@ -16,6 +16,7 @@ const tocEnabled = ref(true)
 const template = ref<'academic' | 'notes'>('academic')
 const validationError = ref('')
 const file = ref<File | null>(null)
+const partItems = ref('')
 
 watch(
   () => props.modelValue,
@@ -25,9 +26,10 @@ watch(
       const saved = localStorage.getItem('v2md_import_draft')
       if (saved) {
         try {
-          const draft = JSON.parse(saved) as { source?: typeof source.value; url?: string; ocrEnabled?: boolean; tocEnabled?: boolean; template?: typeof template.value }
+          const draft = JSON.parse(saved) as { source?: typeof source.value; url?: string; partItems?: string; ocrEnabled?: boolean; tocEnabled?: boolean; template?: typeof template.value }
           if (draft.source) source.value = draft.source
           if (typeof draft.url === 'string') url.value = draft.url
+          if (typeof draft.partItems === 'string') partItems.value = draft.partItems
           if (typeof draft.ocrEnabled === 'boolean') ocrEnabled.value = draft.ocrEnabled
           if (typeof draft.tocEnabled === 'boolean') tocEnabled.value = draft.tocEnabled
           if (draft.template) template.value = draft.template
@@ -57,6 +59,18 @@ function start() {
     validationError.value = '请选择要上传的视频或音频文件'
     return
   }
+  const selected = partItems.value.trim().replace(/\s+/g, '')
+  if (selected && !/^\d+(?:-\d+)?(?:,\d+(?:-\d+)?)*$/.test(selected)) {
+    validationError.value = '合集条目格式应为 1,3-5，留空表示全部'
+    return
+  }
+  if (selected && selected.split(',').some((token) => {
+    const [start, end = start] = token.split('-').map(Number)
+    return start < 1 || end < start
+  })) {
+    validationError.value = '合集条目范围必须从 1 开始，且起止顺序正确'
+    return
+  }
   emit('start', {
     url: url.value.trim(),
     title:
@@ -66,6 +80,7 @@ function start() {
           ? '网盘提取视频'
           : undefined,
     file: source.value === 'local' ? file.value ?? undefined : undefined,
+    partItems: source.value === 'local' ? undefined : selected || undefined,
   })
 }
 
@@ -73,6 +88,7 @@ function saveDraft() {
   localStorage.setItem('v2md_import_draft', JSON.stringify({
     source: source.value,
     url: url.value,
+    partItems: partItems.value,
     ocrEnabled: ocrEnabled.value,
     tocEnabled: tocEnabled.value,
     template: template.value,
@@ -155,6 +171,20 @@ function saveDraft() {
       <p v-if="busy" role="status" aria-live="polite" class="text-sm text-on-surface-variant">
         正在读取视频与合集信息，请稍候。解析成功后会自动加入队列。
       </p>
+      <label v-if="source !== 'local'" class="flex flex-col gap-1 px-1">
+        <span class="font-label-md text-label-md text-on-surface-variant">合集条目（可选）</span>
+        <input
+          v-model="partItems"
+          :disabled="busy"
+          type="text"
+          inputmode="numeric"
+          autocomplete="off"
+          placeholder="留空处理全部，如 1,3-5"
+          aria-describedby="part-items-hint"
+          class="w-full rounded-lg border border-outline-variant/40 bg-surface-container-low px-3 py-2 text-sm text-on-surface focus:border-primary focus:outline-none"
+        />
+        <span id="part-items-hint" class="text-[11px] text-outline">仅对合集生效；单视频留空即可。</span>
+      </label>
       <div class="flex items-center gap-space-xs text-[11px] text-outline px-1">
         <span class="material-symbols-outlined text-[14px]">info</span>
         <span>已自动读取剪贴板链接 · 支持分P全集一键解析</span>
