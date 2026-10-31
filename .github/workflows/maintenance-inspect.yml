@@ -1,0 +1,44 @@
+name: Maintenance inspect
+
+on:
+  workflow_dispatch:
+
+jobs:
+  node-inspect:
+    runs-on: ubuntu-latest
+    environment: prod
+    steps:
+      - name: Setup SSH
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H "${{ secrets.SSH_HOST }}" >> ~/.ssh/known_hosts
+      - name: Inspect production node disk
+        run: |
+          set -euo pipefail
+          ssh "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" 'bash -s' <<'REMOTE'
+          set -euo pipefail
+          echo '=== filesystem ==='
+          df -h /
+          echo '=== top filesystem paths ==='
+          sudo du -xhd1 /var/lib/docker 2>/dev/null | sort -h || true
+          sudo du -xhd1 /var/lib/rancher 2>/dev/null | sort -h || true
+          echo '=== docker usage ==='
+          docker system df || true
+          echo '=== docker containers ==='
+          docker ps -a --format '{{.Names}}\t{{.Status}}\t{{.Image}}' || true
+          echo '=== docker images ==='
+          docker images --format '{{.Repository}}:{{.Tag}}\t{{.Size}}\t{{.CreatedSince}}' | sort -k2 -h || true
+          echo '=== k3s workloads ==='
+          sudo k3s kubectl get pods -A -o wide || true
+          echo '=== k3s images ==='
+          sudo k3s crictl images || true
+          echo '=== docker volumes ==='
+          docker system df -v || true
+          echo '=== deploy stack directories ==='
+          find "$HOME/stack" -maxdepth 2 -mindepth 1 -type d -print 2>/dev/null | sort || true
+          echo '=== large files under stack/data ==='
+          sudo find "$HOME/stack" /var/lib/docker/volumes -xdev -type f -size +500M -printf '%s %p\n' 2>/dev/null | sort -n | tail -50 || true
+          REMOTE
