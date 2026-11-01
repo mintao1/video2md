@@ -1,0 +1,36 @@
+name: Disk inspection
+on:
+  push:
+    branches: [codex/disk-inspect]
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup SSH
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H "${{ secrets.SSH_HOST }}" >> ~/.ssh/known_hosts
+      - name: Inspect node storage
+        run: |
+          set -euo pipefail
+          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} 'bash -s' <<'REMOTE'
+          set -euo pipefail
+          echo "== df =="
+          df -h / /var/lib/rancher/k3s /var/lib/docker 2>/dev/null || true
+          echo "== top directories =="
+          for p in /var/lib/rancher/k3s /var/lib/docker /home /opt /srv; do
+            if [ -d "$p" ]; then du -xhd1 "$p" 2>/dev/null | sort -h | tail -20; fi
+          done
+          echo "== docker disk =="
+          docker system df 2>/dev/null || true
+          echo "== k3s images =="
+          sudo k3s ctr images list 2>/dev/null | sed -n '1,160p' || true
+          echo "== stack directories =="
+          find "$HOME/stack" -maxdepth 2 -type d 2>/dev/null | sort | while read -r d; do du -sh "$d" 2>/dev/null || true; done
+          REMOTE
