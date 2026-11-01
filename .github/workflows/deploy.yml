@@ -252,6 +252,16 @@ jobs:
             echo '✓ all rendered images imported and verified in k3s containerd'
           "
 
+      - name: Release rebuildable build caches before apply
+        run: |
+          set -euo pipefail
+          PRODUCT="${{ inputs.product || 'video2md' }}"
+          # docker build may leave layers even after the tagged image is
+          # removed. Re-run the bounded cleanup before the second guard so
+          # build cache cannot consume the rollout's safety margin.
+          ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
+            "KEEP_ROLLOUTS=1 bash -s" < "${PRODUCT}/scripts/node-safe-cleanup.sh"
+
       - name: Guard node disk pressure before apply
         env:
           MIN_FREE_GIB: ${{ steps.limits.outputs.min_free_gib }}
