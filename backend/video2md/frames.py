@@ -285,7 +285,7 @@ def ocr_remote(frames: list[tuple[float, Path]], base: str, client=None) -> list
     import httpx
 
     opened = [p.open("rb") for _t, p in frames]
-    http = client or httpx.Client(timeout=httpx.Timeout(30.0, read=1800.0))
+    http = client or httpx.Client(trust_env=False, timeout=httpx.Timeout(30.0, read=1800.0))
     try:
         files = [("images", (p.name, fh, "image/jpeg")) for (_t, p), fh in zip(frames, opened)]
         print(f"  ☁️ 远端 GPU OCR → {base.rsplit('//', 1)[-1]}（{len(frames)} 帧一批）")

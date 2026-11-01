@@ -1192,7 +1192,10 @@ async def _google_device_code() -> dict:
         raise HTTPException(500, "服务端未配置 GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET，"
                                  "无法提供设备流登录")
     try:
-        async with httpx.AsyncClient(timeout=15) as c:
+        # Google auth must use the explicitly configured route only. Ambient
+        # SOCKS_PROXY values on a build/worker node can make httpx import
+        # optional socksio and fail before the request is even made.
+        async with httpx.AsyncClient(timeout=15, trust_env=False) as c:
             r = await c.post(_GOOGLE_DEVICE_CODE_URL,
                              data={"client_id": cid, "client_secret": secret,
                                    "scope": "openid email profile"})
@@ -1356,7 +1359,8 @@ async def auth_google_callback(request: Request, code: str = "", state: str = ""
     redirect_uri = f"{_google_public_base()}/auth/google/callback"
     try:
         async with httpx.AsyncClient(timeout=_google_oauth_timeout_s(),
-                                     proxy=_google_oauth_proxy()) as c:
+                                     proxy=_google_oauth_proxy(),
+                                     trust_env=False) as c:
             r = await c.post(_GOOGLE_OAUTH_TOKEN_URL,
                              data={"code": code, "client_id": cid, "client_secret": secret,
                                    "redirect_uri": redirect_uri,
