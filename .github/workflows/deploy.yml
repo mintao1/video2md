@@ -172,7 +172,7 @@ jobs:
           # the previous image is rebuildable from its immutable SHA and must
           # not block a production rollout when the node is below the guard.
           ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
-            "KEEP_ROLLOUTS=1 bash -s" < "${PRODUCT}/scripts/node-safe-cleanup.sh"
+            "KEEP_DAYS=0 KEEP_ROLLOUTS=1 bash -s" < "${PRODUCT}/scripts/node-safe-cleanup.sh"
 
       - name: Guard node disk pressure before build
         env:
@@ -260,7 +260,7 @@ jobs:
           # removed. Re-run the bounded cleanup before the second guard so
           # build cache cannot consume the rollout's safety margin.
           ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
-            "KEEP_ROLLOUTS=1 bash -s" < "${PRODUCT}/scripts/node-safe-cleanup.sh"
+            "KEEP_DAYS=0 KEEP_ROLLOUTS=1 bash -s" < "${PRODUCT}/scripts/node-safe-cleanup.sh"
 
       - name: Guard node disk pressure before apply
         env:
