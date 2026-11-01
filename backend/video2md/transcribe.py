@@ -20,10 +20,14 @@ def remote_transcribe(video: Path, tmp: Path, base: str, model: str, language: s
     import time as _time
     _t0 = _time.monotonic()
     try:
+        # GPU pool endpoints are explicitly configured service endpoints. Do
+        # not let ambient HTTP(S)_PROXY/SOCKS_PROXY settings redirect the
+        # multipart upload (or require an optional socksio dependency).
         r = httpx.post(f"{base.rstrip('/')}/transcribe",
                        files={"audio": (audio.name, audio.read_bytes(), "audio/mp4")},
                        data={"model": model, "language": language},
                        headers=pool_headers(),
+                       trust_env=False,
                        # Batch GPU: upload + provider's 3600s wait + artifact fetch.
                        timeout=httpx.Timeout(20, read=5400.0))
     finally:
