@@ -90,7 +90,7 @@ def remote_cut_clips(published: list, video: Path, dur: float,
     http = client
     own = False
     if http is None:
-        http = httpx.Client(trust_env=False, timeout=httpx.Timeout(30.0, read=3600.0))
+        http = httpx.Client(timeout=httpx.Timeout(30.0, read=3600.0))
         own = True
     try:
         url = f"{base.rstrip('/')}/clips"
