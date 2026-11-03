@@ -106,7 +106,11 @@ def download_public_video(entry: dict, destination: Path) -> Path:
             "fnval": 1, "platform": "html5", "high_quality": 1,
         })
         streams = data.get("durl") or []
-        if data.get("format") != "mp4" or len(streams) != 1:
+        # The public API labels progressive MP4 streams as ``mp4720`` (and
+        # similar quality-specific values) for some videos.  It is still a
+        # single downloadable MP4 stream; reject DASH/multi-stream responses.
+        media_format = str(data.get("format") or "").lower()
+        if not media_format.startswith("mp4") or len(streams) != 1:
             raise RuntimeError("B站未提供可匿名下载的完整 MP4，请使用可公开播放的视频")
         stream = streams[0]
         media_url = stream.get("url") or ""
