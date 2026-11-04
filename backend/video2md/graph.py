@@ -187,6 +187,44 @@ def _failed_dependencies(run: dict, idx: int, stages: tuple[str, ...]) -> list[s
             if str(idx) in {str(value) for value in failures.get(stage, [])}]
 
 
+NOTE_LLM_CHUNK_CHARS = 30000
+NOTE_METADATA_CONTEXT_CHARS = 24000
+
+
+def _transcript_chunks(text: str, max_chars: int = NOTE_LLM_CHUNK_CHARS) -> list[str]:
+    """Split a timestamped transcript on line boundaries for bounded LLM calls."""
+    source = text or ""
+    if len(source) <= max_chars:
+        return [source]
+    chunks: list[str] = []
+    current: list[str] = []
+    size = 0
+    for line in source.splitlines(keepends=True):
+        if current and size + len(line) > max_chars:
+            chunks.append("".join(current).strip())
+            current, size = [], 0
+        while len(line) > max_chars:
+            if current:
+                chunks.append("".join(current).strip())
+                current, size = [], 0
+            chunks.append(line[:max_chars].strip())
+            line = line[max_chars:]
+        if line:
+            current.append(line)
+            size += len(line)
+    if current:
+        chunks.append("".join(current).strip())
+    return [chunk for chunk in chunks if chunk]
+
+
+def _metadata_context(text: str, max_chars: int = NOTE_METADATA_CONTEXT_CHARS) -> str:
+    """Keep metadata extraction bounded while preserving beginning and ending context."""
+    if len(text) <= max_chars:
+        return text
+    half = max_chars // 2
+    return text[:half] + "\n\n[中间正文已由分段整理保留]\n\n" + text[-half:]
+
+
 def node_select_frames(state: RunState) -> dict:
     """内容选帧 LLM：整 run 转录本 + 候选清单（多条目带分节头）→ select 阶段 payload。
 
@@ -268,14 +306,30 @@ def node_note_entry(state: RunState) -> dict:
                  user_id=run.get("owner", ""))
     _STAGE_LOGS[run["run_id"]] = log
     try:
-        organize = llm_task("organize", idx=idx, total=run["total"],
-                            video_filename=video_name, duration=dur_str,
-                            entry_frames=art.get("manifest") or "",
-                            entry_transcript=transcript)
-        review_text = llm_task("review", entry_transcript=transcript,
-                               organize_text=organize) if state.get("review") else ""
-        meta_raw = llm_task("metadata", video_filename=video_name, idx=idx,
-                            organize_text=organize)
+        transcript_parts = _transcript_chunks(transcript)
+        organized_parts: list[str] = []
+        reviewed_parts: list[str] = []
+        for part_index, transcript_part in enumerate(transcript_parts, 1):
+            organize_part = llm_task(
+                "organize", idx=idx, total=run["total"],
+                video_filename=video_name, duration=dur_str,
+                entry_frames=art.get("manifest") or "",
+                entry_transcript=transcript_part,
+            )
+            organized_parts.append(organize_part)
+            if state.get("review"):
+                reviewed_parts.append(llm_task(
+                    "review", entry_transcript=transcript_part,
+                    organize_text=organize_part,
+                ))
+            if len(transcript_parts) > 1:
+                print(f"  🧩 长转录本分段整理 {part_index}/{len(transcript_parts)}")
+        organize = "\n\n".join(organized_parts)
+        review_text = "\n\n".join(reviewed_parts)
+        meta_raw = llm_task(
+            "metadata", video_filename=video_name, idx=idx,
+            organize_text=_metadata_context(organize),
+        )
     except Exception as exc:
         # LLM 三连败 = 全局故障（鉴权/中转/配额）：整条 run 判 error，不拿死 LLM 烧剩余条目
         msg = redact(str(exc))[-300:]
