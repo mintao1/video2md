@@ -134,6 +134,8 @@ _SPEC: dict[str, tuple] = {
     "V2MD_PREFS_FILE":      ("path", str(PROJ / "prefs.json"), None),
     "V2MD_LLM_SETTINGS_FILE": ("str", "", None),  # 可选路径；空=跟随 PREFS_FILE 同目录
     "V2MD_LLM_SETTINGS_KEY": ("raw", "", None),  # 32-byte base64url/hex envelope key
+    # 「我的」页 Auto 模式展示的项目模型名（只用于展示；空=回退 LLM_MODEL 原始 id）
+    "V2MD_LLM_DISPLAY_NAME": ("str", "", None),
     "V2MD_PREFS_STORE":     ("enum", "json", ("json", "postgres")),
     "V2MD_COLAB_SESSION":   ("str", "v2md-whisper", None),
     "V2MD_COLAB_BIN":       ("str", "", None),
@@ -358,6 +360,7 @@ TRUST_XFF: str = _PARSED["V2MD_TRUST_XFF"]
 # 成本归因→预算闸（P2-2）
 BUDGET_MONTH_USD: float = _PARSED["V2MD_BUDGET_MONTH_USD"]
 PLAN_LIMITS_JSON: str = _PARSED["V2MD_PLAN_LIMITS_JSON"]
+LLM_DISPLAY_NAME: str = _PARSED["V2MD_LLM_DISPLAY_NAME"].strip()
 PRICE_LLM_IN_MTOK: float = _PARSED["V2MD_PRICE_LLM_IN_MTOK"]
 PRICE_LLM_OUT_MTOK: float = _PARSED["V2MD_PRICE_LLM_OUT_MTOK"]
 PRICE_GPU_MIN: float = _PARSED["V2MD_PRICE_GPU_MIN"]

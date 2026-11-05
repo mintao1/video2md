@@ -40,7 +40,7 @@ class LlmSettingsOut(BaseModel):
     has_api_key: bool
     configured: bool  # 是否已保存完整的自定义接口（与是否正在使用无关）
     mode: Literal["auto", "custom"]  # 当前生效：auto=项目提供的 LLM；custom=自定义接口
-    system_model: str  # 项目提供的模型名（只回传名字，不回传 URL/Key）
+    system_model: str  # 项目提供的模型展示名（V2MD_LLM_DISPLAY_NAME，空则 LLM_MODEL；不回传 URL/Key）
 
 
 class LlmModeUpdate(BaseModel):

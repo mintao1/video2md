@@ -121,6 +121,9 @@ spec:
               value: "0.50"
             - name: V2MD_PRICE_LLM_CACHED_IN_MTOK
               value: "0.03"
+            # 「我的」页 Auto 模式展示的项目模型名（仅展示，不影响实际调用的 LLM_MODEL）
+            - name: V2MD_LLM_DISPLAY_NAME
+              value: GLM 5.3 Flash
             - name: V2MD_ENV
               value: production
             - name: V2MD_AUTH
