@@ -5,7 +5,7 @@ all_skipped/status/task.status/entries[].done/queue_len/note），只做类型�
 """
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field, SecretStr, field_validator
 
@@ -38,7 +38,13 @@ class LlmSettingsOut(BaseModel):
     base_url: str
     model: str
     has_api_key: bool
-    configured: bool
+    configured: bool  # 是否已保存完整的自定义接口（与是否正在使用无关）
+    mode: Literal["auto", "custom"]  # 当前生效：auto=项目提供的 LLM；custom=自定义接口
+    system_model: str  # 项目提供的模型名（只回传名字，不回传 URL/Key）
+
+
+class LlmModeUpdate(BaseModel):
+    mode: Literal["auto", "custom"]
 
 # ---------------------------------------------------------------- POST /runs
 
@@ -226,14 +232,22 @@ class QuotaStats(BaseModel):
     accuracy: float = 0
 
 
+class QuotaLimits(BaseModel):
+    """Effective per-user submission limits after plan/record overrides."""
+    queue_max: int = 0
+    submit_per_min: int = 0
+    budget_usd: float = 0
+
+
 class QuotaOut(BaseModel):
-    """GET /quota：本人会员配额与统计（展示档，来自 v2md_membership；不参与提交强制）。
-    PG 关（无 DSN）或无 membership 行 → 全 0 默认值。"""
+    """GET /quota：本人会员配额、统计和有效提交限制。
+    PG 关（无 DSN）或无 membership 行 → 全局限额与全 0 统计。"""
     ai_hours_used: float
     ai_hours_total: float
     storage_gb_used: float
     storage_gb_total: float
     stats: QuotaStats
+    limits: QuotaLimits = Field(default_factory=QuotaLimits)
 
 
 class MeOut(BaseModel):
@@ -245,6 +259,20 @@ class MeOut(BaseModel):
     avatar_hue: int
     plan: str = Field("free", description="free|pro|svip")
     id_label: str
+    terms_version: str | None = Field(None, description="最近一次同意的用户协议版本")
+    terms_accepted_at: str | None = Field(None, description="协议同意时间（ISO 8601）")
+    terms_current: bool = Field(False, description="最近同意版本是否为当前版本")
+
+
+class ConsentBody(BaseModel):
+    """协议同意回执：版本由前端显式提交，服务端只接受当前版本。"""
+    terms_version: str = Field(..., min_length=1, max_length=64)
+
+
+class ConsentOut(BaseModel):
+    terms_version: str | None = None
+    terms_accepted_at: str | None = None
+    terms_current: bool = False
 
 
 class HealthOut(BaseModel):

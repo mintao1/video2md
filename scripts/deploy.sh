@@ -56,9 +56,10 @@ REF="$TAG"
 
 echo "── 发布前仓库门禁（角色/RLS/Key 加密/备份/Langfuse）"
 run python3 scripts/check_production_readiness.py --self-test
+run python3 scripts/check_release_consistency.py
 
 echo "── 部署 $TAG → $HOST:$DIR"
-remote "cd $DIR && git fetch --tags --prune && git checkout -f $REF && python3 scripts/check_production_readiness.py --self-test && $COMPOSE build"
+remote "cd $DIR && git fetch --tags --prune && git checkout -f $REF && python3 scripts/check_production_readiness.py --self-test && python3 scripts/check_release_consistency.py && $COMPOSE build"
 remote "cd $DIR && $COMPOSE up -d postgres"
 
 echo "── schema 迁移（幂等；json 档部署自动跳过）"

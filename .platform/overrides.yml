@@ -1,0 +1,44 @@
+# 本仓 deploy.yml 相对平台模板 templates/ci/deploy.yml 的偏离登记（DEP-02，SSOT §15.0）
+# 2026-11-05 随模板上提（平台仓 ddb8749）同步：以下均为模板声明的 OVERRIDE-POINT 区块内的覆盖。
+- file: .github/workflows/deploy.yml
+  point: triggers
+  reason: "加 push: main 自动部署；workflow_dispatch 额外接受 deployment 输入（video2md 的 Deployment 名与产品名不同）"
+  adr: ADR-0020
+  owner: mintao1
+  expires: 2027-04-30
+- file: .github/workflows/deploy.yml
+  point: deploy_target
+  reason: "push 触发没有 inputs：缺省 PRODUCT=video2md、environment=prod"
+  adr: ADR-0020
+  owner: mintao1
+  expires: 2027-04-30
+- file: .github/workflows/deploy.yml
+  point: pre_release_checks
+  reason: "发布前跑 scripts/check_production_readiness.py --self-test 与 scripts/check_release_consistency.py（角色/RLS/Key 加密/镜像版本一致性）"
+  adr: ADR-0020
+  owner: mintao1
+  expires: 2027-04-30
+- file: .github/workflows/deploy.yml
+  point: version_source
+  reason: "push 触发无版本输入：缺省用触发 commit 的 12 位短 SHA，仍校验为合法镜像 tag"
+  adr: ADR-0020
+  owner: mintao1
+  expires: 2027-04-30
+- file: .github/workflows/deploy.yml
+  point: pre_build
+  reason: "构建前经 ssh 流式执行 scripts/node-safe-cleanup.sh，释放可重建的 docker 构建缓存（单节点磁盘紧张，BLD-03）"
+  adr: ADR-0020
+  owner: mintao1
+  expires: 2027-04-30
+- file: .github/workflows/deploy.yml
+  point: deployment_name
+  reason: "Deployment 名为 video2md-api，不是产品名；可用 inputs.deployment 显式指定"
+  adr: ADR-0020
+  owner: mintao1
+  expires: 2027-04-30
+- file: .github/workflows/deploy.yml
+  point: post_smoke
+  reason: "/healthz 之后再查 /preflight（ok=true 才算成功），失败回滚并 exit 1"
+  adr: ADR-0020
+  owner: mintao1
+  expires: 2027-04-30

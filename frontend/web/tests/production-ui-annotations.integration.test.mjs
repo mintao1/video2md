@@ -14,7 +14,8 @@ const canary = 'fixture-only-key-not-a-real-credential'
 const url = 'https://llm.example.invalid/v1'
 const model = 'fixture-model'
 const apps = []
-const summary = (configured = false) => ({ base_url: url, model, configured, has_api_key: configured })
+const summary = (configured = false, mode = configured ? 'custom' : 'auto') =>
+  ({ base_url: url, model, configured, has_api_key: configured, mode, system_model: 'project-model' })
 const response = (body, status = 200) => new Response(JSON.stringify(body), { status })
 
 before(async () => {
@@ -42,8 +43,8 @@ after(async () => { await vite?.close() })
 async function mountCard(respond) {
   const calls = []
   globalThis.fetch = async (target, init = {}) => {
-    assert.equal(new URL(target).pathname, '/settings/llm', 'never contact an external model')
-    calls.push({ method: init.method ?? 'GET', body: init.body && JSON.parse(init.body) })
+    assert.match(new URL(target).pathname, /^\/settings\/llm(\/mode)?$/, 'never contact an external model')
+    calls.push({ method: init.method ?? 'GET', path: new URL(target).pathname, body: init.body && JSON.parse(init.body) })
     return respond(calls.at(-1))
   }
   const node = (type, text = '') => ({ type, text, parent: null, children: [] })
@@ -91,7 +92,7 @@ test('pua-001 submits explicitly entered URL key and model and clears the key af
     assert.equal(input.match(/value="([^"]*)"/)?.[1], value, 'input must remain bound to the submitted state')
   }
   await page.state.save()
-  assert.deepEqual(page.calls.filter(call => call.method === 'PUT'), [{ method: 'PUT',
+  assert.deepEqual(page.calls.filter(call => call.method === 'PUT'), [{ method: 'PUT', path: '/settings/llm',
     body: { base_url: url, api_key: canary, model } }])
   assert.match(page.state.message.value, /配置已保存/)
   assert.equal(page.state.error.value, '')
@@ -128,7 +129,7 @@ test('pua-002 reopens persisted settings without echoing or locally storing the 
   assert.deepEqual(writes, [])
   assert.ok([...storage.values()].every(value => !value.includes(canary)))
   const html = await renderCard(second.state)
-  assert.match(html, /已保存个人配置/)
+  assert.match(html, /当前使用：自定义接口/)
   assert.match(html, /id="llm-api-key"[^>]*type="password"/)
   assert.doesNotMatch(html, new RegExp(canary))
 })
@@ -161,4 +162,36 @@ test('pua-001 missing initial key or unavailable settings cannot submit a save',
   assert.equal(unavailable.state.loaded.value, false)
   assert.deepEqual(unavailable.calls.map(call => call.method), ['GET'])
   assert.equal(unavailable.state.message.value, '')
+})
+
+test('auto mode shows the project model and switching keeps the saved custom key', async () => {
+  let mode = 'auto', configured = false
+  const page = await mountCard(call => {
+    if (call.path === '/settings/llm/mode') mode = call.body.mode
+    if (call.path === '/settings/llm' && call.method === 'PUT') { configured = true; mode = 'custom' }
+    return response(summary(configured, mode))
+  })
+  assert.equal(page.state.activeMode.value, 'auto')
+  let html = await renderCard(page.state)
+  assert.match(html, /当前使用：Auto（项目提供）/)
+  assert.match(html, /project-model/)
+  assert.match(html, /id="llm-mode-auto"[^>]*aria-checked="true"/)
+  // Without a saved endpoint, choosing custom only opens the form (no request).
+  await page.state.choose('custom')
+  assert.equal(page.state.selectedMode.value, 'custom')
+  assert.equal(page.state.activeMode.value, 'auto')
+  assert.equal(page.calls.some(call => call.path === '/settings/llm/mode'), false)
+  fill(page.state)
+  await page.state.save()
+  assert.equal(page.state.activeMode.value, 'custom')
+  await page.state.choose('auto')
+  assert.deepEqual(page.calls.at(-1), { method: 'PUT', path: '/settings/llm/mode', body: { mode: 'auto' } })
+  assert.equal(page.state.activeMode.value, 'auto')
+  assert.equal(page.state.hasKey.value, true, 'switching to auto must not drop the saved key')
+  html = await renderCard(page.state)
+  assert.match(html, /自定义接口仍保留/)
+  await page.state.choose('custom')
+  assert.deepEqual(page.calls.at(-1), { method: 'PUT', path: '/settings/llm/mode', body: { mode: 'custom' } })
+  assert.equal(page.state.activeMode.value, 'custom')
+  assert.deepEqual(writes, [])
 })

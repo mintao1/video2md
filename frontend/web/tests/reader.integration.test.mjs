@@ -27,6 +27,7 @@ it('renders Obsidian image and video references as actual media elements', () =>
   }))
   assert.match(html, /<img src="blob:frame"/)
   assert.match(html, /<video src="blob:clip" controls/)
+  assert.match(html, /playsinline/)
   assert.doesNotMatch(html, /!\[\[|title: Test/)
 })
 

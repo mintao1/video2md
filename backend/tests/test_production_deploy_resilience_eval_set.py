@@ -11,9 +11,17 @@ import os
 import subprocess
 from pathlib import Path
 
+import pytest
+
 ROOT = Path(__file__).resolve().parents[2]
 WORKFLOW = ROOT / ".github/workflows/deploy.yml"
-DISK_GUARD = ROOT / "scripts/node-build-guard.sh"
+# The BLD-03 disk guard is a platform script (templates/ci/deploy.yml streams it
+# from the platform checkout at the workspace root); in the monorepo workspace it
+# sits next to this product directory.  Standalone product checkouts skip the
+# script-level assertions, same as the acctkit vendor sentinel.
+DISK_GUARD = ROOT.parent / "scripts/node-disk-guard.sh"
+needs_platform_guard = pytest.mark.skipif(
+    not DISK_GUARD.exists(), reason="platform repo not in workspace (scripts/node-disk-guard.sh)")
 DATASET = ROOT / "docs/evals/production-deploy-resilience-eval-set.jsonl"
 IDS = [f"pdr-{index:03d}" for index in range(1, 7)]
 
@@ -53,6 +61,7 @@ def test_workflow_imports_rendered_images_before_apply_and_smokes_healthz() -> N
     assert "/preflight" in source and "生产预检未通过" in source
 
 
+@needs_platform_guard
 def test_workflow_blocks_deploy_on_node_disk_pressure_before_apply() -> None:
     source = WORKFLOW.read_text(encoding="utf-8")
     guard = DISK_GUARD.read_text(encoding="utf-8")
@@ -70,8 +79,12 @@ def test_workflow_blocks_deploy_on_node_disk_pressure_before_apply() -> None:
     first_guard = source.find("Guard node disk pressure before build")
     assert first_guard >= 0, "workflow must invoke the disk-pressure guard before building"
     assert first_guard < apply_pos, "disk pressure guard must run before apply"
+    assert "< scripts/node-disk-guard.sh" in source, "workflow must stream the platform guard"
+    second_guard = source.find("Guard node disk pressure before apply")
+    assert first_guard < second_guard < apply_pos, "guard must run again after import, before apply"
 
 
+@needs_platform_guard
 def test_disk_guard_passes_and_fails_closed_on_disk_pressure(tmp_path: Path) -> None:
     """Exercise the shell guard with a fake kubectl boundary, without SSH or a node."""
 

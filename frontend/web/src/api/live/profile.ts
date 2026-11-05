@@ -4,6 +4,8 @@
 import { request } from '../client'
 import type { CostReport, Quota, User } from '../../types'
 
+export const TERMS_VERSION = '2026-10-21'
+
 export async function currentUser(): Promise<User> {
   return request<User>('/me')
 }
@@ -14,4 +16,16 @@ export async function getQuota(): Promise<Quota> {
 
 export async function getCost(): Promise<CostReport> {
   return request<CostReport>('/cost')
+}
+
+/** Record the exact public agreement version accepted on the brand page. */
+export async function acceptTerms(): Promise<{
+  terms_version: string | null
+  terms_accepted_at: string | null
+  terms_current: boolean
+}> {
+  return request('/auth/consent', {
+    method: 'POST',
+    body: JSON.stringify({ terms_version: TERMS_VERSION }),
+  })
 }

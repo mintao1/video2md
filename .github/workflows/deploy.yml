@@ -1,15 +1,17 @@
 # === 平台 CI 部署步骤模板 ===
 # GitHub Actions Deploy workflow。
-# 流程：runner 渲染清单（kustomize build，monorepo 布局）→ ssh 到节点 checkout
-#       目标 SHA 并 docker build → sudo k3s ctr images import → 渲染结果管道给
-#       服务器 kubectl apply → rollout + smoke。
+# 流程：runner 渲染清单（kustomize build，monorepo 布局）→ 节点磁盘护栏 → ssh 到节点
+#       checkout 目标 SHA 并 docker build → 渲染结果里的全部镜像 sudo k3s ctr images
+#       import 并核验 → apply 前再过一次磁盘护栏 → 渲染结果管道给服务器
+#       kubectl apply → rollout + smoke（失败自动回滚）。
 # ⚠️ 不要在服务器上 apply -k：产品 components 引用平台仓相对路径，服务器副本解析不到（HC-01）。
 # ⚠️ 镜像唯一来源 = 节点构建 + ctr import（HC-02）：不 pull/push 任何外部镜像仓库。
 #
 # 前置条件：
 #   - 服务器 SSH key 配置在 GitHub Secrets (SSH_HOST, SSH_USER, SSH_KEY)
 #   - 服务器存在 ~/stack/<product>-git（git 管理的产品仓 checkout；部署时
-#     fetch + checkout 到目标 SHA，不是手工副本，见 HC-03）
+#     fetch + checkout 到目标 SHA，不是手工副本，见 HC-03）。该 checkout 只用于
+#     部署：每次部署前 reset --hard + clean -fd，生产数据不得放在里面。
 #   - 产品 deploy/k8s/base/kustomization.yaml 已就绪；发布时由临时渲染层
 #     注入本次版本，不依赖仓库预先存在 images.newTag。
 #   - 平台仓/产品仓为私有时另配 PLATFORM_REPO_TOKEN / PRODUCT_REPO_TOKEN（contents:read）
@@ -18,9 +20,11 @@
 #   产品仓复制本模板后，只允许改 `# OVERRIDE-POINT: <name>` 与
 #   `# OVERRIDE-POINT-END: <name>` 之间的内容；区块之外必须逐字一致。
 #   其余偏离必须登记于产品仓 `.platform/overrides.yml`（含 reason/adr/owner/expires）。
-#   初始集合：smoke_path / version_source / network_mode。
+#   集合（SSOT §15.0）：triggers / deploy_target / pre_release_checks / version_source /
+#   pre_build / deployment_name / network_mode / smoke_path / post_smoke。
 name: Deploy
 on:
+  # OVERRIDE-POINT: triggers —— 默认：仅手动触发；push 触发须在 deploy_target 给出缺省产品/环境
   push:
     branches: [main]
   workflow_dispatch:
@@ -39,11 +43,17 @@ on:
         required: true
         type: choice
         options: [dev, prod]
+  # OVERRIDE-POINT-END: triggers
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    # OVERRIDE-POINT: deploy_target —— 默认：产品与环境都取 workflow 输入
+    # push 触发没有 inputs：缺省部署 video2md 到 prod。
     environment: ${{ inputs.environment || 'prod' }}
+    env:
+      PRODUCT: ${{ inputs.product || 'video2md' }}
+    # OVERRIDE-POINT-END: deploy_target
     steps:
       # ── 清单在 runner 渲染，不在服务器 ──────────────────────────────
       # 产品 base 经 components: 引用平台仓 templates/k8s-base/components，
@@ -60,19 +70,22 @@ jobs:
 
       - uses: actions/checkout@v4
         with:
-          repository: mintao1/${{ inputs.product || 'video2md' }}
-          path: ${{ inputs.product || 'video2md' }}
-          # Render and build must use the exact commit that triggered this run;
-          # a default-branch checkout can silently deploy a different bundle.
+          repository: mintao1/${{ env.PRODUCT }}
+          path: ${{ env.PRODUCT }}
+          # 渲染与节点构建必须是触发本次 run 的同一个 commit；
+          # 缺省分支 checkout 可能悄悄部署另一份清单。
           ref: ${{ github.sha }}
           token: ${{ secrets.PRODUCT_REPO_TOKEN || github.token }}
 
+      # OVERRIDE-POINT: pre_release_checks —— 默认：无；产品可在此加发布前仓库门禁步骤
       - name: Validate production security contracts
-        if: ${{ (inputs.product || 'video2md') == 'video2md' }}
+        if: ${{ env.PRODUCT == 'video2md' }}
         run: |
           set -euo pipefail
-          cd "${{ inputs.product || 'video2md' }}"
+          cd "${PRODUCT}"
           python3 scripts/check_production_readiness.py --self-test
+          python3 scripts/check_release_consistency.py
+      # OVERRIDE-POINT-END: pre_release_checks
 
       # 钉死 kustomize 版本：runner 默认不带 kustomize；kubectl kustomize 将随
       # KEP-4706 移除，不作依赖。
@@ -82,23 +95,24 @@ jobs:
             | tar xz -C /usr/local/bin kustomize
           kustomize version
 
-      # OVERRIDE-POINT: version_source —— 默认：workflow 输入作为版本号
+      # OVERRIDE-POINT: version_source —— 默认：workflow 输入作为版本号（校验为合法镜像 tag）
       - name: Resolve version (workflow input)
         id: ver
         env:
           INPUT_VERSION: ${{ inputs.version }}
         run: |
           set -euo pipefail
+          # push 触发没有版本输入：缺省用触发 commit 的 12 位短 SHA。
           VERSION="${INPUT_VERSION:-${GITHUB_SHA::12}}"
-          # Docker/Kubernetes image tags must not contain whitespace or shell
-          # metacharacters. Semver, release tags, and the short SHA are valid.
+          # 镜像 tag 不得含空白或 shell 元字符；semver、发布 tag、短 SHA 均合法。
           if [[ ! "$VERSION" =~ ^[A-Za-z0-9_][A-Za-z0-9_.-]*$ ]]; then
-            echo "invalid image version: $VERSION" >&2
+            echo "invalid image version: '$VERSION'" >&2
             exit 2
           fi
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
       # OVERRIDE-POINT-END: version_source
 
+      # BLD-03 阈值单一来源：平台仓 rules/node-limits.yml（缺失/非法即失败，不静默放行）
       - name: Resolve node disk guard threshold (platform SSOT)
         id: limits
         run: |
@@ -113,15 +127,10 @@ jobs:
       - name: Render manifests
         run: |
           set -euo pipefail
-          PRODUCT="${{ inputs.product || 'video2md' }}"
           VERSION="${{ steps.ver.outputs.version }}"
-          cd "${PRODUCT}/deploy/k8s/base"
-          # Inject the exact image built on the node below through a temporary
-          # overlay. The product kustomization remains unchanged in the checkout.
-          # Kustomize rejects absolute resource paths. Keep the temporary
-          # overlay inside the checked-out monorepo so the product base can be
-          # referenced relatively while its shared platform components remain
-          # resolvable.
+          # 用临时 overlay 注入本次构建的镜像 tag，产品仓里的 kustomization 不被改写。
+          # kustomize 不接受绝对 resource 路径，故 overlay 放在 workspace（monorepo）内，
+          # 以相对路径引用产品 base，平台共享 components 照常可解析。
           RENDER_DIR="$(mktemp -d "${GITHUB_WORKSPACE}/.deploy-render.XXXXXX")"
           trap 'rm -rf "$RENDER_DIR"' EXIT
           cat > "$RENDER_DIR/kustomization.yaml" <<EOF
@@ -134,17 +143,14 @@ jobs:
               newName: ${PRODUCT}
               newTag: ${VERSION}
           EOF
-          # The base imports shared platform components outside the product
-          # directory; this is intentional and only the runner renders it.
+          # base 引用产品目录之外的平台 components：有意为之，且只在 runner 渲染。
           kustomize build "$RENDER_DIR" --load-restrictor LoadRestrictionsNone > /tmp/rendered.yaml
           grep -q "image: ${PRODUCT}:${VERSION}" /tmp/rendered.yaml || {
             echo "rendered manifest does not contain ${PRODUCT}:${VERSION}" >&2
             exit 1
           }
-          # Keep every image reference, including initContainers, in the
-          # deployment handoff.  The node must import each local image into
-          # k3s containerd before apply; relying on Docker's image store alone
-          # leaves a Pod in ErrImagePull after a node restart.
+          # 交接渲染结果里的全部镜像引用（含 initContainers）：节点必须在 apply 前
+          # 把每一个都导入 k3s containerd；只留在 Docker 镜像库里，节点重启后 ErrImagePull。
           awk '$1 == "image:" {print $2}' /tmp/rendered.yaml \
             | sed -E 's/^["'"'']//; s/["'"'']$//' \
             | sort -u > /tmp/deploy-images.txt
@@ -156,7 +162,7 @@ jobs:
           cat /tmp/deploy-images.txt
           echo "── 渲染 $(grep -c '^kind:' /tmp/rendered.yaml) 个资源 ──"
 
-      # 后面三步都走同一把 key（key 注入不落到 runner ssh config）
+      # 后面各步都走同一把 key（key 注入不落到 runner ssh config）
       - name: Setup SSH
         run: |
           mkdir -p ~/.ssh
@@ -164,22 +170,23 @@ jobs:
           chmod 600 ~/.ssh/id_ed25519
           ssh-keyscan -H "${{ secrets.SSH_HOST }}" >> ~/.ssh/known_hosts
 
+      # OVERRIDE-POINT: pre_build —— 默认：无；产品可在此释放可重建的节点缓存等
       - name: Release rebuildable node caches before build
         run: |
           set -euo pipefail
-          PRODUCT="${{ inputs.product || 'video2md' }}"
           ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
             "bash -s" < "${PRODUCT}/scripts/node-safe-cleanup.sh"
+      # OVERRIDE-POINT-END: pre_build
 
+      # ── BLD-03：构建前磁盘护栏（脚本来自平台仓 checkout，流式执行，HC-03）──
       - name: Guard node disk pressure before build
         env:
           MIN_FREE_GIB: ${{ steps.limits.outputs.min_free_gib }}
         run: |
           set -euo pipefail
-          PRODUCT="${{ inputs.product || 'video2md' }}"
           set +e
           ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
-            "MIN_FREE_GIB=${MIN_FREE_GIB} bash -s" < "${PRODUCT}/scripts/node-build-guard.sh"
+            "MIN_FREE_GIB=${MIN_FREE_GIB} bash -s" < scripts/node-disk-guard.sh
           STATUS=$?
           set -e
           if [[ "$STATUS" -ne 0 ]]; then
@@ -193,12 +200,10 @@ jobs:
       - name: Build and import image on node
         run: |
           set -euo pipefail
-          PRODUCT="${{ inputs.product || 'video2md' }}"
           VERSION="${{ steps.ver.outputs.version }}"
           SHA="${{ github.sha }}"
           IMAGE_LIST="/tmp/${PRODUCT}-images-${GITHUB_RUN_ID}.txt"
-          # Transfer only the rendered image names.  The manifest remains
-          # rendered on the runner and is still applied with kubectl -f -.
+          # 只传渲染出的镜像名清单；清单本身仍在 runner 渲染、以 kubectl -f - 应用。
           ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
             "cat > '${IMAGE_LIST}'" < /tmp/deploy-images.txt
           ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "
@@ -210,9 +215,7 @@ jobs:
             fi
             cd \"\$REPO\"
             git fetch --quiet origin
-            # This checkout is deployment-only. Discard stale local edits and
-            # untracked non-ignored files before selecting the requested SHA;
-            # production data lives outside this git checkout.
+            # 部署专用 checkout：切 SHA 前丢弃残留改动与未跟踪文件（生产数据不在此目录）。
             git reset --hard --quiet
             git clean -fd --quiet
             git checkout --quiet --detach ${SHA}
@@ -241,23 +244,22 @@ jobs:
                 exit 44
               fi
             done < \"${IMAGE_LIST}\"
-            # The image is already in k3s containerd; release the duplicate
-            # Docker layer before the post-import disk-pressure guard.
+            # 镜像已在 k3s containerd；释放 Docker 里的重复层，再过 apply 前磁盘护栏。
             if docker image inspect ${PRODUCT}:${VERSION} >/dev/null 2>&1; then
               docker image rm ${PRODUCT}:${VERSION} >/dev/null || true
             fi
             echo '✓ all rendered images imported and verified in k3s containerd'
           "
 
+      # ── BLD-03：apply 前再过一次磁盘护栏（导入镜像后磁盘最紧）──
       - name: Guard node disk pressure before apply
         env:
           MIN_FREE_GIB: ${{ steps.limits.outputs.min_free_gib }}
         run: |
           set -euo pipefail
-          PRODUCT="${{ inputs.product || 'video2md' }}"
           set +e
           ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
-            "MIN_FREE_GIB=${MIN_FREE_GIB} bash -s" < "${PRODUCT}/scripts/node-build-guard.sh"
+            "MIN_FREE_GIB=${MIN_FREE_GIB} bash -s" < scripts/node-disk-guard.sh
           STATUS=$?
           set -e
           if [[ "$STATUS" -ne 0 ]]; then
@@ -270,14 +272,14 @@ jobs:
         run: |
           set -euo pipefail
           ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
-            "sudo k3s kubectl apply -n ${{ inputs.product || 'video2md' }} -f -" < /tmp/rendered.yaml
+            "sudo k3s kubectl apply -n ${PRODUCT} -f -" < /tmp/rendered.yaml
 
       - name: Rollout status + smoke
         run: |
           set -euo pipefail
-          NS="${{ inputs.product || 'video2md' }}"
-          PRODUCT="${{ inputs.product || 'video2md' }}"
+          NS="${PRODUCT}"
           VERSION="${{ steps.ver.outputs.version }}"
+          # OVERRIDE-POINT: deployment_name —— 默认：Deployment 与产品同名
           DEPLOYMENT="${{ inputs.deployment }}"
           if [[ -z "$DEPLOYMENT" ]]; then
             case "$PRODUCT" in
@@ -285,16 +287,20 @@ jobs:
               *) DEPLOYMENT="$PRODUCT" ;;
             esac
           fi
-          # OVERRIDE-POINT: network_mode —— 默认：从 deployment 读容器端口（非 hostNetwork 服务）
-          # k3s is only available on the target node; keep this lookup inside
-          # the SSH command instead of running it on the GitHub runner.
+          # OVERRIDE-POINT-END: deployment_name
+          # OVERRIDE-POINT: network_mode —— 默认：空 = 在节点上从 deployment 读容器端口；hostNetwork 服务填固定端口
+          PORT=""
           # OVERRIDE-POINT-END: network_mode
           # OVERRIDE-POINT: smoke_path —— 默认 /healthz；hostNetwork 服务可覆盖（如 /ping）
           SMOKE_PATH=/healthz
           # OVERRIDE-POINT-END: smoke_path
+          # k3s 只在节点上可用：端口查询放在 ssh 内执行，不在 runner 上跑 kubectl。
           ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "
             set -euo pipefail
-            PORT=\$(sudo k3s kubectl -n ${NS} get deploy/${DEPLOYMENT} -o jsonpath='{.spec.template.spec.containers[0].ports[0].containerPort}')
+            PORT='${PORT}'
+            if [ -z \"\${PORT}\" ]; then
+              PORT=\$(sudo k3s kubectl -n ${NS} get deploy/${DEPLOYMENT} -o jsonpath='{.spec.template.spec.containers[0].ports[0].containerPort}')
+            fi
             sudo k3s kubectl -n ${NS} rollout status deploy/${DEPLOYMENT} --timeout=180s
             CODE=\$(curl -s -o /dev/null -w '%{http_code}' -m 10 http://127.0.0.1:\${PORT}${SMOKE_PATH} || echo '000')
             echo '  冒烟 http://127.0.0.1:'\"\${PORT}\"'${SMOKE_PATH} → '\${CODE}
@@ -303,6 +309,7 @@ jobs:
               sudo k3s kubectl -n ${NS} rollout undo deploy/${DEPLOYMENT}
               exit 1
             fi
+            # OVERRIDE-POINT: post_smoke —— 默认：无；产品可在此加冒烟后的业务预检（失败须回滚并 exit 1）
             if [ '${PRODUCT}' = 'video2md' ]; then
               PREFLIGHT=\$(curl -fsS -m 10 http://127.0.0.1:\${PORT}/preflight)
               echo \"  预检 \${PREFLIGHT}\"
@@ -312,6 +319,7 @@ jobs:
                 exit 1
               fi
             fi
+            # OVERRIDE-POINT-END: post_smoke
             echo '✓ ${PRODUCT}:${VERSION} (${DEPLOYMENT}) 部署成功'
             echo '  回滚命令: sudo k3s kubectl -n ${NS} rollout undo deploy/${DEPLOYMENT}'
           "
@@ -320,4 +328,4 @@ jobs:
       - name: Notify on failure
         if: failure()
         run: |
-          echo "::error::部署 ${{ inputs.product || 'video2md' }}:${{ steps.ver.outputs.version || inputs.version }} 失败，请检查服务器日志"
+          echo "::error::部署 ${PRODUCT}:${{ steps.ver.outputs.version || inputs.version }} 失败，请检查服务器日志"

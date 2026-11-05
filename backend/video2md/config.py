@@ -119,6 +119,10 @@ _SPEC: dict[str, tuple] = {
     "V2MD_QUEUE_MAX":           ("int", 100, ("min", 0)),
     "V2MD_USER_QUEUE_MAX":      ("int", 5, ("min", 0)),
     "V2MD_USER_SUBMIT_PER_MIN": ("int", 30, ("min", 0)),
+    # Optional per-plan overrides. JSON object keyed by free/pro/svip; each
+    # value may contain queue_max, submit_per_min, and budget_usd. Empty keeps
+    # the global limits above for backward compatibility.
+    "V2MD_PLAN_LIMITS_JSON":    ("raw", "", None),
     # 上传面
     "V2MD_UPLOADS_DIR":     ("path", str(PROJ / "data" / "uploads"), None),
     "V2MD_UPLOAD_MAX_GB":   ("float", 2.0, ("gt", 0.0)),
@@ -353,6 +357,7 @@ TRUST_XFF: str = _PARSED["V2MD_TRUST_XFF"]
 
 # 成本归因→预算闸（P2-2）
 BUDGET_MONTH_USD: float = _PARSED["V2MD_BUDGET_MONTH_USD"]
+PLAN_LIMITS_JSON: str = _PARSED["V2MD_PLAN_LIMITS_JSON"]
 PRICE_LLM_IN_MTOK: float = _PARSED["V2MD_PRICE_LLM_IN_MTOK"]
 PRICE_LLM_OUT_MTOK: float = _PARSED["V2MD_PRICE_LLM_OUT_MTOK"]
 PRICE_GPU_MIN: float = _PARSED["V2MD_PRICE_GPU_MIN"]

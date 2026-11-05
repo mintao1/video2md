@@ -84,7 +84,11 @@ def test_llm_settings_pg_isolates_and_preserves_keys(stores, monkeypatch):
         llm_settings.update(uid, base_url="https://example.test/v1", api_key="pg-test-key", model="test")
         llm_settings.update(uid, base_url="https://example.test/v2", model="new")
         assert llm_settings.load(uid) == {"base_url": "https://example.test/v2",
-                                          "api_key": "pg-test-key", "model": "new"}
+                                          "api_key": "pg-test-key", "model": "new", "mode": "custom"}
+        assert llm_settings.set_mode(uid, "auto")["mode"] == "auto"
+        assert llm_settings.load(uid)["mode"] == "auto"
+        assert llm_settings.load(uid)["api_key"] == "pg-test-key"
+        llm_settings.set_mode(uid, "custom")
         assert llm_settings.load(uid + "-other") == {}
         assert "pg-test-key" not in str(llm_settings.public(llm_settings.load(uid)))
         llm_settings.update(uid, clear=True)

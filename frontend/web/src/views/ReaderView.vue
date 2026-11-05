@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
@@ -25,6 +25,7 @@ const loading = ref(true)
 const loadError = ref('')
 const mediaUrls = ref<Record<string, string>>({})
 const pendingMedia = ref<string[]>([])
+const playbackErrors = ref<Record<string, boolean>>({})
 let loadVersion = 0
 let stopMedia = () => {}
 
@@ -32,6 +33,7 @@ function releaseMedia() {
   stopMedia()
   mediaUrls.value = {}
   pendingMedia.value = []
+  playbackErrors.value = {}
 }
 
 watch(() => [runId.value, notes.value[idx.value]?.md] as const, ([id, md]) => {
@@ -57,6 +59,22 @@ const progress = computed(() =>
 const html = computed(() =>
   notes.value[idx.value] ? renderMd(notes.value[idx.value].md) : '',
 )
+
+// Network transfer success does not guarantee that a browser can decode an
+// MP4. Attach a real media error listener after v-html inserts the elements so
+// the reader exposes decode failures instead of leaving a permanently loading
+// control with no explanation.
+watch(html, () => {
+  void nextTick(() => {
+    for (const video of contentEl.value?.querySelectorAll('video[src^="blob:"][aria-label]') ?? []) {
+      const name = video.getAttribute('aria-label') ?? ''
+      video.addEventListener('error', () => {
+        if (name) playbackErrors.value = { ...playbackErrors.value, [name]: true }
+      }, { once: true })
+    }
+  })
+})
+
 const chapters = computed<TocChapter[]>(() =>
   notes.value.map((n, i) => ({
     no: i + 1,
@@ -193,6 +211,13 @@ watch(() => [route.params.id, route.query.ch], async () => {
         class="prose-v2md text-on-surface px-5 py-5 pb-24"
         v-html="html"
       />
+      <p
+        v-if="Object.keys(playbackErrors).length"
+        role="alert"
+        class="mx-5 mb-5 rounded-lg bg-error-container/60 px-3 py-2 text-sm text-on-error-container"
+      >
+        部分视频无法播放（{{ Object.keys(playbackErrors).join('、') }}），请检查网络后重试。
+      </p>
     </main>
 
     <!-- 底部章节导航 -->

@@ -1,5 +1,6 @@
 -- 0002_membership：会员/配额展示档（web 个人页 ProfileView 的真数据源）。
--- 只读展示路径：GET /me、GET /quota 读它；不参与 _admit_submission 强制（后续工作）。
+-- GET /me、GET /quota 读取资料；record.limits 可被提交闸门按用户覆盖。
+-- 未配置 limits 时沿用全局限额，保证旧数据兼容。
 -- 无 FK 到 v2md_users：种子时序上 membership 可先于身份行存在，展示档允许
 -- 「未登录过的预置额度」。幂等：全 IF NOT EXISTS，存量库重跑 no-op。
 -- plan 用 CHECK 锁死枚举（与前端 types User.plan 'free'|'pro'|'svip' 对齐）。

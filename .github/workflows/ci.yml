@@ -80,8 +80,13 @@ jobs:
         working-directory: backend
       - name: 生产就绪防回退门禁自测（不访问生产、不读取密钥）
         run: python3 scripts/check_production_readiness.py --self-test
+      - name: 发布版本与部署镜像一致性门禁
+        run: python3 scripts/check_release_consistency.py
       - name: 生产全站修复评测契约（部署/路由/OAuth 防回退）
         run: uv run pytest tests/test_production_readiness_gate.py -q
+        working-directory: backend
+      - name: 生产控制面与版本来源脚本契约
+        run: uv run pytest tests/test_control_plane.py tests/test_release_consistency.py tests/test_release_provenance.py -q
         working-directory: backend
       - name: 502 部署韧性评测（镜像导入/磁盘压力/8790 冒烟；离线）
         run: >-
@@ -127,6 +132,9 @@ jobs:
         working-directory: backend
       - name: 多语种与对抗安全质量子集契约（离线、零 token）
         run: uv run pytest tests/test_quality_subsets_eval_set.py -q
+        working-directory: backend
+      - name: 真实生产运行证据格式契约（离线，不代表生产验收）
+        run: uv run pytest tests/test_real_run_evidence.py -q
         working-directory: backend
       - name: 任务产物完整性、导出交付与 B 站开放项契约（离线）
         run: >-

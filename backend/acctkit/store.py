@@ -101,6 +101,17 @@ class IdentityStore(ABC):
     def put_identity(self, provider: str, external_id: str, uid: str) -> None:
         """预置 (provider, external_id) → uid（账号联动/测试构造用；幂等追加）。"""
 
+    # Consent is deliberately an optional extension of the identity-store
+    # protocol.  Older adapters can continue to implement only identity
+    # resolution; the HTTP host checks for these methods before exposing the
+    # consent record.  Keeping it on the user record makes the acceptance
+    # tenant-scoped and avoids a second auth database in the JSON deployment.
+    def set_consent(self, uid: str, version: str, accepted_at: str) -> bool:
+        return False
+
+    def get_consent(self, uid: str) -> dict:
+        return {}
+
 
 class MemoryStore(IdentityStore):
     def __init__(self) -> None:
@@ -114,6 +125,20 @@ class MemoryStore(IdentityStore):
     def put_identity(self, provider: str, external_id: str, uid: str) -> None:
         with self._lock:
             _add_identity(self._users, provider, external_id, uid, _NOOP_SAVE)
+
+    def set_consent(self, uid: str, version: str, accepted_at: str) -> bool:
+        with self._lock:
+            rec = self._users.get(uid)
+            if rec is None:
+                return False
+            rec["terms_consent"] = {"version": version, "accepted_at": accepted_at}
+            return True
+
+    def get_consent(self, uid: str) -> dict:
+        with self._lock:
+            rec = self._users.get(uid) or {}
+            value = rec.get("terms_consent")
+            return dict(value) if isinstance(value, dict) else {}
 
 
 class JsonFileStore(IdentityStore):
@@ -165,3 +190,19 @@ class JsonFileStore(IdentityStore):
     def put_identity(self, provider: str, external_id: str, uid: str) -> None:
         with self._file_lock():
             _add_identity(self._load(), provider, external_id, uid, self._save)
+
+    def set_consent(self, uid: str, version: str, accepted_at: str) -> bool:
+        with self._file_lock():
+            users = self._load()
+            rec = users.get(uid)
+            if rec is None:
+                return False
+            rec["terms_consent"] = {"version": version, "accepted_at": accepted_at}
+            self._save(users)
+            return True
+
+    def get_consent(self, uid: str) -> dict:
+        with self._file_lock():
+            rec = self._load().get(uid) or {}
+            value = rec.get("terms_consent")
+            return dict(value) if isinstance(value, dict) else {}

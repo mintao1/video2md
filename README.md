@@ -1,5 +1,7 @@
 # video2md
 
+![video2md](frontend/web/public/promo/promo-hero-landscape.png)
+
 **把一段课程视频，变成一份可以直接阅读的图文文稿。**
 
 粘贴 B 站、YouTube、抖音、小红书链接或上传本地视频，video2md 自动完成转写、抽帧、OCR、关键画面选择和正文整理，产出带时间戳章节、插图、视频片段和完整转录本的文稿，在网页阅读器里阅读或导出。
@@ -29,7 +31,7 @@ video2md 产出的不是转录稿，而是**可阅读的文稿**：LLM 按章节
 | 用户隔离 | 每个任务按用户归属，只有本人可见、可下载、可删除 |
 | 数据保留 | 云端不长期储存：产物下载确认后立即销毁，未下载的 24 小时后自动清理 |
 | 用量控制 | 每用户月度预算上限、在途任务数和提交频率限制，超限明确提示而不是静默排队 |
-| 会员档位 | 前端有 free / pro / svip 三档展示；目前**只做展示，不参与提交限制** |
+| 会员档位 | 前端有 free / pro / svip 三档展示；可通过 `V2MD_PLAN_LIMITS_JSON` 和会员记录中的 `record.limits` 实际覆盖队列、频率与月度预算，未配置时沿用全局限额 |
 | 算力 | GPU 不可用时默认明确报错，不悄悄降级到慢速 CPU |
 
 ## 🧠 关键设计决策
@@ -155,6 +157,45 @@ V2MD_COLAB_SESSION=v2md-whisper
 T4 不可用时默认明确报错；只有设置 `V2MD_COLAB_CPU_FALLBACK=on` 才允许 CPU 降级。部署前请阅读 [架构索引](docs/architecture/README.md)、[运行拓扑与部署](docs/architecture/02-runtime-topology.md)、[HTTP 契约与鉴权](docs/architecture/03-api-contract.md)、[安全检查清单](docs/architecture/05-security.md) 和 [灾备 runbook](docs/architecture/09-disaster-recovery.md)。
 
 平台工程部分（Kubernetes 清单、多 GPU 供应商路由、OpenTelemetry / Prometheus / Langfuse 可观测性）只在多副本部署时需要，本地自用可以忽略。
+
+#### 生产控制面验收
+
+`scripts/control_plane.py` 用真实 Bearer 凭据检查公开路由、登录后的 `/me`、任务列表、队列深度，并可轮询一个已有任务。它默认只读，不会提交任务；只有显式传入 `--submit-url` 才会创建任务。下载和销毁也分成两个显式动作，避免把“接口返回成功”误记为用户已保存：
+
+```bash
+# 只检查公开路由和内部队列探针（公网反代会按策略返回 /queue=404）
+uv run --project backend python scripts/control_plane.py \
+  --base-url https://video2md.example.com
+
+# 使用真实登录凭据轮询任务，并把整包保存到本机后校验 zip 内容
+V2MD_ACCESS_TOKEN='…' uv run --project backend python scripts/control_plane.py \
+  --base-url https://video2md.example.com --run-id RUN_ID \
+  --wait 900 --download /tmp/RUN_ID.zip --json
+
+# 只有确认文件已保存后才显式 ACK，触发服务端在架产物销毁
+V2MD_ACCESS_TOKEN='…' uv run --project backend python scripts/control_plane.py \
+  --base-url https://video2md.example.com --run-id RUN_ID \
+  --download /tmp/RUN_ID.zip --ack --json
+
+# 协议回执也是显式动作；默认探针不会修改账号状态
+V2MD_ACCESS_TOKEN='…' uv run --project backend python scripts/control_plane.py \
+  --base-url https://video2md.example.com --accept-terms --json
+```
+
+脚本输出的是可归档的脱敏状态包：不会写出 Bearer token、源视频 URL 或响应 Cookie；`--json` 便于把结果附到生产验收记录中。
+
+发布前的源码、目标 ref、镜像 tag 与运行版本比对使用只读脚本：
+
+```bash
+# 在干净的发布 checkout 中执行；不会 checkout、merge、push 或修改集群
+python3 scripts/check_release_provenance.py \
+  --target-ref origin/main \
+  --expected-image video2md:0.2.0-RELEASE_TAG \
+  --health-url https://video2md.example.com \
+  --strict --json
+```
+
+不带 `--strict` 时只输出 `local_sha`、`target_sha`、ahead/behind、dirty、镜像和 `/healthz.version`，适合先定位本地工作区与主线的偏差。
 
 ### 测试与质量检查
 

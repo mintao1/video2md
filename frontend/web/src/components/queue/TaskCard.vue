@@ -22,11 +22,14 @@ async function action(kind: 'cancel' | 'resume' | 'promote' | 'download') {
   if (busy.value) return
   busy.value = true
   try {
+    let acknowledged = false
     if (kind === 'cancel') await queue.pause(props.run.run_id)
     else if (kind === 'resume') await queue.resume(props.run.run_id)
     else if (kind === 'promote') await queue.promote(props.run.run_id)
     else {
-      const url = URL.createObjectURL(await downloadBundle(props.run.run_id))
+      const blob = await downloadBundle(props.run.run_id)
+      if (!blob.size) throw new Error('导出文件为空，请重新生成教材后再试')
+      const url = URL.createObjectURL(blob)
       const anchor = document.createElement('a')
       anchor.href = url
       anchor.download = `video2md-${props.run.run_id}.zip`
@@ -34,15 +37,29 @@ async function action(kind: 'cancel' | 'resume' | 'promote' | 'download') {
       anchor.click()
       anchor.remove()
       setTimeout(() => URL.revokeObjectURL(url), 60_000)
-      // The blob is fully received before this branch continues.  ACK now so
-      // deliver mode can physically burn the server-side copy immediately;
-      // a failed download never reaches this point and remains recoverable.
-      await acknowledgeBundle(props.run.run_id)
-      // Refresh the card so the expired/burned artifact cannot be offered a
-      // second time from stale client state.
-      try { await queue.load() } catch { /* the download and ACK already succeeded */ }
+      // A successful blob transfer proves the browser received the bundle,
+      // but not that the user kept it. Ask for an explicit confirmation
+      // before ACK burns the server-side copy; cancelling leaves the copy
+      // recoverable until the normal TTL sweeper runs.
+      const confirmed = typeof window.confirm !== 'function' || window.confirm(
+        '整包已交给浏览器下载。确认文件已保存后，立即清理云端副本？',
+      )
+      if (confirmed) {
+        await acknowledgeBundle(props.run.run_id)
+        acknowledged = true
+        // Refresh the card so the expired/burned artifact cannot be offered a
+        // second time from stale client state.
+        try { await queue.load() } catch { /* the download and ACK already succeeded */ }
+      }
     }
-    toast.show({ cancel: '已提交取消请求', resume: '任务已重新排队', promote: '已设为优先', download: '下载已开始' }[kind])
+    toast.show(kind === 'download'
+      ? (acknowledged ? '下载已确认，云端副本已清理' : '下载已开始，云端副本保留至 TTL')
+      : {
+          cancel: '已提交取消请求',
+          resume: '任务已重新排队',
+          promote: '已设为优先',
+          download: '下载已开始',
+        }[kind])
   } catch (error) {
     toast.show(error instanceof Error ? error.message : '操作失败，请稍后重试')
   } finally { busy.value = false }

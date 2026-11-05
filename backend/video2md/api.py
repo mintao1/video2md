@@ -33,6 +33,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import math
 import os
 import re
 import secrets
@@ -60,6 +61,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from . import artsink, events, observability, watchdog
 from .auth import AuthError, Identity, current_identity, optional_identity
+from .auth import engine as auth_engine
 from .colab_auth import router as colab_auth_router
 from .config import (
     BUDGET_MONTH_USD,
@@ -70,6 +72,7 @@ from .config import (
     LOG_DIR,
     MAX_CONCURRENT_RUNS,
     OUT_DIR,
+    PLAN_LIMITS_JSON,
     PRICE_GPU_MIN,
     PRICE_LLM_IN_MTOK,
     PRICE_LLM_OUT_MTOK,
@@ -88,11 +91,14 @@ from .graph import make_checkpointer_from_env, run_graph
 from .models import (
     ArtifactsAckOut,
     CancelOut,
+    ConsentBody,
+    ConsentOut,
     CostOut,
     DeviceCodeOut,
     DeviceTokenBody,
     DeviceTokenOut,
     HealthOut,
+    LlmModeUpdate,
     LlmSettingsOut,
     LlmSettingsUpdate,
     MeOut,
@@ -422,6 +428,60 @@ def _budget_spend(uid: str, be) -> float:
     return month_rollup(uid, since)["spend_usd"]
 
 
+_PLAN_LIMIT_KEYS = ("queue_max", "submit_per_min", "budget_usd")
+
+
+def _coerce_plan_limit(value: object, key: str) -> int | float | None:
+    """Accept only finite, non-negative numeric plan overrides."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    number = float(value)
+    if not math.isfinite(number) or number < 0:
+        return None
+    if key in ("queue_max", "submit_per_min"):
+        return int(number)
+    return number
+
+
+def _plan_limits(uid: str) -> dict[str, int | float]:
+    """Resolve effective per-user limits without changing legacy defaults.
+
+    Precedence is global defaults → configured plan JSON → per-user
+    ``membership.record.limits``. Empty/invalid optional configuration simply
+    leaves the existing global gates in place; membership rows without a
+    limits record remain display-only for backward compatibility.
+    """
+    limits: dict[str, int | float] = {
+        "queue_max": USER_QUEUE_MAX,
+        "submit_per_min": USER_SUBMIT_PER_MIN,
+        "budget_usd": BUDGET_MONTH_USD,
+    }
+    row = _membership_row(uid) or {}
+    plan = str(row.get("plan") or "free").strip().lower()
+    configured: object = {}
+    raw_plan_limits = PLAN_LIMITS_JSON if isinstance(PLAN_LIMITS_JSON, str) else ""
+    if raw_plan_limits.strip():
+        try:
+            configured = json.loads(raw_plan_limits)
+        except (TypeError, ValueError):
+            configured = {}
+    if isinstance(configured, dict):
+        plan_limits = configured.get(plan)
+        if isinstance(plan_limits, dict):
+            for key in _PLAN_LIMIT_KEYS:
+                value = _coerce_plan_limit(plan_limits.get(key), key)
+                if value is not None:
+                    limits[key] = value
+    record = row.get("record")
+    record_limits = record.get("limits") if isinstance(record, dict) else None
+    if isinstance(record_limits, dict):
+        for key in _PLAN_LIMIT_KEYS:
+            value = _coerce_plan_limit(record_limits.get(key), key)
+            if value is not None:
+                limits[key] = value
+    return limits
+
+
 def _admit_submission(uid: str) -> None:
     """POST /runs 入队前的配额闸：总队列 / 每用户在途 / 滑窗提交频率 / 月度预算（P2-2）。
 
@@ -430,12 +490,16 @@ def _admit_submission(uid: str) -> None:
     滑窗跨进程不丢；json 档逐字节现状（进程内视图）。
     """
     be = _tasks_backend()
-    if BUDGET_MONTH_USD:
+    limits = _plan_limits(uid)
+    budget_usd = float(limits["budget_usd"])
+    queue_max = int(limits["queue_max"])
+    submit_per_min = int(limits["submit_per_min"])
+    if budget_usd:
         spent = _budget_spend(uid, be)
-        if spent >= BUDGET_MONTH_USD:
+        if spent >= budget_usd:
             raise HTTPException(
-                429, f"本月预算已用尽（${spent:.2f}/${BUDGET_MONTH_USD:.2f}），"
-                     f"下月自动重置或联系管理员调整 V2MD_BUDGET_MONTH_USD",
+                429, f"本月预算已用尽（${spent:.2f}/${budget_usd:.2f}），"
+                     "下月自动重置或联系管理员调整会员方案",
                 headers={"X-Error": "BUDGET_EXCEEDED"})
     if be is not None:
         if QUEUE_MAX:
@@ -443,32 +507,32 @@ def _admit_submission(uid: str) -> None:
             if n >= QUEUE_MAX:
                 raise HTTPException(429, f"队列已满（{n}/{QUEUE_MAX}），稍后重试",
                                     headers={"X-Error": "QUEUE_FULL"})
-        if USER_QUEUE_MAX:
+        if queue_max:
             mine = be.active_for(uid)
-            if mine >= USER_QUEUE_MAX:
-                raise HTTPException(429, f"你在途/排队的 run 已达上限（{mine}/{USER_QUEUE_MAX}）",
+            if mine >= queue_max:
+                raise HTTPException(429, f"你在途/排队的 run 已达上限（{mine}/{queue_max}）",
                                     headers={"X-Error": "USER_QUEUE_FULL"})
-        if USER_SUBMIT_PER_MIN:
-            if be.submit_window_count(uid) >= USER_SUBMIT_PER_MIN:
-                raise HTTPException(429, f"提交过频（限 {USER_SUBMIT_PER_MIN} 次/分钟），稍后重试",
+        if submit_per_min:
+            if be.submit_window_count(uid) >= submit_per_min:
+                raise HTTPException(429, f"提交过频（限 {submit_per_min} 次/分钟），稍后重试",
                                     headers={"X-Error": "RATE_LIMITED"})
         return
     active = [v for v in _TASKS.values() if v.get("status") in ("queued", "running")]
     if QUEUE_MAX and len(active) >= QUEUE_MAX:
         raise HTTPException(429, f"队列已满（{len(active)}/{QUEUE_MAX}），稍后重试",
                             headers={"X-Error": "QUEUE_FULL"})
-    if USER_QUEUE_MAX:
+    if queue_max:
         mine = sum(1 for v in active if v.get("owner") == uid)
-        if mine >= USER_QUEUE_MAX:
-            raise HTTPException(429, f"你在途/排队的 run 已达上限（{mine}/{USER_QUEUE_MAX}）",
+        if mine >= queue_max:
+            raise HTTPException(429, f"你在途/排队的 run 已达上限（{mine}/{queue_max}）",
                                 headers={"X-Error": "USER_QUEUE_FULL"})
-    if USER_SUBMIT_PER_MIN:
+    if submit_per_min:
         now = time.monotonic()
         dq = _USER_SUBMIT_TS.setdefault(uid, deque())
         while dq and now - dq[0] > 60:
             dq.popleft()
-        if len(dq) >= USER_SUBMIT_PER_MIN:
-            raise HTTPException(429, f"提交过频（限 {USER_SUBMIT_PER_MIN} 次/分钟），稍后重试",
+        if len(dq) >= submit_per_min:
+            raise HTTPException(429, f"提交过频（限 {submit_per_min} 次/分钟），稍后重试",
                                 headers={"X-Error": "RATE_LIMITED"})
         dq.append(now)
 
@@ -1096,6 +1160,17 @@ def put_llm_settings(body: LlmSettingsUpdate, ident: Identity = Depends(current_
     return llm_settings.public(row)
 
 
+@app.put("/settings/llm/mode", response_model=LlmSettingsOut,
+         summary="切换 LLM 模式：auto=项目提供 / custom=本人自定义接口（切回 auto 保留已存 Key）")
+def put_llm_mode(body: LlmModeUpdate, ident: Identity = Depends(current_identity)) -> dict:
+    from . import llm_settings
+    try:
+        row = llm_settings.set_mode(ident.uid, body.mode)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    return llm_settings.public(row)
+
+
 @app.delete("/settings/llm", response_model=LlmSettingsOut, summary="清除本人配置，恢复服务默认 LLM")
 def delete_llm_settings(ident: Identity = Depends(current_identity)) -> dict:
     from . import llm_settings
@@ -1107,6 +1182,7 @@ def delete_llm_settings(ident: Identity = Depends(current_identity)) -> dict:
 async def post_upload(file: UploadFile, ident: Identity = Depends(current_identity)) -> dict:
     """流式落盘 data/uploads/<uid>/（不进内存）；单文件上限/每用户配额/类型白名单，
     TTL 到期惰性清扫——「云端不储存」口径延伸到源文件。"""
+    _require_current_terms(ident)
     name = sanitize_filename(file.filename or "upload")
     ext = Path(name).suffix.lower()
     if ext not in _UPLOAD_EXT_OK:
@@ -1212,6 +1288,11 @@ _GOOGLE_OAUTH_TOKEN_URL = "https://oauth2.googleapis.com/token"
 _GOOGLE_STATE_TTL_S = 600
 _GOOGLE_OAUTH_STATES: dict[str, float] = {}  # state → 过期时刻（monotonic）。进程内记账
 _GOOGLE_OAUTH_REDIRECTS: dict[str, str] = {}  # state → 登录后回到的站内路径（随 state 一并消费）
+_GOOGLE_OAUTH_CONSENTS: dict[str, str] = {}  # state → accepted terms version
+
+# Public document version.  It is intentionally pinned instead of derived from
+# a build timestamp so every API replica records the same legal document.
+TERMS_VERSION = "2026-10-21"
 
 
 def _google_oauth_timeout_s() -> float:
@@ -1261,6 +1342,8 @@ def _google_state_purge() -> None:
         _GOOGLE_OAUTH_STATES.pop(k, None)
     for k in [k for k in _GOOGLE_OAUTH_REDIRECTS if k not in _GOOGLE_OAUTH_STATES]:
         _GOOGLE_OAUTH_REDIRECTS.pop(k, None)
+    for k in [k for k in _GOOGLE_OAUTH_CONSENTS if k not in _GOOGLE_OAUTH_STATES]:
+        _GOOGLE_OAUTH_CONSENTS.pop(k, None)
 
 
 def _google_safe_redirect(path: str) -> str:
@@ -1290,7 +1373,7 @@ def _google_finish(resp: RedirectResponse) -> RedirectResponse:
     """所有出口统一清 CSRF state cookie（一次性，用完即焚）。"""
     resp.delete_cookie("v2md_oauth_state", path="/auth/google/callback")
     # 清理改名前 cookie，避免旧浏览器残留继续影响回调。
-    resp.delete_cookie("v2md_oauth_state", path="/auth/google/callback")
+    resp.delete_cookie("v2pdf_oauth_state", path="/auth/google/callback")
     return resp
 
 
@@ -1316,6 +1399,7 @@ async def auth_google_login(request: Request, redirect: str = "", terms_accepted
     _google_state_purge()
     state = secrets.token_urlsafe(32)
     _GOOGLE_OAUTH_STATES[state] = time.monotonic() + _GOOGLE_STATE_TTL_S
+    _GOOGLE_OAUTH_CONSENTS[state] = TERMS_VERSION
     if back:
         _GOOGLE_OAUTH_REDIRECTS[state] = back
     q = urllib.parse.urlencode({
@@ -1345,8 +1429,8 @@ async def auth_google_callback(request: Request, code: str = "", state: str = ""
     ip = _client_ip(request)
     exp = _GOOGLE_OAUTH_STATES.pop(state, None) if state else None
     back = _GOOGLE_OAUTH_REDIRECTS.pop(state, "") if state else ""
-    cookie_state = (request.cookies.get("v2md_oauth_state")
-                    or request.cookies.get("v2md_oauth_state") or "")
+    consent_version = _GOOGLE_OAUTH_CONSENTS.pop(state, None) if state else None
+    cookie_state = request.cookies.get("v2md_oauth_state") or ""
     if exp is None or exp <= time.monotonic() or cookie_state != state:
         _req_log("GET", "/auth/google/callback", 400, user=f"(anon:{ip})")
         return _google_finish(_google_error_redirect("登录状态已过期或校验失败，请重新登录", back))
@@ -1376,7 +1460,7 @@ async def auth_google_callback(request: Request, code: str = "", state: str = ""
     from acctkit.providers import GoogleProvider
 
     try:
-        await asyncio.to_thread(
+        payload = await asyncio.to_thread(
             GoogleProvider(cid, proxy_url=_google_oauth_proxy() or "")._verify,
             idt,
         )
@@ -1389,6 +1473,28 @@ async def auth_google_callback(request: Request, code: str = "", state: str = ""
                  cause_detail=str(cause)[:240] if cause else "")
         return _google_finish(_google_error_redirect(
             f"Google ID-Token 校验失败（{type(exc).__name__}）", back))
+    if consent_version == TERMS_VERSION:
+        from acctkit.models import Principal
+
+        subject = str(payload.get("sub") or "") if isinstance(payload, dict) else ""
+        setter = getattr(auth_engine.store, "set_consent", None)
+        try:
+            resolved = auth_engine.store.resolve(Principal(
+                "google", subject,
+                email=str(payload.get("email") or "") if isinstance(payload, dict) else None,
+                name=str(payload.get("name") or "") if isinstance(payload, dict) else None,
+            )) if subject else None
+            saved = bool(resolved and callable(setter) and setter(
+                resolved.uid, TERMS_VERSION,
+                datetime.now().astimezone().isoformat(timespec="seconds"),
+            ))
+        except Exception as exc:
+            _req_log("POST", "/auth/consent", 503, user=f"(anon:{ip})",
+                     error_type=type(exc).__name__)
+            saved = False
+        if not saved:
+            return _google_finish(_google_error_redirect(
+                "登录成功但用户协议回执未保存，请重试", back))
     _req_log("GET", "/auth/google/callback", 302, user=f"(anon:{ip})")
     # id_token 是 base64url JWT（fragment 字符集安全，无需再编码）；fragment 不落服务端日志。
     return _google_finish(RedirectResponse(f"{_google_login_url(back)}#id_token={idt}",
@@ -1623,8 +1729,10 @@ async def post_runs(body: RunCreate, ident: Identity = Depends(current_identity)
                                      "from_run": previous["run_id"]}
                                     for i, e in enumerate(previous.get("entries") or [], 1)],
                         "all_skipped": True, "status": "done", "dedup": True}
-    _admit_submission(ident.uid)   # 配额闸（队列/每用户在途/滑窗频率）——便宜检查放最前
     _validate_run_url(url, ident.uid)  # 非 http 输入的白名单闸（多用户档不收裸本地路径）
+    if not body.resolve_only:
+        _require_current_terms(ident)
+    _admit_submission(ident.uid)   # 配额闸（队列/每用户在途/滑窗频率）——便宜检查放最前
     run_id = _new_run_id()
     run, err, is_dup = await asyncio.to_thread(
         resolve_run, url, part_items, body.force, run_id, ident.uid)
@@ -2020,6 +2128,7 @@ def get_cost(ident: Identity = Depends(current_identity)) -> dict:
     be = _tasks_backend()
     since = _month_start_iso()
     u = be.month_rollup(ident.uid, since) if be is not None else month_rollup(ident.uid, since)
+    limits = _plan_limits(ident.uid)
     items = [{"run_id": r["run_id"], "title": _run_title(r), "status": r.get("status"),
               "created": r.get("created"), "deleted": bool(r.get("deleted")), **_run_accounting(r)}
              for r in _load_runs().values()
@@ -2027,7 +2136,7 @@ def get_cost(ident: Identity = Depends(current_identity)) -> dict:
     items.sort(key=lambda r: r.get("created") or "", reverse=True)
     policy = ENV.get("V2MD_GPU_PRICE_POLICY", "metered")
     return {"uid": ident.uid, "month": since, "spend_usd": u["spend_usd"],
-            "budget_usd": BUDGET_MONTH_USD, "usage": u,
+            "budget_usd": float(limits["budget_usd"]), "usage": u,
             "gpu_policy": policy, "runs": items,
             "pricing_configured": PRICE_LLM_IN_MTOK > 0 and PRICE_LLM_OUT_MTOK > 0
                 and (PRICE_GPU_MIN > 0 or (PRICE_GPU_MIN == 0 and policy == "free")),
@@ -2056,6 +2165,69 @@ def _membership_row(uid: str) -> dict | None:
     return _MEMBERSHIP_STORE.get(uid)
 
 
+def _terms_consent(uid: str) -> dict:
+    """Read the tenant-scoped terms receipt from the active identity store."""
+    getter = getattr(auth_engine.store, "get_consent", None)
+    if not callable(getter):
+        return {}
+    value = getter(uid)
+    return value if isinstance(value, dict) else {}
+
+
+def _terms_response(uid: str) -> dict:
+    receipt = _terms_consent(uid)
+    version = str(receipt.get("version") or "") or None
+    accepted_at = str(receipt.get("accepted_at") or "") or None
+    return {
+        "terms_version": version,
+        "terms_accepted_at": accepted_at,
+        "terms_current": version == TERMS_VERSION,
+    }
+
+
+def _require_current_terms(ident: Identity) -> None:
+    """Require a durable agreement before billable/data-processing actions.
+
+    Local development and self-hosted ``V2MD_AUTH=off`` retain their zero-setup
+    behavior. Production OAuth sessions must have a receipt; a browser
+    checkbox alone is never enough to submit a task.
+    """
+    if (ENV.get("V2MD_AUTH") or "off").strip().lower() in ("", "off", "none"):
+        return
+    if _terms_consent(ident.uid).get("version") != TERMS_VERSION:
+        raise HTTPException(
+            428,
+            "请先阅读并同意当前《用户服务协议》与《隐私保护政策》",
+            headers={"X-Error": "CONSENT_REQUIRED"},
+        )
+
+
+@app.get("/auth/consent", response_model=ConsentOut,
+         summary="读取当前账号的用户协议同意回执")
+def get_terms_consent(ident: Identity = Depends(current_identity)) -> dict:
+    """Return the durable receipt used by the login/onboarding UI.
+
+    The endpoint is authenticated so one browser cannot submit consent for a
+    different tenant.  The receipt is metadata only; the document itself
+    remains the public ``/terms`` page.
+    """
+    return _terms_response(ident.uid)
+
+
+@app.post("/auth/consent", response_model=ConsentOut,
+          summary="记录当前账号同意的用户协议版本")
+def record_terms_consent(body: ConsentBody,
+                         ident: Identity = Depends(current_identity)) -> dict:
+    if body.terms_version != TERMS_VERSION:
+        raise HTTPException(409, "用户协议版本已更新，请重新阅读后再提交")
+    setter = getattr(auth_engine.store, "set_consent", None)
+    if not callable(setter) or not setter(
+            ident.uid, TERMS_VERSION,
+            datetime.now().astimezone().isoformat(timespec="seconds")):
+        raise HTTPException(503, "暂时无法保存用户协议同意记录，请稍后重试")
+    return _terms_response(ident.uid)
+
+
 @app.get("/me", response_model=MeOut,
           summary="本人资料卡（web 个人页：plan/昵称/头像色；无 membership 行回 free 默认档）")
 def get_me(ident: Identity = Depends(current_identity)) -> dict:
@@ -2067,11 +2239,12 @@ def get_me(ident: Identity = Depends(current_identity)) -> dict:
             "display_name": display or name,
             "avatar_hue": int((row or {}).get("avatar_hue") or 258),
             "plan": (row or {}).get("plan") or "free",
-            "id_label": f"ID: {ident.uid.removeprefix('u_')}"}
+            "id_label": f"ID: {ident.uid.removeprefix('u_')}",
+            **_terms_response(ident.uid)}
 
 
 @app.get("/quota", response_model=QuotaOut,
-          summary="本人会员配额与统计（展示档，来自 v2md_membership；不参与提交强制）")
+         summary="本人会员配额、统计与有效提交限制")
 def get_quota(ident: Identity = Depends(current_identity)) -> dict:
     row = _membership_row(ident.uid) or {}
     # 已生成教材数取 runs 真相源（与教材库同口径：本人、未删、done/partial），
@@ -2086,7 +2259,8 @@ def get_quota(ident: Identity = Depends(current_identity)) -> dict:
             "storage_gb_total": float(row.get("storage_gb_total") or 0),
             "stats": {"books": books,
                       "knowledge_points": int(row.get("stats_knowledge_points") or 0),
-                      "accuracy": float(row.get("stats_accuracy") or 0)}}
+                      "accuracy": float(row.get("stats_accuracy") or 0)},
+            "limits": _plan_limits(ident.uid)}
 
 
 @app.get("/queue", response_model=QueueOut)

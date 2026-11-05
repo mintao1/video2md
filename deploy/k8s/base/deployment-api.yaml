@@ -38,7 +38,7 @@ spec:
       # an older schema.
       initContainers:
         - name: fix-volume-permissions
-          image: video2md:0.2.0-hotfix-20261021l
+          image: video2md:0.2.0-colab-tenant-20261026d
           imagePullPolicy: IfNotPresent
           securityContext:
             runAsNonRoot: false
