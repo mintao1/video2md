@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { acceptTerms } from '../api'
 import { BASE_URL, request, safeRedirect } from '../api/client'
 import LogoMark from '../components/art/LogoMark.vue'
 import { useAuthStore } from '../stores/auth'
@@ -30,6 +31,14 @@ onMounted(async () => {
       }
     } catch {
       // A temporary Colab status failure must not prevent website sign-in.
+    }
+    // The callback persists the exact document version server-side. Repeat the
+    // idempotent write here so a browser that completed an older callback also
+    // gets a durable receipt before entering the application.
+    try {
+      await acceptTerms()
+    } catch {
+      // Processing endpoints fail closed until the receipt is written.
     }
     await router.replace(destination)
   } else if (authError) {

@@ -2,8 +2,8 @@
 // 会员/配额（getQuota/currentUser，membership table）、
 // 教材库（getBooks/toggleFav/getToc/getNotes/saveProgress，/runs+/prefs）、
 // 队列页主链（listRuns/createRun/cancelRun → GET/POST /runs）。
-export { currentUser, getQuota, getCost } from './live/profile'
-export { getLlmSettings, saveLlmSettings, clearLlmSettings } from './live/llm-settings'
+export { currentUser, getQuota, getCost, acceptTerms } from './live/profile'
+export { getLlmSettings, saveLlmSettings, setLlmMode, clearLlmSettings } from './live/llm-settings'
 export { ArtifactsExpiredError, getBooks, toggleFav, getToc, getNotes, getMedia, saveProgress } from './live/books'
 export { ApiTimeoutError } from './client'
 export {

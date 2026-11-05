@@ -28,6 +28,17 @@ it('keeps the PDF action wired separately from the Markdown download path', asyn
   assert.match(modal, /PDF（打印保存）/)
 })
 
+it('offers a real bundle export and only ACKs after explicit save confirmation', async () => {
+  const { readFile } = await import('node:fs/promises')
+  const source = await readFile(new URL('../src/views/LibraryView.vue', import.meta.url), 'utf8')
+  const modal = await readFile(new URL('../src/components/book/ExportFormatModal.vue', import.meta.url), 'utf8')
+  assert.match(modal, /整包下载 \(\.zip\)/)
+  assert.match(source, /downloadBundle\(book\.id\)/)
+  assert.match(source, /window\.confirm\(/)
+  assert.match(source, /acknowledgeBundle\(book\.id\)/)
+  assert.match(source, /文件仍可重新下载/)
+})
+
 it('uses the bundled MathJax runtime instead of a remote CDN', () => {
   const html = pdf.buildPdfHtml('离线公式', '<p>$$x^2$$</p>')
   assert.match(html, /\/vendor\/mathjax\/tex-svg\.js/)

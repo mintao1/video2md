@@ -98,6 +98,9 @@ export interface User {
   avatar_hue: number
   plan: 'free' | 'pro' | 'svip'
   id_label: string
+  terms_version?: string | null
+  terms_accepted_at?: string | null
+  terms_current?: boolean
 }
 
 /** 配额与统计 */
@@ -110,6 +113,11 @@ export interface Quota {
     books: number
     knowledge_points: number
     accuracy: number
+  }
+  limits?: {
+    queue_max: number
+    submit_per_min: number
+    budget_usd: number
   }
 }
 

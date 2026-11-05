@@ -73,6 +73,7 @@ jobs:
           set -euo pipefail
           cd "${{ inputs.product || 'video2md' }}"
           python3 scripts/check_production_readiness.py --self-test
+          python3 scripts/check_release_consistency.py
 
       # 钉死 kustomize 版本：runner 默认不带 kustomize；kubectl kustomize 将随
       # KEP-4706 移除，不作依赖。

@@ -50,5 +50,10 @@ const initial = computed(() => props.user.name[0] ?? '视')
         <span class="font-label-sm text-label-sm text-outline">提取知识点</span>
       </div>
     </div>
+
+    <p v-if="quota?.limits" class="text-center text-[11px] text-outline">
+      在途 {{ quota.limits.queue_max }} · {{ quota.limits.submit_per_min }} 次/分钟 ·
+      月预算 {{ quota.limits.budget_usd > 0 ? `$${quota.limits.budget_usd}` : '不限' }}
+    </p>
   </div>
 </template>

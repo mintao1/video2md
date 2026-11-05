@@ -11,6 +11,7 @@ const emit = defineEmits<{
 const formats = [
   { key: 'PDF', icon: 'picture_as_pdf', iconCls: 'text-error', label: 'PDF（打印保存）', hint: '保留公式与超链' },
   { key: 'Markdown', icon: 'markdown', iconCls: 'text-primary', label: 'Markdown (.md)', hint: '通用 Markdown 文本' },
+  { key: 'Bundle', icon: 'folder_zip', iconCls: 'text-secondary', label: '整包下载 (.zip)', hint: '正文、转录、图片和视频' },
   { key: 'EPUB', icon: 'book', iconCls: 'text-secondary', label: '电子书 EPUB', hint: '支持微信读书/Kindle' },
   { key: 'LaTeX', icon: 'code', iconCls: 'text-tertiary', label: 'LaTeX 源码包', hint: '含 Overleaf 模板' },
 ]

@@ -61,7 +61,7 @@ export function mediaMarkdown(md: string, urls: Record<string, string>, pending:
       : `<span>媒体暂不可用：${escape(name)}</span>`
     const src = escape(url)
     return /\.mp4$/i.test(name)
-      ? `<video src="${src}" controls preload="metadata" data-v2md-media="${escape(name)}" aria-label="${escape(name)}"></video>`
+      ? `<video src="${src}" controls preload="metadata" playsinline data-v2md-media="${escape(name)}" aria-label="${escape(name)}"></video>`
       : `<img src="${src}" data-v2md-media="${escape(name)}" alt="${escape(name)}">`
   })
 }

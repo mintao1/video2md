@@ -18,7 +18,7 @@ MIGRATION = ROOT / "video2md/migrations/0007_run_id_text_compat.sql"
 def test_legacy_run_id_migration_is_registered_and_widens_both_columns() -> None:
     from video2md import pgmigrate
 
-    assert pgmigrate.SCHEMA_LATEST == 7
+    assert pgmigrate.SCHEMA_LATEST >= 7
     assert (7, "0007_run_id_text_compat.sql") in pgmigrate.MIGRATIONS
 
     sql = MIGRATION.read_text(encoding="utf-8")

@@ -410,10 +410,11 @@ class PostgresTaskStore:
 
 
 class PostgresMembershipStore:
-    """membership 表：uid PK 的会员/配额展示档（web 个人页 /me、/quota 的数据源）。
+    """membership 表：uid PK 的会员/配额资料（web 个人页 /me、/quota）。
 
-    只读展示路径：get() 供端点读；upsert() 供种子/运维写（测试同款）。
-    不参与提交强制（_admit_submission 不读它——后续工作）。"""
+    ``record.limits`` 可按用户覆盖提交闸门；get() 供端点读，upsert() 供
+    种子/运维写（测试同款）。未配置 limits 时继续沿用全局限额。
+    """
 
     def __init__(self, pool: ConnectionPool):
         self.pool = pool  # v2md_membership 建表已上收 migrations/0002（P0-5），构造只接线
@@ -425,13 +426,14 @@ class PostgresMembershipStore:
                 SELECT uid, plan, display_name, avatar_hue,
                        ai_hours_used, ai_hours_total,
                        storage_gb_used, storage_gb_total,
-                       stats_books, stats_knowledge_points, stats_accuracy
+                       stats_books, stats_knowledge_points, stats_accuracy,
+                       record
                   FROM v2md_membership WHERE uid=%s""", (uid,)).fetchone()
         if not row:
             return None
         cols = ("uid", "plan", "display_name", "avatar_hue",
                 "ai_hours_used", "ai_hours_total", "storage_gb_used", "storage_gb_total",
-                "stats_books", "stats_knowledge_points", "stats_accuracy")
+                "stats_books", "stats_knowledge_points", "stats_accuracy", "record")
         return dict(zip(cols, row))
 
     def upsert(self, data: dict) -> None:

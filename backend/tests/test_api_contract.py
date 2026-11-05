@@ -74,6 +74,7 @@ def _clean_state():
     import video2md.api as _api
     _api._GOOGLE_OAUTH_STATES.clear()  # OAuth state 单次消费测试的跨用例泄漏闸
     _api._GOOGLE_OAUTH_REDIRECTS.clear()
+    _api._GOOGLE_OAUTH_CONSENTS.clear()
     _api._DEVICE_WIN.clear()           # IP 滑窗跨用例泄漏闸（设备流/授权码流限流共用一桶）
     yield
 
@@ -292,6 +293,92 @@ def test_me_defaults(client):
     assert body["avatar_hue"] == 258
     assert body["id_label"] == "ID: carol123"  # uid 去 u_ 前缀派生（对齐 mock 语义）
     assert body["display_name"]  # name/display_name 至少回退到 uid，不为空
+
+
+def test_terms_consent_is_versioned_and_tenant_scoped(client):
+    """协议勾选必须留下当前版本的、绑定到已认证 uid 的回执。"""
+    from video2md.api import TERMS_VERSION
+
+    put_identity("test", "consent-user", "u_consent")
+    before = client.get("/auth/consent", headers={"X-Test-Auth": "consent-user"})
+    assert before.status_code == 200
+    assert before.json() == {
+        "terms_version": None,
+        "terms_accepted_at": None,
+        "terms_current": False,
+    }
+    stale = client.post("/auth/consent", headers={"X-Test-Auth": "consent-user"},
+                        json={"terms_version": "2020-01-01"})
+    assert stale.status_code == 409
+    accepted = client.post("/auth/consent", headers={"X-Test-Auth": "consent-user"},
+                           json={"terms_version": TERMS_VERSION})
+    assert accepted.status_code == 200
+    receipt = accepted.json()
+    assert receipt["terms_version"] == TERMS_VERSION
+    assert receipt["terms_current"] is True and receipt["terms_accepted_at"]
+    me = client.get("/me", headers={"X-Test-Auth": "consent-user"})
+    assert me.json()["terms_version"] == TERMS_VERSION
+    assert me.json()["terms_current"] is True
+
+    # A second identity has no access to the first tenant's receipt.
+    put_identity("test", "other-user", "u_other")
+    other = client.get("/auth/consent", headers={"X-Test-Auth": "other-user"})
+    assert other.status_code == 200 and other.json()["terms_version"] is None
+
+
+def test_production_processing_requires_current_terms(client, monkeypatch):
+    put_identity("test", "consent-gate", "u_consent_gate")
+    import video2md.api as _api
+
+    with monkeypatch.context() as mp:
+        mp.setitem(_api.ENV, "V2MD_AUTH", "google")
+        response = client.post("/runs", headers={"X-Test-Auth": "consent-gate"},
+                               json={"url": "https://example.test/video"})
+    assert response.status_code == 428
+    assert response.json()["error"]["details"] == "CONSENT_REQUIRED"
+
+
+def test_membership_plan_limits_are_configurable_and_reported(client, monkeypatch):
+    import video2md.api as _api
+
+    with monkeypatch.context() as mp:
+        mp.setattr(_api, "USER_QUEUE_MAX", 5)
+        mp.setattr(_api, "USER_SUBMIT_PER_MIN", 30)
+        mp.setattr(_api, "BUDGET_MONTH_USD", 0.0)
+        mp.setattr(_api, "PLAN_LIMITS_JSON",
+                   '{"pro":{"queue_max":3,"submit_per_min":12,"budget_usd":9}}')
+        mp.setattr(_api, "_membership_row", lambda uid: {
+            "uid": uid,
+            "plan": "pro",
+            "record": {"limits": {"queue_max": 2}},
+        })
+        limits = _api._plan_limits("u_plan")
+        assert limits == {"queue_max": 2, "submit_per_min": 12, "budget_usd": 9.0}
+        put_identity("test", "plan-user", "u_plan")
+        response = client.get("/quota", headers={"X-Test-Auth": "plan-user"})
+    assert response.status_code == 200
+    assert response.json()["limits"] == {
+        "queue_max": 2,
+        "submit_per_min": 12,
+        "budget_usd": 9.0,
+    }
+
+
+def test_membership_limit_is_enforced_before_submission(client, monkeypatch):
+    import video2md.api as _api
+
+    with monkeypatch.context() as mp:
+        mp.setattr(_api, "_tasks_backend", lambda: None)
+        mp.setattr(_api, "_plan_limits", lambda uid: {
+            "queue_max": 1, "submit_per_min": 0, "budget_usd": 0.0,
+        })
+        mp.setattr(_api, "_TASKS", {
+            "already-running": {"status": "running", "owner": "u_plan"},
+        })
+        with pytest.raises(_api.HTTPException) as error:
+            _api._admit_submission("u_plan")
+    assert error.value.status_code == 429
+    assert error.value.headers["X-Error"] == "USER_QUEUE_FULL"
 
 
 def test_quota_defaults(client):
@@ -852,8 +939,10 @@ def test_auth_google_login_rate_limit(client):
 def test_auth_google_callback_happy_path(client, monkeypatch):
     import video2md.api as _api
     from acctkit import providers as _p
+    from acctkit.models import Principal
     monkeypatch.setattr(_api, "ENV", dict(_GENV))
     _seed_state("st-ok")
+    _api._GOOGLE_OAUTH_CONSENTS["st-ok"] = _api.TERMS_VERSION
     seen: dict = {}
 
     class _Resp:
@@ -877,6 +966,8 @@ def test_auth_google_callback_happy_path(client, monkeypatch):
     assert seen["url"] == _api._GOOGLE_OAUTH_TOKEN_URL
     assert seen["data"]["code"] == "abc" and seen["data"]["redirect_uri"] == \
         "http://api.public/auth/google/callback"
+    uid = _api.auth_engine.store.resolve(Principal("google", "s1")).uid
+    assert _api.auth_engine.store.get_consent(uid)["version"] == _api.TERMS_VERSION
     assert "st-ok" not in _api._GOOGLE_OAUTH_STATES  # state 单次消费
     assert 'v2md_oauth_state="";' in r.headers.get("set-cookie", "").replace(" ", "") \
         or "v2md_oauth_state=;" in r.headers.get("set-cookie", "")  # cookie 已焚
@@ -2013,8 +2104,10 @@ def test_llm_settings_private_persistent_update_and_clear(client, llm_settings_p
     r = client.put(endpoint, headers=alice, json={"base_url": "https://alice.example/v1/chat/completions/",
                                                  "api_key": "alice-secret", "model": "alice-model"})
     assert r.status_code == 200
-    assert r.json() == {"base_url": "https://alice.example/v1", "model": "alice-model",
-                        "has_api_key": True, "configured": True}
+    body = r.json()
+    assert body.pop("system_model")
+    assert body == {"base_url": "https://alice.example/v1", "model": "alice-model",
+                    "has_api_key": True, "configured": True, "mode": "custom"}
     assert "alice-secret" not in r.text
     assert "alice-secret" not in llm_settings_path.read_text()
     assert "alice-secret" not in client.get(endpoint, headers=alice).text
@@ -2027,6 +2120,41 @@ def test_llm_settings_private_persistent_update_and_clear(client, llm_settings_p
     assert client.delete(endpoint, headers=alice).json()["configured"] is False
     assert llm_settings.load("uid_alice") == {}
     assert llm_settings.load("uid_bob")["api_key"] == "bob-secret"
+
+
+def test_llm_mode_auto_keeps_custom_key_and_switches_back(client, llm_settings_path):
+    from video2md import llm_settings
+    put_identity("test", "carol", "uid_carol")
+    carol = {"X-Test-Auth": "carol"}
+    fresh = client.get("/settings/llm", headers=carol).json()
+    assert fresh["mode"] == "auto" and fresh["configured"] is False and fresh["system_model"]
+    # Cannot pick custom before a complete endpoint is saved.
+    assert client.put("/settings/llm/mode", headers=carol, json={"mode": "custom"}).status_code == 422
+    assert client.put("/settings/llm/mode", headers=carol, json={"mode": "bogus"}).status_code == 422
+    assert client.put("/settings/llm/mode", headers=carol, json={"mode": "auto"}).json()["mode"] == "auto"
+    client.put("/settings/llm", headers=carol, json={"base_url": "https://carol.example/v1",
+                                                     "api_key": "carol-secret", "model": "m"})
+    with llm_settings.user_scope("uid_carol"):
+        assert llm_settings.current()["api_key"] == "carol-secret"
+    auto = client.put("/settings/llm/mode", headers=carol, json={"mode": "auto"}).json()
+    assert auto["mode"] == "auto" and auto["configured"] is True and auto["has_api_key"] is True
+    assert "carol-secret" not in str(auto)
+    with llm_settings.user_scope("uid_carol"):
+        assert llm_settings.current() is None  # project LLM is used
+    assert client.get("/settings/llm", headers=carol).json()["mode"] == "auto"
+    back = client.put("/settings/llm/mode", headers=carol, json={"mode": "custom"}).json()
+    assert back["mode"] == "custom"
+    with llm_settings.user_scope("uid_carol"):
+        assert llm_settings.current()["api_key"] == "carol-secret"
+
+
+def test_llm_settings_legacy_row_without_mode_stays_custom(llm_settings_path):
+    from video2md import llm_settings
+    llm_settings.update("uid_legacy_mode", base_url="https://x.example/v1", api_key="k")
+    data = json.loads(llm_settings_path.read_text())
+    data["uid_legacy_mode"].pop("mode")
+    llm_settings_path.write_text(json.dumps(data))
+    assert llm_settings.public(llm_settings.load("uid_legacy_mode"))["mode"] == "custom"
 
 
 def test_llm_settings_plaintext_migration_reencrypts_without_echo(llm_settings_path):

@@ -105,6 +105,29 @@ class PostgresIdentityStore(IdentityStore):
                     ON CONFLICT (provider, external_id) DO UPDATE SET uid = EXCLUDED.uid""",
                     (provider, external_id, uid))
 
+    def set_consent(self, uid: str, version: str, accepted_at: str) -> bool:
+        """Persist the accepted terms version inside the tenant's user record.
+
+        This intentionally reuses ``record`` rather than introducing another
+        table: the migration remains compatible with existing production
+        databases and the JSON and PostgreSQL identity stores have the same
+        shape.
+        """
+        with self.pool.connection() as conn:
+            with conn.transaction():
+                rec = self._get_user(conn, uid)
+                if rec is None:
+                    return False
+                rec["terms_consent"] = {"version": version, "accepted_at": accepted_at}
+                self._put_user(conn, rec)
+                return True
+
+    def get_consent(self, uid: str) -> dict:
+        with self.pool.connection() as conn:
+            rec = self._get_user(conn, uid) or {}
+            value = rec.get("terms_consent")
+            return dict(value) if isinstance(value, dict) else {}
+
 
 def bulk_load(pool: ConnectionPool, users: dict) -> tuple[int, int]:
     """users.json 全量导入（迁移脚本用）：users 行 + identities 展开，幂等 upsert。"""

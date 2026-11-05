@@ -16,6 +16,7 @@ from . import config
 
 _CURRENT: contextvars.ContextVar[dict | None] = contextvars.ContextVar("user_llm_settings", default=None)
 _ENC_PREFIX = "v1:aesgcm:"
+MODES = ("auto", "custom")  # auto=项目提供的服务 LLM；custom=用户自填的 OpenAI 兼容接口
 
 
 class CredentialEncryptionError(RuntimeError):
@@ -81,6 +82,9 @@ def _decrypt(uid: str, value: str) -> str:
 def _decrypt_row(uid: str, row: dict) -> dict:
     result = dict(row)
     result["api_key"] = _decrypt(uid, str(result.get("api_key") or ""))
+    # Rows saved before the auto/custom switch were already routed to the user's
+    # own credentials, so a missing mode means custom (same as migration 0008).
+    result["mode"] = result.get("mode") if result.get("mode") in MODES else "custom"
     return result
 
 
@@ -161,14 +165,18 @@ def _pool():
     return None
 
 
+_COLS = ("base_url", "api_key", "model", "mode")
+
+
 def load(uid: str) -> dict:
     pool = _pool()
     if pool is not None:
         from .pg import tenant_connection
         with tenant_connection(pool) as conn:
-            row = conn.execute("SELECT base_url, api_key, model FROM v2md_llm_settings WHERE uid=%s",
-                               (uid,)).fetchone()
-        return _decrypt_row(uid, dict(zip(("base_url", "api_key", "model"), row))) if row else {}
+            row = conn.execute(
+                "SELECT base_url, api_key, model, mode FROM v2md_llm_settings WHERE uid=%s",
+                (uid,)).fetchone()
+        return _decrypt_row(uid, dict(zip(_COLS, row))) if row else {}
     path = _path()
     # Atomic replacement means readers see either the old or new complete file.
     if not path.exists():
@@ -194,15 +202,16 @@ def update(uid: str, *, base_url: str = "", api_key: str | None = None,
                     # Decrypt before preserving to validate the current key and
                     # prevent carrying forward an unreadable legacy token.
                     _decrypt(uid, str(existing[0]))
+            # Saving a custom endpoint is an explicit choice to use it: mode=custom.
             row = conn.execute("""
-                INSERT INTO v2md_llm_settings (uid, base_url, api_key, model)
-                VALUES (%s, %s, COALESCE(%s, ''), %s)
+                INSERT INTO v2md_llm_settings (uid, base_url, api_key, model, mode)
+                VALUES (%s, %s, COALESCE(%s, ''), %s, 'custom')
                 ON CONFLICT (uid) DO UPDATE SET base_url=EXCLUDED.base_url,
                     api_key=COALESCE(%s, v2md_llm_settings.api_key), model=EXCLUDED.model,
-                    updated=now()
-                RETURNING base_url, api_key, model
+                    mode='custom', updated=now()
+                RETURNING base_url, api_key, model, mode
                 """, (uid, base_url, encrypted, model, encrypted)).fetchone()
-        return _decrypt_row(uid, dict(zip(("base_url", "api_key", "model"), row)))
+        return _decrypt_row(uid, dict(zip(_COLS, row)))
     path = _path()
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.with_suffix(".lock").open("a+") as lock:
@@ -215,27 +224,73 @@ def update(uid: str, *, base_url: str = "", api_key: str | None = None,
             else:
                 existing = data.get(uid, {})
                 preserved = _decrypt(uid, str(existing.get("api_key") or "")) if existing.get("api_key") else ""
-                row = {"base_url": base_url, "model": model,
+                row = {"base_url": base_url, "model": model, "mode": "custom",
                        "api_key": _encrypt(uid, api_key if api_key is not None else preserved)}
                 data[uid] = row
-            fd, name = tempfile.mkstemp(prefix=path.name + ".tmp.", dir=path.parent)
-            try:
-                with os.fdopen(fd, "w") as fh:
-                    json.dump(data, fh, ensure_ascii=False)
-                    fh.flush()
-                    os.fsync(fh.fileno())
-                os.replace(name, path)  # mkstemp creates the credential file with mode 0600.
-            finally:
-                Path(name).unlink(missing_ok=True)
+            _write_json(path, data)
             return _decrypt_row(uid, row) if row else {}
         finally:
             fcntl.flock(lock, fcntl.LOCK_UN)
 
 
+def _write_json(path: Path, data: dict) -> None:
+    fd, name = tempfile.mkstemp(prefix=path.name + ".tmp.", dir=path.parent)
+    try:
+        with os.fdopen(fd, "w") as fh:
+            json.dump(data, fh, ensure_ascii=False)
+            fh.flush()
+            os.fsync(fh.fileno())
+        os.replace(name, path)  # mkstemp creates the credential file with mode 0600.
+    finally:
+        Path(name).unlink(missing_ok=True)
+
+
+def set_mode(uid: str, mode: str) -> dict:
+    """Switch between the project LLM (auto) and the saved custom endpoint.
+
+    Switching to auto keeps the saved (encrypted) credentials so the user can
+    switch back without re-entering the key. Switching to custom requires a
+    complete saved endpoint; otherwise ValueError (API → 422).
+    """
+    if mode not in MODES:
+        raise ValueError("mode 只能是 auto 或 custom")
+    row = load(uid)
+    if mode == "custom" and not (row.get("base_url") and row.get("api_key")):
+        raise ValueError("请先保存自定义 API URL 和 Key")
+    if not row:
+        return {}  # No row is already implicit auto.
+    pool = _pool()
+    if pool is not None:
+        from .pg import tenant_connection
+        with tenant_connection(pool) as conn:
+            conn.execute("UPDATE v2md_llm_settings SET mode=%s, updated=now() WHERE uid=%s",
+                         (mode, uid))
+        return {**row, "mode": mode}
+    path = _path()
+    with path.with_suffix(".lock").open("a+") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        try:
+            data = json.loads(path.read_text()) if path.exists() else {}
+            if uid in data:
+                data[uid]["mode"] = mode
+                _write_json(path, data)
+        finally:
+            fcntl.flock(lock, fcntl.LOCK_UN)
+    return {**row, "mode": mode}
+
+
+def _uses_custom(row: dict) -> bool:
+    return bool(row.get("base_url") and row.get("api_key")) and row.get("mode", "custom") == "custom"
+
+
 def public(row: dict) -> dict:
+    from .llm import LLM_MODEL
     return {"base_url": row.get("base_url", ""), "model": row.get("model", ""),
             "has_api_key": bool(row.get("api_key")),
-            "configured": bool(row.get("base_url") and row.get("api_key"))}
+            "configured": bool(row.get("base_url") and row.get("api_key")),
+            "mode": "custom" if _uses_custom(row) else "auto",
+            # Only the project model name is exposed; never its URL or key.
+            "system_model": LLM_MODEL}
 
 
 def current() -> dict | None:
@@ -245,7 +300,7 @@ def current() -> dict | None:
 @contextlib.contextmanager
 def user_scope(uid: str):
     row = load(uid) if uid else {}
-    token = _CURRENT.set(row if row.get("base_url") and row.get("api_key") else None)
+    token = _CURRENT.set(row if _uses_custom(row) else None)
     try:
         yield
     finally:

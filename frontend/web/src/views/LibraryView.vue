@@ -3,7 +3,15 @@ import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useLibraryStore } from '../stores/library'
 import { useToastStore } from '../stores/toast'
-import { ApiTimeoutError, ArtifactsExpiredError, getMedia, getNotes, getToc } from '../api'
+import {
+  ApiTimeoutError,
+  ArtifactsExpiredError,
+  acknowledgeBundle,
+  downloadBundle,
+  getMedia,
+  getNotes,
+  getToc,
+} from '../api'
 import type { Book, TocChapter } from '../types'
 import { printNotesAsPdf } from '../pdf'
 import AppHeader from '../components/common/AppHeader.vue'
@@ -78,6 +86,23 @@ function exportErrorMessage(error: unknown, format: string): string {
   return error instanceof Error ? error.message : `${format} 导出失败，请稍后重试`
 }
 
+/** Hand the bytes to the browser without keeping an object URL alive forever. */
+function triggerDownload(blob: Blob, filename: string): void {
+  if (!blob.size) throw new Error('导出文件为空，请重新生成教材后再试')
+  const href = URL.createObjectURL(blob)
+  const anchor = document.createElement('a')
+  anchor.href = href
+  anchor.download = filename
+  anchor.rel = 'noopener'
+  document.body.append(anchor)
+  anchor.click()
+  anchor.remove()
+  // Chromium may start the download asynchronously after click dispatch.
+  // Keep the URL around for one minute, then release it even if the user
+  // leaves the page without completing the native save prompt.
+  window.setTimeout(() => URL.revokeObjectURL(href), 60_000)
+}
+
 async function onExport(format: string) {
   const book = activeBook.value
   if (!book) return
@@ -102,6 +127,30 @@ async function onExport(format: string) {
     return
   }
   if (format !== 'Markdown') {
+    if (format === 'Bundle') {
+      try {
+        toast.show('正在准备整包下载…')
+        const blob = await downloadBundle(book.id)
+        triggerDownload(blob, `video2md-${book.id}.zip`)
+
+        // A successful blob transfer proves the browser received the bundle,
+        // but not that the user kept it. Ask for an explicit confirmation
+        // before ACK burns the server-side copy; cancelling leaves the copy
+        // recoverable until the normal TTL sweeper runs.
+        const confirmed = typeof window.confirm !== 'function' || window.confirm(
+          '整包已交给浏览器下载。确认文件已保存后，立即清理云端副本？',
+        )
+        if (!confirmed) {
+          toast.show('文件仍可重新下载；云端副本会按保留期限自动清理')
+          return
+        }
+        await acknowledgeBundle(book.id)
+        toast.show('整包下载已确认，云端副本已清理')
+      } catch (error) {
+        toast.show(exportErrorMessage(error, '整包'))
+      }
+      return
+    }
     toast.show(`${format} 导出暂未开放，请先选择 Markdown`)
     return
   }
@@ -110,12 +159,7 @@ async function onExport(format: string) {
     if (!notes.length) throw new Error('暂无可导出的笔记')
     const content = notes.map((note) => note.md.trim()).join('\n\n') + '\n'
     const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' })
-    const href = URL.createObjectURL(blob)
-    const anchor = document.createElement('a')
-    anchor.href = href
-    anchor.download = `${book.title.replace(/[\\/:*?"<>|]/g, '_')}.md`
-    anchor.click()
-    URL.revokeObjectURL(href)
+    triggerDownload(blob, `${book.title.replace(/[\\/:*?"<>|]/g, '_')}.md`)
     toast.show('Markdown 已开始下载')
   } catch (error) {
     toast.show(exportErrorMessage(error, 'Markdown'))

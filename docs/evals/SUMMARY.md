@@ -33,6 +33,8 @@
 | `production-postdeploy-regression-eval-set.jsonl` | 10 | 部署后短ID、读写面、去重、产物状态、发布与PDF边界 |
 | `production-acceptance-matrix-2026-10-31.jsonl` | 11 | 本轮生产复测结果、导出证据边界与 B 站未关闭项 |
 
+`real-run-evidence-contract.md` 是真实生产运行证据的格式门禁，不计入离线评测集数量：它要求脱敏的真实 run、五类来源、实际 provider 路由、质量/成本/延迟指标，并明确 `offline_can_close_production=false`。
+
 ## 这些评测拦住的典型线上问题
 
 - **视频源风控**：生产容器经代理访问 B站返回 HTTP 412；YouTube 返回 `Sign in to confirm you're not a bot`。评测回放这些失败，验证错误能被正确归因并反馈给用户，而不是静默失败。
