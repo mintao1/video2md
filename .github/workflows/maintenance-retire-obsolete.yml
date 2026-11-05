@@ -42,6 +42,28 @@ jobs:
             sudo k3s kubectl get all,pvc,ingress,configmap,secret -n "$ns" --ignore-not-found || true
           done
           if [[ "$MODE" == "inspect" ]]; then
+            # Read-only disk inventory: every command below only lists or sizes.
+            echo "=== disk inventory (read-only) ==="
+            hostname
+            df -h / /var/lib/rancher/k3s 2>/dev/null || df -h /
+            echo "--- namespaces / pods ---"
+            sudo k3s kubectl get ns --no-headers | awk '{print $1}' | tr '\n' ' '; echo
+            sudo k3s kubectl get pods -A --no-headers | awk '{print $1, $2, $4}'
+            echo "--- k3s images (in-use marked by crictl ps) ---"
+            sudo k3s crictl images 2>/dev/null | sort -k4 -h || true
+            echo "--- images used by running containers ---"
+            sudo k3s crictl ps -o json 2>/dev/null | grep -o '"image": *"[^"]*"' | sort -u || true
+            echo "--- docker ---"
+            docker system df 2>/dev/null || true
+            docker images --format '{{.Repository}}:{{.Tag}} {{.Size}} {{.CreatedSince}}' 2>/dev/null | head -50 || true
+            echo "--- big directories ---"
+            sudo du -xsh /var/lib/docker /var/lib/rancher/k3s/agent/containerd /var/lib/rancher/k3s/storage /var/log /home/* /root /opt /srv /tmp 2>/dev/null | sort -h || true
+            echo "--- PVC data (local-path) ---"
+            sudo du -sh /var/lib/rancher/k3s/storage/* 2>/dev/null | sort -h || true
+            echo "--- deployment checkouts ---"
+            du -sh ~/stack/* 2>/dev/null | sort -h || true
+            echo "--- home top level ---"
+            sudo du -xsh ~/* ~/.cache 2>/dev/null | sort -h | tail -25 || true
             exit 0
           fi
           for ns in "${DELETE_NAMESPACES[@]}"; do
