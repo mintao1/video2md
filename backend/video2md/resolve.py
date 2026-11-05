@@ -26,6 +26,11 @@ _BARE_HOST_RE = re.compile(r"^(?:www\.)?[\w-]+(?:\.[\w-]+)*\.(?:com|cn|net|org|t
 
 _SHARE_URL_RE = re.compile(r"https?://[^\s一-鿿\"'「」『』<>，。；]+")
 
+# Share links whose first hop is not understood reliably by every yt-dlp
+# version.  Expand them before handing the URL to the site extractor so the
+# resolver sees the canonical page (and can use a site-specific fallback).
+_SHORT_LINK_HOSTS = {"xhslink.com", "v.douyin.com", "b23.tv"}
+
 
 def extract_url(text: str) -> str:
     """剥分享文本取 URL（「复制打开抖音【…】 https://v.douyin.com/xx 其余文案」→ 纯链接）。
@@ -79,13 +84,21 @@ def normalize_url(u: str) -> str:
 
 
 def expand_short_link(u: str) -> str:
-    """抖音/小红书短链先跟随重定向：yt-dlp 的这两个 extractor 只认 www 长链。"""
-    if re.match(r"https?://(xhslink\.com|v\.douyin\.com)/", u):
+    """跟随国内视频站短链，避免生产环境的 extractor 版本差异。
+
+    B站的 ``b23.tv`` 会先跳到 ``www.bilibili.com/video/BV...``；保留最终
+    URL 也让解析失败时能进入 B站公开 API 兜底，而不是把短链当成未知站点。
+    """
+    parsed = urlsplit(u)
+    host = (parsed.hostname or "").rstrip(".").casefold()
+    if parsed.scheme in {"http", "https"} and host in _SHORT_LINK_HOSTS:
         try:
             r = httpx.get(u, follow_redirects=True, timeout=20,
+                          trust_env=False,
                           headers={"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)"})
-            if r.url and str(r.url).startswith("http"):
-                return str(r.url)
+            target = str(r.url) if r.url else ""
+            if target.startswith("http"):
+                return target
         except Exception:
             pass
     return u

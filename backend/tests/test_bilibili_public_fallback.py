@@ -190,6 +190,13 @@ def test_missing_media_fails_instead_of_creating_fake_output(api_transport, tmp_
     assert not list(tmp_path.iterdir())
 
 
+def test_quality_specific_progressive_mp4_format_is_accepted(api_transport, tmp_path):
+    api_transport[1]["playurl"]["data"]["format"] = "mp4720"
+    entry = {"url": URL, "id": "video", "bilibili": {"bvid": "BV1vV411k7GB", "cid": 101}}
+    path, _ = download.download_entry(entry, tmp_path)
+    assert path.read_bytes().startswith(b"\x00\x00\x00\x18ftyp")
+
+
 def test_truncated_media_is_removed(api_transport, tmp_path):
     api_transport[1]["playurl"]["data"]["durl"][0]["size"] = 9000
     entry = {"url": URL, "id": "video", "bilibili": {"bvid": "BV1vV411k7GB", "cid": 101}}

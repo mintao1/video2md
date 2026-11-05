@@ -17,7 +17,7 @@ from urllib.parse import urlsplit
 PROJ = Path(__file__).resolve().parent.parent  # 包目录的上一级 = 项目根（state.json/runs.json/.env 都在根上）
 
 
-MAX_TRANSCRIPT_CHARS = 60000  # 约等于 3 小时密集语音
+MAX_TRANSCRIPT_CHARS = 120000  # 保留长视频完整时间线；note 阶段按模型上下文分段整理
 
 
 LOW_CONF = 0.5
