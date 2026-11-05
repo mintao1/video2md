@@ -283,14 +283,19 @@ def _uses_custom(row: dict) -> bool:
     return bool(row.get("base_url") and row.get("api_key")) and row.get("mode", "custom") == "custom"
 
 
-def public(row: dict) -> dict:
+def system_model_label() -> str:
+    """Auto 模式展示给用户的项目模型名：优先运营配置的展示名，否则回退 LLM_MODEL。"""
     from .llm import LLM_MODEL
+    return config.LLM_DISPLAY_NAME or LLM_MODEL
+
+
+def public(row: dict) -> dict:
     return {"base_url": row.get("base_url", ""), "model": row.get("model", ""),
             "has_api_key": bool(row.get("api_key")),
             "configured": bool(row.get("base_url") and row.get("api_key")),
             "mode": "custom" if _uses_custom(row) else "auto",
             # Only the project model name is exposed; never its URL or key.
-            "system_model": LLM_MODEL}
+            "system_model": system_model_label()}
 
 
 def current() -> dict | None:

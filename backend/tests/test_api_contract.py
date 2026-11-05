@@ -2148,6 +2148,16 @@ def test_llm_mode_auto_keeps_custom_key_and_switches_back(client, llm_settings_p
         assert llm_settings.current()["api_key"] == "carol-secret"
 
 
+def test_llm_auto_mode_shows_configured_display_name(client, llm_settings_path, monkeypatch):
+    from video2md import config, llm
+    put_identity("test", "dave", "uid_dave")
+    dave = {"X-Test-Auth": "dave"}
+    monkeypatch.setattr(config, "LLM_DISPLAY_NAME", "GLM 5.3 Flash")
+    assert client.get("/settings/llm", headers=dave).json()["system_model"] == "GLM 5.3 Flash"
+    monkeypatch.setattr(config, "LLM_DISPLAY_NAME", "")
+    assert client.get("/settings/llm", headers=dave).json()["system_model"] == llm.LLM_MODEL
+
+
 def test_llm_settings_legacy_row_without_mode_stays_custom(llm_settings_path):
     from video2md import llm_settings
     llm_settings.update("uid_legacy_mode", base_url="https://x.example/v1", api_key="k")
