@@ -1,5 +1,7 @@
 # video2md
 
+![video2md](frontend/web/public/promo/promo-hero-landscape.png)
+
 **把一段课程视频，变成一份可以直接阅读的图文文稿。**
 
 粘贴 B 站、YouTube、抖音、小红书链接或上传本地视频，video2md 自动完成转写、抽帧、OCR、关键画面选择和正文整理，产出带时间戳章节、插图、视频片段和完整转录本的文稿，在网页阅读器里阅读或导出。
